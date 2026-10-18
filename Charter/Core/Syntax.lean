@@ -66,6 +66,7 @@ inductive Who (σ : Sig)
   | only   (xs : List σ.Actor)
   | except (xs : List σ.Actor)
   | tagged (pairs : List (σ.Actor × σ.Fact))
+  deriving DecidableEq
 
 /-- Conditions on institutional state and time. -/
 inductive Cond (σ : Sig)
@@ -78,12 +79,13 @@ inductive Cond (σ : Sig)
   | not          (c : Cond σ)
   | and          (a b : Cond σ)
   | or           (a b : Cond σ)
+  deriving DecidableEq
 
 /-- Regulated conduct, kept inspectable. `exerciseOf p` is conduct that
-constitutes a *valid* exercise of power `p` — this is how "outside Law 5,
-Adjudicated Suspension, or Insolvency Termination" is expressed: the same
-physical act (terminate) is excepted when, and only when, it is the valid
-exercise of a named power. -/
+constitutes a *valid* exercise of power `p` — this is how "no party may
+terminate a membership except under the exit or expulsion procedures" is
+expressed: the same physical act (terminate) is excepted when, and only when,
+it is the valid exercise of a named power. -/
 inductive Conduct (σ : Sig)
   | act        (a : σ.Act)
   | anyOf      (as : List σ.Act)
@@ -91,6 +93,7 @@ inductive Conduct (σ : Sig)
   | not        (c : Conduct σ)
   | and        (a b : Conduct σ)
   | or         (a b : Conduct σ)
+  deriving DecidableEq
 
 /-- What a duty demands. A prohibition is breached by doing the conduct.
 A requirement is breached when the deadline (measured from activation)
@@ -98,6 +101,7 @@ passes without the conduct having been done. -/
 inductive Demand (σ : Sig)
   | forbid  (c : Conduct σ)
   | require (c : Conduct σ) (within : Time)
+  deriving DecidableEq
 
 /-- A duty is a first-class normative relationship, not a violation
 predicate. The violation predicate is derived from it in `Semantics`. -/
@@ -115,7 +119,7 @@ structure Duty (σ : Sig) where
   conflict between rules. -/
   unlessCond  : Cond σ := .ff
   /-- Power exceptions: the conduct is not a breach when it is the valid
-  exercise of one of these powers ("outside Law 5, ..."). -/
+  exercise of one of these powers ("except under the exit procedure"). -/
   unlessPower : List String := []
   /-- Explicit precedence ("notwithstanding"): duties that, when active,
   defeat this one. Cycles are rejected by `wellFormed`. -/
@@ -126,6 +130,7 @@ structure Duty (σ : Sig) where
   /-- The remedial facts that an established breach brings into force.
   A finding power for this duty adds exactly these — remedy fidelity. -/
   remedies    : List σ.Fact := []
+  deriving DecidableEq
 
 /-- A power: the ability of its holder, by performing `trigger`, to change
 institutional state — *if* the validity conditions hold. Exercise of a
@@ -143,16 +148,17 @@ structure Power (σ : Sig) where
   addsByActor : List (σ.Actor × σ.Fact) := []
   removes     : List σ.Fact := []
   /-- Facts added only when a condition holds at exercise (evaluated on
-  the pre-state): "a host related to a claimant is *presumed* ..." -/
+  the pre-state): "an operator related to a stakeholder is *presumed* ..." -/
   condAdds    : List (Cond σ × σ.Fact) := []
   /-- If this power is the breach procedure for a duty, name it; the
   interpretation adds that duty's `remedies` on exercise. -/
   establishesBreachOf : Option String := none
+  deriving DecidableEq
 
 /-- A declared immunity: while `active`, the holder cannot be subjected to
 the named powers — those powers are *not validly exercised* against it —
-unless `unlessCond`. This is how "notwithstanding ..., the agent is not
-terminated over its objection" is written: a precedence edge from a
+unless `unlessCond`. This is how "notwithstanding ..., the member is not
+expelled over its objection" is written: a precedence edge from a
 protection to a power. It is deliberately a separate node, not a clause
 of the power's validity condition, so the override is visible as such. -/
 structure Immunity (σ : Sig) where
@@ -162,6 +168,7 @@ structure Immunity (σ : Sig) where
   against    : List String        -- power ids this immunity defeats
   active     : Cond σ
   unlessCond : Cond σ := .ff
+  deriving DecidableEq
 
 /-- A body of law over a signature. -/
 structure Law (σ : Sig) where
@@ -169,6 +176,7 @@ structure Law (σ : Sig) where
   powers     : List (Power σ)
   immunities : List (Immunity σ) := []
   init       : LegalState σ := []
+  deriving DecidableEq
 
 namespace Core
 

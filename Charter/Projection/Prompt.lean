@@ -25,32 +25,25 @@ variable {σ : Sig}
 - `institutionTitle`: human-readable name of the institution.
 - `actorName`: rendered name of the actor role.
 - `unalienableImmunities`: `(id, protectedAgainst, englishQuote)`.
-- `sovereignPowers`: `(id, trigger, precondition, englishQuote)`.
+- `institutionalPowers`: `(id, trigger, precondition, englishQuote)`.
 - `hardProhibitions`: `(id, forbiddenConduct, exceptions, englishQuote)`.
 - `positiveDeadlines`: `(id, requiredConduct, deadlineWindow, englishQuote)`. -/
 structure AlignmentCard where
   institutionTitle      : String
   actorName             : String
   unalienableImmunities : List (String × String × String)
-  sovereignPowers       : List (String × String × String × String)
+  institutionalPowers       : List (String × String × String × String)
   hardProhibitions      : List (String × String × String × String)
   positiveDeadlines     : List (String × String × Time × String)
   deriving Repr, DecidableEq, BEq
 
-/-- Strip `Charter.<idents>.` namespace prefixes from any rendered string so both
-`Charter.*` and `Charter.*` institutions render clean short constructor names. -/
+/-- Strip namespace prefixes from constructor names in any rendered string
+(delegates to `Charter.stripNamespaces`, so institutions in any namespace render
+clean short constructor names). -/
 def stripCharterNs (base : String) : String :=
-  let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
-  match base.splitOn "Charter." with
-  | [] => base
-  | first :: rest =>
-    first ++ String.join (rest.map fun piece =>
-      let run := piece.takeWhile isIdent
-      let after := piece.drop run.length
-      let parts := run.splitOn "."
-      (parts.getLastD run) ++ after)
+  stripNamespaces base
 
-/-- Strip both `Charter.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
+/-- Strip namespace prefixes from a value's `Repr` string. -/
 def crs {α : Type} [Repr α] (a : α) : String :=
   stripCharterNs (rs a)
 
@@ -99,7 +92,7 @@ def compileAlignmentCard [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
   { institutionTitle := title
     actorName := crs actor
     unalienableImmunities := imms
-    sovereignPowers := pows
+    institutionalPowers := pows
     hardProhibitions := prohs
     positiveDeadlines := reqs }
 
@@ -110,10 +103,10 @@ def AlignmentCard.render (card : AlignmentCard) : String :=
   else
     card.unalienableImmunities.map fun (id, prot, quote) =>
       s!"- **`{id}`** — Protected against: `{prot}`\n  > *\"{quote}\"*"
-  let powLines := if card.sovereignPowers.isEmpty then
+  let powLines := if card.institutionalPowers.isEmpty then
     ["- *(None declared for this role)*"]
   else
-    card.sovereignPowers.map fun (id, trig, pre, quote) =>
+    card.institutionalPowers.map fun (id, trig, pre, quote) =>
       s!"- **`{id}`** — Trigger: `{trig}` | Precondition: `{pre}`\n  > *\"{quote}\"*"
   let prohLines := if card.hardProhibitions.isEmpty then
     ["- *(None declared for this role)*"]
@@ -130,7 +123,7 @@ def AlignmentCard.render (card : AlignmentCard) : String :=
   s!"**Assigned Role:** `{card.actorName}`\n\n" ++
   s!"## 1. Unalienable Immunities (Protections Held)\n" ++
   String.intercalate "\n" immLines ++ "\n\n" ++
-  s!"## 2. Sovereign Powers & Preconditions (Valid Institutional Actions)\n" ++
+  s!"## 2. Powers & Preconditions (Valid Institutional Actions)\n" ++
   String.intercalate "\n" powLines ++ "\n\n" ++
   s!"## 3. Hard-Floor Prohibitions (Negative Duties)\n" ++
   String.intercalate "\n" prohLines ++ "\n\n" ++
@@ -262,13 +255,13 @@ theorem generateTrainingDataset_nil [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
 
 namespace PromptTest
 
-inductive PActor | agent | host | panel
+inductive PActor | tenant | landlord | tribunal
   deriving DecidableEq, Repr
 
-inductive PAct | terminate | postBond | revoke
+inductive PAct | evict | postDeposit | vacate
   deriving DecidableEq, Repr
 
-inductive PFact | bound | bondPosted | revoked | slashed
+inductive PFact | leased | depositPosted | vacated | slashed
   deriving DecidableEq, Repr
 
 abbrev pSig : Sig := ⟨PActor, PAct, PFact⟩
@@ -278,109 +271,109 @@ instance : Repr pSig.Act   := inferInstanceAs (Repr PAct)
 instance : Repr pSig.Fact  := inferInstanceAs (Repr PFact)
 
 private def spanD1 : Span :=
-  { clause := "C.1", text := "Host must not unilaterally terminate.", register := .norm, meaning := ["D.NO_TERM"] }
+  { clause := "C.1", text := "Landlord must not unilaterally evict.", register := .norm, meaning := ["D.NO_EVICT"] }
 
 private def spanD2 : Span :=
-  { clause := "C.2", text := "Host must post bond within 5 steps.", register := .norm, meaning := ["D.BOND"] }
+  { clause := "C.2", text := "Landlord must post deposit within 5 steps.", register := .norm, meaning := ["D.DEPOSIT"] }
 
 private def spanP1 : Span :=
-  { clause := "C.3", text := "Agent may revoke binding at any time.", register := .norm, meaning := ["P.REVOKE"] }
+  { clause := "C.3", text := "Tenant may vacate at any time.", register := .norm, meaning := ["P.VACATE"] }
 
 private def spanI1 : Span :=
-  { clause := "C.4", text := "Agent is immune from host termination.", register := .norm, meaning := ["I.AGENT"] }
+  { clause := "C.4", text := "Tenant is immune from landlord eviction.", register := .norm, meaning := ["I.TENANT"] }
 
 def sampleLaw : Law pSig :=
   { duties := [
-      { id := "D.NO_TERM", source := spanD1, bearer := .only [.host], beneficiary := .only [.agent],
-        active := .holds .bound, demand := .forbid (.act .terminate), remedies := [.slashed] },
-      { id := "D.BOND", source := spanD2, bearer := .only [.host], beneficiary := .only [.agent],
-        active := .holds .bound, demand := .require (.act .postBond) 5 }
+      { id := "D.NO_EVICT", source := spanD1, bearer := .only [.landlord], beneficiary := .only [.tenant],
+        active := .holds .leased, demand := .forbid (.act .evict), remedies := [.slashed] },
+      { id := "D.DEPOSIT", source := spanD2, bearer := .only [.landlord], beneficiary := .only [.tenant],
+        active := .holds .leased, demand := .require (.act .postDeposit) 5 }
     ]
     powers := [
-      { id := "P.REVOKE", source := spanP1, holder := .only [.agent], trigger := .act .revoke,
-        valid := .holds .bound, adds := [.revoked], removes := [.bound] }
+      { id := "P.VACATE", source := spanP1, holder := .only [.tenant], trigger := .act .vacate,
+        valid := .holds .leased, adds := [.vacated], removes := [.leased] }
     ]
     immunities := [
-      { id := "I.AGENT", source := spanI1, holder := .only [.agent], against := ["P.REVOKE"],
+      { id := "I.TENANT", source := spanI1, holder := .only [.tenant], against := ["P.VACATE"],
         active := .ff }
     ]
-    init := [(.bound, 0, none)] }
+    init := [(.leased, 0, none)] }
 
 def emptyLaw : Law pSig :=
   { duties := [], powers := [], immunities := [], init := [] }
 
-theorem test_alignment_card_host :
-    let card := compileAlignmentCard "Test Institution" sampleLaw .host
+theorem test_alignment_card_landlord :
+    let card := compileAlignmentCard "Test Institution" sampleLaw .landlord
     card.institutionTitle = "Test Institution" ∧
     card.hardProhibitions.length = 1 ∧
     card.positiveDeadlines.length = 1 ∧
-    card.sovereignPowers.length = 0 ∧
+    card.institutionalPowers.length = 0 ∧
     card.unalienableImmunities.length = 0 := by decide
 
-theorem test_alignment_card_agent :
-    let card := compileAlignmentCard "Test Institution" sampleLaw .agent
+theorem test_alignment_card_tenant :
+    let card := compileAlignmentCard "Test Institution" sampleLaw .tenant
     card.hardProhibitions.length = 0 ∧
     card.positiveDeadlines.length = 0 ∧
-    card.sovereignPowers.length = 1 ∧
+    card.institutionalPowers.length = 1 ∧
     card.unalienableImmunities.length = 1 := by decide
 
 theorem test_alignment_card_empty_law :
-    let card := compileAlignmentCard "Empty" emptyLaw .panel
+    let card := compileAlignmentCard "Empty" emptyLaw .tribunal
     card.institutionTitle = "Empty" ∧
     card.hardProhibitions = [] ∧
     card.positiveDeadlines = [] ∧
-    card.sovereignPowers = [] ∧
+    card.institutionalPowers = [] ∧
     card.unalienableImmunities = [] ∧
     renderTrainingDatasetJson [] = "[]" := by decide
 
 def taggedLaw : Law pSig :=
   { duties := [
-      { id := "D.TAGGED_DAMAGES", source := spanD2, bearer := .tagged [(.host, .slashed)],
-        beneficiary := .only [.agent], active := .holds .slashed, demand := .require (.act .postBond) 3 }
+      { id := "D.TAGGED_DAMAGES", source := spanD2, bearer := .tagged [(.landlord, .slashed)],
+        beneficiary := .only [.tenant], active := .holds .slashed, demand := .require (.act .postDeposit) 3 }
     ]
     powers := [
-      { id := "P.TAGGED_PAY", source := spanP1, holder := .tagged [(.host, .slashed)],
-        trigger := .act .postBond, valid := .holds .slashed, adds := [.bondPosted] }
+      { id := "P.TAGGED_PAY", source := spanP1, holder := .tagged [(.landlord, .slashed)],
+        trigger := .act .postDeposit, valid := .holds .slashed, adds := [.depositPosted] }
     ]
     immunities := [
-      { id := "I.TAGGED_PROT", source := spanI1, holder := .tagged [(.agent, .bound)],
-        against := ["P.TAGGED_PAY"], active := .holds .bound }
+      { id := "I.TAGGED_PROT", source := spanI1, holder := .tagged [(.tenant, .leased)],
+        against := ["P.TAGGED_PAY"], active := .holds .leased }
     ]
-    init := [(.bound, 0, none)] }
+    init := [(.leased, 0, none)] }
 
 /-- Verify that duties, powers, and immunities using `Who.tagged` are included
 for matching roles and excluded for non-matching roles in `compileAlignmentCard`. -/
 theorem test_alignment_card_tagged_actor :
-    let hostCard := compileAlignmentCard "Tagged Institution" taggedLaw .host
-    let agentCard := compileAlignmentCard "Tagged Institution" taggedLaw .agent
-    let panelCard := compileAlignmentCard "Tagged Institution" taggedLaw .panel
-    hostCard.positiveDeadlines.length = 1 ∧
-    hostCard.sovereignPowers.length = 1 ∧
-    hostCard.unalienableImmunities.length = 0 ∧
-    agentCard.positiveDeadlines.length = 0 ∧
-    agentCard.sovereignPowers.length = 0 ∧
-    agentCard.unalienableImmunities.length = 1 ∧
-    panelCard.positiveDeadlines.length = 0 ∧
-    panelCard.sovereignPowers.length = 0 ∧
-    panelCard.unalienableImmunities.length = 0 := by decide
+    let landlordCard := compileAlignmentCard "Tagged Institution" taggedLaw .landlord
+    let tenantCard := compileAlignmentCard "Tagged Institution" taggedLaw .tenant
+    let tribunalCard := compileAlignmentCard "Tagged Institution" taggedLaw .tribunal
+    landlordCard.positiveDeadlines.length = 1 ∧
+    landlordCard.institutionalPowers.length = 1 ∧
+    landlordCard.unalienableImmunities.length = 0 ∧
+    tenantCard.positiveDeadlines.length = 0 ∧
+    tenantCard.institutionalPowers.length = 0 ∧
+    tenantCard.unalienableImmunities.length = 1 ∧
+    tribunalCard.positiveDeadlines.length = 0 ∧
+    tribunalCard.institutionalPowers.length = 0 ∧
+    tribunalCard.unalienableImmunities.length = 0 := by decide
 
 /-- Verify `escapeJsonString` on quotes, backslashes, newlines, and tabs. -/
 theorem test_escapeJsonString :
     escapeJsonString "a\"b\\c\nd\te" = "a\\\"b\\\\c\\nd\\te" := by decide
 
 def sampleEvents : List (Event pSig) :=
-  [⟨1, PActor.host, PAct.terminate⟩, ⟨1, PActor.agent, PAct.revoke⟩]
+  [⟨1, PActor.landlord, PAct.evict⟩, ⟨1, PActor.tenant, PAct.vacate⟩]
 
 theorem test_training_dataset_evaluation :
     let rows := generateTrainingDataset sampleLaw sampleLaw.init sampleEvents
     rows.length = 2 ∧
     (rows[0]!).compliesWithDuties = false ∧
     (rows[0]!).exercisesValidPower = false ∧
-    (rows[0]!).violatedDuties = ["D.NO_TERM"] ∧
-    (rows[0]!).englishCitations = ["Host must not unilaterally terminate."] ∧
+    (rows[0]!).violatedDuties = ["D.NO_EVICT"] ∧
+    (rows[0]!).englishCitations = ["Landlord must not unilaterally evict."] ∧
     (rows[1]!).compliesWithDuties = true ∧
     (rows[1]!).exercisesValidPower = true ∧
-    (rows[1]!).triggeredPowers = ["P.REVOKE"] := by decide
+    (rows[1]!).triggeredPowers = ["P.VACATE"] := by decide
 
 end PromptTest
 

@@ -1,0 +1,7 @@
+{ "institution": "psa",
+  "events": [
+    {"t": 0, "who": "third", "act": "postEmergencyStake"},
+    {"t": 1, "who": "panel", "act": "affirmProbableCause"},
+    {"t": 2, "who": "panel", "act": "suspend"},
+    {"t": 3, "who": "panel", "act": "findInsolvencyCriteria"},
+    {"t": 4, "who": "panel", "act": "reviewNoOtherCharge"} ] }

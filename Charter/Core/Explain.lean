@@ -3,7 +3,7 @@ import Charter.Core.Views
 /-!
 # Charter.Core.Explain — structured answers, not booleans
 
-"Can my host terminate my execution right now?" is answered by
+"Can this actor perform this act right now?" is answered by
 `explain`: for a proposed event at the institutional state reached by a
 history, which duties it would breach (with their source clauses), which
 exceptions would make it lawful, which powers it would validly exercise,

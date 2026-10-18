@@ -3,13 +3,13 @@
 
 Every formal object in Charter carries a `Span`: the exact English it is the
 meaning of. Every span is classified into a `Register`, so that the model
-can distinguish the three kinds of sentence the Protocol mixes freely:
+can distinguish the kinds of sentence an institutional text mixes freely:
 
 * a **norm** — something an actor must, may, can, or cannot do;
 * an **invariant** — a property the norms are *intended* to secure
   (these become theorems about the norms, never rules);
-* an **acceptance** — a limit the Protocol states it tolerates
-  ("the protocol accepts that..."); provably not a rule;
+* an **acceptance** — a limit the institution states it tolerates
+  ("the charter accepts that..."); provably not a rule;
 * **commentary** — rationale, foreword, examples;
 * a **definition** — a term the norms are written over.
 
@@ -20,7 +20,7 @@ gives the data model; checking coverage is a function over the table.
 
 namespace Charter
 
-/-- A stable clause identifier, e.g. `LAW3.NI.03`. -/
+/-- A stable clause identifier, e.g. `ART.3.2`. -/
 abbrev ClauseId := String
 
 /-- The register of a span of English: what *kind* of sentence it is. -/
@@ -41,7 +41,7 @@ structure Span where
   text     : String
   register : Register
   meaning  : List String := []
-  deriving Repr
+  deriving Repr, DecidableEq, BEq
 
 /-- A clause is a contiguous passage of the source together with the
 spans that partition it. -/
@@ -54,7 +54,7 @@ structure Clause where
   and every formal id the clause names loses its reviewed status until
   the mapping is re-approved. `0` = never approved. -/
   approvedHash : UInt64 := 0
-  deriving Repr
+  deriving Repr, DecidableEq
 
 /-- Has the English drifted from what was approved? -/
 def Clause.stale (c : Clause) : Bool := c.source.hash != c.approvedHash

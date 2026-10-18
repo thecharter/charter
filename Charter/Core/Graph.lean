@@ -16,15 +16,15 @@ namespace Charter
 /-! ## 1. Affiliation / Related-Party Graph & Attestation-Independent Relatedness -/
 
 /-- A relationship record between two parties (`partyA` and `partyB`), tracking
-four structural criteria of relatedness (`sharesLineage`,
-`commonBeneficialControl`, `isOriginatorOrClaimant`, `economicallyDependent`)
+four structural criteria of relatedness (`sharesGroup`,
+`commonBeneficialControl`, `isFounderOrStakeholder`, `economicallyDependent`)
 alongside `attested : Bool` (which never establishes or defeats relatedness). -/
 structure RelatedPartyEdge where
   partyA                  : Nat
   partyB                  : Nat
-  sharesLineage           : Bool := false
+  sharesGroup           : Bool := false
   commonBeneficialControl : Bool := false
-  isOriginatorOrClaimant  : Bool := false
+  isFounderOrStakeholder  : Bool := false
   economicallyDependent   : Bool := false
   attested                : Bool := false
   deriving DecidableEq, Repr, Inhabited
@@ -41,8 +41,8 @@ abbrev AffiliationGraph := RelatedPartyGraph
 /-- Whether a `RelatedPartyEdge` satisfies at least one of the four structural
 relatedness criteria (independent of `e.attested`). -/
 def RelatedPartyEdge.hasRelation (e : RelatedPartyEdge) : Bool :=
-  e.sharesLineage || e.commonBeneficialControl ||
-  e.isOriginatorOrClaimant || e.economicallyDependent
+  e.sharesGroup || e.commonBeneficialControl ||
+  e.isFounderOrStakeholder || e.economicallyDependent
 
 /-- Whether edge `e` witnesses a relatedness link between `a` and `b` in either
 direction. -/

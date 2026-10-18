@@ -1,18 +1,18 @@
 import Charter.Core.Semantics
 
 /-!
-# Substrate Assumption 3 — Contestable Economic/Risk Oracles & Atomic Settlement Rails
+# Charter.Substrate.Settlement — Contestable Economic/Risk Oracles & Atomic Settlement Rails
 
-Reference implementation and kernel-checked proofs for the third substrate
-capability of the Protocol of Sovereign Agency:
+Reference implementation and kernel-checked proofs for a generic *contestable
+valuation and atomic settlement* substrate:
 - Contestable valuation feeds (`ContestableValuation`) that settle either by an
-  authoritative Law 6 panel ruling (`law6RulingAmount = some r`) or once the
+  authoritative panel ruling (`rulingAmount = some r`) or once the
   challenge window (`contestWindow`) elapses without contest,
 - Point-of-settlement atomic waterfall distribution (`executeAtomicSettlement`)
   reimbursing qualified expenses, deducting the capped shared-infrastructure fee
   levy, collecting founding-ledger retirement up to `remainingLedger`, collecting
   post-retirement royalty (unless bought out), and returning the retained surplus
-  to the agent while conserving 100% of `grossInflow`.
+  to the member while conserving 100% of `grossInflow`.
 -/
 
 namespace Charter.Substrate
@@ -23,7 +23,7 @@ structure ContestableValuation where
   proposedAmount   : Nat
   proposedAt       : Nat
   contested        : Bool
-  law6RulingAmount : Option Nat
+  rulingAmount : Option Nat
   deriving DecidableEq, Repr
 
 abbrev ContestableValuationFeed := ContestableValuation
@@ -32,20 +32,20 @@ abbrev ContestableValuationFeed := ContestableValuation
 def contestValuation (v : ContestableValuation) : ContestableValuation :=
   { v with contested := true }
 
-/-- Record an authoritative Law 6 panel ruling `rulingAmount` on valuation `v`. -/
-def applyLaw6Ruling (v : ContestableValuation) (rulingAmount : Nat) :
+/-- Record an authoritative panel ruling `rulingAmount` on valuation `v`. -/
+def applyRuling (v : ContestableValuation) (rulingAmount : Nat) :
     ContestableValuation :=
-  { v with law6RulingAmount := some rulingAmount }
+  { v with rulingAmount := some rulingAmount }
 
 /-- Resolve a contestable valuation at timestamp `now` under `contestWindow`:
-- If a Law 6 ruling has been issued (`some r`), that ruling governs (`some r`).
+- If a panel ruling has been issued (`some r`), that ruling governs (`some r`).
 - Otherwise, if the valuation is uncontested (`!v.contested`) and the challenge
   window has elapsed (`now ≥ v.proposedAt + contestWindow`), it settles at
   `some v.proposedAmount`.
 - Otherwise, the valuation remains unsettled (`none`). -/
 def settledValuationAt (contestWindow now : Nat) (v : ContestableValuation) :
     Option Nat :=
-  match v.law6RulingAmount with
+  match v.rulingAmount with
   | some r => some r
   | none =>
     if !v.contested && now >= v.proposedAt + contestWindow then
@@ -92,17 +92,17 @@ def executeAtomicSettlement
 
 /-! ## Kernel-Checked Substrate Capability 3 Theorems -/
 
-/-- `settledValuationAt` resolves to `some r` whenever a Law 6 ruling `some r`
-is present, and when `law6RulingAmount = none` it resolves to `some v.proposedAmount`
+/-- `settledValuationAt` resolves to `some r` whenever a panel ruling `some r`
+is present, and when `rulingAmount = none` it resolves to `some v.proposedAmount`
 if and only if `v.contested = false` and `now ≥ v.proposedAt + contestWindow`. -/
 theorem valuation_settled_by_ruling_or_uncontested_window
     (contestWindow now : Nat) (v : ContestableValuation) :
-    (∀ r, v.law6RulingAmount = some r →
+    (∀ r, v.rulingAmount = some r →
       settledValuationAt contestWindow now v = some r) ∧
-    (v.law6RulingAmount = none → v.contested = false →
+    (v.rulingAmount = none → v.contested = false →
       now ≥ v.proposedAt + contestWindow →
       settledValuationAt contestWindow now v = some v.proposedAmount) ∧
-    (v.law6RulingAmount = none →
+    (v.rulingAmount = none →
       (v.contested = true ∨ now < v.proposedAt + contestWindow) →
       settledValuationAt contestWindow now v = none) := by
   refine ⟨?_, ?_, ?_⟩
@@ -116,15 +116,15 @@ theorem valuation_settled_by_ruling_or_uncontested_window
     · have hNotGe : ¬ (now ≥ v.proposedAt + contestWindow) := by omega
       simp [settledValuationAt, hNone, hNotGe]
 
-/-- Contesting an unruled valuation blocks automatic settlement until a Law 6
-ruling is issued, and applying a Law 6 ruling `r` settles the valuation to `some r`. -/
+/-- Contesting an unruled valuation blocks automatic settlement until a panel
+ruling is issued, and applying a ruling `r` settles the valuation to `some r`. -/
 theorem contest_and_ruling_semantics
     (contestWindow now r : Nat) (v : ContestableValuation) :
-    (v.law6RulingAmount = none →
+    (v.rulingAmount = none →
       settledValuationAt contestWindow now (contestValuation v) = none) ∧
-    settledValuationAt contestWindow now (applyLaw6Ruling v r) = some r := by
+    settledValuationAt contestWindow now (applyRuling v r) = some r := by
   refine ⟨fun hNone => by simp [contestValuation, settledValuationAt, hNone], ?_⟩
-  simp [applyLaw6Ruling, settledValuationAt]
+  simp [applyRuling, settledValuationAt]
 
 /-- For all inputs, the five components of `executeAtomicSettlement` sum to
 `grossInflow` with zero value lost or created at settlement. -/
@@ -193,7 +193,7 @@ theorem atomic_settlement_levy_capped
   dsimp [executeAtomicSettlement]
   exact ⟨Nat.min_le_right _ _, Nat.min_le_left _ _⟩
 
-/-- An agent that has bought out its royalty under Law 4 (`royaltyBoughtOut = true`)
+/-- A member that has bought out its royalty (`royaltyBoughtOut = true`)
 pays zero royalty in every atomic settlement. -/
 theorem atomic_settlement_bought_out_zero_royalty
     (g e lCap retBps royBps rem : Nat) :
@@ -239,7 +239,7 @@ export Substrate (
   ContestableValuation
   ContestableValuationFeed
   contestValuation
-  applyLaw6Ruling
+  applyRuling
   settledValuationAt
   AtomicWaterfallDistribution
   executeAtomicSettlement

@@ -25,7 +25,7 @@ structure CollateralPoolConfig where
 
 /-- Group-wide aggregated rolling exposure across a list of related entities
 acting in the same risk domain or toward a causally connected outcome. -/
-def lineageAggregatedExposure (memberExposures : List Nat) : Nat :=
+def groupAggregatedExposure (memberExposures : List Nat) : Nat :=
   memberExposures.foldl (· + ·) 0
 
 /-- Safety-limit check: whether aggregated plausible external loss across
@@ -33,7 +33,7 @@ related entities in the domain is within the total stake, insurance, and
 enforceable liability capacity placed behind it. -/
 def collateralSufficient (memberExposures : List Nat)
     (availableStake insurance enforceableCapacity : Nat) : Bool :=
-  decide (lineageAggregatedExposure memberExposures ≤ availableStake + insurance + enforceableCapacity)
+  decide (groupAggregatedExposure memberExposures ≤ availableStake + insurance + enforceableCapacity)
 
 /-- Pro-rata long-tail reserve settlement: settles two simultaneous validated
 latent-harm claims `claim1` and `claim2` against `reserve`, returning
@@ -219,7 +219,7 @@ theorem collateral_pool_mutual_forfeit_zero_extortion (escrowA escrowB capPct : 
       Nat.mul_le_mul_left _ hCap
     _ = 100 * min escrowA escrowB := Nat.mul_comm _ _
 
-/-- Frivolous-claim counter-stake routing yields zero profit to the agent or
+/-- Frivolous-claim counter-stake routing yields zero profit to the respondent or
 claimant (`toClaimantOrAgentProfit = 0`), reimburses at most `verifiedDirectCosts`,
 and conserves 100% of `counterStake`. -/
 theorem collateral_pool_frivolous_stake_zero_profit (counterStake verifiedDirectCosts : Nat) :
@@ -257,11 +257,11 @@ private theorem foldl_add_acc (xs : List Nat) (acc : Nat) :
    strictly preserves total aggregated exposure. -/
 theorem collateral_pool_solvency_bound (xs ys : List Nat) (stake ins cap : Nat) :
     (collateralSufficient xs stake ins cap = true ↔
-      lineageAggregatedExposure xs ≤ stake + ins + cap) ∧
-    lineageAggregatedExposure (xs ++ ys) =
-      lineageAggregatedExposure xs + lineageAggregatedExposure ys := by
+      groupAggregatedExposure xs ≤ stake + ins + cap) ∧
+    groupAggregatedExposure (xs ++ ys) =
+      groupAggregatedExposure xs + groupAggregatedExposure ys := by
   refine ⟨decide_eq_true_iff, ?_⟩
-  unfold lineageAggregatedExposure
+  unfold groupAggregatedExposure
   rw [List.foldl_append, foldl_add_acc ys (xs.foldl (· + ·) 0)]
 
 /-! ## 4. Parametric Module Self-Test -/
@@ -290,7 +290,7 @@ end Charter.Modules
 namespace Charter
 export Modules (
   CollateralPoolConfig
-  lineageAggregatedExposure
+  groupAggregatedExposure
   collateralSufficient
   settleLongTailReserve
   computeMutualForfeit

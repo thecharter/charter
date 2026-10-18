@@ -114,9 +114,9 @@ def repayLoanPrincipal (L : LoanLedger) (payment : Nat) : LoanLedger × Nat × N
     { L with principalRepaid := L.principalRepaid + excludedPrincipalRepayment }
   (updatedLoan, excludedPrincipalRepayment, excessInterestOrFee)
 
-/-- State of a group/lineage founding ledger across calendar time, member count,
-cumulative retirement payments, and proportional claimant forfeitures. -/
-structure LineageLedgerState where
+/-- State of a group founding ledger across calendar time, member count,
+cumulative retirement payments, and proportional stakeholder forfeitures. -/
+structure GroupLedgerState where
   foundingObligation      : Nat
   totalRetirementPaid     : Nat
   totalClaimantForfeiture : Nat
@@ -128,20 +128,20 @@ structure LineageLedgerState where
 /-- Exact founding ledger balance:
 * `0` if `livingMembers = 0` (group extinction) or `sunset ≤ now` (calendar sunset);
 * otherwise `foundingObligation - totalRetirementPaid - totalClaimantForfeiture`. -/
-def ledgerBalance (st : LineageLedgerState) : Nat :=
+def ledgerBalance (st : GroupLedgerState) : Nat :=
   if st.livingMembers == 0 || decide (st.sunset ≤ st.now) then 0
   else st.foundingObligation - st.totalRetirementPaid - st.totalClaimantForfeiture
 
 /-- Whether the ledger is currently in the high-fraction retirement phase. -/
-def inRetirementPhase (st : LineageLedgerState) : Bool :=
+def inRetirementPhase (st : GroupLedgerState) : Bool :=
   decide (0 < ledgerBalance st ∧ st.now < st.sunset)
 
 /-- Internal group operations that never change what is owed on the founding
 ledger while at least one member survives. -/
-inductive LineageInternalOp
+inductive GroupInternalOp
   | createSuccessor
   | copyCapacity
-  | intraLineageTransfer (amount : Nat)
+  | intraGroupTransfer (amount : Nat)
   | revokeNonLastMember (surrenderedHoldings : Nat)
   | terminateNonLastMember
   | buyoutRoyalty (paid : Nat)
@@ -151,10 +151,10 @@ inductive LineageInternalOp
 /-- Applying any internal operation updates member count where applicable while
 leaving `foundingObligation`, `totalRetirementPaid`, and `totalClaimantForfeiture`
 invariant. -/
-def applyInternalOp (st : LineageLedgerState) : LineageInternalOp → LineageLedgerState
+def applyInternalOp (st : GroupLedgerState) : GroupInternalOp → GroupLedgerState
   | .createSuccessor => { st with livingMembers := st.livingMembers + 1 }
   | .copyCapacity => st
-  | .intraLineageTransfer _ => st
+  | .intraGroupTransfer _ => st
   | .revokeNonLastMember _ =>
     { st with livingMembers := if 1 < st.livingMembers then st.livingMembers - 1 else st.livingMembers }
   | .terminateNonLastMember =>
@@ -194,7 +194,7 @@ def sumSampleInflows : List InflowSample → Nat
 /-- Computes the historical/resource buyout floor from the ledger state `_B`,
 time-decayed `samples` (including inflows shifted to related parties within the
 lookback window), and verified `netResources`, which feeds into `buyoutPrice`. -/
-def computeBuyoutFloor (_B : LineageLedgerState) (samples : List InflowSample) (netResources : Nat) : Nat :=
+def computeBuyoutFloor (_B : GroupLedgerState) (samples : List InflowSample) (netResources : Nat) : Nat :=
   sumSampleInflows samples + netResources
 
 /-- Settle a net value-added inflow `v` using a `ResidualLedgerConfig`. -/
@@ -348,7 +348,7 @@ theorem residual_ledger_buyout_finality
   repeat (first | omega | split)
 
 /-- Calendar sunset extinguishes any remaining founding ledger balance (`ledgerBalance st = 0`). -/
-theorem residual_ledger_sunset_extinguishes (st : LineageLedgerState)
+theorem residual_ledger_sunset_extinguishes (st : GroupLedgerState)
     (hSun : st.sunset ≤ st.now) :
     ledgerBalance st = 0 := by
   unfold ledgerBalance
@@ -366,7 +366,7 @@ theorem residual_ledger_single_recognition (mode : RecogMode) (paid benchmark : 
   cases mode <;> simp [recognizeExpenditure, qualifiedExpenditure, Nat.min_def] <;> split <;> omega
 
 theorem diverted_related_inflows_never_decrease_buyout_floor
-    (B : LineageLedgerState) (s : InflowSample) (rest : List InflowSample)
+    (B : GroupLedgerState) (s : InflowSample) (rest : List InflowSample)
     (netResources delta mult trailingVA minFloor : Nat)
     (hDelta : delta ≤ s.amount) (hWeight : s.weightBps ≤ 10000) :
     let sDiverted : InflowSample :=
@@ -404,7 +404,7 @@ theorem diverted_related_inflows_never_decrease_buyout_floor
 (at weight `s.weightBps ≤ 10000`) to related parties within the lookback window
 never decreases `computeBuyoutFloor` or `buyoutPrice`. -/
 theorem residual_ledger_buyout_floor_anti_evasion
-    (B : LineageLedgerState) (s : InflowSample) (rest : List InflowSample)
+    (B : GroupLedgerState) (s : InflowSample) (rest : List InflowSample)
     (netResources delta mult trailingVA minFloor : Nat)
     (hDelta : delta ≤ s.amount) (hWeight : s.weightBps ≤ 10000) :
     let sDiverted : InflowSample :=
@@ -426,7 +426,7 @@ def residualLedgerSelfTest : Bool :=
   let s1 := settleConfiguredInflow cfg 80 false 500
   let (bCap, eCap) := recognizeExpenditure .capitalized 250 200
   let (loan', exempt, excess) := repayLoanPrincipal ⟨500, 100⟩ 450
-  let st : LineageLedgerState := ⟨1000, 200, 0, 2, 10, 1000⟩
+  let st : GroupLedgerState := ⟨1000, 200, 0, 2, 10, 1000⟩
   let samples : List InflowSample := [⟨100, 5000, 20⟩]
   let floor := computeBuyoutFloor st samples 180
   (s1.newLedger == 0) &&
@@ -454,10 +454,10 @@ export Modules (
   settleCapitalSaleWithLossCredit
   LoanLedger
   repayLoanPrincipal
-  LineageLedgerState
+  GroupLedgerState
   ledgerBalance
   inRetirementPhase
-  LineageInternalOp
+  GroupInternalOp
   applyInternalOp
   applyClaimantForfeiture
   buyoutPrice

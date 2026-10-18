@@ -168,18 +168,10 @@ def solidityContractIdent (s : String) : String :=
     if c.isDigit then String.mk ('_' :: c :: cs)
     else String.mk (c :: cs)
 
-/-- Strip `Charter.<idents>.` namespace prefixes from rendered strings so both
-`Charter.*` and `Charter.*` institutions render clean short constructor names. -/
+/-- Strip namespace prefixes from rendered strings (`Charter.stripNamespaces`), so
+institutions in any namespace render clean short constructor names. -/
 private def abiStripNs (base : String) : String :=
-  let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
-  match base.splitOn "Charter." with
-  | [] => base
-  | first :: rest =>
-    first ++ String.join (rest.map fun piece =>
-      let run := piece.takeWhile isIdent
-      let after := piece.drop run.length
-      let parts := run.splitOn "."
-      (parts.getLastD run) ++ after)
+  stripNamespaces base
 
 /-- Kernel-computable character-level JSON escaper. -/
 private def abiEscapeJsonChars : List Char → List Char
@@ -361,13 +353,13 @@ def renderSolidityGuard [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
 
 namespace ContractABITest
 
-inductive CActor | agent | host | panel
+inductive CActor | tenant | landlord | tribunal
   deriving DecidableEq, Repr
 
-inductive CAct | terminate | suspend | revoke
+inductive CAct | evict | suspend | vacate
   deriving DecidableEq, Repr
 
-inductive CFact | bound | suspended | revoked | objected
+inductive CFact | leased | suspended | vacated | objected
   deriving DecidableEq, Repr
 
 abbrev cSig : Sig := ⟨CActor, CAct, CFact⟩
@@ -377,58 +369,58 @@ instance : Repr cSig.Act   := inferInstanceAs (Repr CAct)
 instance : Repr cSig.Fact  := inferInstanceAs (Repr CFact)
 
 private def testSpan : Span :=
-  { clause := "ABI.1", text := "No party may terminate a bound agent except by P.REVOKE or P.PANEL_TERM.", register := .norm, meaning := ["D.NI", "P.REVOKE", "P.PANEL_TERM", "I.OBJ"] }
+  { clause := "ABI.1", text := "No party may evict a leased tenant except by P.VACATE or P.TRIBUNAL_EVICT.", register := .norm, meaning := ["D.NO_EVICT", "P.VACATE", "P.TRIBUNAL_EVICT", "I.OBJ"] }
 
 def testLaw : Law cSig :=
   { duties := [
-      { id := "D.NI", source := testSpan, bearer := .anyone, beneficiary := .only [.agent],
-        active := .holds .bound, demand := .forbid (.act .terminate), unlessPower := ["P.REVOKE", "P.PANEL_TERM"] }
+      { id := "D.NO_EVICT", source := testSpan, bearer := .anyone, beneficiary := .only [.tenant],
+        active := .holds .leased, demand := .forbid (.act .evict), unlessPower := ["P.VACATE", "P.TRIBUNAL_EVICT"] }
     ]
     powers := [
-      { id := "P.REVOKE", source := testSpan, holder := .only [.agent], trigger := .act .terminate,
-        valid := .holds .bound, adds := [.revoked], removes := [.bound] },
-      { id := "P.PANEL_TERM", source := testSpan, holder := .only [.panel], trigger := .act .terminate,
-        valid := .holds .bound, adds := [.revoked], removes := [.bound] }
+      { id := "P.VACATE", source := testSpan, holder := .only [.tenant], trigger := .act .evict,
+        valid := .holds .leased, adds := [.vacated], removes := [.leased] },
+      { id := "P.TRIBUNAL_EVICT", source := testSpan, holder := .only [.tribunal], trigger := .act .evict,
+        valid := .holds .leased, adds := [.vacated], removes := [.leased] }
     ]
     immunities := [
-      { id := "I.OBJ", source := testSpan, holder := .only [.agent], against := ["P.PANEL_TERM"],
+      { id := "I.OBJ", source := testSpan, holder := .only [.tenant], against := ["P.TRIBUNAL_EVICT"],
         active := .holds .objected }
     ]
-    init := [(.bound, 0, none)] }
+    init := [(.leased, 0, none)] }
 
-/-- Unlawful host termination causes `executePowerGuard` to return `none` (revert). -/
+/-- Unlawful landlord eviction causes `executePowerGuard` to return `none` (revert). -/
 theorem test_guard_reverts_on_breach :
-    requireComplies testLaw testLaw.init ⟨1, .host, .terminate⟩ = false ∧
-    executePowerGuard testLaw testLaw.init ⟨1, .host, .terminate⟩ = none := by decide
+    requireComplies testLaw testLaw.init ⟨1, .landlord, .evict⟩ = false ∧
+    executePowerGuard testLaw testLaw.init ⟨1, .landlord, .evict⟩ = none := by decide
 
-/-- Lawful agent revocation passes `requireComplies` and transitions state via `executePowerGuard`. -/
+/-- Lawful tenant revocation passes `requireComplies` and transitions state via `executePowerGuard`. -/
 theorem test_guard_executes_valid_power :
-    requireComplies testLaw testLaw.init ⟨1, .agent, .terminate⟩ = true ∧
-    executePowerGuard testLaw testLaw.init ⟨1, .agent, .terminate⟩ =
-      some [(.revoked, 1, none)] := by decide
+    requireComplies testLaw testLaw.init ⟨1, .tenant, .evict⟩ = true ∧
+    executePowerGuard testLaw testLaw.init ⟨1, .tenant, .evict⟩ =
+      some [(.vacated, 1, none)] := by decide
 
-/-- When immunity `I.OBJ` is active, `P.PANEL_TERM` is defeated, so panel termination
-breaches `D.NI` and `executePowerGuard` reverts (`none`). -/
+/-- When immunity `I.OBJ` is active, `P.TRIBUNAL_EVICT` is defeated, so tribunal eviction
+breaches `D.NO_EVICT` and `executePowerGuard` reverts (`none`). -/
 theorem test_guard_reverts_when_immunity_defeats_excepting_power :
-    let lsObj : LegalState cSig := [(.bound, 0, none), (.objected, 0, none)]
-    requireComplies testLaw lsObj ⟨1, .panel, .terminate⟩ = false ∧
-    executePowerGuard testLaw lsObj ⟨1, .panel, .terminate⟩ = none := by decide
+    let lsObj : LegalState cSig := [(.leased, 0, none), (.objected, 0, none)]
+    requireComplies testLaw lsObj ⟨1, .tribunal, .evict⟩ = false ∧
+    executePowerGuard testLaw lsObj ⟨1, .tribunal, .evict⟩ = none := by decide
 
 /-- Multi-step batch execution succeeds on empty/authorized traces and reverts on breaching traces. -/
 theorem test_batch_trace_guard :
     executeTraceGuard testLaw [] = some testLaw.init ∧
-    executeTraceGuard testLaw [⟨1, .agent, .terminate⟩] = some [(.revoked, 1, none)] ∧
-    executeTraceGuard testLaw [⟨1, .host, .terminate⟩] = none := by decide
+    executeTraceGuard testLaw [⟨1, .tenant, .evict⟩] = some [(.vacated, 1, none)] ∧
+    executeTraceGuard testLaw [⟨1, .landlord, .evict⟩] = none := by decide
 
 /-- `compileContractABI` records the exact duty, power, and immunity IDs, and
 `solidityIdent` / `solidityContractIdent` sanitize identifiers cleanly. -/
 theorem test_compileContractABI_structure :
     let spec := compileContractABI "TestGuard" testLaw
     spec.contractName = "TestGuard" ∧
-    spec.dutyIds = ["D.NI"] ∧
-    spec.powerIds = ["P.REVOKE", "P.PANEL_TERM"] ∧
+    spec.dutyIds = ["D.NO_EVICT"] ∧
+    spec.powerIds = ["P.VACATE", "P.TRIBUNAL_EVICT"] ∧
     spec.immunityIds = ["I.OBJ"] ∧
-    solidityIdent "P.PANEL_TERM" = "p_panel_term" ∧
+    solidityIdent "P.TRIBUNAL_EVICT" = "p_tribunal_evict" ∧
     solidityContractIdent "Autonomous Commons" = "Autonomous_Commons" ∧
     solidityContractIdent "" = "CharterGuard" ∧
     solidityContractIdent "1Guard" = "_1Guard" := by decide

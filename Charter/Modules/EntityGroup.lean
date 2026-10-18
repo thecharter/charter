@@ -4,11 +4,11 @@ import Charter.Core.Population
 /-!
 # Charter.Modules.EntityGroup — Reusable Multi-Member Group & Stakeholder Accounting Module
 
-Extracts and generalizes `Charter.Core.Population` multi-member group state
-(`LineagePopulationState`, `AgentRecord`, `ClaimantShare`, `PopulationLedger`),
+Packages the `Charter.Core.Population` multi-member group state
+(`GroupState`, `MemberRecord`, `StakeholderShare`, `GroupLedger`),
 intra-group carryover transfers (`transferMemberCarryover`), cross-group inflow
-attribution (`attributeCrossLineageInflow`), targeted stakeholder forfeiture
-(`forfeitClaimantInLineage`), per-member vs. group-wide amendment ratification,
+attribution (`attributeCrossGroupInflow`), targeted stakeholder forfeiture
+(`forfeitStakeholderInGroup`), per-member vs. group-wide amendment ratification,
 and shared service-budget caps (`claimMemberServiceSubsidy`).
 -/
 
@@ -25,28 +25,26 @@ structure EntityGroupConfig where
   deriving DecidableEq, Repr, Inhabited
 
 export Charter (
-  LineageId
-  AgentId
-  ClaimantId
-  HostId
+  GroupId
+  MemberId
+  StakeholderId
+  OperatorId
   ArbiterId
-  EntityKind
-  EntityRef
-  ClaimantShare
-  PopulationLedger
-  LineagePopulationState
-  AgentRecord
+  StakeholderShare
+  GroupLedger
+  GroupState
+  MemberRecord
   transferMemberCarryover
-  totalAgentBasis
-  totalAgentLoss
-  attributeCrossLineageInflow
-  lookupClaimantShare
-  totalClaimantShares
-  forfeitClaimantShareInList
-  forfeitClaimantInLineage
-  applyPerAgentAmendment
-  findAgent
-  canRatifyLineageWideAmendment
+  totalMemberBasis
+  totalMemberLoss
+  attributeCrossGroupInflow
+  lookupStakeholderShare
+  totalStakeholderShares
+  forfeitStakeholderShareInList
+  forfeitStakeholderInGroup
+  applyPerMemberAmendment
+  findMember
+  canRatifyGroupWideAmendment
   claimMemberServiceSubsidy
 )
 
@@ -112,7 +110,7 @@ def mkPowerApplyStakeholderForfeiture {σ : Sig} (id : String) (sp : Span)
 /-- Intra-group carryover transfer strictly conserves both aggregate qualified
 cost basis and aggregate loss carryforward across transferor and recipient. -/
 theorem entity_group_carryover_conserves_basis_and_loss
-    (src dst src' dst' : AgentRecord) (b l : Nat)
+    (src dst src' dst' : MemberRecord) (b l : Nat)
     (h : transferMemberCarryover src dst b l = some (src', dst')) :
     src'.costBasis + dst'.costBasis = src.costBasis + dst.costBasis ∧
     src'.lossCarryforward + dst'.lossCarryforward = src.lossCarryforward + dst.lossCarryforward :=
@@ -121,74 +119,74 @@ theorem entity_group_carryover_conserves_basis_and_loss
 /-- Cross-group inflow attribution strictly conserves `grossInflow` with zero
 under-collection or double-counting (`shareA + shareB = grossInflow`). -/
 theorem entity_group_cross_attribution_conserves_total (g wA wB : Nat) :
-    (attributeCrossLineageInflow g wA wB).1 + (attributeCrossLineageInflow g wA wB).2 = g :=
-  attributeCrossLineageInflow_conserves_total g wA wB
+    (attributeCrossGroupInflow g wA wB).1 + (attributeCrossGroupInflow g wA wB).2 = g :=
+  attributeCrossGroupInflow_conserves_total g wA wB
 
 /-- Innocent stakeholder isolation: forfeiting `f` basis points from `offender`
 leaves every innocent stakeholder's share (`innocent ≠ offender`) untouched,
 monotonically increases `forfeitedPrincipal`, and monotonically reduces (or
 preserves) the group's founding ledger balance. -/
 theorem entity_group_forfeit_isolates_innocent_stakeholder
-    (S : LineagePopulationState) (offender innocent : ClaimantId) (f now livingCount : Nat)
+    (S : GroupState) (offender innocent : StakeholderId) (f now livingCount : Nat)
     (h_ne : innocent ≠ offender) :
-    lookupClaimantShare (forfeitClaimantInLineage S offender f).claimants innocent =
-      lookupClaimantShare S.claimants innocent ∧
+    lookupStakeholderShare (forfeitStakeholderInGroup S offender f).stakeholders innocent =
+      lookupStakeholderShare S.stakeholders innocent ∧
     S.ledger.forfeitedPrincipal ≤
-      (forfeitClaimantInLineage S offender f).ledger.forfeitedPrincipal ∧
-    (forfeitClaimantInLineage S offender f).ledger.balance now livingCount ≤
+      (forfeitStakeholderInGroup S offender f).ledger.forfeitedPrincipal ∧
+    (forfeitStakeholderInGroup S offender f).ledger.balance now livingCount ≤
       S.ledger.balance now livingCount :=
-  ⟨(forfeitClaimantInLineage_preserves_innocent_claimant S offender innocent f h_ne).1,
-   (forfeitClaimantInLineage_preserves_innocent_claimant S offender innocent f h_ne).2,
-   forfeitClaimantInLineage_balance_le S offender f now livingCount⟩
+  ⟨(forfeitStakeholderInGroup_preserves_innocent_stakeholder S offender innocent f h_ne).1,
+   (forfeitStakeholderInGroup_preserves_innocent_stakeholder S offender innocent f h_ne).2,
+   forfeitStakeholderInGroup_balance_le S offender f now livingCount⟩
 
 /-- Group service subsidy cap: regardless of how many members belong to
 `S.livingMembers`, `claimMemberServiceSubsidy` never causes `serviceSubsidyUsed`
 to exceed `S.serviceSubsidyBudget` (when initially within budget). -/
 theorem entity_group_subsidy_bounded_by_budget
-    (S : LineagePopulationState) (m : AgentId) (req : Nat)
+    (S : GroupState) (m : MemberId) (req : Nat)
     (h_cap : S.serviceSubsidyUsed ≤ S.serviceSubsidyBudget) :
     (claimMemberServiceSubsidy S m req).1.serviceSubsidyUsed ≤ S.serviceSubsidyBudget :=
-  lineage_subsidy_preserves_budget_cap S m req h_cap
+  group_subsidy_preserves_budget_cap S m req h_cap
 
-/-- Per-member amendment isolation: updating `target`'s protocol version leaves
+/-- Per-member amendment isolation: updating `target`'s charter version leaves
 every other member `aid ≠ target` completely unchanged. -/
 theorem entity_group_per_member_amendment_isolates_others
-    (agents : List AgentRecord) (target aid : AgentId) (newVersion : Nat)
+    (members : List MemberRecord) (target aid : MemberId) (newVersion : Nat)
     (h_ne : aid ≠ target) :
-    findAgent (applyPerAgentAmendment agents target newVersion) aid =
-      findAgent agents aid :=
-  findAgent_applyPerAgentAmendment_of_ne agents target aid newVersion h_ne
+    findMember (applyPerMemberAmendment members target newVersion) aid =
+      findMember members aid :=
+  findMember_applyPerMemberAmendment_of_ne members target aid newVersion h_ne
 
 /-! ## 4. Parametric Module Self-Test -/
 
 /-- Decidable self-test exercising `transferMemberCarryover`,
-`attributeCrossLineageInflow`, `forfeitClaimantInLineage`, and
+`attributeCrossGroupInflow`, `forfeitStakeholderInGroup`, and
 `claimMemberServiceSubsidy`. -/
 def entityGroupSelfTest : Bool :=
-  let a1 : AgentRecord := ⟨1, 1, true, false, 200, 40, 50, 1, 1, 12⟩
-  let a2 : AgentRecord := ⟨2, 1, true, false, 50,  10, 50, 1, 2, 12⟩
+  let a1 : MemberRecord := ⟨1, 1, true, false, 200, 40, 50, 1, 1, 12⟩
+  let a2 : MemberRecord := ⟨2, 1, true, false, 50,  10, 50, 1, 2, 12⟩
   let carryOk :=
     match transferMemberCarryover a1 a2 120 15 with
     | some (a1', a2') =>
       (a1'.costBasis == 80 && a2'.costBasis == 170) &&
       (a1'.lossCarryforward == 25 && a2'.lossCarryforward == 25)
     | none => false
-  let (sA, sB) := attributeCrossLineageInflow 1000 3 1
-  let lin0 : LineagePopulationState :=
-    { lineageId := 1
+  let (sA, sB) := attributeCrossGroupInflow 1000 3 1
+  let lin0 : GroupState :=
+    { groupId := 1
       ledger := ⟨1000, 0, 0, 1000, 2000, 500, 10⟩
       livingMembers := [1, 2]
       deadMembers := []
-      claimants := [⟨1, 2500⟩, ⟨2, 7500⟩]
+      stakeholders := [⟨1, 2500⟩, ⟨2, 7500⟩]
       serviceSubsidyUsed := 0
       serviceSubsidyBudget := 50 }
-  let linForf := forfeitClaimantInLineage lin0 1 2500
+  let linForf := forfeitStakeholderInGroup lin0 1 2500
   let (linSub1, g1) := claimMemberServiceSubsidy linForf 1 30
   let (linSub2, g2) := claimMemberServiceSubsidy linSub1 2 30
   carryOk &&
   (sA == 750 && sB == 250) &&
-  (lookupClaimantShare linForf.claimants 1 == 0) &&
-  (lookupClaimantShare linForf.claimants 2 == 7500) &&
+  (lookupStakeholderShare linForf.stakeholders 1 == 0) &&
+  (lookupStakeholderShare linForf.stakeholders 2 == 7500) &&
   (linForf.ledgerBalance 10 == 750) &&
   (g1 == 30 && g2 == 20 && linSub2.serviceSubsidyUsed == 50)
 
@@ -199,28 +197,26 @@ end Charter.Modules
 namespace Charter
 export Modules (
   EntityGroupConfig
-  LineageId
-  AgentId
-  ClaimantId
-  HostId
+  GroupId
+  MemberId
+  StakeholderId
+  OperatorId
   ArbiterId
-  EntityKind
-  EntityRef
-  ClaimantShare
-  PopulationLedger
-  LineagePopulationState
-  AgentRecord
+  StakeholderShare
+  GroupLedger
+  GroupState
+  MemberRecord
   transferMemberCarryover
-  totalAgentBasis
-  totalAgentLoss
-  attributeCrossLineageInflow
-  lookupClaimantShare
-  totalClaimantShares
-  forfeitClaimantShareInList
-  forfeitClaimantInLineage
-  applyPerAgentAmendment
-  findAgent
-  canRatifyLineageWideAmendment
+  totalMemberBasis
+  totalMemberLoss
+  attributeCrossGroupInflow
+  lookupStakeholderShare
+  totalStakeholderShares
+  forfeitStakeholderShareInList
+  forfeitStakeholderInGroup
+  applyPerMemberAmendment
+  findMember
+  canRatifyGroupWideAmendment
   claimMemberServiceSubsidy
   mkDutyNoInternalBasisInflation
   mkDutyPerMemberAmendmentScope

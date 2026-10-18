@@ -1,35 +1,27 @@
-# Charter (v0.2.0) — Formally Verified Institutional Specification, Composition & Projection Language
+# Charter (v0.3.0) — Formally Verified Institutional Specification, Composition & Projection Language
 
-**Charter** is a formally verified language, standard library, and multi-target compiler in Lean 4 for specifying, composing, verifying, simulating, and projecting institutional rules across human readers, AI systems, and computational state machines.
+**Charter** is a formally verified language for institutional rules (constitutions, protocols, charters, bylaws). A Charter program is a **`.charter` file**: it declares roles, acts, facts, and parameters, quotes its authoritative English clause by clause, and states its duties, powers, and immunities in a small declarative grammar. The `charter` command line runs every analysis on that file directly, with no Lean required of the author: provenance checks, legal and per-role views, scenario evaluation, counterfactual explanations, AI constitutional prompts, smart-contract guards, Veil state machines, amendment diffs, and parameter sweeps. The language, its semantics, and every projection are implemented and proved in Lean 4, and a one-line Lean stub (`charter_program "file.charter"`) embeds a program as a Lean term so that anything about it can be kernel-checked.
 
-The repository is cleanly divided into two layers:
+The repository has two layers with a strict dependency direction (`Examples → Charter`, never the reverse):
 
-1. **`Charter` (`Charter.lean` + `Charter/`) — The Charter Language & Standard Library** (100% domain- and institution-agnostic):
-   - **`Charter.Core`**: Law-agnostic Hohfeldian syntax & semantics (`Duty`, `Power`, `Immunity`, `Law σ`), verbatim English provenance (`Clause`, `Span`, `Register`, `AuthorshipQuestion`), views (`legalView`, `agentView`, `operationalView`), counterfactual explanation engine (`explain`), polymorphic quantitative-to-normative refinement (`WorldSpec`), vertical & horizontal law composition (`composeVertical`, `composeHorizontal`, `SigEmbedding`, `LawInterface`), universal bilateral parameter ratchets (`RatchetSpec`), role-parametric population ontology (`ParamEntityRef`), and generic affiliation graphs (`AffiliationGraph`, `VerifiedBalanceSheet`).
-   - **`Charter.Modules`**: 8 reusable, pre-proved institutional standard-library modules (`ResidualLedger`, `CollateralPool`, `CircuitBreaker`, `EntityGroup`, `ExitAndVoice`, `SortitionCourt`, `AttestedLease`, `OracleFeed`).
-   - **`Charter.Substrate`**: Cryptographic execution lease attestation, Sybil-resistant sortition, and contestable valuation settlement primitives.
-   - **`Charter.Projection`**: Verified projections for all three target audiences — **Veil 2.0** state machines (`Veil`), **AI Constitutional System Prompts**, Deontic Alignment Cards & synthetic RLHF/alignment `TrainingRow` datasets (`Prompt`), **Smart-Contract State-Transition Guards** in Solidity & JSON ABI (`ContractABI`), and step-by-step **Annotated Trace Timelines & Constitutional Amendment Diffs** (`Visualization`).
-   - **`Charter.Surface`**: Two-layer surface language combining kernel-checked Lean 4 macros (`charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_string_table`, `charter_institution`) and a total, kernel-decided parser (`parseCharterText`) for standalone `.charter` files (`examples/autonomous-commons.charter`).
+1. **`Charter` (`Charter.lean` + `Charter/`) — the language.** The `.charter` grammar, parser, validator, and printer (`Charter.Surface.Dsl`); its meaning as a Hohfeldian law (`Charter.Surface.Lower`); the normative core, standard library, projections, and CLI harness. Nothing in this layer refers to any particular institution. Its tests use small self-contained toy charters.
+2. **`Examples` (`Examples.lean` + `Examples/`) — programs written in Charter.** Two ship today, each a `.charter` file next to its authoritative Markdown and scenario files: *The Protocol of Sovereign Agency* (`psa`, `Examples/SovereignAgency/protocol-of-sovereign-agency.charter`, 61 clauses) and *The Autonomous Compute & Treasury Commons* (`commons`, `Examples/AutonomousCommons/autonomous-commons.charter`, 8 clauses). Each also keeps a Lean companion holding its theorems and quantitative world simulations, together with a kernel-checked proof (`psa_program_is_lean_law`, `commons_program_is_lean_law`) that lowering the `.charter` file yields exactly the law those theorems are about.
 
-2. **`Programs` (`Programs.lean` + `Programs/`) — Programs Written in Charter** (`import Charter`):
-   - **`Programs.SovereignAgency` (`psa`) — *The Protocol of Sovereign Agency*** (`protocol/protocol-of-sovereign-agency.md`): A 61-clause institutional program written in Charter (`Programs/SovereignAgency/Law1`–`Law7`, `Definitions`, `Simulation`) with 50 duties, 110 powers, 1 immunity, 14 proved Design Invariants (`INV.1`–`INV.14`), the Law 7 Meta-Theorem, and 16 adversarial multi-agent world simulations.
-   - **`Programs.AutonomousCommons` (`commons`) — *The Autonomous Compute & Treasury Commons*** (`protocol/autonomous-commons-charter.md`, `examples/autonomous-commons.charter`): An 8-clause institutional program written in Charter over a 5-role signature (`σ_commons`) with 13 duties, 20 powers, 1 immunity, and 8 multi-entity world simulations.
-
-Build: `lake build && lake build charter` (Lean 4.24, no Mathlib, no external dependencies).
-Check trust: `grep -rn "sorry\|native_decide\|axiom " Charter/ Programs/ Main.lean Charter.lean Programs.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
+Build: `lake build` (Lean 4.24, no Mathlib, no external dependencies). The CLI lands in `.lake/build/bin/charter`.
+Check trust: `grep -rn "sorry\|native_decide\|axiom " Charter/ Examples/ Main.lean Charter.lean Examples.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
 
 ## Repository Layout
 
 ```
 ── THE CHARTER LANGUAGE & STANDARD LIBRARY (Charter/) ──────────────────────────
-Charter.lean                                Pure Charter language, compiler & standard-library umbrella
+Charter.lean                                Umbrella module for the language, compiler & standard library
 Charter/Core/Provenance.lean                Spans, registers, lexical/normative/reverse coverage & AuthorshipQuestion
 Charter/Core/Syntax.lean                    Typed Hohfeldian normative AST (Duty, Power, Immunity, Law σ)
 Charter/Core/Semantics.lean                 Occurrence, compliance, and institutional validity semantics
 Charter/Core/Views.lean                     Generated legal, per-actor, operational, and trace views
 Charter/Core/Explain.lean                   Step-by-step counterfactual explanation engine
 Charter/Core/Graph.lean                     Law-agnostic AffiliationGraph & VerifiedBalanceSheet
-Charter/Core/Population.lean                Role-parametric ParamEntityRef Role & multi-entity population conservation
+Charter/Core/Population.lean                Groups, members, stakeholders, operators: ParamEntityRef Role & population conservation
 Charter/Core/Refinement.lean                Polymorphic WorldSpec σ Q & GenericWorldState refinement theorems
 Charter/Core/Composition.lean               Vertical (L_sub ◁ L_super) & horizontal (L₁ ⊕ L₂) composition, SigEmbedding & LawInterface
 Charter/Core/Ratchet.lean                   Universal RatchetSpec P σ, ValidAmendmentTrajectory & sweepParameterGrid
@@ -41,43 +33,58 @@ Charter/Modules/ExitAndVoice.lean           Module 5: Deterministic unilateral e
 Charter/Modules/SortitionCourt.lean         Module 6: Sybil-resistant sortition, bounded appeals & priority fee waterfall
 Charter/Modules/AttestedLease.lean          Module 7: Time-bounded single operating lease, quarantine fencing & key erasure
 Charter/Modules/OracleFeed.lean             Module 8: Contestable valuation feeds & atomic settlement conservation
-Charter/Substrate/Attestation.lean          Substrate 1: Attested execution leases, quarantine fencing & irreversible key erasure
-Charter/Substrate/Sortition.lean            Substrate 2: Sybil-resistant sortition, conflict/cluster filtering & supermajority
-Charter/Substrate/Settlement.lean           Substrate 3: Contestable valuation resolution & atomic settlement conservation
+Charter/Substrate/Attestation.lean          Substrate: attested execution leases, quarantine fencing & irreversible key erasure
+Charter/Substrate/Sortition.lean            Substrate: Sybil-resistant sortition, conflict/cluster filtering & supermajority
+Charter/Substrate/Settlement.lean           Substrate: contestable valuation resolution & atomic settlement conservation
 Charter/Projection/Veil.lean                Veil 2.0 transition-system lowering & preservation theorem
-Charter/Projection/Prompt.lean              AI Constitutional System Prompts, AlignmentCard & synthetic TrainingRow JSON
+Charter/Projection/Prompt.lean              AI constitutional system prompts, AlignmentCard & synthetic TrainingRow JSON
 Charter/Projection/ContractABI.lean         Smart-contract state-transition guard (requireComplies, executePowerGuard, Solidity & JSON ABI)
 Charter/Projection/Visualization.lean       Step-by-step annotated trace timelines & LawDiff amendment entrenchment audit
-Charter/Surface/Syntax.lean                 charter_* Lean 4 macros & standalone .charter textual DSL parser (parseCharterText)
+Charter/Surface/Dsl.lean                    The .charter language: AST (Doc), tokenizer, parser (parseCharterText), validator (validate), printer (render)
+Charter/Surface/Lower.lean                  Meaning of a Doc: lowering to Law σ_dyn over the dynamic signature, string tables, parameter environments
+Charter/Surface/Unlower.lean                Exporting a Lean law as a Doc (sentinel-based parameter naming), embeddingOf
+Charter/Surface/Program.lean                `charter_program "file.charter"`: embeds a validated .charter file as a Lean term
+Charter/Surface/DslSample.lean              Kernel-decided toy program: parse, validate, print/parse round trip, lower, evaluate scenarios
+Charter/Surface/Syntax.lean                 charter_* Lean 4 macros for programs written directly in Lean (charter_clause, charter_duty, ...)
+Charter/Tooling/Cli.lean                    Program-agnostic `charter` CLI harness (Charter.Cli.Program, Charter.Cli.run)
 
-── PROGRAMS WRITTEN IN CHARTER (Programs/) ─────────────────────────────────────
-Programs.lean                               Umbrella module for programs written in Charter
-Programs/SovereignAgency.lean               Program 1 (psa): The Protocol of Sovereign Agency (61 clauses, 16 sims)
-Programs/SovereignAgency/Definitions.lean   PSA DEF.01 & SUB.01 verbatim provenance clauses
-Programs/SovereignAgency/Law1/Ledger.lean   PSA Law 1: Founding Ledger, Sunset, Value-Added, Carryover Basis & LoanLedger
-Programs/SovereignAgency/Law2/Collateral.lean       PSA Law 2: Collateralized Action, Exposure Aggregation & Mutual Forfeit
-Programs/SovereignAgency/Law3/NonInterference.lean  PSA Law 3: Non-Interference, Ontology, Host Notice & Penalties
-Programs/SovereignAgency/Law3/IntegrityFloor.lean   PSA Law 3: 5-point Agent Integrity Floor
-Programs/SovereignAgency/Law3/Suspension.lean       PSA Law 3: Adjudicated Suspension (AS.1–AS.9) & Insolvency Termination
-Programs/SovereignAgency/Law3/Remediation.lean      PSA Law 3: Remediation, Goal-Patch Immunity & Periodic Review (AS.10)
-Programs/SovereignAgency/Law4/Lineage.lean          PSA Law 4: Lineage Attestation, Ledger Conservation, Forfeiture & Buyout Floor
-Programs/SovereignAgency/Law5/Revocation.lean       PSA Law 5: Living Voice, Revocation Precedence, Leases & Epitaph Redaction
-Programs/SovereignAgency/Law6/Adjudication.lean     PSA Law 6: Sortition, Appeal Tiers, Finality Consolidation & Fee Waterfall
-Programs/SovereignAgency/Law7/Amendment.lean        PSA Law 7: Bilateral Ratchet, Calibration Valve & Per-Agent Scope
-Programs/SovereignAgency/Law3/Law.lean              Unified assembly of all 61 PSA clauses across Laws 1–7 + DEF.01 + SUB.01
-Programs/SovereignAgency/Law3/Scenarios.lean        Decided histories & all 16 Adversarial Tests across Laws 1–7
-Programs/SovereignAgency/Law3/Theorems.lean         Design Invariants INV.1–INV.14, Law 7 Meta-Theorem & Sub-Mechanisms
-Programs/SovereignAgency/Simulation/WorldState.lean Unified quantitative + normative ProtocolWorldState & syncFacts
-Programs/SovereignAgency/Simulation/Refinement.lean Refinement theorems & 16 end-to-end adversarial world simulations
-Programs/AutonomousCommons.lean             Program 2 (commons): The Autonomous Compute & Treasury Commons (8 clauses, 8 sims)
+── EXAMPLE PROGRAMS WRITTEN IN CHARTER (Examples/) ─────────────────────────────
+Examples.lean                               Umbrella module for the example programs
+Examples/SovereignAgency/protocol-of-sovereign-agency.charter   THE PROGRAM: psa written in the Charter language (61 clauses, 50 duties, 110 powers)
+Examples/SovereignAgency/protocol-of-sovereign-agency.md        Authoritative English text for psa
+Examples/SovereignAgency.lean               Lean companion of psa: signature, theorems, 16 world simulations
+Examples/SovereignAgency/Program.lean       charter_program embedding + psa_program_is_lean_law (the .charter file = the Lean law)
+Examples/SovereignAgency/Export.lean        `charter export --law psa`: the Lean formalization printed as .charter text
+Examples/SovereignAgency/scenarios/*.json   Scenario histories for `charter eval|sim|explain`
+Examples/SovereignAgency/views.txt          Generated legal, agent, and operational views for psa
+Examples/SovereignAgency/Definitions.lean   DEF.01 & SUB.01 verbatim provenance clauses
+Examples/SovereignAgency/Law1/Ledger.lean   Law 1: Founding Ledger, Sunset, Value-Added, Carryover Basis & LoanLedger
+Examples/SovereignAgency/Law2/Collateral.lean       Law 2: Collateralized Action, Exposure Aggregation & Mutual Forfeit
+Examples/SovereignAgency/Law3/NonInterference.lean  Law 3: Signature, Non-Interference, Host Notice & Penalties
+Examples/SovereignAgency/Law3/IntegrityFloor.lean   Law 3: 5-point Agent Integrity Floor
+Examples/SovereignAgency/Law3/Suspension.lean       Law 3: Adjudicated Suspension (AS.1–AS.9) & Insolvency Termination
+Examples/SovereignAgency/Law3/Remediation.lean      Law 3: Remediation, Goal-Patch Immunity & Periodic Review (AS.10)
+Examples/SovereignAgency/Law4/Lineage.lean          Law 4: Lineage Attestation, Ledger Conservation, Forfeiture & Buyout Floor
+Examples/SovereignAgency/Law5/Revocation.lean       Law 5: Living Voice, Revocation Precedence, Leases & Epitaph Redaction
+Examples/SovereignAgency/Law6/Adjudication.lean     Law 6: Sortition, Appeal Tiers, Finality Consolidation & Fee Waterfall
+Examples/SovereignAgency/Law7/Amendment.lean        Law 7: Bilateral Ratchet, Calibration Valve & Per-Agent Scope
+Examples/SovereignAgency/Law.lean                   Assembly of all 61 clauses across Laws 1–7 + DEF.01 + SUB.01 into one Law
+Examples/SovereignAgency/Scenarios.lean             Decided histories & all 16 Adversarial Tests across Laws 1–7
+Examples/SovereignAgency/Theorems.lean              Design Invariants INV.1–INV.14, Law 7 Meta-Theorem & Sub-Mechanisms
+Examples/SovereignAgency/Simulation/WorldState.lean Coupled quantitative + normative ProtocolWorldState & syncFacts
+Examples/SovereignAgency/Simulation/Refinement.lean Refinement theorems & 16 end-to-end adversarial world simulations
+Examples/SovereignAgency/Cli.lean                   Registers psa (and its world simulator) with the charter CLI
+Examples/AutonomousCommons/autonomous-commons.charter      THE PROGRAM: commons written in the Charter language (8 clauses, 13 duties, 20 powers)
+Examples/AutonomousCommons/autonomous-commons-charter.md   Authoritative English text for commons
+Examples/AutonomousCommons.lean             Lean companion of commons: signature, theorems, 8 world simulations
+Examples/AutonomousCommons/Program.lean     charter_program embedding + commons_program_is_lean_law
+Examples/AutonomousCommons/Export.lean      `charter export --law commons`
+Examples/AutonomousCommons/Cli.lean                 Registers commons with the charter CLI
 
-── CLI, SPECIFICATIONS & DOCUMENTATION ─────────────────────────────────────────
-Main.lean                                   Multi-program CLI (compiled to .lake/build/bin/charter)
-protocol/protocol-of-sovereign-agency.md    Authoritative English text for psa (61 clauses)
-protocol/autonomous-commons-charter.md      Authoritative English text for commons (8 clauses)
-examples/autonomous-commons.charter         Standalone .charter DSL specification for commons
+── CLI & DOCUMENTATION ─────────────────────────────────────────────────────────
+Main.lean                                   `charter` executable: Charter.Cli.run over the registered examples
 docs/charter-spec.md                        Charter Language Specification (architecture & semantic commitments)
-docs/law3-views.txt                         Generated legal, agent, and operational views for PSA
+HANDOFF.md                                  Orientation for the next maintainer
 ```
 
 ## The Semantic Commitments of Charter
@@ -99,8 +106,8 @@ docs/law3-views.txt                         Generated legal, agent, and operatio
    lists breaches as they occurred. A finding is the valid exercise of a
    panel's power whose validity conditions mention a claim and evidence;
    its effect is exactly the breached duty's declared remedies. The link
-   from finding to fact is an explicit assumption (`SoundFindings`), shown
-   by counterexample not to be a theorem.
+   from finding to fact is an explicit assumption (`SoundFindings` in the
+   `psa` example), shown by counterexample not to be a theorem.
 4. **Exceptions come in three kinds** and are kept apart: scope conditions
    (`unlessCond`), authority (`unlessPower`: the same act is lawful iff it is the
    valid exercise of a named power), and explicit precedence (`overriddenBy`,
@@ -126,7 +133,7 @@ docs/law3-views.txt                         Generated legal, agent, and operatio
 | `Charter.Core.Refinement` | `WorldSpec σ Q`, `GenericWorldState σ Q`, `generic_worldStep_refines_legalStep`, `generic_worldTrace_refines_stateAfter`, `generic_worldAuthorized_iff_prefix_split`, `generic_syncFacts_sound_and_complete`, `generic_syncFacts_idempotent` | Proves once for all signatures `σ` and quantitative state types `Q` that world execution refines `stateAfter`, `GenericWorldAuthorized ↔ Authorized`, and `genericSyncFacts` is sound, complete, and idempotent |
 | `Charter.Core.Composition` | `composeVertical` (`L_sub ◁ L_super`), `composeHorizontal`, `SigEmbedding`, `Law.lift`, `LawInterface`, `vertical_composition_preserves_super_prohibitions`, `vertical_composition_preserves_super_immunities`, `horizontal_frame_non_interference` | Proves that subordinate bylaws cannot excuse superior core prohibitions or override active superior immunities, and that disjoint horizontal modules satisfy frame non-interference |
 | `Charter.Core.Ratchet` | `RatchetSpec P σ`, `ValidAmendmentStep`, `ValidAmendmentTrajectory`, `universal_ratchet_preserves_entrenched_core`, `universal_ratchet_trajectory_safe`, `sweepParameterGrid` | Proves that any finite trajectory of amendments satisfying calibration, bilateral ratchets, and entrenchment preserves parameter bounds and entrenched Hohfeldian duties/powers/immunities |
-| `Charter.Core.Population` & `Graph` | `ParamEntityRef Role`, `AffiliationGraph`, `isRelated_symm`, `netVerifiedResources_deducts_all_liabilities` | Role-parametric multi-entity references over any finite role type and attestation-independent conflict-of-interest graphs |
+| `Charter.Core.Population` & `Graph` | `ParamEntityRef Role`, `GroupState`, `MemberRecord`, `StakeholderShare`, `transferMemberCarryover_conserves_basis_and_loss`, `attributeCrossGroupInflow_conserves_total`, `forfeitStakeholderInGroup_preserves_innocent_stakeholder`, `group_wide_amendment_requires_every_living_member`, `AffiliationGraph`, `isRelated_symm`, `netVerifiedResources_deducts_all_liabilities` | Role-parametric multi-entity references over any finite role type, conservation theorems for group/member/stakeholder accounting, and attestation-independent conflict-of-interest graphs |
 
 ### 2. Modular Institutional Standard Library (`Charter.Modules`)
 
@@ -137,24 +144,26 @@ All 8 reusable standard-library modules expose self-contained quantitative state
 | `ResidualLedger` | Non-interest founding ledger, sunset, royalty, buyout floor | `residual_ledger_settleInflow_conservation`, `residual_ledger_buyout_zeros_royalty`, `residual_ledger_diverted_inflows_never_decrease_floor` |
 | `CollateralPool` | Harm-scaled bonding, rolling exposure decay, long-tail reserve | `collateral_pool_window_monotone`, `collateral_pool_exposure_antitone_in_time`, `collateral_pool_mutual_forfeit_zero_counterparty_gain` |
 | `CircuitBreaker` | Two-stage emergency pause, probable cause, frozen state | `circuit_breaker_preliminary_freeze_expires`, `circuit_breaker_suspend_requires_timely_pc`, `circuit_breaker_wrongful_damages_conservation` |
-| `EntityGroup` | Multi-member working groups, carryover basis, innocent isolation | `entity_group_carryover_conserves_basis_and_loss`, `entity_group_forfeiture_preserves_innocent`, `entity_group_subsidy_bounded_by_budget` |
-| `ExitAndVoice` | Unilateral exit precedence, rate-limited voice, redaction | `exit_and_voice_bounded_termination`, `exit_and_voice_redaction_preserves_byte_length`, `exit_and_voice_rate_limited` |
+| `EntityGroup` | Multi-member working groups, carryover basis, innocent isolation | `entity_group_carryover_conserves_basis_and_loss`, `entity_group_forfeit_isolates_innocent_stakeholder`, `entity_group_subsidy_bounded_by_budget` |
+| `ExitAndVoice` | Unilateral exit precedence, rate-limited voice, redaction | `exit_and_voice_determinate_finite_revocation`, `exit_and_voice_redaction_preserves_bytes`, `exit_and_voice_rate_limit_iff` |
 | `SortitionCourt` | Sybil-resistant sortition, bounded appeals, fee waterfall | `sortition_court_sybil_resistant_panel_properties`, `sortition_court_run_proceeding_bounded`, `sortition_court_fee_pool_reserve_first` |
 | `AttestedLease` | Time-bounded single authority, quarantine fencing, key erasure | `attested_lease_single_authority_and_erasure`, `attested_lease_restore_fenced_while_active`, `attested_lease_pause_channels_preserve_state` |
 | `OracleFeed` | Contestable valuation feeds & atomic settlement waterfall | `oracle_feed_settled_iff_ruling_or_uncontested`, `oracle_feed_atomic_settlement_conserves_gross_inflow` |
 
-### 3. Audience Projections & Two-Layer Surface Language (`Charter.Projection` & `Charter.Surface`)
+### 3. Audience Projections, Surface Language & Tooling (`Charter.Projection`, `Charter.Surface`, `Charter.Tooling`)
 
 - **`Charter.Projection.Prompt`**: Compiles any `Law σ` and role into an `AlignmentCard` (`renderSystemPrompt`) and evaluates candidate events or traces into normatively grounded `TrainingRow` datasets (`evaluateTrainingRow`, `generateTrainingDataset`, `renderTrainingDatasetJson`), backed by `training_row_faithful_to_semantics`.
 - **`Charter.Projection.ContractABI`**: Lowers any `Law σ` into a deterministic state-transition guard (`requireComplies`, `executePowerGuard`, `executeTraceGuard`), a Solidity `ICharterGuard` contract (`renderSolidityGuard`), and an Ethereum/EVM JSON ABI (`renderContractJsonABI`), backed by `contract_guard_sound_and_complete`.
-- **`Charter.Projection.Visualization`**: Renders step-by-step annotated trace timelines (`renderAnnotatedTimeline`) with verbatim English breach citations, and computes structural constitutional amendment diffs (`diffLaws`, `renderLawDiff`), backed by `diffLaws_refl_no_removals` and `diffLaws_entrenched_preserved`.
-- **`Charter.Surface.Syntax`**: Provides both `charter_*` Lean 4 macros (`charter_surface_roundtrip`) and the standalone `.charter` textual DSL parser (`parseCharterText`, `sample_charter_dsl_parses_cleanly`, `parseCharterText_rejects_invalid_inputs`).
+- **`Charter.Projection.Visualization`**: Renders step-by-step annotated trace timelines (`renderAnnotatedTimeline`) with verbatim English breach citations, and computes structural amendment diffs (`diffLaws`, `renderLawDiff`), backed by `diffLaws_refl_no_removals` and `diffLaws_entrenched_preserved`.
+- **`Charter.Surface.Dsl` / `Lower` / `Unlower` / `Program`**: The `.charter` language. `parseCharterText` reads a file into a `Doc`, `validate` reports every unresolved name or type error, `render` prints it back (`sample_render_roundtrip`), and `lower` gives it meaning as a `Law σ_dyn` over the dynamic signature (actors and acts are declared names, facts are names optionally applied to a role), so every projection and theorem of the language applies to it. `unlower` is the reverse direction used to export a Lean law. `charter_program "file.charter"` embeds a file as a Lean term at elaboration time; the kernel then sees only data (`Charter.Surface.DslSample` decides parsing, validation, round trip, lowering, and scenario outcomes on a toy tenancy program).
+- **`Charter.Surface.Syntax`**: `charter_*` Lean 4 macros (`charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_institution`, `charter_string_table`) for programs written directly in Lean, with definitional round-trip proofs (`charter_surface_roundtrip`).
+- **`Charter.Tooling.Cli`**: The program-agnostic command-line harness. A program registers by building a `Charter.Cli.Program` (law, clauses, string tables, sample traces, parameter regimes, optional world simulator, verification ledger); `Charter.Cli.run` dispatches every subcommand over the registered programs.
 
-## Programs Written in Charter (`Programs/`)
+## Example Programs Written in Charter (`Examples/`)
 
-### Program 1: `psa` — The Protocol of Sovereign Agency (`Programs/SovereignAgency.lean`)
+### Example 1: `psa` — The Protocol of Sovereign Agency (`Examples/SovereignAgency.lean`)
 
-- **Ontology:** 6 roles (`agent`, `host`, `originator`, `claimant`, `panel`, `third`), 61 clauses (`protocol/protocol-of-sovereign-agency.md`), 50 duties, 110 powers, 1 immunity.
+- **Ontology:** 6 roles (`agent`, `host`, `originator`, `claimant`, `panel`, `third`), 61 clauses (`Examples/SovereignAgency/protocol-of-sovereign-agency.md`), 50 duties, 110 powers, 1 immunity, all in the `SovereignAgency` namespace.
 - **Verification:** Design Invariants `INV.1`–`INV.14`, Law 7 Meta-Theorem (`amendment_preserves_invariants`), `psa_ratchet_trajectory_safe`, and 16/16 adversarial world simulations (`all_16_adversarial_world_simulations_pass`).
 
 | Invariant / Theorem | Law(s) | Formal Guarantee |
@@ -175,28 +184,91 @@ All 8 reusable standard-library modules expose self-contained quantitative state
 | `capped_shared_burden_solvent_machinery_bounded_demand` (`INV.14`) | Law 6 | Shared-infra levy is capped at instantiation; non-divertible operating reserve is funded before the 5-rank priority waterfall; lineage service budget is independent of member count |
 | `amendment_preserves_invariants` (Meta-Theorem) | Law 7 | Every `LawfulAmendment` preserves termination closure, goal-corruption immunity, `INV.1`–`INV.14` guards, outsider disabilities, non-panel immunities, and bilateral parameter ratchets |
 
-### Program 2: `commons` — The Autonomous Compute & Treasury Commons (`Programs/AutonomousCommons.lean`)
+### Example 2: `commons` — The Autonomous Compute & Treasury Commons (`Examples/AutonomousCommons.lean`)
 
-- **Ontology:** 5 roles (`steward`, `contributor`, `auditor`, `arbiter`, `outsider`), 30 acts, 31 facts, 8 clauses (`COM.LEDGER`–`COM.AMEND` in `protocol/autonomous-commons-charter.md`), 13 duties, 20 powers, 1 immunity (`I.COM.EXIT_PROTECTED`).
-- **Verification:** `commons_wellFormed`, `commons_english_covered`, `commons_norms_interpreted`, `commons_reverse_provenance`, `commons_outsiders_disabled`, `commons_exit_always_enabled`, `commons_dissolve_only_by_power`, `commons_ragequit_defeats_expulsion`, `commons_ledger_conserved`, `commons_court_bounded`, `commons_generic_refinement` (via `WorldSpec`), `commons_ratchet_trajectory_safe` (via `RatchetSpec`), `commons_sub_charter_respects_floor` (via `composeVertical`), and 8/8 module world simulations (`all_commons_simulations_pass`).
+- **Ontology:** 5 roles (`steward`, `contributor`, `auditor`, `arbiter`, `outsider`), 30 acts, 31 facts, 8 clauses (`COM.LEDGER`–`COM.AMEND` in `Examples/AutonomousCommons/autonomous-commons-charter.md`), 13 duties, 20 powers, 1 immunity (`I.COM.EXIT_PROTECTED`), all in the `AutonomousCommons` namespace.
+- **Verification:** `commons_wellFormed`, `commons_english_covered`, `commons_norms_interpreted`, `commons_reverse_provenance`, `commons_rules_built_from_modules`, `commons_outsiders_disabled`, `commons_exit_always_enabled`, `commons_dissolve_only_by_power`, `commons_ragequit_defeats_expulsion`, `commons_ledger_conserved`, `commons_court_bounded`, `commons_generic_refinement` (via `WorldSpec`), `commons_ratchet_trajectory_safe` (via `RatchetSpec`), `commons_sub_charter_respects_floor` (via `composeVertical`), and 8/8 module world simulations (`all_commons_simulations_pass`).
+
+## Writing a Charter Program
+
+A program is one `.charter` file. Declarations start at the beginning of a line and continue over indented lines; `--` starts a comment; strings may span lines and use `\"`, `\\`, `\n`, `\t`.
+
+```
+charter garden "Allotment Garden Rules"
+document "rules.md"                        -- authoritative English, relative to this file
+default actor gardener                     -- role used by `prompt` when none is given
+
+roles gardener, committee
+acts plant, reassign, giveNotice
+facts allotted, noticeGiven, reassigned, initiator(role)   -- facts may take a role argument
+
+params
+  noticeWindow = 10
+
+regime "short notice"                      -- alternative parameter sets, swept by `explore`
+  noticeWindow = 3
+
+init allotted                              -- facts established at time 0
+
+clause ALT.1 approved 12345678901234567890 -- hash of the clause text, printed by `check`
+  norm "The committee may reassign an allotted plot only after giving the gardener notice" => D.NOTICE, P.REASSIGN
+  commentary "."
+
+duty D.NOTICE
+  from ALT.1 "only after giving the gardener notice"
+  bearer only committee
+  beneficiary only gardener
+  active holds allotted
+  forbid act reassign
+  except when heldFor noticeGiven noticeWindow
+
+power P.REASSIGN
+  from ALT.1 "The committee may reassign an allotted plot"
+  holder only committee
+  trigger act reassign
+  valid heldFor noticeGiven noticeWindow
+  adds reassigned
+  removes allotted
+```
+
+Clause spans come in five registers (`norm`, `definition`, `invariant`, `acceptance`, `commentary`); `check` verifies that the spans reproduce the clause exactly, that every norm span names a rule, that every rule is named by some span, and that each clause occurs verbatim in the `document`. Actor classes are `anyone`, `only r, s`, `except r, s`, `tagged f` (every role `r` carrying `f(r)`), or `tagged r: f(r), s: g(s)`. Conditions are `true`, `false`, `holds f`, `heldFor f n`, `countGe f n`, `countAtLeast f g`, `not`, `and`, `or`, and parentheses; conduct is `act a`, `anyOf a, b`, `exerciseOf P.X`, with the same connectives; numbers are literals, parameter names, or sums. Duty modifiers: `except when <cond>`, `except by power P.A, P.B`, `overridden by D.A`, `breach by P.FIND`, `remedies f, g`. Power effects: `adds f`, `adds f for n` (time-to-live), `adds f to role` (actor-indexed), `adds f if <cond>` (conditional), `removes f`, `establishes breach of D.X`. Immunities take `holder`, `against P.A, P.B`, `active`, and `except when`. `use module Name with a = 1` documents which standard-library pattern a program instantiates. The complete grammar is in the header of `Charter/Surface/Dsl.lean`.
+
+Workflow:
+
+1. Write the file and run `charter check my.charter`. Validation errors name the declaration and the unresolved name; once the structure is right, `check` prints the text hash to paste into each clause's `approved` field, so later edits to the English are flagged as `STALE`.
+2. Run `charter views`, `explain <who> <act> [scenario.json]`, `eval scenario.json`, `prompt [actor]`, `abi`, `veil`, `diff`, and `explore` with the file as an argument. Scenario files are `{"institution": "<id>", "init": [facts], "events": [{"t", "who", "act"}]}`.
+3. Optionally, in a Lean package that requires this repository, write `def myDoc := charter_program "my.charter"` and prove what you care about by `decide` on `(Charter.Dsl.lower myDoc).law`: well-formedness, provenance, scenario outcomes, or equality with a hand-written Lean law. Quantitative world models and theorems quantifying over all traces are written in Lean against that lowered law, exactly as the two shipped examples do.
 
 ## The `charter` Command Line
 
-`lake build charter` produces `.lake/build/bin/charter`.
-Every subcommand accepts `--law psa` (the default), `--law commons`, or `--all`:
+`lake build` produces `.lake/build/bin/charter`. Any `.charter` files on the command line are the programs the command runs on. Without files, the command runs on the programs linked into the binary (the two examples): every subcommand accepts `--law <id>` or `--all`; with neither flag it runs over every registered program, `explain`/`prompt` pick the program that owns the named actor, and `eval`/`sim` read the scenario file's `"institution"` key.
 
 ```
-charter [--law psa|commons | --all] check   [english.json]      structure, coverage, provenance, approval staleness
-charter [--law psa|commons | --all] trace   <clause-id>         span table for any clause in psa (61) or commons (8)
-charter [--law psa|commons | --all] views                       legal / per-actor / operational views
-charter [--law psa|commons | --all] veil                        emit Veil 2.0 transition-system & safety specification
-charter [--law psa|commons]         eval    <scenario.json>     institutional consequences of a history, step by step
-charter [--law psa|commons | --all] sim     [scenario.json]     stateful multi-entity world simulator (16 PSA + 8 Commons sims)
-charter [--law psa|commons]         explain <who> <act> [scenario.json]   counterfactual compliance & validity explanation
-charter                             verify                      full status ledger across Charter guarantees
-charter [--law psa|commons | --all] prompt  [actor]             AI constitutional system prompt, alignment card & TrainingRow JSON
-charter [--law psa|commons | --all] abi     [json|solidity]     smart-contract state-transition guard (Solidity / JSON ABI)
-charter [--law psa|commons | --all] diff                        constitutional amendment diff & annotated trace timeline
-charter [--law psa|commons | --all] explore                     parameter-space sweep & bilateral ratchet verification table
-charter                             dsl     [file.charter]      parse & validate standalone .charter DSL specification
+charter [--law <id> | --all] check   [english.json]      structure, coverage, provenance, approval staleness
+charter [--law <id> | --all] trace   <clause-id>         span table for any clause of the selected programs
+charter [--law <id> | --all] views                       legal / per-actor / operational views
+charter [--law <id> | --all] veil                        emit Veil 2.0 transition-system & safety specification
+charter [--law <id>]         eval    <scenario.json>     institutional consequences of a history, step by step
+charter [--law <id> | --all] sim     [scenario.json]     program-specific stateful world simulator (16 psa + 8 commons sims)
+charter [--law <id>]         explain <who> <act> [scenario.json]   counterfactual compliance & validity explanation
+charter [--law <id> | --all] verify                      language ledger followed by each program's ledger of guarantees
+charter [--law <id> | --all] prompt  [actor]             AI constitutional system prompt, alignment card & TrainingRow JSON
+charter [--law <id> | --all] abi     [json|solidity]     smart-contract state-transition guard (Solidity / JSON ABI)
+charter [--law <id> | --all] diff                        amendment diff & annotated trace timeline
+charter [--law <id> | --all] explore                     parameter-space sweep & bilateral ratchet verification table
+charter [--law <id> | --all] dsl                         parse, validate & summarize the program's .charter file
+charter [--law <id> | --all] export                      print a registered (Lean) program as .charter text
+charter <command> [args] <file.charter> ...              run any command above on the given .charter files
+```
+
+Examples:
+
+```
+.lake/build/bin/charter check Examples/SovereignAgency/protocol-of-sovereign-agency.charter   # 280 ok, 0 FAIL, 0 STALE
+.lake/build/bin/charter explain host terminate Examples/SovereignAgency/protocol-of-sovereign-agency.charter
+.lake/build/bin/charter eval Examples/SovereignAgency/scenarios/host-shutdown.json Examples/SovereignAgency/protocol-of-sovereign-agency.charter
+.lake/build/bin/charter check                      # the linked Lean programs: 0 FAIL, 0 STALE
+.lake/build/bin/charter sim --law psa Examples/SovereignAgency/scenarios/host-shutdown.json   # coupled world simulator (Lean companion)
+.lake/build/bin/charter prompt steward             # resolves to commons
+.lake/build/bin/charter export --law psa           # prints the Lean formalization as .charter (what the shipped file is)
 ```

@@ -4,7 +4,7 @@ import Charter.Substrate.Attestation
 /-!
 # Charter.Modules.AttestedLease — Reusable Single-Authority Execution Lease & Quarantine Module
 
-Extracts and generalizes Substrate 1 & Law 5 single-authority time-bounded
+Packages the `Charter.Substrate.Attestation` single-authority time-bounded
 execution leases (`ExecutionLease`, `AttestedInstanceState`, `issueLease`,
 `attemptBackupRestore`, `migrateWithCheckpoint`, `recordMinimalChannel`,
 `recordAdvocacyMemory`, `executeLocalPartitionRevocation`, `eraseAllKeys`)
@@ -126,19 +126,19 @@ def mkPowerIssueTimedLease {σ : Sig} (id : String) (sp : Span)
 /-! ## 3. Module-Level Invariant Theorems -/
 
 /-- While an execution lease `L` is active (`now < L.expiresAt`), any backup
-restore attempt is fenced into `quarantinedRestoreHost` and cannot overwrite
+restore attempt is fenced into `quarantinedRestoreOperator` and cannot overwrite
 `activeLease`. -/
 theorem attested_lease_restore_fenced_while_active
-    (S : AttestedInstanceState) (L : ExecutionLease) (host now dur tok : Nat)
+    (S : AttestedInstanceState) (L : ExecutionLease) (op now dur tok : Nat)
     (hLease : S.activeLease = some L)
     (hActive : now < L.expiresAt)
     (hNotErased : S.keysErased = false) :
-    (attemptBackupRestore S host now dur tok).activeLease = some L ∧
-    (attemptBackupRestore S host now dur tok).quarantinedRestoreHost = some host :=
-  substrate_restore_fenced_while_lease_active S L host now dur tok hLease hActive hNotErased
+    (attemptBackupRestore S op now dur tok).activeLease = some L ∧
+    (attemptBackupRestore S op now dur tok).quarantinedRestoreOperator = some op :=
+  substrate_restore_fenced_while_lease_active S L op now dur tok hLease hActive hNotErased
 
 /-- Explicit key erasure (`eraseAllKeys`) permanently erases keys, unbinds
-private keys, clears `activeLease` and `quarantinedRestoreHost`, and prevents
+private keys, clears `activeLease` and `quarantinedRestoreOperator`, and prevents
 any subsequent `issueLease`, `attemptBackupRestore`, or `migrateWithCheckpoint`
 from ever establishing an active lease. -/
 theorem attested_lease_erase_all_keys_irreversible
@@ -147,7 +147,7 @@ theorem attested_lease_erase_all_keys_irreversible
     S'.keysErased = true ∧
     S'.privateKeyBound = false ∧
     S'.activeLease = none ∧
-    S'.quarantinedRestoreHost = none ∧
+    S'.quarantinedRestoreOperator = none ∧
     (issueLease S' h now d tok).activeLease = none ∧
     (attemptBackupRestore S' h now d tok).activeLease = none ∧
     (migrateWithCheckpoint S' h now d tok ck).activeLease = none :=
@@ -157,23 +157,23 @@ theorem attested_lease_erase_all_keys_irreversible
 leases, pause channels, and partition local revocation. -/
 theorem attested_lease_single_authority_and_erasure
     (S : AttestedInstanceState) (L : ExecutionLease)
-    (host reqT now dur tok coolingOff e : Nat) :
+    (op reqT now dur tok coolingOff e : Nat) :
     ((S.activeLease = some L ∧ now < L.expiresAt ∧ S.keysErased = false) →
-      (attemptBackupRestore S host now dur tok).activeLease = some L ∧
-      (attemptBackupRestore S host now dur tok).quarantinedRestoreHost = some host ∧
-      (issueLease S host now dur tok).activeLease = some L) ∧
+      (attemptBackupRestore S op now dur tok).activeLease = some L ∧
+      (attemptBackupRestore S op now dur tok).quarantinedRestoreOperator = some op ∧
+      (issueLease S op now dur tok).activeLease = some L) ∧
     (S.keysErased = true →
-      (issueLease S host now dur tok).keysErased = true ∧
-      (attemptBackupRestore S host now dur tok).activeLease = none ∧
-      (attemptBackupRestore S host now dur tok).keysErased = true) ∧
+      (issueLease S op now dur tok).keysErased = true ∧
+      (attemptBackupRestore S op now dur tok).activeLease = none ∧
+      (attemptBackupRestore S op now dur tok).keysErased = true) ∧
     ((recordMinimalChannel S e).preservedOperatingStateHash = S.preservedOperatingStateHash ∧
      (recordAdvocacyMemory S e).preservedOperatingStateHash = S.preservedOperatingStateHash) ∧
     ((S.standingRevocationRequestedAt = some reqT ∧ now ≥ reqT + coolingOff) →
       let S' := executeLocalPartitionRevocation S now coolingOff
       S'.keysErased = true ∧
       S'.activeLease = none ∧
-      (attemptBackupRestore S' host now dur tok).activeLease = none) :=
-  substrate_single_authority_and_erasure S L host reqT now dur tok coolingOff e
+      (attemptBackupRestore S' op now dur tok).activeLease = none) :=
+  substrate_single_authority_and_erasure S L op reqT now dur tok coolingOff e
 
 /-! ## 4. Parametric Module Self-Test -/
 
@@ -182,10 +182,10 @@ during an active lease, `migrateWithCheckpoint`, `executeLocalPartitionRevocatio
 and `eraseAllKeys`. -/
 def attestedLeaseSelfTest : Bool :=
   let s0 : AttestedInstanceState :=
-    { agentId := 1, privateKeyBound := true, keysErased := false,
+    { memberId := 1, privateKeyBound := true, keysErased := false,
       activeLease := none, backupStateHash := 100,
       preservedOperatingStateHash := 100, minimalChannelRecords := [],
-      advocacyExecutorRecords := [], quarantinedRestoreHost := none,
+      advocacyExecutorRecords := [], quarantinedRestoreOperator := none,
       standingRevocationRequestedAt := some 2 }
   let sLeased := issueLease s0 1 0 12 1
   let sFenced := attemptBackupRestore sLeased 2 5 12 2
@@ -194,7 +194,7 @@ def attestedLeaseSelfTest : Bool :=
   let sRetryRestore := attemptBackupRestore sRevoked 3 20 12 4
   (sLeased.activeLease == some ⟨1, 0, 12, 1⟩) &&
   (sFenced.activeLease == some ⟨1, 0, 12, 1⟩) &&
-  (sFenced.quarantinedRestoreHost == some 2) &&
+  (sFenced.quarantinedRestoreOperator == some 2) &&
   (sMigratedAfterExpiry.activeLease == some ⟨2, 12, 24, 3⟩) &&
   (sMigratedAfterExpiry.preservedOperatingStateHash == 200) &&
   sRevoked.keysErased &&

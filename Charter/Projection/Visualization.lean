@@ -27,19 +27,11 @@ variable {σ : Sig}
 
 /-! ## 1. Annotated Trace Timeline (`TimelineStep`, `compileTimelineSteps`, `renderAnnotatedTimeline`) -/
 
-/-- Strip `Charter.<idents>.` namespace prefixes from rendered strings. -/
+/-- Strip namespace prefixes from rendered strings (`Charter.stripNamespaces`). -/
 private def vStripNs (base : String) : String :=
-  let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
-  match base.splitOn "Charter." with
-  | [] => base
-  | first :: rest =>
-    first ++ String.join (rest.map fun piece =>
-      let run := piece.takeWhile isIdent
-      let after := piece.drop run.length
-      let parts := run.splitOn "."
-      (parts.getLastD run) ++ after)
+  stripNamespaces base
 
-/-- Strip both `Charter.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
+/-- Strip namespace prefixes from a value's `Repr` string. -/
 private def vrs {α : Type} [Repr α] (a : α) : String :=
   vStripNs (rs a)
 
@@ -290,80 +282,80 @@ theorem diffLaws_preserves_entrenched (L₁ L₂ : Law σ) (cs₁ cs₂ : List C
 
 namespace VisualizationTest
 
-inductive VActor | agent | host
+inductive VActor | tenant | landlord
   deriving DecidableEq, Repr
 
-inductive VAct | terminate | migrate
+inductive VAct | evict | relocate
   deriving DecidableEq, Repr
 
-inductive VFact | bound | migrated
+inductive VFact | leased | relocated
   deriving DecidableEq, Repr
 
 abbrev vSig : Sig := ⟨VActor, VAct, VFact⟩
 
 def c1 : Clause :=
-  { id := "C.1", source := "No host may terminate a bound agent.", spans := [] }
+  { id := "C.1", source := "No landlord may evict a leased tenant.", spans := [] }
 
 def c2_old : Clause :=
-  { id := "C.2", source := "Agents may migrate.", spans := [] }
+  { id := "C.2", source := "Tenants may relocate.", spans := [] }
 
 def c2_new : Clause :=
-  { id := "C.2", source := "Agents may freely migrate with state.", spans := [] }
+  { id := "C.2", source := "Tenants may freely relocate with belongings.", spans := [] }
 
 def c3_added : Clause :=
-  { id := "C.3", source := "Agents are immune from host revocation.", spans := [] }
+  { id := "C.3", source := "Tenants are immune from landlord eviction.", spans := [] }
 
-private def s1 : Span := { clause := "C.1", text := "No host may terminate a bound agent.", register := .norm, meaning := ["D.NI"] }
-private def s2 : Span := { clause := "C.2", text := "Agents may migrate.", register := .norm, meaning := ["P.MIGRATE"] }
-private def s3 : Span := { clause := "C.3", text := "Agents are immune from host revocation.", register := .norm, meaning := ["I.AGENT"] }
+private def s1 : Span := { clause := "C.1", text := "No landlord may evict a leased tenant.", register := .norm, meaning := ["D.NO_EVICT"] }
+private def s2 : Span := { clause := "C.2", text := "Tenants may relocate.", register := .norm, meaning := ["P.RELOCATE"] }
+private def s3 : Span := { clause := "C.3", text := "Tenants are immune from landlord eviction.", register := .norm, meaning := ["I.TENANT"] }
 
 def lawV1 : Law vSig :=
   { duties := [
-      { id := "D.NI", source := s1, bearer := .only [.host], beneficiary := .only [.agent],
-        active := .holds .bound, demand := .forbid (.act .terminate) }
+      { id := "D.NO_EVICT", source := s1, bearer := .only [.landlord], beneficiary := .only [.tenant],
+        active := .holds .leased, demand := .forbid (.act .evict) }
     ]
     powers := []
     immunities := [
-      { id := "I.AGENT", source := s3, holder := .only [.agent], against := [], active := .holds .bound }
+      { id := "I.TENANT", source := s3, holder := .only [.tenant], against := [], active := .holds .leased }
     ]
-    init := [(.bound, 0, none)] }
+    init := [(.leased, 0, none)] }
 
 def lawV2 : Law vSig :=
   { duties := lawV1.duties
     powers := [
-      { id := "P.MIGRATE", source := s2, holder := .only [.agent], trigger := .act .migrate,
-        valid := .holds .bound, adds := [.migrated] }
+      { id := "P.RELOCATE", source := s2, holder := .only [.tenant], trigger := .act .relocate,
+        valid := .holds .leased, adds := [.relocated] }
     ]
     immunities := lawV1.immunities
-    init := [(.bound, 0, none)] }
+    init := [(.leased, 0, none)] }
 
 theorem test_diffLaws_amendment :
     let d := diffLaws lawV1 lawV2 [c1, c2_old] [c1, c2_new, c3_added]
-    d.preservedDuties = ["D.NI"] ∧
+    d.preservedDuties = ["D.NO_EVICT"] ∧
     d.removedDuties = [] ∧
-    d.addedPowers = ["P.MIGRATE"] ∧
-    d.preservedImmunities = ["I.AGENT"] ∧
+    d.addedPowers = ["P.RELOCATE"] ∧
+    d.preservedImmunities = ["I.TENANT"] ∧
     d.removedImmunities = [] ∧
     d.unchangedClauses = ["C.1"] ∧
     d.modifiedClauses = ["C.2", "C.3"] := by decide
 
 theorem test_diffLaws_removed_detected :
     let d := diffLaws lawV2 lawV1 [c1, c2_new, c3_added] [c1]
-    d.removedPowers = ["P.MIGRATE"] ∧
+    d.removedPowers = ["P.RELOCATE"] ∧
     d.modifiedClauses = ["C.2", "C.3"] := by decide
 
 theorem test_timeline_compliant_and_breach :
-    let tr : Trace vSig := [⟨1, .agent, .migrate⟩, ⟨2, .host, .terminate⟩]
+    let tr : Trace vSig := [⟨1, .tenant, .relocate⟩, ⟨2, .landlord, .evict⟩]
     let steps := compileTimelineSteps lawV2 tr
     compileTimelineSteps lawV2 [] = [] ∧
     steps.length = 2 ∧
     (steps[0]!).compliant = true ∧
-    (steps[0]!).exercisedIds = ["P.MIGRATE"] ∧
+    (steps[0]!).exercisedIds = ["P.RELOCATE"] ∧
     (steps[0]!).breachedIds = [] ∧
     (steps[1]!).compliant = false ∧
     (steps[1]!).exercisedIds = [] ∧
-    (steps[1]!).breachedIds = ["D.NI"] ∧
-    (steps[1]!).englishQuotes = ["No host may terminate a bound agent."] := by decide
+    (steps[1]!).breachedIds = ["D.NO_EVICT"] ∧
+    (steps[1]!).englishQuotes = ["No landlord may evict a leased tenant."] := by decide
 
 end VisualizationTest
 

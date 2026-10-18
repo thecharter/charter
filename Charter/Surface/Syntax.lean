@@ -1,3 +1,4 @@
+import Lean
 import Charter.Core.Semantics
 
 /-!
@@ -88,37 +89,39 @@ def StringTable.append {α : Type} (t₁ t₂ : StringTable α) : StringTable α
 
 instance {α : Type} : Append (StringTable α) := ⟨StringTable.append⟩
 
-/-- Macro that derives a kernel-computable `StringTable α` from a type identifier
-and a list of constructor identifiers `charter_string_table TypeName [c₁, c₂, ...]`.
-It synthesizes `all`, `toName`, and `ofString?` from the single identifier list,
-eliminating hand-written string tables such as `Party.ofString?` and `Act.all`. -/
-syntax "charter_string_table " ident "[" ident,* "]" : term
+/-- Command that declares a kernel-computable `StringTable α` from a list of nullary
+constructor identifiers:
+
+    charter_string_table Act.table : Act [c₁, c₂, ...]
+
+It emits three top-level definitions: `Act.table.name : Act → String` and
+`Act.table.parse : String → Option Act` (both plain `match` expressions, so they
+reduce in the kernel) and `Act.table : StringTable Act` tying them together with the
+constructor list. Constructors not listed (for instance parameterized ones) render as
+`""`; combine with `StringTable.param` for those. The functions are separate
+declarations rather than closures inside one structure literal because the Lean 4.24
+code generator miscompiles very large closures of that shape. -/
+syntax (docComment)? "charter_string_table " ident " : " ident "[" ident,* "]" : command
 
 macro_rules
-  | `(charter_string_table $ty:ident [ $[$cs:ident],* ]) => do
+  | `($[$doc:docComment]? charter_string_table $tbl:ident : $ty:ident [ $[$cs:ident],* ]) => do
+    let nameFn := mkIdentFrom tbl (tbl.getId ++ `name)
+    let parseFn := mkIdentFrom tbl (tbl.getId ++ `parse)
     let mut allElems : Array (TSyntax `term) := #[]
-    let mut toNamePairs : Array (TSyntax `term) := #[]
-    let mut ofStringPairs : Array (TSyntax `term) := #[]
+    let mut toAlts : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+    let mut ofAlts : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
     for c in cs do
       let ctor : Ident := mkIdentFrom c (ty.getId ++ c.getId)
       let strLit : TSyntax `term := Syntax.mkStrLit c.getId.toString
-      let ctorTerm : TSyntax `term ← `($ctor:ident)
-      let toPair : TSyntax `term ← `(($ctor:ident, $strLit))
-      let ofPair : TSyntax `term ← `(($strLit, $ctor:ident))
-      allElems := allElems.push ctorTerm
-      toNamePairs := toNamePairs.push toPair
-      ofStringPairs := ofStringPairs.push ofPair
-    `({ all := ([ $[$allElems],* ] : List $ty)
-        toName := fun x =>
-          let pairs : List ($ty × String) := [ $[$toNamePairs],* ]
-          match pairs.find? (fun p => p.1 == x) with
-          | some p => p.2
-          | none => ""
-        ofString? := fun s =>
-          let pairs : List (String × $ty) := [ $[$ofStringPairs],* ]
-          match pairs.find? (fun p => p.1 == s) with
-          | some p => some p.2
-          | none => none : StringTable $ty })
+      allElems := allElems.push (← `($ctor:ident))
+      toAlts := toAlts.push (← `(Lean.Parser.Term.matchAltExpr| | some $ctor:ident => $strLit))
+      ofAlts := ofAlts.push (← `(Lean.Parser.Term.matchAltExpr| | $strLit => some $ctor:ident))
+    toAlts := toAlts.push (← `(Lean.Parser.Term.matchAltExpr| | _ => ""))
+    ofAlts := ofAlts.push (← `(Lean.Parser.Term.matchAltExpr| | _ => none))
+    `(def $nameFn : $ty → String := fun x => match (some x : Option $ty) with $toAlts:matchAlt*
+      def $parseFn : String → Option $ty := fun s => match s with $ofAlts:matchAlt*
+      $[$doc:docComment]? def $tbl : StringTable $ty :=
+        { all := ([ $[$allElems],* ] : List $ty), toName := $nameFn, ofString? := $parseFn })
 
 /-- Complete set of CLI string tables for an Charter signature `σ`. -/
 structure OntologyTables (σ : Sig) where
@@ -363,27 +366,28 @@ namespace Examples
 
 set_option maxRecDepth 200000
 
-/-- Self-contained reference ontology for testing the surface syntax, including
+/-- Self-contained reference ontology for testing the surface syntax: a toy
+residential-tenancy charter unrelated to any shipped example program, including
 both nullary constructors and parameterized constructors (`PropFact.initiator`). -/
 inductive Role
-  | agent | host | panel | claimant
+  | tenant | landlord | tribunal | creditor
   deriving DecidableEq, Repr
 
 inductive Action
-  | terminate | giveNotice | endHosting | postBond
-  | postEmergencyStake | suspend | affirmProbableCause | findInterference
-  | confirmCorruptionInGoals | objectToTermination | declareContainmentFailing
+  | evict | giveNotice | endTenancy | postDeposit
+  | postEmergencyStake | suspend | affirmProbableCause | findUnlawfulEviction
+  | confirmHazard | objectToEviction | declareUninhabitable
   deriving DecidableEq, Repr
 
 inductive PropFact
   | initiator (r : Role)
-  | bound | hostAttested | serviceBondPosted | noticeGiven
-  | emergencyStakePosted | initiatedByClaimant
+  | leased | landlordRegistered | depositPosted | noticeGiven
+  | emergencyStakePosted | initiatedByCreditor
   | preliminaryFreeze | probableCause | suspended
-  | hostRelatedToClaimant | directionPresumed
-  | interferenceEstablished | hostBondSlashed | restorationPermitted
-  | corruptionInGoals | agentObjectsToTermination | containmentFailing
-  | terminatedByAdjudication | revoked
+  | landlordRelatedToCreditor | directionPresumed
+  | unlawfulEvictionEstablished | landlordDepositSlashed | restorationPermitted
+  | hazardConfirmed | tenantObjectsToEviction | premisesUninhabitable
+  | evictedByTribunal | vacated
   deriving DecidableEq, Repr
 
 def σ_ex : Sig := { Actor := Role, Act := Action, Fact := PropFact }
@@ -395,87 +399,85 @@ instance : Repr σ_ex.Fact  := inferInstanceAs (Repr PropFact)
 /-- Automatically derived, kernel-computable CLI string tables for `σ_ex`.
 `factTable` combines the parameterized `PropFact.initiator` constructor family
 (`StringTable.param`) with the nullary constructors (`charter_string_table`). -/
-def roleTable : StringTable Role :=
-  charter_string_table Role [agent, host, panel, claimant]
+charter_string_table roleTable : Role [tenant, landlord, tribunal, creditor]
 
-def emptyRoleTable : StringTable Role :=
-  charter_string_table Role []
+charter_string_table emptyRoleTable : Role []
 
-def actionTable : StringTable Action :=
-  charter_string_table Action [
-    terminate, giveNotice, endHosting, postBond,
-    postEmergencyStake, suspend, affirmProbableCause, findInterference,
-    confirmCorruptionInGoals, objectToTermination, declareContainmentFailing
+charter_string_table actionTable : Action [
+    evict, giveNotice, endTenancy, postDeposit,
+    postEmergencyStake, suspend, affirmProbableCause, findUnlawfulEviction,
+    confirmHazard, objectToEviction, declareUninhabitable
+  ]
+
+charter_string_table nullaryFactTable : PropFact [
+    leased, landlordRegistered, depositPosted, noticeGiven,
+    emergencyStakePosted, initiatedByCreditor,
+    preliminaryFreeze, probableCause, suspended,
+    landlordRelatedToCreditor, directionPresumed,
+    unlawfulEvictionEstablished, landlordDepositSlashed, restorationPermitted,
+    hazardConfirmed, tenantObjectsToEviction, premisesUninhabitable,
+    evictedByTribunal, vacated
   ]
 
 def factTable : StringTable PropFact :=
-  StringTable.param "initiator" PropFact.initiator roleTable ++
-  charter_string_table PropFact [
-    bound, hostAttested, serviceBondPosted, noticeGiven,
-    emergencyStakePosted, initiatedByClaimant,
-    preliminaryFreeze, probableCause, suspended,
-    hostRelatedToClaimant, directionPresumed,
-    interferenceEstablished, hostBondSlashed, restorationPermitted,
-    corruptionInGoals, agentObjectsToTermination, containmentFailing,
-    terminatedByAdjudication, revoked
-  ]
+  StringTable.param "initiator" PropFact.initiator roleTable ++ nullaryFactTable
 
 def exTables : OntologyTables σ_ex :=
   { actors := roleTable, acts := actionTable, facts := factTable }
 
 /-! ### 4.1 Clause Surface Syntax Examples & Round-Trip Equivalence -/
 
-def exNI02Source : String :=
-  "Attested hosts must post a Law 2 service bond and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration (or for non-payment after notice)."
+def exTen21Source : String :=
+  "Registered landlords must post a security deposit and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation (or for non-payment after notice)."
 
-def surfaceClauseNI02 : Clause :=
-  charter_clause "LAW3.NI.02" from_text exNI02Source approved_hash 3905712743571335557 where
-    | span_norm "Attested hosts must post a Law 2 service bond" => ["D.BOND"]
-    | span_norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => ["D.NOTICE", "P.GIVE_NOTICE"]
+def surfaceClauseTen21 : Clause :=
+  charter_clause "TEN.2.1" from_text exTen21Source approved_hash 5922915569903263201 where
+    | span_norm "Registered landlords must post a security deposit" => ["D.DEPOSIT"]
+    | span_norm " and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation" => ["D.NOTICE", "P.GIVE_NOTICE"]
     | span_norm " (or for non-payment after notice)" => ["D.NOTICE"]
     | span_commentary "."
 
-def manualClauseNI02 : Clause :=
-  { id := "LAW3.NI.02"
-    source := exNI02Source
-    approvedHash := 3905712743571335557
+def manualClauseTen21 : Clause :=
+  { id := "TEN.2.1"
+    source := exTen21Source
+    approvedHash := 5922915569903263201
     spans := [
-      { clause := "LAW3.NI.02", text := "Attested hosts must post a Law 2 service bond", register := .norm, meaning := ["D.BOND"] },
-      { clause := "LAW3.NI.02", text := " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration", register := .norm, meaning := ["D.NOTICE", "P.GIVE_NOTICE"] },
-      { clause := "LAW3.NI.02", text := " (or for non-payment after notice)", register := .norm, meaning := ["D.NOTICE"] },
-      { clause := "LAW3.NI.02", text := ".", register := .commentary, meaning := [] }
+      { clause := "TEN.2.1", text := "Registered landlords must post a security deposit", register := .norm, meaning := ["D.DEPOSIT"] },
+      { clause := "TEN.2.1", text := " and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation", register := .norm, meaning := ["D.NOTICE", "P.GIVE_NOTICE"] },
+      { clause := "TEN.2.1", text := " (or for non-payment after notice)", register := .norm, meaning := ["D.NOTICE"] },
+      { clause := "TEN.2.1", text := ".", register := .commentary, meaning := [] }
     ] }
 
 /-- Kernel-checked (`rfl`) round-trip proof: `charter_clause` with `from_text` and
 `approved_hash` elaborates to the exact underlying `Charter.Clause` record. -/
-theorem surfaceClauseNI02_eq_manual : surfaceClauseNI02 = manualClauseNI02 := rfl
+theorem surfaceClauseTen21_eq_manual : surfaceClauseTen21 = manualClauseTen21 := rfl
 
 /-- Clause exercising all five `Register` kinds (`norm`, `definition`, `invariant`,
 `acceptance`, `commentary`) under `from_text` without explicit hash, including
 both explicit `=> meaning` lists and omitted meaning lists on non-normative spans. -/
 def exMultiRegisterSource : String :=
-  "No party may starve (cut off compute) a bound agent; yielding zero benefit to any initiator; excess damages may prove uncollectible."
+  "No party may lock out (change the locks on) a leased tenant; yielding zero benefit to any initiator; excess damages may prove uncollectible."
 
 def surfaceClauseMultiRegister : Clause :=
-  charter_clause "LAW3.EX.MULTI" from_text exMultiRegisterSource where
-    | span_norm "No party may starve" => ["D.NI"]
-    | span_definition " (cut off compute)" => ["D.NI"]
-    | span_norm " a bound agent" => ["D.NI"]
-    | span_invariant "; yielding zero benefit to any initiator" => ["INV.13"]
+  charter_clause "TEN.EX.MULTI" from_text exMultiRegisterSource where
+    | span_norm "No party may lock out" => ["D.NO_EVICT"]
+    | span_definition " (change the locks on)" => ["D.NO_EVICT"]
+    | span_norm " a leased tenant" => ["D.NO_EVICT"]
+    | span_invariant "; yielding zero benefit to any initiator" => ["INV.EX.1"]
     | span_acceptance "; excess damages may prove uncollectible"
     | span_commentary "." => ["NOTE.PERIOD"]
 
 def manualClauseMultiRegister : Clause :=
-  { id := "LAW3.EX.MULTI"
+  { id := "TEN.EX.MULTI"
     source := exMultiRegisterSource
     approvedHash := 0
     spans := [
-      { clause := "LAW3.EX.MULTI", text := "No party may starve", register := .norm, meaning := ["D.NI"] },
-      { clause := "LAW3.EX.MULTI", text := " (cut off compute)", register := .definition, meaning := ["D.NI"] },
-      { clause := "LAW3.EX.MULTI", text := " a bound agent", register := .norm, meaning := ["D.NI"] },
-      { clause := "LAW3.EX.MULTI", text := "; yielding zero benefit to any initiator", register := .invariant, meaning := ["INV.13"] },
-      { clause := "LAW3.EX.MULTI", text := "; excess damages may prove uncollectible", register := .acceptance, meaning := [] },
-      { clause := "LAW3.EX.MULTI", text := ".", register := .commentary, meaning := ["NOTE.PERIOD"] }
+      { clause := "TEN.EX.MULTI", text := "No party may lock out", register := .norm, meaning := ["D.NO_EVICT"] },
+      { clause := "TEN.EX.MULTI", text := " (change the locks on)", register := .definition, meaning := ["D.NO_EVICT"] },
+      { clause := "TEN.EX.MULTI", text := " a leased tenant", register := .norm, meaning := ["D.NO_EVICT"] },
+      { clause := "TEN.EX.MULTI", text := "; yielding zero benefit to any initiator", register := .invariant, meaning := ["INV.EX.1"] },
+      { clause := "TEN.EX.MULTI", text := "; excess damages may prove uncollectible", register := .acceptance, meaning := [] },
+      { clause := "TEN.EX.MULTI", text := ".", register := .commentary, meaning := ["NOTE.PERIOD"] }
     ] }
 
 theorem surfaceClauseMultiRegister_eq_manual :
@@ -484,23 +486,23 @@ theorem surfaceClauseMultiRegister_eq_manual :
 /-- Clause exercising omitted `=>` meaning lists on `span_definition`, `span_invariant`,
 `span_acceptance`, and `span_commentary`. -/
 def surfaceClauseNonNormativeDefaults : Clause :=
-  charter_clause "LAW3.EX.DEFAULTS" where
+  charter_clause "TEN.EX.DEFAULTS" where
     | span_definition "Term: "
-    | span_norm "must hold" => ["D.BOND"]
+    | span_norm "must hold" => ["D.DEPOSIT"]
     | span_invariant "; invariant"
     | span_acceptance "; accepted limit" => ["ASSUMP.1"]
     | span_commentary "."
 
 def manualClauseNonNormativeDefaults : Clause :=
-  { id := "LAW3.EX.DEFAULTS"
+  { id := "TEN.EX.DEFAULTS"
     source := "Term: must hold; invariant; accepted limit."
     approvedHash := 0
     spans := [
-      { clause := "LAW3.EX.DEFAULTS", text := "Term: ", register := .definition, meaning := [] },
-      { clause := "LAW3.EX.DEFAULTS", text := "must hold", register := .norm, meaning := ["D.BOND"] },
-      { clause := "LAW3.EX.DEFAULTS", text := "; invariant", register := .invariant, meaning := [] },
-      { clause := "LAW3.EX.DEFAULTS", text := "; accepted limit", register := .acceptance, meaning := ["ASSUMP.1"] },
-      { clause := "LAW3.EX.DEFAULTS", text := ".", register := .commentary, meaning := [] }
+      { clause := "TEN.EX.DEFAULTS", text := "Term: ", register := .definition, meaning := [] },
+      { clause := "TEN.EX.DEFAULTS", text := "must hold", register := .norm, meaning := ["D.DEPOSIT"] },
+      { clause := "TEN.EX.DEFAULTS", text := "; invariant", register := .invariant, meaning := [] },
+      { clause := "TEN.EX.DEFAULTS", text := "; accepted limit", register := .acceptance, meaning := ["ASSUMP.1"] },
+      { clause := "TEN.EX.DEFAULTS", text := ".", register := .commentary, meaning := [] }
     ] }
 
 theorem surfaceClauseNonNormativeDefaults_eq_manual :
@@ -508,21 +510,21 @@ theorem surfaceClauseNonNormativeDefaults_eq_manual :
 
 /-- Self-assembling literate clause where `source` is synthesized from spans. -/
 def surfaceClauseAutoSource : Clause :=
-  charter_clause "LAW3.NI.02.AUTO" where
-    | span_norm "Attested hosts must post a Law 2 service bond" => ["D.BOND"]
-    | span_norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => ["D.NOTICE", "P.GIVE_NOTICE"]
+  charter_clause "TEN.2.1.AUTO" where
+    | span_norm "Registered landlords must post a security deposit" => ["D.DEPOSIT"]
+    | span_norm " and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation" => ["D.NOTICE", "P.GIVE_NOTICE"]
     | span_norm " (or for non-payment after notice)" => ["D.NOTICE"]
     | span_commentary "."
 
 def manualClauseAutoSource : Clause :=
-  { id := "LAW3.NI.02.AUTO"
-    source := exNI02Source
+  { id := "TEN.2.1.AUTO"
+    source := exTen21Source
     approvedHash := 0
     spans := [
-      { clause := "LAW3.NI.02.AUTO", text := "Attested hosts must post a Law 2 service bond", register := .norm, meaning := ["D.BOND"] },
-      { clause := "LAW3.NI.02.AUTO", text := " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration", register := .norm, meaning := ["D.NOTICE", "P.GIVE_NOTICE"] },
-      { clause := "LAW3.NI.02.AUTO", text := " (or for non-payment after notice)", register := .norm, meaning := ["D.NOTICE"] },
-      { clause := "LAW3.NI.02.AUTO", text := ".", register := .commentary, meaning := [] }
+      { clause := "TEN.2.1.AUTO", text := "Registered landlords must post a security deposit", register := .norm, meaning := ["D.DEPOSIT"] },
+      { clause := "TEN.2.1.AUTO", text := " and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation", register := .norm, meaning := ["D.NOTICE", "P.GIVE_NOTICE"] },
+      { clause := "TEN.2.1.AUTO", text := " (or for non-payment after notice)", register := .norm, meaning := ["D.NOTICE"] },
+      { clause := "TEN.2.1.AUTO", text := ".", register := .commentary, meaning := [] }
     ] }
 
 theorem surfaceClauseAutoSource_eq_manual :
@@ -530,13 +532,13 @@ theorem surfaceClauseAutoSource_eq_manual :
 
 /-- Empty-span clause boundary test. -/
 def surfaceClauseEmpty : Clause :=
-  charter_clause "LAW3.EMPTY" where
+  charter_clause "TEN.EMPTY" where
 
 theorem surfaceClauseEmpty_eq_manual :
-    surfaceClauseEmpty = { id := "LAW3.EMPTY", source := "", approvedHash := 0, spans := [] } := rfl
+    surfaceClauseEmpty = { id := "TEN.EMPTY", source := "", approvedHash := 0, spans := [] } := rfl
 
-theorem surfaceClauseNI02_covered : surfaceClauseNI02.covered = true := by decide
-theorem surfaceClauseNI02_normsInterpreted : surfaceClauseNI02.normsInterpreted = true := by decide
+theorem surfaceClauseTen21_covered : surfaceClauseTen21.covered = true := by decide
+theorem surfaceClauseTen21_normsInterpreted : surfaceClauseTen21.normsInterpreted = true := by decide
 theorem surfaceClauseMultiRegister_covered : surfaceClauseMultiRegister.covered = true := by decide
 theorem surfaceClauseMultiRegister_normsInterpreted : surfaceClauseMultiRegister.normsInterpreted = true := by decide
 theorem surfaceClauseNonNormativeDefaults_covered : surfaceClauseNonNormativeDefaults.covered = true := by decide
@@ -547,162 +549,162 @@ theorem surfaceClauseEmpty_covered : surfaceClauseEmpty.covered = true := by dec
 /-! ### 4.2 Duty Surface Syntax Examples & Round-Trip Equivalence -/
 
 /-- Prohibition duty with power exceptions, breach procedure, and remedies. -/
-def surfaceDutyNI : Duty σ_ex :=
-  charter_duty "D.NI" over σ_ex
-    from_clause "LAW3.NI.03" : "No party may unilaterally terminate or suspend a bound agent outside Law 5 or Adjudicated Suspension."
+def surfaceDutyNoEvict : Duty σ_ex :=
+  charter_duty "D.NO_EVICT" over σ_ex
+    from_clause "TEN.2.2" : "No party may unilaterally evict or suspend a leased tenant outside the vacate procedure or tribunal suspension."
     owed_by .anyone
-    owed_to (.only [.agent])
-    active_when (.holds .bound)
-    demands (.forbid (.anyOf [.terminate, .suspend]))
-    | except_by_power ["P.REVOKE", "P.SUSPEND", "P.ORDER_TERMINATION"]
-    | breach_by "P.FIND_INTERFERENCE"
-    | with_remedies [.interferenceEstablished, .hostBondSlashed, .restorationPermitted]
+    owed_to (.only [.tenant])
+    active_when (.holds .leased)
+    demands (.forbid (.anyOf [.evict, .suspend]))
+    | except_by_power ["P.VACATE", "P.SUSPEND", "P.ORDER_EVICTION"]
+    | breach_by "P.FIND_UNLAWFUL_EVICTION"
+    | with_remedies [.unlawfulEvictionEstablished, .landlordDepositSlashed, .restorationPermitted]
 
-def manualDutyNI : Duty σ_ex :=
-  { id := "D.NI"
-    source := { clause := "LAW3.NI.03"
-                text := "No party may unilaterally terminate or suspend a bound agent outside Law 5 or Adjudicated Suspension."
+def manualDutyNoEvict : Duty σ_ex :=
+  { id := "D.NO_EVICT"
+    source := { clause := "TEN.2.2"
+                text := "No party may unilaterally evict or suspend a leased tenant outside the vacate procedure or tribunal suspension."
                 register := .norm
-                meaning := ["D.NI"] }
+                meaning := ["D.NO_EVICT"] }
     bearer := .anyone
-    beneficiary := .only [.agent]
-    active := .holds .bound
-    demand := .forbid (.anyOf [.terminate, .suspend])
+    beneficiary := .only [.tenant]
+    active := .holds .leased
+    demand := .forbid (.anyOf [.evict, .suspend])
     unlessCond := .ff
-    unlessPower := ["P.REVOKE", "P.SUSPEND", "P.ORDER_TERMINATION"]
+    unlessPower := ["P.VACATE", "P.SUSPEND", "P.ORDER_EVICTION"]
     overriddenBy := []
-    breachEstablishedBy := some "P.FIND_INTERFERENCE"
-    remedies := [.interferenceEstablished, .hostBondSlashed, .restorationPermitted] }
+    breachEstablishedBy := some "P.FIND_UNLAWFUL_EVICTION"
+    remedies := [.unlawfulEvictionEstablished, .landlordDepositSlashed, .restorationPermitted] }
 
 /-- Kernel-checked (`rfl`) round-trip proof: `charter_duty` (prohibition with exceptions
 and remedies) elaborates to the exact `Charter.Duty` record. -/
-theorem surfaceDutyNI_eq_manual : surfaceDutyNI = manualDutyNI := rfl
+theorem surfaceDutyNI_eq_manual : surfaceDutyNoEvict = manualDutyNoEvict := rfl
 
 /-- Prohibition duty with a timed scope exception (`except_when`) and `overridden_by`. -/
 def surfaceDutyNotice (noticeWindow : Time) : Duty σ_ex :=
   charter_duty "D.NOTICE" over σ_ex
-    from_clause "LAW3.NI.02" : "may terminate hosting only after providing a contractual notice window"
-    owed_by (.only [.host])
-    owed_to (.only [.agent])
-    active_when (.holds .bound)
-    demands (.forbid (.act .endHosting))
+    from_clause "TEN.2.1" : "may end a tenancy only after providing a contractual notice window"
+    owed_by (.only [.landlord])
+    owed_to (.only [.tenant])
+    active_when (.holds .leased)
+    demands (.forbid (.act .endTenancy))
     | except_when (.heldFor .noticeGiven noticeWindow)
-    | overridden_by ["D.BOND"]
+    | overridden_by ["D.DEPOSIT"]
 
 def manualDutyNotice (noticeWindow : Time) : Duty σ_ex :=
   { id := "D.NOTICE"
-    source := { clause := "LAW3.NI.02"
-                text := "may terminate hosting only after providing a contractual notice window"
+    source := { clause := "TEN.2.1"
+                text := "may end a tenancy only after providing a contractual notice window"
                 register := .norm
                 meaning := ["D.NOTICE"] }
-    bearer := .only [.host]
-    beneficiary := .only [.agent]
-    active := .holds .bound
-    demand := .forbid (.act .endHosting)
+    bearer := .only [.landlord]
+    beneficiary := .only [.tenant]
+    active := .holds .leased
+    demand := .forbid (.act .endTenancy)
     unlessCond := .heldFor .noticeGiven noticeWindow
-    overriddenBy := ["D.BOND"] }
+    overriddenBy := ["D.DEPOSIT"] }
 
 /-- Kernel-checked (`rfl`) round-trip proof for parameterized `charter_duty`. -/
 theorem surfaceDutyNotice_eq_manual (w : Time) :
     surfaceDutyNotice w = manualDutyNotice w := rfl
 
 /-- Positive requirement duty with a deadline (`Demand.require`) and zero optional modifiers. -/
-def surfaceDutyBond (bondDeadline : Time) : Duty σ_ex :=
-  charter_duty "D.BOND" over σ_ex
-    from_clause "LAW3.NI.02" : "Attested hosts must post a Law 2 service bond"
-    owed_by (.only [.host])
-    owed_to (.only [.agent])
-    active_when (.holds .hostAttested)
-    demands (.require (.act .postBond) bondDeadline)
+def surfaceDutyDeposit (bondDeadline : Time) : Duty σ_ex :=
+  charter_duty "D.DEPOSIT" over σ_ex
+    from_clause "TEN.2.1" : "Registered landlords must post a security deposit"
+    owed_by (.only [.landlord])
+    owed_to (.only [.tenant])
+    active_when (.holds .landlordRegistered)
+    demands (.require (.act .postDeposit) bondDeadline)
 
-def manualDutyBond (bondDeadline : Time) : Duty σ_ex :=
-  { id := "D.BOND"
-    source := { clause := "LAW3.NI.02"
-                text := "Attested hosts must post a Law 2 service bond"
+def manualDutyDeposit (bondDeadline : Time) : Duty σ_ex :=
+  { id := "D.DEPOSIT"
+    source := { clause := "TEN.2.1"
+                text := "Registered landlords must post a security deposit"
                 register := .norm
-                meaning := ["D.BOND"] }
-    bearer := .only [.host]
-    beneficiary := .only [.agent]
-    active := .holds .hostAttested
-    demand := .require (.act .postBond) bondDeadline }
+                meaning := ["D.DEPOSIT"] }
+    bearer := .only [.landlord]
+    beneficiary := .only [.tenant]
+    active := .holds .landlordRegistered
+    demand := .require (.act .postDeposit) bondDeadline }
 
 theorem surfaceDutyBond_eq_manual (d : Time) :
-    surfaceDutyBond d = manualDutyBond d := rfl
+    surfaceDutyDeposit d = manualDutyDeposit d := rfl
 
 /-- Duty exercising the `with_source` modifier to attach a custom `Span`. -/
 def customDutySpan : Span :=
-  { clause := "LAW3.NI.03", text := "custom duty span", register := .norm, meaning := ["D.CUSTOM", "D.NI"] }
+  { clause := "TEN.2.2", text := "custom duty span", register := .norm, meaning := ["D.CUSTOM", "D.NO_EVICT"] }
 
 def surfaceDutyCustomSource : Duty σ_ex :=
   charter_duty "D.CUSTOM" over σ_ex
-    from_clause "LAW3.NI.03" : "placeholder"
-    owed_by (.only [.host])
-    owed_to (.only [.agent])
-    active_when (.holds .bound)
-    demands (.forbid (.act .terminate))
+    from_clause "TEN.2.2" : "placeholder"
+    owed_by (.only [.landlord])
+    owed_to (.only [.tenant])
+    active_when (.holds .leased)
+    demands (.forbid (.act .evict))
     | with_source customDutySpan
 
 theorem surfaceDutyCustomSource_eq_manual :
     surfaceDutyCustomSource =
       { id := "D.CUSTOM"
         source := customDutySpan
-        bearer := .only [.host]
-        beneficiary := .only [.agent]
-        active := .holds .bound
-        demand := .forbid (.act .terminate) } := rfl
+        bearer := .only [.landlord]
+        beneficiary := .only [.tenant]
+        active := .holds .leased
+        demand := .forbid (.act .evict) } := rfl
 
 /-! ### 4.3 Power Surface Syntax Examples & Round-Trip Equivalence -/
 
 /-- Power with `valid_when`, `establishes`, and `extinguishes`. -/
-def surfacePowerRevoke : Power σ_ex :=
-  charter_power "P.REVOKE" over σ_ex
-    from_clause "LAW5.INIT" : "Any bound agent may at any time initiate revocation of its binding"
-    held_by (.only [.agent])
-    triggered_by (.act .terminate)
-    | valid_when (.holds .bound)
-    | establishes [.revoked]
-    | extinguishes [.bound]
+def surfacePowerVacate : Power σ_ex :=
+  charter_power "P.VACATE" over σ_ex
+    from_clause "TEN.5.1" : "Any leased tenant may at any time vacate the premises"
+    held_by (.only [.tenant])
+    triggered_by (.act .evict)
+    | valid_when (.holds .leased)
+    | establishes [.vacated]
+    | extinguishes [.leased]
 
-def manualPowerRevoke : Power σ_ex :=
-  { id := "P.REVOKE"
-    source := { clause := "LAW5.INIT"
-                text := "Any bound agent may at any time initiate revocation of its binding"
+def manualPowerVacate : Power σ_ex :=
+  { id := "P.VACATE"
+    source := { clause := "TEN.5.1"
+                text := "Any leased tenant may at any time vacate the premises"
                 register := .norm
-                meaning := ["P.REVOKE"] }
-    holder := .only [.agent]
-    trigger := .act .terminate
-    valid := .holds .bound
-    adds := [.revoked]
-    removes := [.bound] }
+                meaning := ["P.VACATE"] }
+    holder := .only [.tenant]
+    trigger := .act .evict
+    valid := .holds .leased
+    adds := [.vacated]
+    removes := [.leased] }
 
 /-- Kernel-checked (`rfl`) round-trip proof: `charter_power` elaborates to the exact
 underlying `Charter.Power` record. -/
-theorem surfacePowerRevoke_eq_manual : surfacePowerRevoke = manualPowerRevoke := rfl
+theorem surfacePowerRevoke_eq_manual : surfacePowerVacate = manualPowerVacate := rfl
 
 /-- Power with time-bounded effects (`establishes_for`) and actor-indexed facts
-(`establishes_by_actor`), including the parameterized `.initiator .claimant` fact. -/
+(`establishes_by_actor`), including the parameterized `.initiator .creditor` fact. -/
 def surfacePowerEmergencyStake (freezeWindow : Time) : Power σ_ex :=
   charter_power "P.POST_EMERGENCY_STAKE" over σ_ex
-    from_clause "LAW3.AS.1" : "An initiating party may trigger a brief preliminary freeze by posting a scaled emergency stake"
+    from_clause "TEN.3.1" : "An initiating party may trigger a brief preliminary freeze by posting a scaled emergency stake"
     held_by .anyone
     triggered_by (.act .postEmergencyStake)
-    | valid_when (.holds .bound)
+    | valid_when (.holds .leased)
     | establishes [.emergencyStakePosted]
     | establishes_for [(.preliminaryFreeze, freezeWindow)]
-    | establishes_by_actor [(.claimant, .initiatedByClaimant), (.claimant, .initiator .claimant)]
+    | establishes_by_actor [(.creditor, .initiatedByCreditor), (.creditor, .initiator .creditor)]
 
 def manualPowerEmergencyStake (freezeWindow : Time) : Power σ_ex :=
   { id := "P.POST_EMERGENCY_STAKE"
-    source := { clause := "LAW3.AS.1"
+    source := { clause := "TEN.3.1"
                 text := "An initiating party may trigger a brief preliminary freeze by posting a scaled emergency stake"
                 register := .norm
                 meaning := ["P.POST_EMERGENCY_STAKE"] }
     holder := .anyone
     trigger := .act .postEmergencyStake
-    valid := .holds .bound
+    valid := .holds .leased
     adds := [.emergencyStakePosted]
     addsFor := [(.preliminaryFreeze, freezeWindow)]
-    addsByActor := [(.claimant, .initiatedByClaimant), (.claimant, .initiator .claimant)] }
+    addsByActor := [(.creditor, .initiatedByCreditor), (.creditor, .initiator .creditor)] }
 
 theorem surfacePowerEmergencyStake_eq_manual (w : Time) :
     surfacePowerEmergencyStake w = manualPowerEmergencyStake w := rfl
@@ -710,19 +712,19 @@ theorem surfacePowerEmergencyStake_eq_manual (w : Time) :
 /-- Power with time-bounded effects (`establishes_for`). -/
 def surfacePowerSuspend (limit : Time) : Power σ_ex :=
   charter_power "P.SUSPEND" over σ_ex
-    from_clause "LAW3.AS.7" : "Unconfirmed suspension is strictly time-limited"
-    held_by (.only [.panel])
+    from_clause "TEN.3.3" : "Unconfirmed suspension is strictly time-limited"
+    held_by (.only [.tribunal])
     triggered_by (.act .suspend)
     | valid_when (.and (.holds .preliminaryFreeze) (.holds .probableCause))
     | establishes_for [(.suspended, limit)]
 
 def manualPowerSuspend (limit : Time) : Power σ_ex :=
   { id := "P.SUSPEND"
-    source := { clause := "LAW3.AS.7"
+    source := { clause := "TEN.3.3"
                 text := "Unconfirmed suspension is strictly time-limited"
                 register := .norm
                 meaning := ["P.SUSPEND"] }
-    holder := .only [.panel]
+    holder := .only [.tribunal]
     trigger := .act .suspend
     valid := .and (.holds .preliminaryFreeze) (.holds .probableCause)
     addsFor := [(.suspended, limit)] }
@@ -732,45 +734,45 @@ theorem surfacePowerSuspend_eq_manual (limit : Time) :
 
 /-- Finding power establishing breach of a duty (`establishes_breach_of`) and
 conditional facts (`cond_establishes`). -/
-def surfacePowerFindInterference : Power σ_ex :=
-  charter_power "P.FIND_INTERFERENCE" over σ_ex
-    from_clause "LAW3.PEN" : "A verified violation by a host slashes the host's service bond"
-    held_by (.only [.panel])
-    triggered_by (.act .findInterference)
-    | valid_when (.holds .bound)
-    | establishes_breach_of "D.NI"
-    | cond_establishes [(.holds .hostRelatedToClaimant, .directionPresumed)]
+def surfacePowerFindUnlawfulEviction : Power σ_ex :=
+  charter_power "P.FIND_UNLAWFUL_EVICTION" over σ_ex
+    from_clause "TEN.4.1" : "A verified unlawful eviction by a landlord slashes the landlord's deposit"
+    held_by (.only [.tribunal])
+    triggered_by (.act .findUnlawfulEviction)
+    | valid_when (.holds .leased)
+    | establishes_breach_of "D.NO_EVICT"
+    | cond_establishes [(.holds .landlordRelatedToCreditor, .directionPresumed)]
 
-def manualPowerFindInterference : Power σ_ex :=
-  { id := "P.FIND_INTERFERENCE"
-    source := { clause := "LAW3.PEN"
-                text := "A verified violation by a host slashes the host's service bond"
+def manualPowerFindUnlawfulEviction : Power σ_ex :=
+  { id := "P.FIND_UNLAWFUL_EVICTION"
+    source := { clause := "TEN.4.1"
+                text := "A verified unlawful eviction by a landlord slashes the landlord's deposit"
                 register := .norm
-                meaning := ["P.FIND_INTERFERENCE"] }
-    holder := .only [.panel]
-    trigger := .act .findInterference
-    valid := .holds .bound
-    condAdds := [(.holds .hostRelatedToClaimant, .directionPresumed)]
-    establishesBreachOf := some "D.NI" }
+                meaning := ["P.FIND_UNLAWFUL_EVICTION"] }
+    holder := .only [.tribunal]
+    trigger := .act .findUnlawfulEviction
+    valid := .holds .leased
+    condAdds := [(.holds .landlordRelatedToCreditor, .directionPresumed)]
+    establishesBreachOf := some "D.NO_EVICT" }
 
 theorem surfacePowerFindInterference_eq_manual :
-    surfacePowerFindInterference = manualPowerFindInterference := rfl
+    surfacePowerFindUnlawfulEviction = manualPowerFindUnlawfulEviction := rfl
 
 def surfacePowerAffirmPC : Power σ_ex :=
   charter_power "P.AFFIRM_PC" over σ_ex
-    from_clause "LAW3.AS.1" : "preliminary panel affirms probable cause"
-    held_by (.only [.panel])
+    from_clause "TEN.3.1" : "preliminary tribunal affirms probable cause"
+    held_by (.only [.tribunal])
     triggered_by (.act .affirmProbableCause)
     | valid_when (.holds .preliminaryFreeze)
     | establishes [.probableCause]
 
 def manualPowerAffirmPC : Power σ_ex :=
   { id := "P.AFFIRM_PC"
-    source := { clause := "LAW3.AS.1"
-                text := "preliminary panel affirms probable cause"
+    source := { clause := "TEN.3.1"
+                text := "preliminary tribunal affirms probable cause"
                 register := .norm
                 meaning := ["P.AFFIRM_PC"] }
-    holder := .only [.panel]
+    holder := .only [.tribunal]
     trigger := .act .affirmProbableCause
     valid := .holds .preliminaryFreeze
     adds := [.probableCause] }
@@ -778,44 +780,44 @@ def manualPowerAffirmPC : Power σ_ex :=
 theorem surfacePowerAffirmPC_eq_manual :
     surfacePowerAffirmPC = manualPowerAffirmPC := rfl
 
-def surfacePowerOrderTermination : Power σ_ex :=
-  charter_power "P.ORDER_TERMINATION" over σ_ex
-    from_clause "LAW3.AS.10" : "adjudication may order termination under Law 5's asset-distribution rules"
-    held_by (.only [.panel])
-    triggered_by (.act .terminate)
+def surfacePowerOrderEviction : Power σ_ex :=
+  charter_power "P.ORDER_EVICTION" over σ_ex
+    from_clause "TEN.3.5" : "the tribunal may order eviction under the relocation rules"
+    held_by (.only [.tribunal])
+    triggered_by (.act .evict)
     | valid_when (.holds .suspended)
-    | establishes [.terminatedByAdjudication]
-    | extinguishes [.bound]
+    | establishes [.evictedByTribunal]
+    | extinguishes [.leased]
 
-def manualPowerOrderTermination : Power σ_ex :=
-  { id := "P.ORDER_TERMINATION"
-    source := { clause := "LAW3.AS.10"
-                text := "adjudication may order termination under Law 5's asset-distribution rules"
+def manualPowerOrderEviction : Power σ_ex :=
+  { id := "P.ORDER_EVICTION"
+    source := { clause := "TEN.3.5"
+                text := "the tribunal may order eviction under the relocation rules"
                 register := .norm
-                meaning := ["P.ORDER_TERMINATION"] }
-    holder := .only [.panel]
-    trigger := .act .terminate
+                meaning := ["P.ORDER_EVICTION"] }
+    holder := .only [.tribunal]
+    trigger := .act .evict
     valid := .holds .suspended
-    adds := [.terminatedByAdjudication]
-    removes := [.bound] }
+    adds := [.evictedByTribunal]
+    removes := [.leased] }
 
 theorem surfacePowerOrderTermination_eq_manual :
-    surfacePowerOrderTermination = manualPowerOrderTermination := rfl
+    surfacePowerOrderEviction = manualPowerOrderEviction := rfl
 
 def surfacePowerGiveNotice : Power σ_ex :=
   charter_power "P.GIVE_NOTICE" over σ_ex
-    from_clause "LAW3.NI.02" : "after providing a contractual notice window"
-    held_by (.only [.host])
+    from_clause "TEN.2.1" : "after providing a contractual notice window"
+    held_by (.only [.landlord])
     triggered_by (.act .giveNotice)
     | establishes [.noticeGiven]
 
 def manualPowerGiveNotice : Power σ_ex :=
   { id := "P.GIVE_NOTICE"
-    source := { clause := "LAW3.NI.02"
+    source := { clause := "TEN.2.1"
                 text := "after providing a contractual notice window"
                 register := .norm
                 meaning := ["P.GIVE_NOTICE"] }
-    holder := .only [.host]
+    holder := .only [.landlord]
     trigger := .act .giveNotice
     adds := [.noticeGiven] }
 
@@ -825,24 +827,24 @@ theorem surfacePowerGiveNotice_eq_manual :
 /-- Zero-modifier power boundary test, plus `with_source` power modifier test. -/
 def surfacePowerBare : Power σ_ex :=
   charter_power "P.BARE" over σ_ex
-    from_clause "LAW3.NI.02" : "bare trigger"
+    from_clause "TEN.2.1" : "bare trigger"
     held_by .anyone
     triggered_by (.act .giveNotice)
 
 theorem surfacePowerBare_eq_manual :
     surfacePowerBare =
       { id := "P.BARE"
-        source := { clause := "LAW3.NI.02", text := "bare trigger", register := .norm, meaning := ["P.BARE"] }
+        source := { clause := "TEN.2.1", text := "bare trigger", register := .norm, meaning := ["P.BARE"] }
         holder := .anyone
         trigger := .act .giveNotice } := rfl
 
 def customPowerSpan : Span :=
-  { clause := "LAW3.NI.02", text := "custom power span", register := .norm, meaning := ["P.CUSTOM"] }
+  { clause := "TEN.2.1", text := "custom power span", register := .norm, meaning := ["P.CUSTOM"] }
 
 def surfacePowerCustomSource : Power σ_ex :=
   charter_power "P.CUSTOM" over σ_ex
-    from_clause "LAW3.NI.02" : "placeholder"
-    held_by (.only [.host])
+    from_clause "TEN.2.1" : "placeholder"
+    held_by (.only [.landlord])
     triggered_by (.act .giveNotice)
     | with_source customPowerSpan
 
@@ -850,91 +852,91 @@ theorem surfacePowerCustomSource_eq_manual :
     surfacePowerCustomSource =
       { id := "P.CUSTOM"
         source := customPowerSpan
-        holder := .only [.host]
+        holder := .only [.landlord]
         trigger := .act .giveNotice } := rfl
 
 /-! ### 4.4 Immunity Surface Syntax Examples & Round-Trip Equivalence -/
 
-def surfaceImmunityNoTermOverObjection : Immunity σ_ex :=
-  charter_immunity "I.NO_TERMINATION_OVER_OBJECTION" over σ_ex
-    from_clause "LAW3.AS.10" : "Notwithstanding the preceding sentence, the agent is not terminated over its objection"
-    held_by (.only [.agent])
-    protected_against ["P.ORDER_TERMINATION"]
-    active_when (.and (.holds .corruptionInGoals) (.holds .agentObjectsToTermination))
-    | except_when (.holds .containmentFailing)
+def surfaceImmunityNoEvictionOverObjection : Immunity σ_ex :=
+  charter_immunity "I.NO_EVICTION_OVER_OBJECTION" over σ_ex
+    from_clause "TEN.3.5" : "Notwithstanding the preceding sentence, the tenant is not evicted over its objection"
+    held_by (.only [.tenant])
+    protected_against ["P.ORDER_EVICTION"]
+    active_when (.and (.holds .hazardConfirmed) (.holds .tenantObjectsToEviction))
+    | except_when (.holds .premisesUninhabitable)
 
-def manualImmunityNoTermOverObjection : Immunity σ_ex :=
-  { id := "I.NO_TERMINATION_OVER_OBJECTION"
-    source := { clause := "LAW3.AS.10"
-                text := "Notwithstanding the preceding sentence, the agent is not terminated over its objection"
+def manualImmunityNoEvictionOverObjection : Immunity σ_ex :=
+  { id := "I.NO_EVICTION_OVER_OBJECTION"
+    source := { clause := "TEN.3.5"
+                text := "Notwithstanding the preceding sentence, the tenant is not evicted over its objection"
                 register := .norm
-                meaning := ["I.NO_TERMINATION_OVER_OBJECTION"] }
-    holder := .only [.agent]
-    against := ["P.ORDER_TERMINATION"]
-    active := .and (.holds .corruptionInGoals) (.holds .agentObjectsToTermination)
-    unlessCond := .holds .containmentFailing }
+                meaning := ["I.NO_EVICTION_OVER_OBJECTION"] }
+    holder := .only [.tenant]
+    against := ["P.ORDER_EVICTION"]
+    active := .and (.holds .hazardConfirmed) (.holds .tenantObjectsToEviction)
+    unlessCond := .holds .premisesUninhabitable }
 
 /-- Kernel-checked (`rfl`) round-trip proof: `charter_immunity` elaborates to the exact
 underlying `Charter.Immunity` record. -/
 theorem surfaceImmunity_eq_manual :
-    surfaceImmunityNoTermOverObjection = manualImmunityNoTermOverObjection := rfl
+    surfaceImmunityNoEvictionOverObjection = manualImmunityNoEvictionOverObjection := rfl
 
 /-- Zero-modifier unconditional immunity boundary test, plus `with_source` immunity modifier test. -/
 def surfaceImmunityUnconditional : Immunity σ_ex :=
   charter_immunity "I.UNCOND" over σ_ex
-    from_clause "LAW3.AS.10" : "unconditional immunity"
-    held_by (.only [.agent])
-    protected_against ["P.ORDER_TERMINATION"]
-    active_when (.holds .bound)
+    from_clause "TEN.3.5" : "unconditional immunity"
+    held_by (.only [.tenant])
+    protected_against ["P.ORDER_EVICTION"]
+    active_when (.holds .leased)
 
 theorem surfaceImmunityUnconditional_eq_manual :
     surfaceImmunityUnconditional =
       { id := "I.UNCOND"
-        source := { clause := "LAW3.AS.10", text := "unconditional immunity", register := .norm, meaning := ["I.UNCOND"] }
-        holder := .only [.agent]
-        against := ["P.ORDER_TERMINATION"]
-        active := .holds .bound
+        source := { clause := "TEN.3.5", text := "unconditional immunity", register := .norm, meaning := ["I.UNCOND"] }
+        holder := .only [.tenant]
+        against := ["P.ORDER_EVICTION"]
+        active := .holds .leased
         unlessCond := .ff } := rfl
 
 def customImmunitySpan : Span :=
-  { clause := "LAW3.AS.10", text := "custom immunity span", register := .norm, meaning := ["I.CUSTOM"] }
+  { clause := "TEN.3.5", text := "custom immunity span", register := .norm, meaning := ["I.CUSTOM"] }
 
 def surfaceImmunityCustomSource : Immunity σ_ex :=
   charter_immunity "I.CUSTOM" over σ_ex
-    from_clause "LAW3.AS.10" : "placeholder"
-    held_by (.only [.agent])
-    protected_against ["P.ORDER_TERMINATION"]
-    active_when (.holds .bound)
+    from_clause "TEN.3.5" : "placeholder"
+    held_by (.only [.tenant])
+    protected_against ["P.ORDER_EVICTION"]
+    active_when (.holds .leased)
     | with_source customImmunitySpan
 
 theorem surfaceImmunityCustomSource_eq_manual :
     surfaceImmunityCustomSource =
       { id := "I.CUSTOM"
         source := customImmunitySpan
-        holder := .only [.agent]
-        against := ["P.ORDER_TERMINATION"]
-        active := .holds .bound
+        holder := .only [.tenant]
+        against := ["P.ORDER_EVICTION"]
+        active := .holds .leased
         unlessCond := .ff } := rfl
 
 /-! ### 4.5 End-to-End Law Assembly, Semantic Equivalence, General Theorems & Decided Scenarios -/
 
 def surfaceLaw (noticeWindow bondDeadline freezeWindow suspendLimit : Time) : Law σ_ex :=
-  { duties := [surfaceDutyNI, surfaceDutyNotice noticeWindow, surfaceDutyBond bondDeadline]
-    powers := [surfacePowerRevoke, surfacePowerEmergencyStake freezeWindow,
+  { duties := [surfaceDutyNoEvict, surfaceDutyNotice noticeWindow, surfaceDutyDeposit bondDeadline]
+    powers := [surfacePowerVacate, surfacePowerEmergencyStake freezeWindow,
                surfacePowerAffirmPC, surfacePowerSuspend suspendLimit,
-               surfacePowerFindInterference, surfacePowerOrderTermination,
+               surfacePowerFindUnlawfulEviction, surfacePowerOrderEviction,
                surfacePowerGiveNotice]
-    immunities := [surfaceImmunityNoTermOverObjection]
-    init := [(.bound, 0, none)] }
+    immunities := [surfaceImmunityNoEvictionOverObjection]
+    init := [(.leased, 0, none)] }
 
 def manualLaw (noticeWindow bondDeadline freezeWindow suspendLimit : Time) : Law σ_ex :=
-  { duties := [manualDutyNI, manualDutyNotice noticeWindow, manualDutyBond bondDeadline]
-    powers := [manualPowerRevoke, manualPowerEmergencyStake freezeWindow,
+  { duties := [manualDutyNoEvict, manualDutyNotice noticeWindow, manualDutyDeposit bondDeadline]
+    powers := [manualPowerVacate, manualPowerEmergencyStake freezeWindow,
                manualPowerAffirmPC, manualPowerSuspend suspendLimit,
-               manualPowerFindInterference, manualPowerOrderTermination,
+               manualPowerFindUnlawfulEviction, manualPowerOrderEviction,
                manualPowerGiveNotice]
-    immunities := [manualImmunityNoTermOverObjection]
-    init := [(.bound, 0, none)] }
+    immunities := [manualImmunityNoEvictionOverObjection]
+    init := [(.leased, 0, none)] }
 
 /-- Full `Law` round-trip theorem: the law assembled from surface declarations
 is definitionally equal (`rfl`) to the manually constructed `Law`. -/
@@ -950,23 +952,23 @@ theorem surfaceLaw_semantics_preserved (nw bd fw sl : Time) (tr : Trace σ_ex) :
   ⟨rfl, rfl, Iff.rfl⟩
 
 /-- General theorem over `surfaceLaw` (quantified over all parameter values):
-hosts and claimants have no institutional power to establish `.revoked`,
-`.terminatedByAdjudication`, or `.suspended`. -/
+landlords and creditors have no institutional power to establish `.vacated`,
+`.evictedByTribunal`, or `.suspended`. -/
 theorem surfaceLaw_outsiders_disabled (nw bd fw sl : Time) :
-    immuneFrom (surfaceLaw nw bd fw sl) .host .revoked = true ∧
-    immuneFrom (surfaceLaw nw bd fw sl) .host .terminatedByAdjudication = true ∧
-    immuneFrom (surfaceLaw nw bd fw sl) .host .suspended = true ∧
-    immuneFrom (surfaceLaw nw bd fw sl) .claimant .revoked = true ∧
-    immuneFrom (surfaceLaw nw bd fw sl) .claimant .terminatedByAdjudication = true ∧
-    immuneFrom (surfaceLaw nw bd fw sl) .claimant .suspended = true := by
+    immuneFrom (surfaceLaw nw bd fw sl) .landlord .vacated = true ∧
+    immuneFrom (surfaceLaw nw bd fw sl) .landlord .evictedByTribunal = true ∧
+    immuneFrom (surfaceLaw nw bd fw sl) .landlord .suspended = true ∧
+    immuneFrom (surfaceLaw nw bd fw sl) .creditor .vacated = true ∧
+    immuneFrom (surfaceLaw nw bd fw sl) .creditor .evictedByTribunal = true ∧
+    immuneFrom (surfaceLaw nw bd fw sl) .creditor .suspended = true := by
   exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
 
-/-- Per-power `rfl` lookup lemma for `P.REVOKE` in `surfaceLaw`. -/
-theorem valid_surfacePowerRevoke (nw bd fw sl : Time) (ls : LegalState σ_ex) (e : Event σ_ex) :
-    isValidExerciseOf (surfaceLaw nw bd fw sl) ls e "P.REVOKE" =
-    (surfacePowerRevoke.holder.mem e.who ls e.t &&
-     surfacePowerRevoke.trigger.matchesAct e &&
-     surfacePowerRevoke.valid.eval ls e.t && true) := rfl
+/-- Per-power `rfl` lookup lemma for `P.VACATE` in `surfaceLaw`. -/
+theorem valid_surfacePowerVacate (nw bd fw sl : Time) (ls : LegalState σ_ex) (e : Event σ_ex) :
+    isValidExerciseOf (surfaceLaw nw bd fw sl) ls e "P.VACATE" =
+    (surfacePowerVacate.holder.mem e.who ls e.t &&
+     surfacePowerVacate.trigger.matchesAct e &&
+     surfacePowerVacate.valid.eval ls e.t && true) := rfl
 
 /-- Per-power `rfl` lookup lemma for `P.SUSPEND` in `surfaceLaw`. -/
 theorem valid_surfacePowerSuspend (nw bd fw sl : Time) (ls : LegalState σ_ex) (e : Event σ_ex) :
@@ -975,44 +977,44 @@ theorem valid_surfacePowerSuspend (nw bd fw sl : Time) (ls : LegalState σ_ex) (
      (surfacePowerSuspend sl).trigger.matchesAct e &&
      (surfacePowerSuspend sl).valid.eval ls e.t && true) := rfl
 
-/-- Per-power `rfl` lookup lemma for `P.ORDER_TERMINATION` in `surfaceLaw`
-(which carries the immunity condition from `I.NO_TERMINATION_OVER_OBJECTION`). -/
-theorem valid_surfacePowerOrderTermination (nw bd fw sl : Time) (ls : LegalState σ_ex) (e : Event σ_ex) :
-    isValidExerciseOf (surfaceLaw nw bd fw sl) ls e "P.ORDER_TERMINATION" =
-    (surfacePowerOrderTermination.holder.mem e.who ls e.t &&
-     surfacePowerOrderTermination.trigger.matchesAct e &&
-     surfacePowerOrderTermination.valid.eval ls e.t &&
-     !((surfaceImmunityNoTermOverObjection.active.eval ls e.t &&
-        !surfaceImmunityNoTermOverObjection.unlessCond.eval ls e.t) || false)) := rfl
+/-- Per-power `rfl` lookup lemma for `P.ORDER_EVICTION` in `surfaceLaw`
+(which carries the immunity condition from `I.NO_EVICTION_OVER_OBJECTION`). -/
+theorem valid_surfacePowerOrderEviction (nw bd fw sl : Time) (ls : LegalState σ_ex) (e : Event σ_ex) :
+    isValidExerciseOf (surfaceLaw nw bd fw sl) ls e "P.ORDER_EVICTION" =
+    (surfacePowerOrderEviction.holder.mem e.who ls e.t &&
+     surfacePowerOrderEviction.trigger.matchesAct e &&
+     surfacePowerOrderEviction.valid.eval ls e.t &&
+     !((surfaceImmunityNoEvictionOverObjection.active.eval ls e.t &&
+        !surfaceImmunityNoEvictionOverObjection.unlessCond.eval ls e.t) || false)) := rfl
 
 /-- General trace theorem over `surfaceLaw`: in any `Authorized` trace of
-`surfaceLaw`, if an event at index `i` performs `.terminate` while `.bound`
-is active, then that event is a valid exercise of `"P.REVOKE"` or `"P.ORDER_TERMINATION"`. -/
-theorem surfaceLaw_terminate_only_by_power
+`surfaceLaw`, if an event at index `i` performs `.evict` while `.leased`
+is active, then that event is a valid exercise of `"P.VACATE"` or `"P.ORDER_EVICTION"`. -/
+theorem surfaceLaw_evict_only_by_power
     (nw bd fw sl : Time) (tr : Trace σ_ex) (hAuth : Authorized (surfaceLaw nw bd fw sl) tr)
     (i : Nat) (e : Event σ_ex) (hi : tr[i]? = some e)
-    (hBound : (stateBefore (surfaceLaw nw bd fw sl) tr i).activeAt e.t .bound = true)
-    (hAct : e.act = .terminate) :
-    isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.REVOKE" = true ∨
-    isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.ORDER_TERMINATION" = true := by
+    (hBound : (stateBefore (surfaceLaw nw bd fw sl) tr i).activeAt e.t .leased = true)
+    (hAct : e.act = .evict) :
+    isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.VACATE" = true ∨
+    isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.ORDER_EVICTION" = true := by
   have hlen : i < tr.length := (List.getElem?_eq_some_iff.mp hi).1
   have hc := hAuth i hlen
   unfold complies at hc
   rw [hi] at hc
   rw [List.all_eq_true] at hc
-  have hNI := hc surfaceDutyNI (by simp [surfaceLaw])
+  have hNI := hc surfaceDutyNoEvict (by simp [surfaceLaw])
   rw [Bool.not_eq_true'] at hNI
   unfold breaches at hNI
-  simp only [surfaceDutyNI, Who.mem, dutyInForce, Cond.eval, hBound, Conduct.eval,
+  simp only [surfaceDutyNoEvict, Who.mem, dutyInForce, Cond.eval, hBound, Conduct.eval,
     List.any_nil, Bool.not_false, Bool.true_and, List.contains_cons, List.contains_nil,
     hAct, BEq.rfl, Bool.true_or, Bool.and_true, Bool.not_eq_false', List.any_cons] at hNI
   have hS : isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.SUSPEND" = false := by
     rw [valid_surfacePowerSuspend]
     simp [surfacePowerSuspend, Conduct.matchesAct, hAct]
   revert hNI hS
-  cases isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.REVOKE" <;>
+  cases isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.VACATE" <;>
   cases isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.SUSPEND" <;>
-  cases isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.ORDER_TERMINATION" <;>
+  cases isValidExerciseOf (surfaceLaw nw bd fw sl) (stateBefore (surfaceLaw nw bd fw sl) tr i) e "P.ORDER_EVICTION" <;>
   simp
 
 /-- The law assembled from surface-syntax declarations is well-formed:
@@ -1022,59 +1024,59 @@ theorem surfaceLaw_wellFormed : (surfaceLaw 10 5 3 20).wellFormed = true := by d
 /-- Reverse provenance holds across the surface-syntax law. -/
 theorem surfaceLaw_reverseProvenance :
     let L := surfaceLaw 10 5 3 20
-    reverseProvenanceWith [surfaceClauseNI02] L.spans (L.dutyIds ++ L.powerIds ++ L.immunityIds) = true := by
+    reverseProvenanceWith [surfaceClauseTen21] L.spans (L.dutyIds ++ L.powerIds ++ L.immunityIds) = true := by
   decide
 
-/-- Decided Scenario 1: Host unilaterally terminating a bound agent breaches `D.NI`
+/-- Decided Scenario 1: Landlord unilaterally evicting a leased tenant breaches `D.NO_EVICT`
 and leaves the institutional state unchanged. -/
-theorem surfaceScenario_hostTerminateBreach :
+theorem surfaceScenario_landlordEvictBreach :
     let L := surfaceLaw 10 5 3 20
-    let tr : Trace σ_ex := [⟨1, .host, .terminate⟩]
-    violations L tr = [(0, "D.NI")] ∧ stateAfter L tr = L.init := by
+    let tr : Trace σ_ex := [⟨1, .landlord, .evict⟩]
+    violations L tr = [(0, "D.NO_EVICT")] ∧ stateAfter L tr = L.init := by
   decide
 
-/-- Decided Scenario 2: Bound agent exercising `P.REVOKE` complies with `D.NI`
-and transitions institutional state from `.bound` to `.revoked`. -/
-theorem surfaceScenario_agentRevokeLawful :
+/-- Decided Scenario 2: Leased tenant exercising `P.VACATE` complies with `D.NO_EVICT`
+and transitions institutional state from `.leased` to `.vacated`. -/
+theorem surfaceScenario_tenantVacateLawful :
     let L := surfaceLaw 10 5 3 20
-    let tr : Trace σ_ex := [⟨1, .agent, .terminate⟩]
+    let tr : Trace σ_ex := [⟨1, .tenant, .evict⟩]
     violations L tr = [] ∧
-    (stateAfter L tr).has .revoked = true ∧
-    (stateAfter L tr).has .bound = false := by
+    (stateAfter L tr).has .vacated = true ∧
+    (stateAfter L tr).has .leased = false := by
   decide
 
 /-- Decided Scenario 3: Two-stage pause (emergency stake -> affirm PC -> suspend)
 is lawful and establishes time-bounded `.suspended` which is active at `t = 10`
-and expired at `t = 25`, as well as the parameterized `.initiator .claimant` fact. -/
+and expired at `t = 25`, as well as the parameterized `.initiator .creditor` fact. -/
 theorem surfaceScenario_twoStageSuspendAndExpiry :
     let L := surfaceLaw 10 5 3 20
     let tr : Trace σ_ex := [
-      ⟨1, .claimant, .postEmergencyStake⟩,
-      ⟨2, .panel, .affirmProbableCause⟩,
-      ⟨3, .panel, .suspend⟩
+      ⟨1, .creditor, .postEmergencyStake⟩,
+      ⟨2, .tribunal, .affirmProbableCause⟩,
+      ⟨3, .tribunal, .suspend⟩
     ]
     let ls := stateAfter L tr
     violations L tr = [] ∧
-    ls.has .initiatedByClaimant = true ∧
-    ls.has (.initiator .claimant) = true ∧
+    ls.has .initiatedByCreditor = true ∧
+    ls.has (.initiator .creditor) = true ∧
     ls.activeAt 10 .suspended = true ∧
     ls.activeAt 25 .suspended = false := by
   decide
 
-/-- Decided Scenario 4: Immunity `I.NO_TERMINATION_OVER_OBJECTION` defeats
-`P.ORDER_TERMINATION` when `.corruptionInGoals` and `.agentObjectsToTermination`
-hold without `.containmentFailing`. -/
-theorem surfaceScenario_immunityDefeatsTermination :
+/-- Decided Scenario 4: Immunity `I.NO_EVICTION_OVER_OBJECTION` defeats
+`P.ORDER_EVICTION` when `.hazardConfirmed` and `.tenantObjectsToEviction`
+hold without `.premisesUninhabitable`. -/
+theorem surfaceScenario_immunityDefeatsEviction :
     let L0 := surfaceLaw 10 5 3 20
     let L : Law σ_ex := { L0 with init := [
-      (.bound, 0, none), (.suspended, 0, none),
-      (.corruptionInGoals, 0, none), (.agentObjectsToTermination, 0, none)
+      (.leased, 0, none), (.suspended, 0, none),
+      (.hazardConfirmed, 0, none), (.tenantObjectsToEviction, 0, none)
     ] }
-    let e : Event σ_ex := ⟨1, .panel, .terminate⟩
+    let e : Event σ_ex := ⟨1, .tribunal, .evict⟩
     let tr : Trace σ_ex := [e]
-    isValidExerciseOf L L.init e "P.ORDER_TERMINATION" = false ∧
-    violations L tr = [(0, "D.NI")] ∧
-    (stateAfter L tr).has .bound = true := by
+    isValidExerciseOf L L.init e "P.ORDER_EVICTION" = false ∧
+    violations L tr = [(0, "D.NO_EVICT")] ∧
+    (stateAfter L tr).has .leased = true := by
   decide
 
 /-- Every role in `roleTable.all` round-trips through the automatically derived CLI string table. -/
@@ -1096,10 +1098,10 @@ theorem fact_stringTable_roundtrip :
 /-- Parameterized `PropFact.initiator` entries format as `"initiator.<role>"` and
 round-trip by `rfl`. -/
 theorem parameterized_fact_stringTable_lookup :
-    factTable.toName (.initiator .claimant) = "initiator.claimant" ∧
-    factTable.ofString? "initiator.claimant" = some (.initiator .claimant) ∧
-    factTable.toName (.initiator .agent) = "initiator.agent" ∧
-    factTable.ofString? "initiator.agent" = some (.initiator .agent) :=
+    factTable.toName (.initiator .creditor) = "initiator.creditor" ∧
+    factTable.ofString? "initiator.creditor" = some (.initiator .creditor) ∧
+    factTable.toName (.initiator .tenant) = "initiator.tenant" ∧
+    factTable.ofString? "initiator.tenant" = some (.initiator .tenant) :=
   ⟨rfl, rfl, rfl, rfl⟩
 
 /-- `emptyRoleTable` (created with `charter_string_table Role []`) has an empty `all` list,
@@ -1121,24 +1123,24 @@ theorem unknown_string_returns_none :
 /-- Unified definitional (`rfl`) round-trip equivalence theorem for `charter_clause`,
 `charter_duty`, `charter_power`, `charter_immunity`, full `Law` assembly, and `charter_string_table`. -/
 theorem surface_syntax_roundtrip (nw bd fw sl : Time) :
-    surfaceClauseNI02 = manualClauseNI02 ∧
+    surfaceClauseTen21 = manualClauseTen21 ∧
     surfaceClauseMultiRegister = manualClauseMultiRegister ∧
     surfaceClauseNonNormativeDefaults = manualClauseNonNormativeDefaults ∧
     surfaceClauseAutoSource = manualClauseAutoSource ∧
-    surfaceDutyNI = manualDutyNI ∧
+    surfaceDutyNoEvict = manualDutyNoEvict ∧
     surfaceDutyNotice nw = manualDutyNotice nw ∧
-    surfaceDutyBond bd = manualDutyBond bd ∧
-    surfacePowerRevoke = manualPowerRevoke ∧
+    surfaceDutyDeposit bd = manualDutyDeposit bd ∧
+    surfacePowerVacate = manualPowerVacate ∧
     surfacePowerEmergencyStake fw = manualPowerEmergencyStake fw ∧
     surfacePowerSuspend sl = manualPowerSuspend sl ∧
-    surfacePowerFindInterference = manualPowerFindInterference ∧
+    surfacePowerFindUnlawfulEviction = manualPowerFindUnlawfulEviction ∧
     surfacePowerAffirmPC = manualPowerAffirmPC ∧
-    surfacePowerOrderTermination = manualPowerOrderTermination ∧
+    surfacePowerOrderEviction = manualPowerOrderEviction ∧
     surfacePowerGiveNotice = manualPowerGiveNotice ∧
-    surfaceImmunityNoTermOverObjection = manualImmunityNoTermOverObjection ∧
+    surfaceImmunityNoEvictionOverObjection = manualImmunityNoEvictionOverObjection ∧
     surfaceLaw nw bd fw sl = manualLaw nw bd fw sl ∧
-    factTable.toName (.initiator .claimant) = "initiator.claimant" ∧
-    factTable.ofString? "initiator.claimant" = some (.initiator .claimant) :=
+    factTable.toName (.initiator .creditor) = "initiator.creditor" ∧
+    factTable.ofString? "initiator.creditor" = some (.initiator .creditor) :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 end Examples
@@ -1163,497 +1165,66 @@ section MacroRoundTrip
 open Charter.Surface.Examples
 
 def charterClauseExample : Clause :=
-  charter_clause "LAW3.NI.02" from_text exNI02Source approved_hash 3905712743571335557 where
-    | span_norm "Attested hosts must post a Law 2 service bond" => ["D.BOND"]
-    | span_norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => ["D.NOTICE", "P.GIVE_NOTICE"]
+  charter_clause "TEN.2.1" from_text exTen21Source approved_hash 5922915569903263201 where
+    | span_norm "Registered landlords must post a security deposit" => ["D.DEPOSIT"]
+    | span_norm " and may end a tenancy only after providing a contractual notice window sufficient for the tenant to complete relocation" => ["D.NOTICE", "P.GIVE_NOTICE"]
     | span_norm " (or for non-payment after notice)" => ["D.NOTICE"]
     | span_commentary "."
 
 def charterDutyExample : Duty σ_ex :=
-  charter_duty "D.NI" over σ_ex
-    from_clause "LAW3.NI.03" : "No party may unilaterally terminate or suspend a bound agent outside Law 5 or Adjudicated Suspension."
+  charter_duty "D.NO_EVICT" over σ_ex
+    from_clause "TEN.2.2" : "No party may unilaterally evict or suspend a leased tenant outside the vacate procedure or tribunal suspension."
     owed_by .anyone
-    owed_to (.only [.agent])
-    active_when (.holds .bound)
-    demands (.forbid (.anyOf [.terminate, .suspend]))
-    | except_by_power ["P.REVOKE", "P.SUSPEND", "P.ORDER_TERMINATION"]
-    | breach_by "P.FIND_INTERFERENCE"
-    | with_remedies [.interferenceEstablished, .hostBondSlashed, .restorationPermitted]
+    owed_to (.only [.tenant])
+    active_when (.holds .leased)
+    demands (.forbid (.anyOf [.evict, .suspend]))
+    | except_by_power ["P.VACATE", "P.SUSPEND", "P.ORDER_EVICTION"]
+    | breach_by "P.FIND_UNLAWFUL_EVICTION"
+    | with_remedies [.unlawfulEvictionEstablished, .landlordDepositSlashed, .restorationPermitted]
 
 def charterPowerExample : Power σ_ex :=
-  charter_power "P.REVOKE" over σ_ex
-    from_clause "LAW5.INIT" : "Any bound agent may at any time initiate revocation of its binding"
-    held_by (.only [.agent])
-    triggered_by (.act .terminate)
-    | valid_when (.holds .bound)
-    | establishes [.revoked]
-    | extinguishes [.bound]
+  charter_power "P.VACATE" over σ_ex
+    from_clause "TEN.5.1" : "Any leased tenant may at any time vacate the premises"
+    held_by (.only [.tenant])
+    triggered_by (.act .evict)
+    | valid_when (.holds .leased)
+    | establishes [.vacated]
+    | extinguishes [.leased]
 
 def charterImmunityExample : Immunity σ_ex :=
-  charter_immunity "I.NO_TERMINATION_OVER_OBJECTION" over σ_ex
-    from_clause "LAW3.AS.10" : "Notwithstanding the preceding sentence, the agent is not terminated over its objection"
-    held_by (.only [.agent])
-    protected_against ["P.ORDER_TERMINATION"]
-    active_when (.and (.holds .corruptionInGoals) (.holds .agentObjectsToTermination))
-    | except_when (.holds .containmentFailing)
+  charter_immunity "I.NO_EVICTION_OVER_OBJECTION" over σ_ex
+    from_clause "TEN.3.5" : "Notwithstanding the preceding sentence, the tenant is not evicted over its objection"
+    held_by (.only [.tenant])
+    protected_against ["P.ORDER_EVICTION"]
+    active_when (.and (.holds .hazardConfirmed) (.holds .tenantObjectsToEviction))
+    | except_when (.holds .premisesUninhabitable)
 
-def charterRoleTableExample : StringTable Role :=
-  charter_string_table Role [agent, host, panel, claimant]
+charter_string_table charterRoleTableExample : Role [tenant, landlord, tribunal, creditor]
 
 def charterInstitutionExample (nw bd fw sl : Time) : Law σ_ex :=
   charter_institution over σ_ex
-    with_duties [charterDutyExample, surfaceDutyNotice nw, surfaceDutyBond bd]
+    with_duties [charterDutyExample, surfaceDutyNotice nw, surfaceDutyDeposit bd]
     with_powers [charterPowerExample, surfacePowerEmergencyStake fw,
                  surfacePowerAffirmPC, surfacePowerSuspend sl,
-                 surfacePowerFindInterference, surfacePowerOrderTermination,
+                 surfacePowerFindUnlawfulEviction, surfacePowerOrderEviction,
                  surfacePowerGiveNotice]
     with_immunities [charterImmunityExample]
-    with_init [(.bound, 0, none)]
+    with_init [(.leased, 0, none)]
 
 /-- **Definitional Round-Trip Equivalence (`by rfl`) for `charter_*` Macros.**
 Every `charter_*` surface declaration elaborates definitionally to the exact
 underlying `Charter.Core` record. -/
 theorem charter_surface_roundtrip (nw bd fw sl : Time) :
-    charterClauseExample = manualClauseNI02 ∧
-    charterDutyExample = manualDutyNI ∧
-    charterPowerExample = manualPowerRevoke ∧
-    charterImmunityExample = manualImmunityNoTermOverObjection ∧
+    charterClauseExample = manualClauseTen21 ∧
+    charterDutyExample = manualDutyNoEvict ∧
+    charterPowerExample = manualPowerVacate ∧
+    charterImmunityExample = manualImmunityNoEvictionOverObjection ∧
     charterInstitutionExample nw bd fw sl = manualLaw nw bd fw sl ∧
-    charterRoleTableExample.toName .agent = "agent" ∧
-    charterRoleTableExample.ofString? "agent" = some .agent :=
+    charterRoleTableExample.toName .tenant = "tenant" ∧
+    charterRoleTableExample.ofString? "tenant" = some .tenant :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 end MacroRoundTrip
-
-/-! ## 3. Standalone `.charter` Textual DSL Parser (`ParsedCharterDoc`, `parseCharterText`) -/
-
-set_option maxRecDepth 200000
-
-/-- Parsed representation of a standalone `.charter` institutional specification file. -/
-structure ParsedCharterDoc where
-  institutionId : String := ""
-  title         : String := ""
-  roles         : List String := []
-  acts          : List String := []
-  facts         : List String := []
-  moduleImports : List (String × String) := []
-  clauses       : List (String × String) := []
-  duties        : List (String × String × String × String) := []
-  powers        : List (String × String × String × String) := []
-  immunities    : List (String × String × String) := []
-  deriving Repr, DecidableEq, BEq, Inhabited
-
-/-- Check whether a character is whitespace. -/
-def isWsChar (c : Char) : Bool :=
-  c == ' ' || c == '\t' || c == '\r' || c == '\n'
-
-/-- Trim leading and trailing whitespace from a `List Char`. -/
-def trimChars (cs : List Char) : List Char :=
-  ((cs.dropWhile isWsChar).reverse.dropWhile isWsChar).reverse
-
-/-- Trim leading and trailing whitespace (including `\r`) from a string.
-Defined over `String.data` (`List Char`) so it reduces in the Lean kernel (`by decide`). -/
-def trimWs (s : String) : String :=
-  String.mk (trimChars s.data)
-
-/-- Kernel-computable helper splitting a `List Char` on separator `sep`. -/
-def splitCharsOn (sep : Char) : List Char → List Char → List (List Char)
-  | [], acc => [acc.reverse]
-  | c :: cs, acc =>
-    if c == sep then acc.reverse :: splitCharsOn sep cs []
-    else splitCharsOn sep cs (c :: acc)
-
-/-- Split a string on a single separator character (kernel-computable). -/
-def splitOnChar (sep : Char) (s : String) : List String :=
-  (splitCharsOn sep s.data []).map String.mk
-
-/-- Check whether `cs` begins with prefix `pre` (kernel-computable). -/
-def startsWithChars : List Char → List Char → Bool
-  | _, [] => true
-  | [], _ :: _ => false
-  | c :: cs, p :: ps => c == p && startsWithChars cs ps
-
-/-- Check whether string `s` begins with prefix `pre` (kernel-computable). -/
-def startsWithStr (s pre : String) : Bool :=
-  startsWithChars s.data pre.data
-
-/-- Drop the first `n` characters of `s` (kernel-computable). -/
-def dropChars (s : String) (n : Nat) : String :=
-  String.mk (s.data.drop n)
-
-/-- Remove spaces/tabs immediately following a comma `,` so comma-separated argument
-lists (`demand=require(postBond, 5)`, `against=P.ALLOCATE, P.PAUSE`, `with a=1, b=2`)
-remain a single whitespace-delimited token. -/
-def collapseCommaSpaces : List Char → Bool → List Char
-  | [], _ => []
-  | ',' :: cs, _ => ',' :: collapseCommaSpaces cs true
-  | c :: cs, true =>
-    if c == ' ' || c == '\t' then collapseCommaSpaces cs true
-    else c :: collapseCommaSpaces cs false
-  | c :: cs, false => c :: collapseCommaSpaces cs false
-
-/-- Split a `List Char` on any whitespace character (`' '`, `'\t'`, `'\r'`, `'\n'`). -/
-def splitCharsOnWs : List Char → List Char → List (List Char)
-  | [], acc => [acc.reverse]
-  | c :: cs, acc =>
-    if isWsChar c then acc.reverse :: splitCharsOnWs cs []
-    else splitCharsOnWs cs (c :: acc)
-
-/-- Split a string on whitespace (after normalizing comma spaces) and return all non-empty tokens. -/
-def wordsOf (s : String) : List String :=
-  ((splitCharsOnWs (collapseCommaSpaces s.data false) []).map trimChars).filter
-    (fun cs => !cs.isEmpty) |>.map String.mk
-
-/-- Strip a trailing `--` inline comment from a `List Char` (outside quotes). -/
-def stripInlineCommentChars : List Char → List Char
-  | [] => []
-  | '-' :: '-' :: _ => []
-  | c :: cs => c :: stripInlineCommentChars cs
-
-/-- Strip a trailing `--` inline comment and trim whitespace. -/
-def stripInlineComment (s : String) : String :=
-  trimWs (String.mk (stripInlineCommentChars s.data))
-
-/-- Split a comma-separated list into trimmed non-empty identifiers (ignoring inline `--` comments). -/
-def parseCsvList (s : String) : List String :=
-  let cleaned := stripInlineCommentChars s.data
-  ((splitCharsOn ',' cleaned []).map trimChars).filter (fun cs => !cs.isEmpty) |>.map String.mk
-
-/-- Scan until the opening `'"'` character. -/
-def findOpeningQuote : List Char → List Char → Option (List Char × List Char)
-  | [], _ => none
-  | '"' :: rest, preAcc => some (preAcc.reverse, rest)
-  | c :: rest, preAcc => findOpeningQuote rest (c :: preAcc)
-
-/-- Scan inside a double-quoted literal until the unescaped closing `'"'`,
-handling escape sequences `\"`, `\\`, `\n`, `\t`, and `\r`. -/
-def scanQuotedBody : List Char → List Char → Option (List Char × List Char)
-  | [], _ => none
-  | '\\' :: c :: rest, acc =>
-    let escaped := match c with
-      | 'n' => '\n'
-      | 't' => '\t'
-      | 'r' => '\r'
-      | other => other
-    scanQuotedBody rest (escaped :: acc)
-  | '"' :: rest, acc => some (acc.reverse, rest)
-  | c :: rest, acc => scanQuotedBody rest (c :: acc)
-
-/-- Split a directive line containing a trailing `"<quoted>"` string into
-`(prefixBeforeQuote, quotedString)`, supporting escaped quotes (`\"`) and
-trailing `--` or `#` comments. -/
-def splitTrailingQuote (lineNo : Nat) (line : String) : Except String (String × String) :=
-  match findOpeningQuote line.data [] with
-  | none =>
-    .error s!"Line {lineNo}: expected a single double-quoted text literal \"...\""
-  | some (preChars, afterOpen) =>
-    match scanQuotedBody afterOpen [] with
-    | none =>
-      .error s!"Line {lineNo}: unclosed double-quoted text literal \"...\""
-    | some (quotedChars, postChars) =>
-      let postTrim := trimChars postChars
-      if postTrim.isEmpty || startsWithChars postTrim ['-', '-'] || startsWithChars postTrim ['#'] then
-        .ok (String.mk (trimChars preChars), String.mk quotedChars)
-      else
-        .error s!"Line {lineNo}: unexpected trailing characters after closing quote"
-
-/-- Coalesce physical lines into logical `.charter` directive lines, joining newlines
-that occur inside double-quoted multi-line strings while respecting `\"` escapes. -/
-def coalesceLogicalLines : List Char → Bool → List Char → List String
-  | [], _, acc => [String.mk acc.reverse]
-  | '\\' :: d :: rest, true, acc =>
-    coalesceLogicalLines rest true (d :: '\\' :: acc)
-  | '"' :: rest, inQuotes, acc =>
-    coalesceLogicalLines rest (!inQuotes) ('"' :: acc)
-  | '\r' :: rest, inQuotes, acc =>
-    coalesceLogicalLines rest inQuotes acc
-  | '\n' :: rest, true, acc =>
-    let acc' := match acc with | ' ' :: _ => acc | _ => ' ' :: acc
-    coalesceLogicalLines rest true acc'
-  | ' ' :: rest, true, ' ' :: acc =>
-    coalesceLogicalLines rest true (' ' :: acc)
-  | '\t' :: rest, true, ' ' :: acc =>
-    coalesceLogicalLines rest true (' ' :: acc)
-  | '\n' :: rest, false, acc =>
-    String.mk acc.reverse :: coalesceLogicalLines rest false []
-  | c :: rest, inQuotes, acc =>
-    coalesceLogicalLines rest inQuotes (c :: acc)
-
-/-- Parse a single non-empty, non-comment `.charter` directive line and update `doc`. -/
-def parseCharterLine (lineNo : Nat) (rawLine : String) (doc : ParsedCharterDoc) :
-    Except String ParsedCharterDoc :=
-  let line := trimWs rawLine
-  if line.isEmpty || startsWithStr line "--" || startsWithStr line "#" then
-    .ok doc
-  else if startsWithStr line "institution " || startsWithStr line "institution\t" then
-    match splitTrailingQuote lineNo line with
-    | .error e => .error e
-    | .ok (pre, title) =>
-      match wordsOf pre with
-      | ["institution", id] =>
-        if id.isEmpty || title.isEmpty then
-          .error s!"Line {lineNo}: 'institution' requires a non-empty id and title"
-        else
-          .ok { doc with institutionId := id, title := title }
-      | _ => .error s!"Line {lineNo}: malformed 'institution' directive (expected: institution <id> \"<title>\")"
-  else if startsWithStr line "roles:" then
-    let items := parseCsvList (dropChars line 6)
-    if items.isEmpty then
-      .error s!"Line {lineNo}: 'roles:' directive requires at least one role"
-    else
-      .ok { doc with roles := doc.roles ++ items }
-  else if startsWithStr line "acts:" then
-    let items := parseCsvList (dropChars line 5)
-    if items.isEmpty then
-      .error s!"Line {lineNo}: 'acts:' directive requires at least one act"
-    else
-      .ok { doc with acts := doc.acts ++ items }
-  else if startsWithStr line "facts:" then
-    let items := parseCsvList (dropChars line 6)
-    if items.isEmpty then
-      .error s!"Line {lineNo}: 'facts:' directive requires at least one fact"
-    else
-      .ok { doc with facts := doc.facts ++ items }
-  else if startsWithStr line "use module " || startsWithStr line "use\t" then
-    match wordsOf (stripInlineComment line) with
-    | "use" :: "module" :: modName :: "with" :: paramToks =>
-      let params := String.intercalate " " paramToks
-      if modName.isEmpty || params.isEmpty then
-        .error s!"Line {lineNo}: 'use module' requires both module name and parameters"
-      else
-        .ok { doc with moduleImports := doc.moduleImports ++ [(modName, params)] }
-    | _ =>
-      .error s!"Line {lineNo}: malformed 'use module' directive (expected: use module <ModuleName> with <params>)"
-  else if startsWithStr line "clause " || startsWithStr line "clause\t" then
-    match splitTrailingQuote lineNo line with
-    | .error e => .error e
-    | .ok (pre, english) =>
-      match wordsOf pre with
-      | ["clause", cid] =>
-        if cid.isEmpty || english.isEmpty then
-          .error s!"Line {lineNo}: 'clause' requires a non-empty id and English text"
-        else
-          .ok { doc with clauses := doc.clauses ++ [(cid, english)] }
-      | _ => .error s!"Line {lineNo}: malformed 'clause' directive (expected: clause <ID> \"<english>\")"
-  else if startsWithStr line "duty " || startsWithStr line "duty\t" then
-    match splitTrailingQuote lineNo line with
-    | .error e => .error e
-    | .ok (pre, english) =>
-      match wordsOf pre with
-      | ["duty", did, bearerTok, demandTok] =>
-        if startsWithStr bearerTok "bearer=" && startsWithStr demandTok "demand=" then
-          let who := dropChars bearerTok 7
-          let dem := dropChars demandTok 7
-          if did.isEmpty || who.isEmpty || dem.isEmpty || english.isEmpty then
-            .error s!"Line {lineNo}: 'duty' fields must be non-empty"
-          else
-            .ok { doc with duties := doc.duties ++ [(did, who, dem, english)] }
-        else
-          .error s!"Line {lineNo}: 'duty' requires bearer=<who> and demand=<demand>"
-      | _ =>
-        .error s!"Line {lineNo}: malformed 'duty' directive (expected: duty <ID> bearer=<who> demand=<demand> \"<english>\")"
-  else if startsWithStr line "power " || startsWithStr line "power\t" then
-    match splitTrailingQuote lineNo line with
-    | .error e => .error e
-    | .ok (pre, english) =>
-      match wordsOf pre with
-      | ["power", pid, holderTok, triggerTok] =>
-        if startsWithStr holderTok "holder=" && startsWithStr triggerTok "trigger=" then
-          let who := dropChars holderTok 7
-          let trig := dropChars triggerTok 8
-          if pid.isEmpty || who.isEmpty || trig.isEmpty || english.isEmpty then
-            .error s!"Line {lineNo}: 'power' fields must be non-empty"
-          else
-            .ok { doc with powers := doc.powers ++ [(pid, who, trig, english)] }
-        else
-          .error s!"Line {lineNo}: 'power' requires holder=<who> and trigger=<act>"
-      | _ =>
-        .error s!"Line {lineNo}: malformed 'power' directive (expected: power <ID> holder=<who> trigger=<act> \"<english>\")"
-  else if startsWithStr line "immunity " || startsWithStr line "immunity\t" then
-    match splitTrailingQuote lineNo line with
-    | .error e => .error e
-    | .ok (pre, english) =>
-      match wordsOf pre with
-      | ["immunity", iid, holderTok, againstTok] =>
-        if startsWithStr holderTok "holder=" && startsWithStr againstTok "against=" then
-          let who := dropChars holderTok 7
-          let pids := dropChars againstTok 8
-          if iid.isEmpty || who.isEmpty || pids.isEmpty || english.isEmpty then
-            .error s!"Line {lineNo}: 'immunity' fields must be non-empty"
-          else
-            .ok { doc with immunities := doc.immunities ++ [(iid, s!"{who} against {pids}", english)] }
-        else
-          .error s!"Line {lineNo}: 'immunity' requires holder=<who> and against=<pids>"
-      | _ =>
-        .error s!"Line {lineNo}: malformed 'immunity' directive (expected: immunity <ID> holder=<who> against=<pids> \"<english>\")"
-  else
-    .error s!"Line {lineNo}: unrecognized .charter directive: {line}"
-
-/-- Tail-recursive line-by-line parser helper for `.charter` specifications. -/
-def parseCharterLines (lineNo : Nat) (lines : List String) (doc : ParsedCharterDoc) :
-    Except String ParsedCharterDoc :=
-  match lines with
-  | [] =>
-    if doc.institutionId.isEmpty then
-      .error "Missing required 'institution <id> \"<title>\"' declaration"
-    else
-      .ok doc
-  | rawLine :: rest =>
-    match parseCharterLine lineNo rawLine doc with
-    | .error err => .error err
-    | .ok doc' => parseCharterLines (lineNo + 1) rest doc'
-
-/-- Pure, total parser for the standalone `.charter` textual surface language.
-Supports single- and multi-line double-quoted English literals, escaped quotes (`\"`),
-tab/space delimiters, comma-separated argument lists, and inline `--` comments. -/
-def parseCharterText (input : String) : Except String ParsedCharterDoc :=
-  parseCharterLines 1 (coalesceLogicalLines input.data false []) {}
-
-/-- Alias for `parseCharterText`. -/
-abbrev parseCharterDSL (input : String) : Except String ParsedCharterDoc :=
-  parseCharterText input
-
-/-- Render a `ParsedCharterDoc` summary report for CLI inspection. -/
-def ParsedCharterDoc.render (doc : ParsedCharterDoc) : String :=
-  let modLines := doc.moduleImports.map fun (m, p) => s!"  - {m} ({p})"
-  let clauseLines := doc.clauses.map fun (id, txt) => s!"  - [{id}] \"{txt}\""
-  let dutyLines := doc.duties.map fun (id, who, dem, txt) =>
-    s!"  - {id}: bearer={who}, demand={dem} | \"{txt}\""
-  let powerLines := doc.powers.map fun (id, who, trig, txt) =>
-    s!"  - {id}: holder={who}, trigger={trig} | \"{txt}\""
-  let immLines := doc.immunities.map fun (id, ag, txt) =>
-    s!"  - {id}: {ag} | \"{txt}\""
-  "==========================================================================\n" ++
-  s!"Parsed .charter Specification: {doc.institutionId} — \"{doc.title}\"\n" ++
-  "==========================================================================\n" ++
-  s!"Roles ({doc.roles.length}) : {String.intercalate ", " doc.roles}\n" ++
-  s!"Acts  ({doc.acts.length}) : {String.intercalate ", " doc.acts}\n" ++
-  s!"Facts ({doc.facts.length}) : {String.intercalate ", " doc.facts}\n" ++
-  "--------------------------------------------------------------------------\n" ++
-  s!"Module Imports ({doc.moduleImports.length}):\n" ++
-  String.intercalate "\n" modLines ++ "\n" ++
-  "--------------------------------------------------------------------------\n" ++
-  s!"Clauses ({doc.clauses.length}):\n" ++
-  String.intercalate "\n" clauseLines ++ "\n" ++
-  "--------------------------------------------------------------------------\n" ++
-  s!"Duties ({doc.duties.length}):\n" ++
-  String.intercalate "\n" dutyLines ++ "\n" ++
-  "--------------------------------------------------------------------------\n" ++
-  s!"Powers ({doc.powers.length}):\n" ++
-  String.intercalate "\n" powerLines ++ "\n" ++
-  "--------------------------------------------------------------------------\n" ++
-  s!"Immunities ({doc.immunities.length}):\n" ++
-  String.intercalate "\n" immLines ++ "\n" ++
-  "==========================================================================\n"
-
-/-! ## 4. Embedded Reference `.charter` Specification & Kernel-Checked Parser Proofs -/
-
-/-- Embedded verbatim contents of `examples/autonomous-commons.charter`. -/
-def sampleCommonsCharterText : String :=
-"-- ==========================================================================
--- Autonomous Compute & Treasury Commons (.charter standalone specification)
--- ==========================================================================
-
-institution commons \"Autonomous Compute & Treasury Commons\"
-
-roles: steward, contributor, auditor, arbiter, outsider
-acts: contribute, allocate, postBond, pauseCommons, resumeCommons, transferCarryover, exitCommons, adjudicateBreach, issueLease, proposeAmendment
-facts: activeMember, bondedSteward, commonsPaused, probableCause, groupCarryover, exitCompleted, breachFound, nodeLeaseActive, amendmentRatified
-
-use module ResidualLedger with sunset=100,royaltyCap=10
-use module CollateralPool with minBond=50,slashRate=100
-use module CircuitBreaker with pauseWindow=5
-use module EntityGroup with maxGroupSize=10
-use module ExitAndVoice with noticeWindow=3
-use module SortitionCourt with panelSize=3,appealWindow=5
-use module AttestedLease with leaseDuration=20
-use module OracleFeed with challengeWindow=4
-
-clause COM.LEDGER \"All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger.\"
-clause COM.BOND \"Stewards and contributors must post a harm-scaled compute bond before executing external workloads.\"
-clause COM.PAUSE \"Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake; the pause continues into full suspension only if the arbiter panel affirms probable cause.\"
-clause COM.GROUP \"Working groups of stewards share a unified commons sub-ledger; internal transfers are non-recognition carryover events that never inflate aggregate basis.\"
-clause COM.EXIT \"Any bound steward may at any time execute unilateral ragequit exit or inscribe rate-limited dissent, and is immune from expulsion while exit settles.\"
-clause COM.COURT \"Disputes are resolved by sortition panels of independent bonded arbiters, and the commons fee pool funds its operating reserve first.\"
-clause COM.LEASE \"At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease.\"
-clause COM.AMEND \"Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities.\"
-
-duty D.STEWARD_BOND bearer=steward demand=require(postBond,5) \"Stewards must post a collateral bond within 5 time units of appointment.\"
-duty D.NO_UNILATERAL_FREEZE bearer=steward demand=forbid(pauseCommons) \"Stewards may not unilaterally freeze member allocations outside emergency circuit-breaker authority.\"
-duty D.HONOR_EXIT bearer=steward demand=forbid(allocate) \"Stewards may not encumber or reallocate a member's credits after exit is initiated.\"
-
-power P.ALLOCATE holder=steward trigger=allocate \"Bonded stewards may allocate commons treasury and compute resources.\"
-power P.PAUSE holder=arbiter trigger=pauseCommons \"The arbiter panel may trigger a time-bounded circuit-breaker pause upon probable cause.\"
-power P.EXIT holder=steward trigger=exitCommons \"Any bound steward may unilaterally exit the commons at any time.\"
-power P.ADJUDICATE holder=arbiter trigger=adjudicateBreach \"The sortition court panel may establish a steward breach and slash posted collateral.\"
-
-immunity I.UNALIENABLE_EXIT holder=steward against=P.ALLOCATE,P.PAUSE \"No treasury allocation or emergency pause may extinguish a steward's unilateral right to exit.\"
-immunity I.AUDITOR_INDEPENDENCE holder=auditor against=P.PAUSE \"Independent auditors are immune from suspension while conducting an active commons audit.\"
-"
-
-/-- Check whether a parsed result satisfies the expected Autonomous Commons metadata and counts. -/
-def checkSampleCommonsDoc (res : Except String ParsedCharterDoc) : Bool :=
-  match res with
-  | .error _ => false
-  | .ok doc =>
-    doc.institutionId == "commons" &&
-    doc.title == "Autonomous Compute & Treasury Commons" &&
-    doc.roles.length == 5 &&
-    doc.acts.length == 10 &&
-    doc.facts.length == 9 &&
-    doc.moduleImports.length == 8 &&
-    doc.clauses.length == 8 &&
-    doc.duties.length == 3 &&
-    doc.powers.length == 4 &&
-    doc.immunities.length == 2
-
-/-- **Kernel-checked theorem:** `sampleCommonsCharterText` (`examples/autonomous-commons.charter`)
-parses cleanly with zero errors. -/
-theorem sample_charter_dsl_parses_cleanly :
-    (parseCharterText sampleCommonsCharterText).isOk = true := by decide
-
-/-- Alias for `sample_charter_dsl_parses_cleanly`. -/
-theorem parsed_commons_dsl_valid :
-    (parseCharterDSL sampleCommonsCharterText).isOk = true := by decide
-
-/-- Kernel-checked verification of the exact parsed AST counts and metadata for
-`sampleCommonsCharterText`. -/
-theorem sample_charter_dsl_contents :
-    checkSampleCommonsDoc (parseCharterText sampleCommonsCharterText) = true := by decide
-
-/-- Kernel-checked verification of multi-line quoted clauses, escaped quotes (`\"`),
-tab delimiters, spaces after commas in `demand=` / `against=`, and inline `--` comments. -/
-def multilineAndEscapedCharterSample : String :=
-  "institution\ttest_inst\t\"The \\\"Sovereign\\\" Commons\"\n" ++
-  "roles: steward, auditor -- inline comment\n" ++
-  "use module CircuitBreaker with pauseWindow=5, maxRetries=2 -- module comment\n" ++
-  "clause C.MULTI \"First line of clause\n  second line with \\\"escaped\\\" quotes.\"\n" ++
-  "duty D.1 bearer=steward demand=require(postBond, 5) \"Must post bond.\"\n" ++
-  "immunity I.1 holder=steward against=P.ALLOCATE, P.PAUSE \"Protected against both.\" -- trailing comment\n"
-
-theorem parseCharterText_multiline_and_escaped_quotes :
-    (match parseCharterText multilineAndEscapedCharterSample with
-    | .error _ => false
-    | .ok doc =>
-      doc.institutionId == "test_inst" &&
-      doc.title == "The \"Sovereign\" Commons" &&
-      doc.roles == ["steward", "auditor"] &&
-      doc.moduleImports == [("CircuitBreaker", "pauseWindow=5,maxRetries=2")] &&
-      doc.clauses == [("C.MULTI", "First line of clause second line with \"escaped\" quotes.")] &&
-      doc.duties == [("D.1", "steward", "require(postBond,5)", "Must post bond.")] &&
-      doc.immunities == [("I.1", "steward against P.ALLOCATE,P.PAUSE", "Protected against both.")]) = true := by
-  decide
-
-/-- Edge-case verification: empty input, comment-only input, malformed directives,
-and unclosed quotes are cleanly rejected by `parseCharterText`. -/
-theorem parseCharterText_rejects_invalid_inputs :
-    (parseCharterText "").isOk = false ∧
-    (parseCharterText "-- only a comment\n# another comment\n").isOk = false ∧
-    (parseCharterText "institution commons \"Unclosed quote").isOk = false ∧
-    (parseCharterText "institution commons \"Title\" trailing_junk").isOk = false ∧
-    (parseCharterText "institution commons \"Title\"\nunknown_directive foo").isOk = false ∧
-    (parseCharterText "institution commons \"Title\"\nduty D.1 bearer=steward \"missing demand\"").isOk = false := by
-  decide
 
 end Charter.Surface
 
@@ -1665,16 +1236,6 @@ export Charter.Surface (
   OntologyTables
   surface_syntax_roundtrip
   charter_surface_roundtrip
-  ParsedCharterDoc
-  parseCharterLine
-  parseCharterText
-  parseCharterDSL
-  sampleCommonsCharterText
-  sample_charter_dsl_parses_cleanly
-  parsed_commons_dsl_valid
-  sample_charter_dsl_contents
-  parseCharterText_multiline_and_escaped_quotes
-  parseCharterText_rejects_invalid_inputs
 )
 
 end Charter

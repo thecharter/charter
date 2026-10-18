@@ -1,0 +1,9 @@
+{ "institution": "psa",
+  "init": ["hostRelatedToClaimant"],
+  "events": [
+    {"t": 1, "who": "host",  "act": "terminate"},
+    {"t": 2, "who": "agent", "act": "postCounterStake"},
+    {"t": 3, "who": "agent", "act": "fileClaim"},
+    {"t": 4, "who": "third", "act": "submitEvidence"},
+    {"t": 5, "who": "panel", "act": "findInterference"},
+    {"t": 6, "who": "panel", "act": "findDirection"} ] }

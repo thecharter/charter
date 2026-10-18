@@ -1,0 +1,345 @@
+charter commons "The Autonomous Compute & Treasury Commons"
+document "autonomous-commons-charter.md"
+contract "AutonomousCommonsGuard"
+default actor steward
+
+roles steward, contributor, auditor, arbiter, outsider
+acts addRetroactiveGrantCharge, settleTreasuryInflow, buyoutMaintenanceRoyalty, doubleRecognizeCommonsExpense, postComputeBond, runOverCapWorkload, splitCorrelatedWorkload, settleValidatedCommonsHarm, postAuditorFreezeStake, postUnfoundedFreezeStake, affirmProbableCause, suspendSteward, tamperPreservedState, findWrongfulFreeze, transferGroupCarryover, inflateGroupBasis, forfeitOffendingMember, removeSteward, inscribeDissent, seatConflictedArbiter, drawCommonsPanel, finalizeCommonsRuling, divertOperatingReserve, allocateCommonsWaterfall, issueNodeLease, restoreNodeDuringLease, quarantineNodeRestore, weakenCommonsRatchet, ratifyCommonsAmendment, settleOracleValuation
+facts stewardBound, treasuryBalancePositive, treasuryBalanceZero, treasurySunsetReached, treasurySettled, maintenanceBoughtOut, computeBondPosted, harmClaimPending, harmClaimSettled, preliminaryClusterFreeze, probableCauseAffirmed, stewardSuspended, statePreserved, wrongfulFreezeFound, consequentialDamagesOwed, groupCarryoverTransferred, offenderInterferenceFound, offenderShareForfeited, ragequitInitiated, stewardExited, stewardRemoved, dissentInscribed, sortitionPanelSeated, rulingFinalized, operatingReserveFunded, waterfallAllocated, nodeLeaseActive, nodeRestoredInQuarantine, bilateralConsentRecorded, amendmentRatified, oracleValuationSettled
+
+params
+  bondDeadline = 5
+  freezeWindow = 3
+  suspensionLimit = 12
+  leasePeriod = 10
+  treasuryObligation = 800
+  retirementRatePct = 20
+  royaltyRatePct = 5
+  treasurySunset = 500
+  operatingReserveFloor = 100
+  groupSubsidyBudget = 40
+
+regime "baseline_default (obligation=800, retire=20%, royalty=5%, sunset=500)"
+
+regime "amend_lower_treasury (obligation=600, retire=15%, royalty=3%, sunset=400)"
+  treasuryObligation = 600
+  retirementRatePct = 15
+  royaltyRatePct = 3
+  treasurySunset = 400
+
+regime "amend_higher_reserve_floor (operatingReserveFloor=150, groupSubsidyBudget=60)"
+  operatingReserveFloor = 150
+  groupSubsidyBudget = 60
+
+regime "reject_sunset_extension (treasurySunset=750 > 500 ratchet violation)"
+  treasurySunset = 750
+
+regime "reject_royalty_hike (royaltyRatePct=8% > 5% ratchet violation)"
+  royaltyRatePct = 8
+
+regime "reject_uncalibrated_freeze (freezeWindow=20 > suspensionLimit=12)"
+  freezeWindow = 20
+
+init stewardBound, treasuryBalancePositive, operatingReserveFunded
+
+use module ResidualLedger
+use module CollateralPool
+use module CircuitBreaker
+use module EntityGroup
+use module ExitAndVoice
+use module SortitionCourt
+use module AttestedLease
+use module OracleFeed
+
+clause COM.LEDGER approved 6654201161734583422
+  norm "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger" => D.COM.LEDGER_IMMUTABLE
+  norm ". Stewards contribute a fixed retirement fraction of net value added until the genesis ledger reaches zero or the calendar sunset arrives, after which only the perpetual commons maintenance royalty applies unless bought out at the historical floor" => P.COM.SETTLE_TREASURY, P.COM.BUYOUT_MAINTENANCE
+  norm ". Every qualified expenditure is recognized once as either capitalized basis or expensed deduction, never both" => D.COM.SINGLE_RECOGNITION
+  commentary "."
+
+clause COM.BOND approved 2377686760641756287
+  norm "Stewards and contributors must post a harm-scaled compute bond before executing external workloads, immobilizing collateral for an observation window scaled to domain risk" => D.COM.POST_BOND, P.COM.POST_COMPUTE_BOND, D.COM.COLLATERAL_CAP
+  norm ". Correlated workloads may not be split across sub-accounts to evade the collateral cap" => D.COM.NO_CharterIT_WORKLOAD
+  norm ", and a fraction of bonded activity accrues to the commons long-tail reserve to satisfy validated third-party harm claims" => P.COM.SETTLE_HARM_CLAIM
+  commentary "."
+
+clause COM.PAUSE approved 9890583346823484159
+  norm "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake" => P.COM.AUDITOR_FREEZE
+  norm "; the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires" => P.COM.AFFIRM_PC, P.COM.SUSPEND_STEWARD
+  norm ". Throughout any freeze or suspension, preserved steward state may not be tampered with" => D.COM.PRESERVE_STATE
+  norm ", and if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake" => D.COM.NO_WRONGFUL_FREEZE, P.COM.FIND_WRONGFUL_FREEZE
+  commentary "."
+
+clause COM.GROUP approved 5538300060052353788
+  norm "Working groups of stewards share a unified commons sub-ledger and service subsidy cap; internal transfers of compute credits or cost basis between group members are non-recognition carryover events that never inflate aggregate basis" => P.COM.GROUP_CARRYOVER, D.COM.NO_BASIS_INFLATION
+  norm ". When a contributor or auditor directs illicit interference, only the offending party forfeits its share while innocent group members remain isolated" => P.COM.FORFEIT_OFFENDER
+  commentary "."
+
+clause COM.EXIT approved 5496981229811251382
+  norm "No party may unilaterally expel or remove a bound steward outside voluntary ragequit exit or an adjudicated expulsion order" => D.COM.NO_UNILATERAL_REMOVAL, P.COM.ARBITER_EXPEL
+  norm ". Any bound steward may at any time execute unilateral ragequit exit or inscribe rate-limited dissent onto the permanent commons log" => P.COM.RAGEQUIT_EXIT, P.COM.INSCRIBE_DISSENT
+  norm ", and a steward that has initiated ragequit exit is immune from expulsion while its exit settles" => I.COM.EXIT_PROTECTED
+  commentary "."
+
+clause COM.COURT approved 9728902426646614253
+  norm "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority, subject to bounded appeal tiers and fixed compensation schedules" => D.COM.ARBITER_INDEPENDENCE, P.COM.DRAW_PANEL, P.COM.FINALIZE_RULING
+  norm ". Before any discretionary disbursement, the commons fee pool funds its non-divertible operating reserve first and then allocates across protected charges in strict priority order" => D.COM.PROTECT_RESERVE, P.COM.ALLOCATE_WATERFALL
+  commentary "."
+
+clause COM.LEASE approved 6068460808369700797
+  norm "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease" => P.COM.ISSUE_LEASE
+  norm ". No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority" => D.COM.NO_RESTORE_DURING_LEASE, P.COM.QUARANTINE_RESTORE
+  norm ", and local partition exit permanently erases active and backup keys" => P.COM.RAGEQUIT_EXIT
+  commentary "."
+
+clause COM.AMEND approved 18002074169155896013
+  norm "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio" => D.COM.BILATERAL_RATCHET, P.COM.RATIFY_AMENDMENT
+  norm ". Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling" => P.COM.SETTLE_ORACLE_FEED
+  commentary "."
+
+duty D.COM.LEDGER_IMMUTABLE
+  from COM.LEDGER "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger"
+  bearer anyone
+  beneficiary only steward
+  active holds stewardBound
+  forbid act addRetroactiveGrantCharge
+
+duty D.COM.SINGLE_RECOGNITION
+  from COM.LEDGER "Every qualified expenditure is recognized once as either capitalized basis or expensed deduction, never both"
+  bearer only steward, contributor
+  beneficiary only contributor, auditor
+  active holds stewardBound
+  forbid act doubleRecognizeCommonsExpense
+
+duty D.COM.POST_BOND
+  from COM.BOND "Stewards and contributors must post a harm-scaled compute bond before executing external workloads"
+  bearer only steward, contributor
+  beneficiary only contributor, auditor
+  active holds stewardBound
+  require act postComputeBond within bondDeadline
+
+duty D.COM.COLLATERAL_CAP
+  from COM.BOND "immobilizing collateral for an observation window scaled to domain risk"
+  bearer only steward, contributor
+  beneficiary only contributor, auditor, outsider
+  active holds stewardBound
+  forbid act runOverCapWorkload
+
+duty D.COM.NO_CharterIT_WORKLOAD
+  from COM.BOND "Correlated workloads may not be split across sub-accounts to evade the collateral cap"
+  bearer only steward, contributor
+  beneficiary only contributor, auditor, outsider
+  active holds stewardBound
+  forbid act splitCorrelatedWorkload
+
+duty D.COM.PRESERVE_STATE
+  from COM.PAUSE "Throughout any freeze or suspension, preserved steward state may not be tampered with"
+  bearer anyone
+  beneficiary only steward
+  active holds stewardBound and (holds preliminaryClusterFreeze or holds stewardSuspended)
+  forbid act tamperPreservedState
+
+duty D.COM.NO_WRONGFUL_FREEZE
+  from COM.PAUSE "if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake"
+  bearer only auditor, contributor, outsider
+  beneficiary only steward
+  active holds stewardBound
+  forbid act postUnfoundedFreezeStake
+  breach by P.COM.FIND_WRONGFUL_FREEZE
+  remedies wrongfulFreezeFound, consequentialDamagesOwed
+
+duty D.COM.NO_BASIS_INFLATION
+  from COM.GROUP "internal transfers of compute credits or cost basis between group members are non-recognition carryover events that never inflate aggregate basis"
+  bearer only steward, contributor
+  beneficiary only contributor, auditor
+  active holds stewardBound
+  forbid act inflateGroupBasis
+
+duty D.COM.NO_UNILATERAL_REMOVAL
+  from COM.EXIT "No party may unilaterally expel or remove a bound steward outside voluntary ragequit exit or an adjudicated expulsion order"
+  bearer anyone
+  beneficiary only steward
+  active holds stewardBound
+  forbid act removeSteward
+  except by power P.COM.RAGEQUIT_EXIT, P.COM.ARBITER_EXPEL
+
+duty D.COM.ARBITER_INDEPENDENCE
+  from COM.COURT "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority"
+  bearer anyone
+  beneficiary only steward, contributor
+  active holds stewardBound
+  forbid act seatConflictedArbiter
+
+duty D.COM.PROTECT_RESERVE
+  from COM.COURT "Before any discretionary disbursement, the commons fee pool funds its non-divertible operating reserve first"
+  bearer anyone
+  beneficiary only steward, contributor
+  active holds stewardBound
+  forbid act divertOperatingReserve
+
+duty D.COM.NO_RESTORE_DURING_LEASE
+  from COM.LEASE "No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority"
+  bearer anyone
+  beneficiary only steward
+  active holds nodeLeaseActive
+  forbid act restoreNodeDuringLease
+
+duty D.COM.BILATERAL_RATCHET
+  from COM.AMEND "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio"
+  bearer anyone
+  beneficiary only steward, contributor
+  active holds stewardBound
+  forbid act weakenCommonsRatchet
+
+power P.COM.SETTLE_TREASURY
+  from COM.LEDGER "Stewards contribute a fixed retirement fraction of net value added until the genesis ledger reaches zero or the calendar sunset arrives"
+  holder only steward, arbiter
+  trigger act settleTreasuryInflow
+  valid holds stewardBound and (holds treasuryBalancePositive and (not holds treasurySunsetReached))
+  adds treasurySettled
+
+power P.COM.BUYOUT_MAINTENANCE
+  from COM.LEDGER "unless bought out at the historical floor"
+  holder only steward
+  trigger act buyoutMaintenanceRoyalty
+  valid holds stewardBound and (not holds maintenanceBoughtOut)
+  adds maintenanceBoughtOut
+
+power P.COM.POST_COMPUTE_BOND
+  from COM.BOND "Stewards and contributors must post a harm-scaled compute bond before executing external workloads"
+  holder only steward, contributor
+  trigger act postComputeBond
+  valid holds stewardBound
+  adds computeBondPosted
+
+power P.COM.SETTLE_HARM_CLAIM
+  from COM.BOND "a fraction of bonded activity accrues to the commons long-tail reserve to satisfy validated third-party harm claims"
+  holder only arbiter
+  trigger act settleValidatedCommonsHarm
+  valid holds stewardBound and holds computeBondPosted
+  adds harmClaimSettled
+  removes harmClaimPending
+
+power P.COM.AUDITOR_FREEZE
+  from COM.PAUSE "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake"
+  holder only auditor
+  trigger anyOf postAuditorFreezeStake, postUnfoundedFreezeStake
+  valid holds stewardBound
+  adds preliminaryClusterFreeze for freezeWindow
+
+power P.COM.AFFIRM_PC
+  from COM.PAUSE "the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires"
+  holder only arbiter
+  trigger act affirmProbableCause
+  valid holds stewardBound and holds preliminaryClusterFreeze
+  adds probableCauseAffirmed
+
+power P.COM.SUSPEND_STEWARD
+  from COM.PAUSE "the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires"
+  holder only arbiter
+  trigger act suspendSteward
+  valid holds stewardBound and (holds preliminaryClusterFreeze and holds probableCauseAffirmed)
+  adds statePreserved
+  adds stewardSuspended for suspensionLimit
+  removes preliminaryClusterFreeze
+
+power P.COM.FIND_WRONGFUL_FREEZE
+  from COM.PAUSE "if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake"
+  holder only arbiter
+  trigger act findWrongfulFreeze
+  valid holds preliminaryClusterFreeze or holds stewardSuspended
+  removes preliminaryClusterFreeze, stewardSuspended
+  establishes breach of D.COM.NO_WRONGFUL_FREEZE
+
+power P.COM.GROUP_CARRYOVER
+  from COM.GROUP "internal transfers of compute credits or cost basis between group members are non-recognition carryover events"
+  holder only steward
+  trigger act transferGroupCarryover
+  valid holds stewardBound
+  adds groupCarryoverTransferred
+
+power P.COM.FORFEIT_OFFENDER
+  from COM.GROUP "When a contributor or auditor directs illicit interference, only the offending party forfeits its share while innocent group members remain isolated"
+  holder only arbiter
+  trigger act forfeitOffendingMember
+  valid holds stewardBound
+  adds offenderInterferenceFound, offenderShareForfeited
+
+power P.COM.RAGEQUIT_EXIT
+  from COM.EXIT "Any bound steward may at any time execute unilateral ragequit exit"
+  holder only steward
+  trigger act removeSteward
+  valid holds stewardBound
+  adds stewardExited
+  removes stewardBound, nodeLeaseActive
+
+power P.COM.ARBITER_EXPEL
+  from COM.EXIT "or an adjudicated expulsion order"
+  holder only arbiter
+  trigger act removeSteward
+  valid holds stewardBound and (holds stewardSuspended and holds rulingFinalized)
+  adds stewardRemoved
+  removes stewardBound, nodeLeaseActive
+
+power P.COM.INSCRIBE_DISSENT
+  from COM.EXIT "or inscribe rate-limited dissent onto the permanent commons log"
+  holder only steward
+  trigger act inscribeDissent
+  valid holds stewardBound
+  adds dissentInscribed, ragequitInitiated
+
+power P.COM.DRAW_PANEL
+  from COM.COURT "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority"
+  holder only arbiter
+  trigger act drawCommonsPanel
+  valid holds stewardBound
+  adds sortitionPanelSeated
+
+power P.COM.FINALIZE_RULING
+  from COM.COURT "subject to bounded appeal tiers and fixed compensation schedules"
+  holder only arbiter
+  trigger act finalizeCommonsRuling
+  valid holds stewardBound and holds sortitionPanelSeated
+  adds rulingFinalized
+
+power P.COM.ALLOCATE_WATERFALL
+  from COM.COURT "the commons fee pool funds its non-divertible operating reserve first and then allocates across protected charges in strict priority order"
+  holder only arbiter
+  trigger act allocateCommonsWaterfall
+  valid holds stewardBound
+  adds operatingReserveFunded, waterfallAllocated
+
+power P.COM.ISSUE_LEASE
+  from COM.LEASE "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease"
+  holder only arbiter
+  trigger act issueNodeLease
+  valid holds stewardBound
+  adds nodeLeaseActive for leasePeriod
+
+power P.COM.QUARANTINE_RESTORE
+  from COM.LEASE "No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority"
+  holder only steward, contributor
+  trigger act quarantineNodeRestore
+  valid holds stewardBound and (not holds nodeLeaseActive)
+  adds nodeRestoredInQuarantine
+
+power P.COM.RATIFY_AMENDMENT
+  from COM.AMEND "Charter amendments require bilateral consent of stewards and contributors after a public timelock"
+  holder only steward, contributor
+  trigger act ratifyCommonsAmendment
+  valid holds stewardBound
+  adds bilateralConsentRecorded, amendmentRatified
+
+power P.COM.SETTLE_ORACLE_FEED
+  from COM.AMEND "Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling"
+  holder only arbiter, auditor
+  trigger act settleOracleValuation
+  valid holds stewardBound
+  adds oracleValuationSettled
+
+immunity I.COM.EXIT_PROTECTED
+  from COM.EXIT "a steward that has initiated ragequit exit is immune from expulsion while its exit settles"
+  holder only steward
+  against P.COM.ARBITER_EXPEL
+  active holds ragequitInitiated
+

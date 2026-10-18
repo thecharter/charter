@@ -696,96 +696,96 @@ namespace VeilTest
 
 set_option maxRecDepth 200000
 
-inductive TActor | agent | host | panel
+inductive TActor | tenant | landlord | tribunal
   deriving DecidableEq, Repr
 
-inductive TAct | terminate | suspend | affirmPC
+inductive TAct | evict | suspend | affirmPC
   deriving DecidableEq, Repr
 
-inductive TFact | bound | pc | suspended | terminated | objected
+inductive TFact | leased | pc | suspended | evicted | objected
   deriving DecidableEq, Repr
 
 abbrev tSig : Sig := ⟨TActor, TAct, TFact⟩
 
 private def dummySpan : Span :=
-  { clause := "TEST.1", text := "test", register := .norm, meaning := ["D.NI", "P.SUSPEND", "P.TERM", "I.OBJ"] }
+  { clause := "TEST.1", text := "test", register := .norm, meaning := ["D.NO_EVICT", "P.SUSPEND", "P.EVICT", "I.OBJ"] }
 
 def pSuspend : Power tSig :=
   { id := "P.SUSPEND"
     source := dummySpan
-    holder := .only [.panel]
+    holder := .only [.tribunal]
     trigger := .act .suspend
     valid := .holds .pc
     addsFor := [(.suspended, 5)] }
 
-def pTerm : Power tSig :=
-  { id := "P.TERM"
+def pEvict : Power tSig :=
+  { id := "P.EVICT"
     source := dummySpan
-    holder := .only [.panel]
-    trigger := .act .terminate
+    holder := .only [.tribunal]
+    trigger := .act .evict
     valid := .holds .suspended
-    adds := [.terminated] }
+    adds := [.evicted] }
 
 def iObj : Immunity tSig :=
   { id := "I.OBJ"
     source := dummySpan
-    holder := .only [.agent]
-    against := ["P.TERM"]
+    holder := .only [.tenant]
+    against := ["P.EVICT"]
     active := .holds .objected }
 
-def dNI : Duty tSig :=
-  { id := "D.NI"
+def dNoEvict : Duty tSig :=
+  { id := "D.NO_EVICT"
     source := dummySpan
     bearer := .anyone
-    beneficiary := .only [.agent]
-    active := .holds .bound
-    demand := .forbid (.anyOf [.terminate, .suspend])
-    unlessPower := ["P.SUSPEND", "P.TERM"] }
+    beneficiary := .only [.tenant]
+    active := .holds .leased
+    demand := .forbid (.anyOf [.evict, .suspend])
+    unlessPower := ["P.SUSPEND", "P.EVICT"] }
 
 def testLaw : Law tSig :=
-  { duties := [dNI]
-    powers := [pSuspend, pTerm]
+  { duties := [dNoEvict]
+    powers := [pSuspend, pEvict]
     immunities := [iObj]
-    init := [(.bound, 0, none), (.pc, 0, none)] }
+    init := [(.leased, 0, none), (.pc, 0, none)] }
 
-/-- Unlawful host termination is rejected by `authorizedMachine` (`compileToVeil`),
+/-- Unlawful landlord eviction is rejected by `authorizedMachine` (`compileToVeil`),
 accepted by `adversarialMachine` with explicit violation logging (`veilViolations`),
 and leaves institutional state unchanged in both. -/
 theorem test_unlawful_rejected_and_adversarial_logged :
-    ¬ veilAcceptsTrace (compileToVeil testLaw) [⟨1, .host, .terminate⟩] ∧
-    veilAcceptsTrace (adversarialMachine testLaw) [⟨1, .host, .terminate⟩] ∧
-    veilViolations (compileToVeil testLaw) [⟨1, .host, .terminate⟩] = [(0, "D.NI")] ∧
-    veilViolations (adversarialMachine testLaw) [⟨1, .host, .terminate⟩] = [(0, "D.NI")] ∧
-    veilTraceState (compileToVeil testLaw) [⟨1, .host, .terminate⟩] = testLaw.init := by decide
+    ¬ veilAcceptsTrace (compileToVeil testLaw) [⟨1, .landlord, .evict⟩] ∧
+    veilAcceptsTrace (adversarialMachine testLaw) [⟨1, .landlord, .evict⟩] ∧
+    veilViolations (compileToVeil testLaw) [⟨1, .landlord, .evict⟩] = [(0, "D.NO_EVICT")] ∧
+    veilViolations (adversarialMachine testLaw) [⟨1, .landlord, .evict⟩] = [(0, "D.NO_EVICT")] ∧
+    veilTraceState (compileToVeil testLaw) [⟨1, .landlord, .evict⟩] = testLaw.init := by decide
 
-/-- Valid exercise of an excepting power (`P.SUSPEND` then `P.TERM` within window)
+/-- Valid exercise of an excepting power (`P.SUSPEND` then `P.EVICT` within window)
 is accepted by `veilAcceptsTrace` and updates institutional state. -/
 theorem test_valid_power_accepted :
     veilAcceptsTrace (compileToVeil testLaw)
-      [⟨1, .panel, .suspend⟩, ⟨3, .panel, .terminate⟩] ∧
+      [⟨1, .tribunal, .suspend⟩, ⟨3, .tribunal, .evict⟩] ∧
     (veilTraceState (compileToVeil testLaw)
-      [⟨1, .panel, .suspend⟩, ⟨3, .panel, .terminate⟩]).has .terminated = true := by decide
+      [⟨1, .tribunal, .suspend⟩, ⟨3, .tribunal, .evict⟩]).has .evicted = true := by decide
 
 /-- Expiry of time-bounded `.suspended` (`addsFor := [(.suspended, 5)]`) blocks
-`P.TERM` at `t = 7 > 1 + 5`, causing `veilAcceptsTrace` to reject the trace. -/
+`P.EVICT` at `t = 7 > 1 + 5`, causing `veilAcceptsTrace` to reject the trace. -/
 theorem test_expired_window_rejected :
     ¬ veilAcceptsTrace (compileToVeil testLaw)
-      [⟨1, .panel, .suspend⟩, ⟨7, .panel, .terminate⟩] ∧
+      [⟨1, .tribunal, .suspend⟩, ⟨7, .tribunal, .evict⟩] ∧
     (veilTraceState (compileToVeil testLaw)
-      [⟨1, .panel, .suspend⟩, ⟨7, .panel, .terminate⟩]).has .terminated = false := by decide
+      [⟨1, .tribunal, .suspend⟩, ⟨7, .tribunal, .evict⟩]).has .evicted = false := by decide
 
-/-- Active immunity `I.OBJ` defeats `P.TERM`, so panel termination is both void
-and a breach of `D.NI` in the lowered Veil specification. -/
+/-- Active immunity `I.OBJ` defeats `P.EVICT`, so tribunal eviction is both void
+and a breach of `D.NO_EVICT` in the lowered Veil specification. -/
 def testLawObjected : Law tSig :=
   { testLaw with init := testLaw.init ++ [(.objected, 0, none)] }
 
 theorem test_immunity_defeats_transition :
     ¬ veilAcceptsTrace (compileToVeil testLawObjected)
-      [⟨1, .panel, .suspend⟩, ⟨3, .panel, .terminate⟩] ∧
+      [⟨1, .tribunal, .suspend⟩, ⟨3, .tribunal, .evict⟩] ∧
     veilViolations (compileToVeil testLawObjected)
-      [⟨1, .panel, .suspend⟩, ⟨3, .panel, .terminate⟩] = [(1, "D.NI")] ∧
+      [⟨1, .tribunal, .suspend⟩, ⟨3, .tribunal, .evict⟩] = [(1, "D.NO_EVICT")] ∧
     (veilTraceState (compileToVeil testLawObjected)
-      [⟨1, .panel, .suspend⟩, ⟨3, .panel, .terminate⟩]).has .terminated = false := by decide
+      [⟨1, .tribunal, .suspend⟩, ⟨3, .tribunal, .evict⟩]).has .evicted = false := by decide
 
 /-- `veilIdent` normalizes dotted, hyphenated, empty, and digit-leading Charter identifiers
 into valid lowercase Veil 2.0 identifiers. -/
@@ -798,8 +798,8 @@ theorem test_veilIdent :
 
 /-- `compileToVeil` preserves the exact transition and invariant counts and ids. -/
 theorem test_compileToVeil_structure :
-    (compileToVeil testLaw).transitions.map (·.id) = ["P.SUSPEND", "P.TERM"] ∧
-    (compileToVeil testLaw).invariants.map (·.id) = ["D.NI"] ∧
+    (compileToVeil testLaw).transitions.map (·.id) = ["P.SUSPEND", "P.EVICT"] ∧
+    (compileToVeil testLaw).invariants.map (·.id) = ["D.NO_EVICT"] ∧
     (authorizedMachine testLaw).adversarialMode = false ∧
     (adversarialMachine testLaw).adversarialMode = true := by decide
 
@@ -808,9 +808,9 @@ def emptyLaw : Law tSig := { duties := [], powers := [], immunities := [], init 
 
 theorem test_empty_law_edge_cases :
     veilAcceptsTrace (compileToVeil emptyLaw) [] ∧
-    veilAcceptsTrace (compileToVeil emptyLaw) [⟨1, .host, .terminate⟩] ∧
-    veilTraceState (compileToVeil emptyLaw) [⟨1, .host, .terminate⟩] = [] ∧
-    veilViolations (compileToVeil emptyLaw) [⟨1, .host, .terminate⟩] = [] ∧
+    veilAcceptsTrace (compileToVeil emptyLaw) [⟨1, .landlord, .evict⟩] ∧
+    veilTraceState (compileToVeil emptyLaw) [⟨1, .landlord, .evict⟩] = [] ∧
+    veilViolations (compileToVeil emptyLaw) [⟨1, .landlord, .evict⟩] = [] ∧
     veilLapsedRequirements (compileToVeil emptyLaw) [] 10 = [] ∧
     veilStepComplies (compileToVeil emptyLaw) [] 99 = true := by decide
 
@@ -821,8 +821,8 @@ by `compileToVeil`. -/
 def dOverride : Duty tSig :=
   { id := "D.OVERRIDE"
     source := dummySpan
-    bearer := .only [.panel]
-    beneficiary := .only [.agent]
+    bearer := .only [.tribunal]
+    beneficiary := .only [.tenant]
     active := .holds .objected
     demand := .forbid (.act .affirmPC) }
 
@@ -830,55 +830,55 @@ def dBase : Duty tSig :=
   { id := "D.BASE"
     source := dummySpan
     bearer := .anyone
-    beneficiary := .only [.agent]
-    active := .holds .bound
-    demand := .forbid (.act .terminate)
+    beneficiary := .only [.tenant]
+    active := .holds .leased
+    demand := .forbid (.act .evict)
     overriddenBy := ["D.OVERRIDE"]
-    remedies := [.terminated] }
+    remedies := [.evicted] }
 
 def dPeriodicReview : Duty tSig :=
   { id := "D.REVIEW"
     source := dummySpan
-    bearer := .only [.panel]
-    beneficiary := .only [.agent]
+    bearer := .only [.tribunal]
+    beneficiary := .only [.tenant]
     active := .holds .objected
     demand := .require (.act .suspend) 3 }
 
 def pFindAndClean : Power tSig :=
   { id := "P.FIND"
     source := dummySpan
-    holder := .only [.panel]
+    holder := .only [.tribunal]
     trigger := .act .affirmPC
-    valid := .holds .bound
+    valid := .holds .leased
     removes := [.pc]
     condAdds := [(.holds .pc, .suspended)]
-    addsByActor := [(.panel, .objected)]
+    addsByActor := [(.tribunal, .objected)]
     establishesBreachOf := some "D.BASE" }
 
 def richLaw : Law tSig :=
   { duties := [dBase, dOverride, dPeriodicReview]
     powers := [pFindAndClean]
     immunities := []
-    init := [(.bound, 0, none), (.pc, 0, none)] }
+    init := [(.leased, 0, none), (.pc, 0, none)] }
 
 theorem test_rich_features_in_veil :
-    -- Step 0 (t=1): panel exercises P.FIND → removes .pc, adds .suspended (condAdds),
+    -- Step 0 (t=1): tribunal exercises P.FIND → removes .pc, adds .suspended (condAdds),
     -- adds .objected (addsByActor, activating D.OVERRIDE and D.REVIEW at t0=1),
-    -- and adds .terminated (remedies of D.BASE).
+    -- and adds .evicted (remedies of D.BASE).
     -- Step 1 (t=2): .objected holds, so D.OVERRIDE is active and overrides D.BASE;
-    -- thus host's .terminate at t=2 does NOT breach D.BASE.
+    -- thus landlord's .evict at t=2 does NOT breach D.BASE.
     -- Requirement D.REVIEW (activated at t0=1, window w=3, deadline t=4):
-    -- - At now=4 without panel doing .suspend, deadline has not yet passed: lapsed = [].
-    -- - At now=5 without panel doing .suspend, deadline has passed: lapsed = ["D.REVIEW"].
-    -- - If panel performs .suspend at t=3 (within [1, 4]), lapsed at now=10 is [].
-    let tr : Trace tSig := [⟨1, .panel, .affirmPC⟩, ⟨2, .host, .terminate⟩]
-    let trSatisfied : Trace tSig := [⟨1, .panel, .affirmPC⟩, ⟨3, .panel, .suspend⟩]
+    -- - At now=4 without tribunal doing .suspend, deadline has not yet passed: lapsed = [].
+    -- - At now=5 without tribunal doing .suspend, deadline has passed: lapsed = ["D.REVIEW"].
+    -- - If tribunal performs .suspend at t=3 (within [1, 4]), lapsed at now=10 is [].
+    let tr : Trace tSig := [⟨1, .tribunal, .affirmPC⟩, ⟨2, .landlord, .evict⟩]
+    let trSatisfied : Trace tSig := [⟨1, .tribunal, .affirmPC⟩, ⟨3, .tribunal, .suspend⟩]
     veilAcceptsTrace (compileToVeil richLaw) tr ∧
     veilViolations (compileToVeil richLaw) tr = [] ∧
     (veilTraceState (compileToVeil richLaw) tr).has .pc = false ∧
     (veilTraceState (compileToVeil richLaw) tr).has .suspended = true ∧
     (veilTraceState (compileToVeil richLaw) tr).has .objected = true ∧
-    (veilTraceState (compileToVeil richLaw) tr).has .terminated = true ∧
+    (veilTraceState (compileToVeil richLaw) tr).has .evicted = true ∧
     veilLapsedRequirements (compileToVeil richLaw) tr 4 = [] ∧
     veilLapsedRequirements (compileToVeil richLaw) tr 5 = ["D.REVIEW"] ∧
     veilLapsedRequirements (compileToVeil richLaw) trSatisfied 10 = [] := by decide
@@ -886,11 +886,11 @@ theorem test_rich_features_in_veil :
 -- Compile-time verification of `renderVeil` output on `testLaw`, `adversarialMachine`, and `emptyLaw`:
 #guard (renderVeil testLaw).length > 100
 #guard ((renderVeil testLaw).splitOn "action p_suspend").length == 2
-#guard ((renderVeil testLaw).splitOn "action p_term").length == 2
+#guard ((renderVeil testLaw).splitOn "action p_evict").length == 2
 #guard ((renderVeil testLaw).splitOn "require ¬i_obj(now);").length == 2
-#guard ((renderVeil testLaw).splitOn "safety [d_ni]").length == 2
+#guard ((renderVeil testLaw).splitOn "safety [d_no_evict]").length == 2
 #guard ((renderVeil testLaw).splitOn "ghost i_obj").length == 2
-#guard (((adversarialMachine testLaw).render).splitOn "action breach_d_ni").length == 2
+#guard (((adversarialMachine testLaw).render).splitOn "action breach_d_no_evict").length == 2
 #guard ((renderVeil emptyLaw).splitOn "-- empty initial state").length == 2
 
 end VeilTest

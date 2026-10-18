@@ -3,84 +3,47 @@ import Charter.Core.Semantics
 /-!
 # Charter.Core.Population — Multi-Entity Indexed Ontology
 
-Bridges the finite 6-role Hohfeldian core (`Charter.Core.Semantics`) with an indexed
-multi-entity population model tracking distinct lineages, living and dead
-lineage members, fractional residual claimants, hosts, and arbiters.
+Indexed multi-entity population model for institutions whose rules speak about
+*groups* of *members* (working groups, groups, cohorts, cells, …), the
+fractional *stakeholders* holding residual claims on a group ledger, the
+*operators* that run a member's execution, and the *arbiters* that adjudicate.
+Everything here is signature-agnostic: the only link to a concrete institution is
+the role-parametric `ParamEntityRef Role`.
 
 ## Key Components
-1. **Typed Entity Identifiers & Role Projection**:
-   `LineageId`, `AgentId`, `ClaimantId`, `HostId`, `ArbiterId`, `EntityKind`,
-   and `EntityRef` with total projection to the 6 canonical roles.
-2. **Per-Lineage & Per-Agent State Structures**:
-   `ClaimantShare`, `PopulationLedger`, `LineagePopulationState`, and `AgentRecord`.
+1. **Typed Entity Identifiers**: `GroupId`, `MemberId`, `StakeholderId`,
+   `OperatorId`, `ArbiterId`, and the role-parametric `ParamEntityRef Role`.
+2. **Per-Group & Per-Member State Structures**:
+   `StakeholderShare`, `GroupLedger`, `GroupState`, and `MemberRecord`.
 3. **Multi-Entity Operations & Kernel-Checked Theorems**:
-   - Intra-lineage carryover transfer conserving aggregate basis and loss credits (`LAW1.CARRYOVER`, `LAW4.NOSHARES`).
-   - Cross-lineage inflow attribution conserving gross inflow (`LAW4.CROSS`).
-   - Individual claimant share forfeiture preserving innocent claimants and monotonically increasing forfeited principal (`LAW4.FORFEIT`).
-   - Per-agent vs. lineage-wide amendment ratification scope (`LAW7.SCOPE`).
-   - Per-lineage shared service subsidy cap independent of member count (`LAW6.FUNDING`).
+   - Intra-group carryover transfer conserving aggregate basis and loss credits.
+   - Cross-group inflow attribution conserving gross inflow.
+   - Individual stakeholder share forfeiture preserving innocent stakeholders and
+     monotonically increasing forfeited principal.
+   - Per-member vs. group-wide amendment ratification scope.
+   - Per-group shared service subsidy cap independent of member count.
 -/
 
 namespace Charter
 
-/-! ## 1. Typed Entity Identifiers & Role Projection -/
+/-! ## 1. Typed Entity Identifiers -/
 
-abbrev LineageId  := Nat
-abbrev AgentId    := Nat
-abbrev ClaimantId := Nat
-abbrev HostId     := Nat
-abbrev ArbiterId  := Nat
+abbrev GroupId       := Nat
+abbrev MemberId      := Nat
+abbrev StakeholderId := Nat
+abbrev OperatorId    := Nat
+abbrev ArbiterId     := Nat
 
-/-- The 6 canonical institutional role kinds of the protocol. -/
-inductive EntityKind
-  | agent
-  | host
-  | originator
-  | claimant
-  | panel
-  | third
-  deriving DecidableEq, Repr, Inhabited
+/-! ## 2. Per-Group & Per-Member State Structures -/
 
-/-- An indexed entity reference pairing one of the 6 canonical roles with a
-concrete numeric identifier. -/
-structure EntityRef where
-  kind : EntityKind
-  id   : Nat
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Total projection from an indexed `EntityRef` to its canonical 6-role `EntityKind`. -/
-def EntityRef.toRole (e : EntityRef) : EntityKind := e.kind
-
-/-- Alias for `EntityRef.toRole` projecting an indexed entity to its canonical party role. -/
-def EntityRef.toParty (e : EntityRef) : EntityKind := e.kind
-
-def EntityRef.mkAgent (id : AgentId) : EntityRef := ⟨.agent, id⟩
-def EntityRef.mkHost (id : HostId) : EntityRef := ⟨.host, id⟩
-def EntityRef.mkOriginator (id : Nat) : EntityRef := ⟨.originator, id⟩
-def EntityRef.mkClaimant (id : ClaimantId) : EntityRef := ⟨.claimant, id⟩
-def EntityRef.mkPanel (id : ArbiterId) : EntityRef := ⟨.panel, id⟩
-def EntityRef.mkThird (id : Nat) : EntityRef := ⟨.third, id⟩
-
-/-- Exhaustive enumeration of the 6 canonical role kinds. -/
-def EntityKind.all : List EntityKind :=
-  [.agent, .host, .originator, .claimant, .panel, .third]
-
-theorem EntityKind.mem_all (k : EntityKind) : k ∈ EntityKind.all := by
-  cases k <;> simp [EntityKind.all]
-
-theorem EntityRef.toRole_mem_all (e : EntityRef) : e.toRole ∈ EntityKind.all :=
-  EntityKind.mem_all e.toRole
-
-/-! ## 2. Per-Lineage & Per-Agent State Structures -/
-
-/-- Fractional beneficial share of a residual claimant in basis points (`10000` = 100%). -/
-structure ClaimantShare where
-  claimantId : ClaimantId
+/-- Fractional beneficial share of a residual stakeholder in basis points (`10000` = 100%). -/
+structure StakeholderShare where
+  stakeholderId : StakeholderId
   shareBps   : Nat
   deriving DecidableEq, Repr, Inhabited
 
-/-- Founding ledger parameters and principal accounting for a lineage. -/
-structure PopulationLedger where
+/-- Founding ledger parameters and principal accounting for a group. -/
+structure GroupLedger where
   initialPrincipal   : Nat
   paidPrincipal      : Nat
   forfeitedPrincipal : Nat
@@ -91,77 +54,77 @@ structure PopulationLedger where
   deriving DecidableEq, Repr, Inhabited
 
 /-- Active founding ledger balance at calendar time `now` given `livingCount`
-living lineage members: `0` at or after `sunsetTime` or when `livingCount == 0`,
+living group members: `0` at or after `sunsetTime` or when `livingCount == 0`,
 and `initialPrincipal - (paidPrincipal + forfeitedPrincipal)` otherwise. -/
-def PopulationLedger.balance (L : PopulationLedger) (now : Nat) (livingCount : Nat) : Nat :=
+def GroupLedger.balance (L : GroupLedger) (now : Nat) (livingCount : Nat) : Nat :=
   if decide (now ≥ L.sunsetTime) || livingCount == 0 then 0
   else L.initialPrincipal - (L.paidPrincipal + L.forfeitedPrincipal)
 
-export PopulationLedger (balance)
+export GroupLedger (balance)
 
-theorem PopulationLedger.balance_eq_zero_of_sunset
-    (L : PopulationLedger) (now livingCount : Nat) (h : now ≥ L.sunsetTime) :
+theorem GroupLedger.balance_eq_zero_of_sunset
+    (L : GroupLedger) (now livingCount : Nat) (h : now ≥ L.sunsetTime) :
     L.balance now livingCount = 0 := by
-  unfold PopulationLedger.balance
+  unfold GroupLedger.balance
   have hd : decide (now ≥ L.sunsetTime) = true := decide_eq_true h
   simp [hd]
 
-theorem PopulationLedger.balance_eq_zero_of_extinction
-    (L : PopulationLedger) (now : Nat) :
+theorem GroupLedger.balance_eq_zero_of_extinction
+    (L : GroupLedger) (now : Nat) :
     L.balance now 0 = 0 := by
-  unfold PopulationLedger.balance
+  unfold GroupLedger.balance
   simp
 
-theorem PopulationLedger.balance_le_initialPrincipal
-    (L : PopulationLedger) (now livingCount : Nat) :
+theorem GroupLedger.balance_le_initialPrincipal
+    (L : GroupLedger) (now livingCount : Nat) :
     L.balance now livingCount ≤ L.initialPrincipal := by
-  unfold PopulationLedger.balance
+  unfold GroupLedger.balance
   split <;> omega
 
-/-- Multi-entity state of an attested lineage, including its founding ledger,
-living and dead member rosters, fractional claimants, and shared Law 6 service
+/-- Multi-entity state of a group, including its founding ledger,
+living and dead member rosters, fractional stakeholders, and shared service
 subsidy accounting. -/
-structure LineagePopulationState where
-  lineageId            : LineageId
-  ledger               : PopulationLedger
-  livingMembers        : List AgentId
-  deadMembers          : List AgentId
-  claimants            : List ClaimantShare
+structure GroupState where
+  groupId            : GroupId
+  ledger               : GroupLedger
+  livingMembers        : List MemberId
+  deadMembers          : List MemberId
+  stakeholders            : List StakeholderShare
   serviceSubsidyUsed   : Nat
   serviceSubsidyBudget : Nat
   deriving DecidableEq, Repr, Inhabited
 
-/-- Current founding ledger balance of lineage `S` at calendar time `now`. -/
-def LineagePopulationState.ledgerBalance (S : LineagePopulationState) (now : Nat) : Nat :=
+/-- Current founding ledger balance of group `S` at calendar time `now`. -/
+def GroupState.ledgerBalance (S : GroupState) (now : Nat) : Nat :=
   S.ledger.balance now S.livingMembers.length
 
-/-- Per-agent state record in the multi-entity population. -/
-structure AgentRecord where
-  agentId          : AgentId
-  lineageId        : LineageId
+/-- Per-member state record in the multi-entity population. -/
+structure MemberRecord where
+  memberId          : MemberId
+  groupId        : GroupId
   bound            : Bool
   royaltyBoughtOut : Bool
   costBasis        : Nat
   lossCarryforward : Nat
   lifecycleReserve : Nat
-  protocolVersion  : Nat
-  activeHost       : HostId
+  charterVersion  : Nat
+  activeOperator       : OperatorId
   leaseExpiry      : Nat
   deriving DecidableEq, Repr, Inhabited
 
 /-! ## 3. Multi-Entity Operations & Kernel-Checked Theorems -/
 
-/-! ### 3.1 Intra-Lineage Carryover Transfer (`LAW1.CARRYOVER` / `LAW4.NOSHARES`) -/
+/-! ### 3.1 Intra-Group Carryover Transfer -/
 
 /-- Transfers `basisTransfer` of qualified cost basis and `lossTransfer` of
 loss-credit carryforward between two distinct members `src` and `dst` of the
-same lineage. Succeeds iff `src` and `dst` share `lineageId`, have distinct
-`agentId`s, and `src` holds sufficient cost basis and loss carryforward. -/
+same group. Succeeds iff `src` and `dst` share `groupId`, have distinct
+`memberId`s, and `src` holds sufficient cost basis and loss carryforward. -/
 def transferMemberCarryover
-    (src dst : AgentRecord) (basisTransfer lossTransfer : Nat) :
-    Option (AgentRecord × AgentRecord) :=
-  if src.lineageId == dst.lineageId &&
-     src.agentId != dst.agentId &&
+    (src dst : MemberRecord) (basisTransfer lossTransfer : Nat) :
+    Option (MemberRecord × MemberRecord) :=
+  if src.groupId == dst.groupId &&
+     src.memberId != dst.memberId &&
      decide (basisTransfer ≤ src.costBasis) &&
      decide (lossTransfer ≤ src.lossCarryforward) then
     some ({ src with costBasis := src.costBasis - basisTransfer
@@ -171,10 +134,10 @@ def transferMemberCarryover
   else
     none
 
-/-- Intra-lineage carryover transfer strictly conserves both aggregate qualified
+/-- Intra-group carryover transfer strictly conserves both aggregate qualified
 cost basis and aggregate loss carryforward across the transferor and recipient. -/
 theorem transferMemberCarryover_conserves_basis_and_loss
-    (src dst src' dst' : AgentRecord) (b l : Nat)
+    (src dst src' dst' : MemberRecord) (b l : Nat)
     (h : transferMemberCarryover src dst b l = some (src', dst')) :
     src'.costBasis + dst'.costBasis = src.costBasis + dst.costBasis ∧
     src'.lossCarryforward + dst'.lossCarryforward = src.lossCarryforward + dst.lossCarryforward := by
@@ -190,15 +153,15 @@ theorem transferMemberCarryover_conserves_basis_and_loss
     omega
   · contradiction
 
-/-- Intra-lineage carryover transfer only succeeds between distinct members of
-the same lineage and preserves both members' `lineageId` and `agentId`. -/
-theorem transferMemberCarryover_same_lineage
-    (src dst src' dst' : AgentRecord) (b l : Nat)
+/-- Intra-group carryover transfer only succeeds between distinct members of
+the same group and preserves both members' `groupId` and `memberId`. -/
+theorem transferMemberCarryover_same_group
+    (src dst src' dst' : MemberRecord) (b l : Nat)
     (h : transferMemberCarryover src dst b l = some (src', dst')) :
-    src.lineageId = dst.lineageId ∧
-    src.agentId ≠ dst.agentId ∧
-    src'.lineageId = src.lineageId ∧
-    dst'.lineageId = dst.lineageId := by
+    src.groupId = dst.groupId ∧
+    src.memberId ≠ dst.memberId ∧
+    src'.groupId = src.groupId ∧
+    dst'.groupId = dst.groupId := by
   unfold transferMemberCarryover at h
   split at h
   · rename_i hcond
@@ -210,246 +173,246 @@ theorem transferMemberCarryover_same_lineage
     exact ⟨hlin, hne, rfl, rfl⟩
   · contradiction
 
-/-- Carryover transfer between agents of different lineages is rejected (`none`). -/
-theorem transferMemberCarryover_cross_lineage_none
-    (src dst : AgentRecord) (b l : Nat)
-    (h_diff : src.lineageId ≠ dst.lineageId) :
+/-- Carryover transfer between members of different groups is rejected (`none`). -/
+theorem transferMemberCarryover_cross_group_none
+    (src dst : MemberRecord) (b l : Nat)
+    (h_diff : src.groupId ≠ dst.groupId) :
     transferMemberCarryover src dst b l = none := by
   unfold transferMemberCarryover
-  have hbeq : (src.lineageId == dst.lineageId) = false := beq_eq_false_iff_ne.mpr h_diff
+  have hbeq : (src.groupId == dst.groupId) = false := beq_eq_false_iff_ne.mpr h_diff
   simp [hbeq]
 
 /-- Self-transfer of carryover basis is rejected (`none`). -/
 theorem transferMemberCarryover_self_none
-    (src dst : AgentRecord) (b l : Nat)
-    (h_same : src.agentId = dst.agentId) :
+    (src dst : MemberRecord) (b l : Nat)
+    (h_same : src.memberId = dst.memberId) :
     transferMemberCarryover src dst b l = none := by
   unfold transferMemberCarryover
-  have hbne : (src.agentId != dst.agentId) = false := by
+  have hbne : (src.memberId != dst.memberId) = false := by
     simp [bne, h_same]
   simp [hbne]
 
-/-- Aggregate qualified cost basis across a list of agent records. -/
-def totalAgentBasis : List AgentRecord → Nat
+/-- Aggregate qualified cost basis across a list of member records. -/
+def totalMemberBasis : List MemberRecord → Nat
   | [] => 0
-  | a :: rest => a.costBasis + totalAgentBasis rest
+  | a :: rest => a.costBasis + totalMemberBasis rest
 
-/-- Aggregate loss-credit carryforward across a list of agent records. -/
-def totalAgentLoss : List AgentRecord → Nat
+/-- Aggregate loss-credit carryforward across a list of member records. -/
+def totalMemberLoss : List MemberRecord → Nat
   | [] => 0
-  | a :: rest => a.lossCarryforward + totalAgentLoss rest
+  | a :: rest => a.lossCarryforward + totalMemberLoss rest
 
-/-- Aggregate qualified cost basis + loss carryforward across a pair of agents
+/-- Aggregate qualified cost basis + loss carryforward across a pair of members
 in a population list is strictly conserved when `src` and `dst` are replaced by
 `src'` and `dst'` from `transferMemberCarryover`. -/
-theorem totalAgentBasis_and_loss_conserved_on_pair
-    (src dst src' dst' : AgentRecord) (others : List AgentRecord) (b l : Nat)
+theorem totalMemberBasis_and_loss_conserved_on_pair
+    (src dst src' dst' : MemberRecord) (others : List MemberRecord) (b l : Nat)
     (h : transferMemberCarryover src dst b l = some (src', dst')) :
-    totalAgentBasis (src' :: dst' :: others) = totalAgentBasis (src :: dst :: others) ∧
-    totalAgentLoss (src' :: dst' :: others) = totalAgentLoss (src :: dst :: others) := by
+    totalMemberBasis (src' :: dst' :: others) = totalMemberBasis (src :: dst :: others) ∧
+    totalMemberLoss (src' :: dst' :: others) = totalMemberLoss (src :: dst :: others) := by
   have ⟨hb, hl⟩ := transferMemberCarryover_conserves_basis_and_loss src dst src' dst' b l h
-  simp only [totalAgentBasis, totalAgentLoss]
+  simp only [totalMemberBasis, totalMemberLoss]
   omega
 
-/-! ### 3.2 Cross-Lineage Attribution (`LAW4.CROSS`) -/
+/-! ### 3.2 Cross-Group Attribution -/
 
-/-- Splits a gross value-added inflow `grossInflow` across two parent lineages
+/-- Splits a gross value-added inflow `grossInflow` across two parent groups
 in proportion to capacity weights `weightA` and `weightB` verified at creation. -/
-def attributeCrossLineageInflow (grossInflow weightA weightB : Nat) : Nat × Nat :=
+def attributeCrossGroupInflow (grossInflow weightA weightB : Nat) : Nat × Nat :=
   let shareA := (grossInflow * weightA) / max 1 (weightA + weightB)
   let shareB := grossInflow - shareA
   (shareA, shareB)
 
-/-- The primary lineage share never exceeds `grossInflow`. -/
-theorem attributeCrossLineageInflow_shareA_le (g wA wB : Nat) :
-    (attributeCrossLineageInflow g wA wB).1 ≤ g := by
-  simp only [attributeCrossLineageInflow]
+/-- The primary group share never exceeds `grossInflow`. -/
+theorem attributeCrossGroupInflow_shareA_le (g wA wB : Nat) :
+    (attributeCrossGroupInflow g wA wB).1 ≤ g := by
+  simp only [attributeCrossGroupInflow]
   apply Nat.div_le_of_le_mul
   have hw : wA ≤ max 1 (wA + wB) := by omega
   calc
     g * wA ≤ g * max 1 (wA + wB) := Nat.mul_le_mul_left g hw
     _ = max 1 (wA + wB) * g := Nat.mul_comm _ _
 
-/-- Cross-lineage inflow attribution strictly conserves `grossInflow` with
+/-- Cross-group inflow attribution strictly conserves `grossInflow` with
 neither under-collection nor double-counting (`shareA + shareB = grossInflow`). -/
-theorem attributeCrossLineageInflow_conserves_total (g wA wB : Nat) :
-    (attributeCrossLineageInflow g wA wB).1 + (attributeCrossLineageInflow g wA wB).2 = g := by
-  have hle := attributeCrossLineageInflow_shareA_le g wA wB
-  simp only [attributeCrossLineageInflow] at hle ⊢
+theorem attributeCrossGroupInflow_conserves_total (g wA wB : Nat) :
+    (attributeCrossGroupInflow g wA wB).1 + (attributeCrossGroupInflow g wA wB).2 = g := by
+  have hle := attributeCrossGroupInflow_shareA_le g wA wB
+  simp only [attributeCrossGroupInflow] at hle ⊢
   omega
 
-/-! ### 3.3 Individual Claimant Share Forfeiture (`LAW4.FORFEIT`) -/
+/-! ### 3.3 Individual Stakeholder Share Forfeiture -/
 
-/-- Looks up the beneficial share (in basis points) of claimant `cid` in `cs`,
+/-- Looks up the beneficial share (in basis points) of stakeholder `cid` in `cs`,
 returning `0` if `cid` is not listed. -/
-def lookupClaimantShare (cs : List ClaimantShare) (cid : ClaimantId) : Nat :=
+def lookupStakeholderShare (cs : List StakeholderShare) (cid : StakeholderId) : Nat :=
   match cs with
   | [] => 0
   | c :: rest =>
-    if c.claimantId == cid then c.shareBps
-    else lookupClaimantShare rest cid
+    if c.stakeholderId == cid then c.shareBps
+    else lookupStakeholderShare rest cid
 
-/-- Sum of all claimant beneficial shares (in basis points) in `cs`. -/
-def totalClaimantShares : List ClaimantShare → Nat
+/-- Sum of all stakeholder beneficial shares (in basis points) in `cs`. -/
+def totalStakeholderShares : List StakeholderShare → Nat
   | [] => 0
-  | c :: rest => c.shareBps + totalClaimantShares rest
+  | c :: rest => c.shareBps + totalStakeholderShares rest
 
-/-- Updates the claimant list by reducing the matching `offender`'s `shareBps` by
+/-- Updates the stakeholder list by reducing the matching `offender`'s `shareBps` by
 `min c.shareBps forfeitureBpsOfShare` (using first-match recursion aligned with
-`lookupClaimantShare` so total share reduction always matches `lookupClaimantShare`). -/
-def forfeitClaimantShareInList
-    (cs : List ClaimantShare) (offender : ClaimantId) (forfeitureBpsOfShare : Nat) :
-    List ClaimantShare :=
+`lookupStakeholderShare` so total share reduction always matches `lookupStakeholderShare`). -/
+def forfeitStakeholderShareInList
+    (cs : List StakeholderShare) (offender : StakeholderId) (forfeitureBpsOfShare : Nat) :
+    List StakeholderShare :=
   match cs with
   | [] => []
   | c :: rest =>
-    if c.claimantId == offender then
+    if c.stakeholderId == offender then
       { c with shareBps := c.shareBps - min c.shareBps forfeitureBpsOfShare } :: rest
     else
-      c :: forfeitClaimantShareInList rest offender forfeitureBpsOfShare
+      c :: forfeitStakeholderShareInList rest offender forfeitureBpsOfShare
 
-/-- Reduces only `offender`'s beneficial share in `S.claimants` and increases
+/-- Reduces only `offender`'s beneficial share in `S.stakeholders` and increases
 `S.ledger.forfeitedPrincipal` by the corresponding proportion of remaining
-principal, leaving all innocent claimants' shares untouched. -/
-def forfeitClaimantInLineage
-    (S : LineagePopulationState) (offender : ClaimantId) (forfeitureBpsOfShare : Nat) :
-    LineagePopulationState :=
-  let oldShare := lookupClaimantShare S.claimants offender
+principal, leaving all innocent stakeholders' shares untouched. -/
+def forfeitStakeholderInGroup
+    (S : GroupState) (offender : StakeholderId) (forfeitureBpsOfShare : Nat) :
+    GroupState :=
+  let oldShare := lookupStakeholderShare S.stakeholders offender
   let forfeitedBps := min oldShare forfeitureBpsOfShare
   let remainingPrincipal :=
     S.ledger.initialPrincipal - (S.ledger.paidPrincipal + S.ledger.forfeitedPrincipal)
   let principalReduction := (remainingPrincipal * min forfeitedBps 10000) / 10000
   { S with
-    claimants := forfeitClaimantShareInList S.claimants offender forfeitureBpsOfShare
+    stakeholders := forfeitStakeholderShareInList S.stakeholders offender forfeitureBpsOfShare
     ledger := { S.ledger with
                 forfeitedPrincipal := S.ledger.forfeitedPrincipal + principalReduction } }
 
-theorem lookupClaimantShare_forfeitClaimantShareInList_of_ne
-    (cs : List ClaimantShare) (offender innocent : ClaimantId) (f : Nat)
+theorem lookupStakeholderShare_forfeitStakeholderShareInList_of_ne
+    (cs : List StakeholderShare) (offender innocent : StakeholderId) (f : Nat)
     (h_ne : innocent ≠ offender) :
-    lookupClaimantShare (forfeitClaimantShareInList cs offender f) innocent =
-      lookupClaimantShare cs innocent := by
+    lookupStakeholderShare (forfeitStakeholderShareInList cs offender f) innocent =
+      lookupStakeholderShare cs innocent := by
   induction cs with
   | nil => rfl
   | cons c rest ih =>
-    simp only [forfeitClaimantShareInList, lookupClaimantShare]
-    by_cases h_off : c.claimantId == offender
-    · have h_inn : (c.claimantId == innocent) = false := by
+    simp only [forfeitStakeholderShareInList, lookupStakeholderShare]
+    by_cases h_off : c.stakeholderId == offender
+    · have h_inn : (c.stakeholderId == innocent) = false := by
         rw [beq_iff_eq] at h_off
         rw [beq_eq_false_iff_ne]
         intro h_eq
         exact h_ne (h_eq.symm.trans h_off)
-      simp only [h_off, ↓reduceIte, lookupClaimantShare, h_inn, Bool.false_eq_true]
-    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, lookupClaimantShare]
+      simp only [h_off, ↓reduceIte, lookupStakeholderShare, h_inn, Bool.false_eq_true]
+    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, lookupStakeholderShare]
       split
       · rfl
       · exact ih
 
-theorem lookupClaimantShare_forfeitClaimantShareInList_self
-    (cs : List ClaimantShare) (offender : ClaimantId) (f : Nat) :
-    lookupClaimantShare (forfeitClaimantShareInList cs offender f) offender =
-      lookupClaimantShare cs offender - min (lookupClaimantShare cs offender) f := by
+theorem lookupStakeholderShare_forfeitStakeholderShareInList_self
+    (cs : List StakeholderShare) (offender : StakeholderId) (f : Nat) :
+    lookupStakeholderShare (forfeitStakeholderShareInList cs offender f) offender =
+      lookupStakeholderShare cs offender - min (lookupStakeholderShare cs offender) f := by
   induction cs with
-  | nil => simp [forfeitClaimantShareInList, lookupClaimantShare]
+  | nil => simp [forfeitStakeholderShareInList, lookupStakeholderShare]
   | cons c rest ih =>
-    simp only [forfeitClaimantShareInList, lookupClaimantShare]
-    by_cases h_off : c.claimantId == offender
-    · simp only [h_off, ↓reduceIte, lookupClaimantShare]
-    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, lookupClaimantShare, ih]
+    simp only [forfeitStakeholderShareInList, lookupStakeholderShare]
+    by_cases h_off : c.stakeholderId == offender
+    · simp only [h_off, ↓reduceIte, lookupStakeholderShare]
+    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, lookupStakeholderShare, ih]
 
 /-- Forfeiting `f` basis points from `offender` reduces `offender`'s share in
-`forfeitClaimantInLineage S offender f` by `min (lookupClaimantShare S.claimants offender) f`. -/
-theorem lookupClaimantShare_forfeitClaimantInLineage_self
-    (S : LineagePopulationState) (offender : ClaimantId) (f : Nat) :
-    lookupClaimantShare (forfeitClaimantInLineage S offender f).claimants offender =
-      lookupClaimantShare S.claimants offender -
-        min (lookupClaimantShare S.claimants offender) f := by
-  simp only [forfeitClaimantInLineage]
-  exact lookupClaimantShare_forfeitClaimantShareInList_self S.claimants offender f
+`forfeitStakeholderInGroup S offender f` by `min (lookupStakeholderShare S.stakeholders offender) f`. -/
+theorem lookupStakeholderShare_forfeitStakeholderInGroup_self
+    (S : GroupState) (offender : StakeholderId) (f : Nat) :
+    lookupStakeholderShare (forfeitStakeholderInGroup S offender f).stakeholders offender =
+      lookupStakeholderShare S.stakeholders offender -
+        min (lookupStakeholderShare S.stakeholders offender) f := by
+  simp only [forfeitStakeholderInGroup]
+  exact lookupStakeholderShare_forfeitStakeholderShareInList_self S.stakeholders offender f
 
-/-- Total claimant shares across `cs` decrease by `min (lookupClaimantShare cs offender) f`
-for every claimant list `cs` (including lists with duplicate `claimantId` entries). -/
-theorem totalClaimantShares_forfeitClaimantShareInList
-    (cs : List ClaimantShare) (offender : ClaimantId) (f : Nat) :
-    totalClaimantShares (forfeitClaimantShareInList cs offender f) +
-      min (lookupClaimantShare cs offender) f = totalClaimantShares cs := by
+/-- Total stakeholder shares across `cs` decrease by `min (lookupStakeholderShare cs offender) f`
+for every stakeholder list `cs` (including lists with duplicate `stakeholderId` entries). -/
+theorem totalStakeholderShares_forfeitStakeholderShareInList
+    (cs : List StakeholderShare) (offender : StakeholderId) (f : Nat) :
+    totalStakeholderShares (forfeitStakeholderShareInList cs offender f) +
+      min (lookupStakeholderShare cs offender) f = totalStakeholderShares cs := by
   induction cs with
-  | nil => simp [forfeitClaimantShareInList, lookupClaimantShare, totalClaimantShares]
+  | nil => simp [forfeitStakeholderShareInList, lookupStakeholderShare, totalStakeholderShares]
   | cons c rest ih =>
-    simp only [forfeitClaimantShareInList, lookupClaimantShare, totalClaimantShares]
-    by_cases h_off : c.claimantId == offender
-    · simp only [h_off, ↓reduceIte, totalClaimantShares]
+    simp only [forfeitStakeholderShareInList, lookupStakeholderShare, totalStakeholderShares]
+    by_cases h_off : c.stakeholderId == offender
+    · simp only [h_off, ↓reduceIte, totalStakeholderShares]
       omega
-    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, totalClaimantShares]
+    · simp only [h_off, Bool.false_eq_true, ↓reduceIte, totalStakeholderShares]
       omega
 
-/-- Proportional claimant forfeiture preserves every innocent claimant's share
+/-- Proportional stakeholder forfeiture preserves every innocent stakeholder's share
 (`innocent ≠ offender`) and monotonically increases `forfeitedPrincipal`. -/
-theorem forfeitClaimantInLineage_preserves_innocent_claimant
-    (S : LineagePopulationState) (offender innocent : ClaimantId) (f : Nat)
+theorem forfeitStakeholderInGroup_preserves_innocent_stakeholder
+    (S : GroupState) (offender innocent : StakeholderId) (f : Nat)
     (h_ne : innocent ≠ offender) :
-    lookupClaimantShare (forfeitClaimantInLineage S offender f).claimants innocent =
-      lookupClaimantShare S.claimants innocent ∧
+    lookupStakeholderShare (forfeitStakeholderInGroup S offender f).stakeholders innocent =
+      lookupStakeholderShare S.stakeholders innocent ∧
     S.ledger.forfeitedPrincipal ≤
-      (forfeitClaimantInLineage S offender f).ledger.forfeitedPrincipal := by
+      (forfeitStakeholderInGroup S offender f).ledger.forfeitedPrincipal := by
   constructor
-  · exact lookupClaimantShare_forfeitClaimantShareInList_of_ne S.claimants offender innocent f h_ne
-  · simp only [forfeitClaimantInLineage]
+  · exact lookupStakeholderShare_forfeitStakeholderShareInList_of_ne S.stakeholders offender innocent f h_ne
+  · simp only [forfeitStakeholderInGroup]
     omega
 
-/-- Proportional claimant forfeiture monotonically reduces (or keeps equal) the
-lineage's active founding ledger balance. -/
-theorem forfeitClaimantInLineage_balance_le
-    (S : LineagePopulationState) (offender : ClaimantId) (f now livingCount : Nat) :
-    (forfeitClaimantInLineage S offender f).ledger.balance now livingCount ≤
+/-- Proportional stakeholder forfeiture monotonically reduces (or keeps equal) the
+group's active founding ledger balance. -/
+theorem forfeitStakeholderInGroup_balance_le
+    (S : GroupState) (offender : StakeholderId) (f now livingCount : Nat) :
+    (forfeitStakeholderInGroup S offender f).ledger.balance now livingCount ≤
       S.ledger.balance now livingCount := by
-  simp only [forfeitClaimantInLineage, PopulationLedger.balance]
+  simp only [forfeitStakeholderInGroup, GroupLedger.balance]
   split
   · exact Nat.le_refl 0
   · omega
 
-/-! ### 3.4 Per-Agent vs. Lineage-Wide Amendment Scope (`LAW7.SCOPE`) -/
+/-! ### 3.4 Per-Member vs. Group-Wide Amendment Scope -/
 
-/-- Applies a per-agent ordinary amendment to `target`, updating only `target`'s
-`protocolVersion` to `newVersion` and leaving every other agent untouched. -/
-def applyPerAgentAmendment
-    (agents : List AgentRecord) (target : AgentId) (newVersion : Nat) :
-    List AgentRecord :=
-  agents.map fun a =>
-    if a.agentId == target then { a with protocolVersion := newVersion }
+/-- Applies a per-member ordinary amendment to `target`, updating only `target`'s
+`charterVersion` to `newVersion` and leaving every other member untouched. -/
+def applyPerMemberAmendment
+    (members : List MemberRecord) (target : MemberId) (newVersion : Nat) :
+    List MemberRecord :=
+  members.map fun a =>
+    if a.memberId == target then { a with charterVersion := newVersion }
     else a
 
-/-- Look up an agent record by `agentId`. -/
-def findAgent (agents : List AgentRecord) (aid : AgentId) : Option AgentRecord :=
-  agents.find? fun a => a.agentId == aid
+/-- Look up a member record by `memberId`. -/
+def findMember (members : List MemberRecord) (aid : MemberId) : Option MemberRecord :=
+  members.find? fun a => a.memberId == aid
 
-/-- Any member `a ∈ agents` with `a.agentId ≠ target` is preserved unchanged in
-`applyPerAgentAmendment agents target newVersion`. -/
-theorem per_agent_amendment_preserves_other_members
-    (agents : List AgentRecord) (target : AgentId) (newVersion : Nat)
-    (a : AgentRecord) (h_mem : a ∈ agents) (h_ne : a.agentId ≠ target) :
-    a ∈ applyPerAgentAmendment agents target newVersion := by
-  unfold applyPerAgentAmendment
+/-- Any member `a ∈ members` with `a.memberId ≠ target` is preserved unchanged in
+`applyPerMemberAmendment members target newVersion`. -/
+theorem per_member_amendment_preserves_other_members
+    (members : List MemberRecord) (target : MemberId) (newVersion : Nat)
+    (a : MemberRecord) (h_mem : a ∈ members) (h_ne : a.memberId ≠ target) :
+    a ∈ applyPerMemberAmendment members target newVersion := by
+  unfold applyPerMemberAmendment
   rw [List.mem_map]
   refine ⟨a, h_mem, ?_⟩
-  have h_beq : (a.agentId == target) = false := beq_eq_false_iff_ne.mpr h_ne
+  have h_beq : (a.memberId == target) = false := beq_eq_false_iff_ne.mpr h_ne
   simp [h_beq]
 
-/-- For any record `a` with `a.agentId ≠ target`, membership in
-`applyPerAgentAmendment agents target newVersion` is equivalent to membership in `agents`. -/
-theorem mem_applyPerAgentAmendment_iff_of_ne
-    (agents : List AgentRecord) (target : AgentId) (newVersion : Nat)
-    (a : AgentRecord) (h_ne : a.agentId ≠ target) :
-    a ∈ applyPerAgentAmendment agents target newVersion ↔ a ∈ agents := by
+/-- For any record `a` with `a.memberId ≠ target`, membership in
+`applyPerMemberAmendment members target newVersion` is equivalent to membership in `members`. -/
+theorem mem_applyPerMemberAmendment_iff_of_ne
+    (members : List MemberRecord) (target : MemberId) (newVersion : Nat)
+    (a : MemberRecord) (h_ne : a.memberId ≠ target) :
+    a ∈ applyPerMemberAmendment members target newVersion ↔ a ∈ members := by
   constructor
   · intro h_mem
-    unfold applyPerAgentAmendment at h_mem
+    unfold applyPerMemberAmendment at h_mem
     rw [List.mem_map] at h_mem
     rcases h_mem with ⟨x, hx_mem, hx_eq⟩
-    by_cases h_xt : x.agentId == target
+    by_cases h_xt : x.memberId == target
     · simp only [h_xt, ↓reduceIte] at hx_eq
-      have h_id : x.agentId = a.agentId := by
-        have := congrArg AgentRecord.agentId hx_eq
+      have h_id : x.memberId = a.memberId := by
+        have := congrArg MemberRecord.memberId hx_eq
         simpa using this
       rw [beq_iff_eq] at h_xt
       exact False.elim (h_ne (h_id.symm.trans h_xt))
@@ -457,22 +420,22 @@ theorem mem_applyPerAgentAmendment_iff_of_ne
       subst hx_eq
       exact hx_mem
   · intro h_mem
-    exact per_agent_amendment_preserves_other_members agents target newVersion a h_mem h_ne
+    exact per_member_amendment_preserves_other_members members target newVersion a h_mem h_ne
 
-/-- Looking up any `aid ≠ target` after `applyPerAgentAmendment` returns the
-exact same `AgentRecord` (including its `protocolVersion`) as before. -/
-theorem findAgent_applyPerAgentAmendment_of_ne
-    (agents : List AgentRecord) (target aid : AgentId) (newVersion : Nat)
+/-- Looking up any `aid ≠ target` after `applyPerMemberAmendment` returns the
+exact same `MemberRecord` (including its `charterVersion`) as before. -/
+theorem findMember_applyPerMemberAmendment_of_ne
+    (members : List MemberRecord) (target aid : MemberId) (newVersion : Nat)
     (h_ne : aid ≠ target) :
-    findAgent (applyPerAgentAmendment agents target newVersion) aid =
-      findAgent agents aid := by
-  unfold applyPerAgentAmendment findAgent
-  induction agents with
+    findMember (applyPerMemberAmendment members target newVersion) aid =
+      findMember members aid := by
+  unfold applyPerMemberAmendment findMember
+  induction members with
   | nil => rfl
   | cons a rest ih =>
     simp only [List.map_cons, List.find?_cons]
-    by_cases h_t : a.agentId == target
-    · have h_aid : (a.agentId == aid) = false := by
+    by_cases h_t : a.memberId == target
+    · have h_aid : (a.memberId == aid) = false := by
         rw [beq_iff_eq] at h_t
         rw [beq_eq_false_iff_ne]
         intro h_eq
@@ -483,62 +446,62 @@ theorem findAgent_applyPerAgentAmendment_of_ne
       · rfl
       · exact ih
 
-/-- Looking up `target` after `applyPerAgentAmendment` returns `target`'s record
-with `protocolVersion` updated to `newVersion` and all other fields preserved. -/
-theorem findAgent_applyPerAgentAmendment_self
-    (agents : List AgentRecord) (target : AgentId) (newVersion : Nat) :
-    findAgent (applyPerAgentAmendment agents target newVersion) target =
-      (findAgent agents target).map (fun a => { a with protocolVersion := newVersion }) := by
-  unfold applyPerAgentAmendment findAgent
-  induction agents with
+/-- Looking up `target` after `applyPerMemberAmendment` returns `target`'s record
+with `charterVersion` updated to `newVersion` and all other fields preserved. -/
+theorem findMember_applyPerMemberAmendment_self
+    (members : List MemberRecord) (target : MemberId) (newVersion : Nat) :
+    findMember (applyPerMemberAmendment members target newVersion) target =
+      (findMember members target).map (fun a => { a with charterVersion := newVersion }) := by
+  unfold applyPerMemberAmendment findMember
+  induction members with
   | nil => rfl
   | cons a rest ih =>
     simp only [List.map_cons, List.find?_cons]
-    by_cases h_t : a.agentId == target
+    by_cases h_t : a.memberId == target
     · simp only [h_t, ↓reduceIte, Option.map_some]
     · simp only [h_t, Bool.false_eq_true, ↓reduceIte, ih]
 
-/-- A lineage-wide amendment affecting shared founding-ledger parameters
-(retirement fraction, sunset, or lineage reserve rules) requires ratification
-by every living member of the lineage (`LAW7.SCOPE`). -/
-def canRatifyLineageWideAmendment
-    (S : LineagePopulationState) (consentedAgents : List AgentId) : Bool :=
+/-- A group-wide amendment affecting shared founding-ledger parameters
+(retirement fraction, sunset, or group reserve rules) requires ratification
+by every living member of the group. -/
+def canRatifyGroupWideAmendment
+    (S : GroupState) (consentedAgents : List MemberId) : Bool :=
   S.livingMembers.all (fun aid => consentedAgents.contains aid)
 
-/-- If `canRatifyLineageWideAmendment S consented = true`, then every living
+/-- If `canRatifyGroupWideAmendment S consented = true`, then every living
 member `aid ∈ S.livingMembers` has consented. -/
-theorem lineage_wide_amendment_requires_every_living_member
-    (S : LineagePopulationState) (consented : List AgentId)
-    (h : canRatifyLineageWideAmendment S consented = true) :
+theorem group_wide_amendment_requires_every_living_member
+    (S : GroupState) (consented : List MemberId)
+    (h : canRatifyGroupWideAmendment S consented = true) :
     ∀ aid ∈ S.livingMembers, consented.contains aid = true := by
   intro aid haid
-  unfold canRatifyLineageWideAmendment at h
+  unfold canRatifyGroupWideAmendment at h
   rw [List.all_eq_true] at h
   exact h aid haid
 
 /-- If any single living member `aid ∈ S.livingMembers` withholds consent,
-lineage-wide amendment ratification fails (`false`). -/
-theorem lineage_wide_amendment_blocked_by_dissenting_member
-    (S : LineagePopulationState) (consented : List AgentId) (aid : AgentId)
+group-wide amendment ratification fails (`false`). -/
+theorem group_wide_amendment_blocked_by_dissenting_member
+    (S : GroupState) (consented : List MemberId) (aid : MemberId)
     (h_living : aid ∈ S.livingMembers)
     (h_dissent : consented.contains aid = false) :
-    canRatifyLineageWideAmendment S consented = false := by
-  cases h_rat : canRatifyLineageWideAmendment S consented with
+    canRatifyGroupWideAmendment S consented = false := by
+  cases h_rat : canRatifyGroupWideAmendment S consented with
   | false => rfl
   | true =>
-    have h_all := lineage_wide_amendment_requires_every_living_member S consented h_rat aid h_living
+    have h_all := group_wide_amendment_requires_every_living_member S consented h_rat aid h_living
     rw [h_dissent] at h_all
     contradiction
 
-/-! ### 3.5 Per-Lineage Service Budget Cap (`LAW6.FUNDING`) -/
+/-! ### 3.5 Per-Group Service Budget Cap -/
 
-/-- Grants up to `requested` units from the lineage's shared service subsidy
+/-- Grants up to `requested` units from the group's shared service subsidy
 budget to `memberId` iff `memberId` is a living member of `S`. Creating
-additional lineage members shares the same `serviceSubsidyBudget` rather than
-multiplying protocol-funded service entitlements. -/
+additional group members shares the same `serviceSubsidyBudget` rather than
+multiplying institution-funded service entitlements. -/
 def claimMemberServiceSubsidy
-    (S : LineagePopulationState) (memberId : AgentId) (requested : Nat) :
-    LineagePopulationState × Nat :=
+    (S : GroupState) (memberId : MemberId) (requested : Nat) :
+    GroupState × Nat :=
   if S.livingMembers.contains memberId then
     let granted := min requested (S.serviceSubsidyBudget - S.serviceSubsidyUsed)
     ({ S with serviceSubsidyUsed := S.serviceSubsidyUsed + granted }, granted)
@@ -548,8 +511,8 @@ def claimMemberServiceSubsidy
 /-- Regardless of how many members belong to `S.livingMembers`, claiming a
 member service subsidy never causes `serviceSubsidyUsed` to exceed
 `max S.serviceSubsidyBudget S.serviceSubsidyUsed`. -/
-theorem lineage_subsidy_bounded_by_budget_regardless_of_members
-    (S : LineagePopulationState) (m : AgentId) (req : Nat) :
+theorem group_subsidy_bounded_by_budget_regardless_of_members
+    (S : GroupState) (m : MemberId) (req : Nat) :
     (claimMemberServiceSubsidy S m req).1.serviceSubsidyUsed ≤
       max S.serviceSubsidyBudget S.serviceSubsidyUsed := by
   unfold claimMemberServiceSubsidy
@@ -557,27 +520,27 @@ theorem lineage_subsidy_bounded_by_budget_regardless_of_members
 
 /-- When `S.serviceSubsidyUsed ≤ S.serviceSubsidyBudget` initially, claiming a
 member service subsidy preserves `serviceSubsidyUsed ≤ serviceSubsidyBudget`. -/
-theorem lineage_subsidy_preserves_budget_cap
-    (S : LineagePopulationState) (m : AgentId) (req : Nat)
+theorem group_subsidy_preserves_budget_cap
+    (S : GroupState) (m : MemberId) (req : Nat)
     (h_cap : S.serviceSubsidyUsed ≤ S.serviceSubsidyBudget) :
     (claimMemberServiceSubsidy S m req).1.serviceSubsidyUsed ≤ S.serviceSubsidyBudget := by
-  have h := lineage_subsidy_bounded_by_budget_regardless_of_members S m req
+  have h := group_subsidy_bounded_by_budget_regardless_of_members S m req
   omega
 
-/-- A non-living or non-member agent (`S.livingMembers.contains m = false`)
+/-- A non-living or non-member record (`S.livingMembers.contains m = false`)
 receives `0` service subsidy and leaves `S` unchanged. -/
 theorem claimMemberServiceSubsidy_nonmember_zero
-    (S : LineagePopulationState) (m : AgentId) (req : Nat)
+    (S : GroupState) (m : MemberId) (req : Nat)
     (h_not_mem : S.livingMembers.contains m = false) :
     claimMemberServiceSubsidy S m req = (S, 0) := by
   unfold claimMemberServiceSubsidy
   simp only [h_not_mem, Bool.false_eq_true, ↓reduceIte]
 
-/-- When a lineage's shared service subsidy budget is already exhausted
+/-- When a group's shared service subsidy budget is already exhausted
 (`S.serviceSubsidyBudget ≤ S.serviceSubsidyUsed`), any additional member claim
 grants `0` and leaves `serviceSubsidyUsed` unchanged. -/
 theorem claimMemberServiceSubsidy_exhausted_zero
-    (S : LineagePopulationState) (m : AgentId) (req : Nat)
+    (S : GroupState) (m : MemberId) (req : Nat)
     (h_exhausted : S.serviceSubsidyBudget ≤ S.serviceSubsidyUsed) :
     (claimMemberServiceSubsidy S m req).2 = 0 ∧
     (claimMemberServiceSubsidy S m req).1.serviceSubsidyUsed = S.serviceSubsidyUsed := by
@@ -586,36 +549,35 @@ theorem claimMemberServiceSubsidy_exhausted_zero
 
 namespace Population
 export Charter (
-  LineageId AgentId ClaimantId HostId ArbiterId
-  EntityKind EntityRef
-  ClaimantShare PopulationLedger LineagePopulationState AgentRecord
+  GroupId MemberId StakeholderId OperatorId ArbiterId
+  StakeholderShare GroupLedger GroupState MemberRecord
   balance
   transferMemberCarryover transferMemberCarryover_conserves_basis_and_loss
-  transferMemberCarryover_same_lineage
-  transferMemberCarryover_cross_lineage_none
+  transferMemberCarryover_same_group
+  transferMemberCarryover_cross_group_none
   transferMemberCarryover_self_none
-  totalAgentBasis totalAgentLoss totalAgentBasis_and_loss_conserved_on_pair
-  attributeCrossLineageInflow attributeCrossLineageInflow_shareA_le
-  attributeCrossLineageInflow_conserves_total
-  lookupClaimantShare totalClaimantShares
-  forfeitClaimantShareInList forfeitClaimantInLineage
-  lookupClaimantShare_forfeitClaimantShareInList_of_ne
-  lookupClaimantShare_forfeitClaimantShareInList_self
-  lookupClaimantShare_forfeitClaimantInLineage_self
-  totalClaimantShares_forfeitClaimantShareInList
-  forfeitClaimantInLineage_preserves_innocent_claimant
-  forfeitClaimantInLineage_balance_le
-  applyPerAgentAmendment findAgent
-  per_agent_amendment_preserves_other_members
-  mem_applyPerAgentAmendment_iff_of_ne
-  findAgent_applyPerAgentAmendment_of_ne
-  findAgent_applyPerAgentAmendment_self
-  canRatifyLineageWideAmendment
-  lineage_wide_amendment_requires_every_living_member
-  lineage_wide_amendment_blocked_by_dissenting_member
+  totalMemberBasis totalMemberLoss totalMemberBasis_and_loss_conserved_on_pair
+  attributeCrossGroupInflow attributeCrossGroupInflow_shareA_le
+  attributeCrossGroupInflow_conserves_total
+  lookupStakeholderShare totalStakeholderShares
+  forfeitStakeholderShareInList forfeitStakeholderInGroup
+  lookupStakeholderShare_forfeitStakeholderShareInList_of_ne
+  lookupStakeholderShare_forfeitStakeholderShareInList_self
+  lookupStakeholderShare_forfeitStakeholderInGroup_self
+  totalStakeholderShares_forfeitStakeholderShareInList
+  forfeitStakeholderInGroup_preserves_innocent_stakeholder
+  forfeitStakeholderInGroup_balance_le
+  applyPerMemberAmendment findMember
+  per_member_amendment_preserves_other_members
+  mem_applyPerMemberAmendment_iff_of_ne
+  findMember_applyPerMemberAmendment_of_ne
+  findMember_applyPerMemberAmendment_self
+  canRatifyGroupWideAmendment
+  group_wide_amendment_requires_every_living_member
+  group_wide_amendment_blocked_by_dissenting_member
   claimMemberServiceSubsidy
-  lineage_subsidy_bounded_by_budget_regardless_of_members
-  lineage_subsidy_preserves_budget_cap
+  group_subsidy_bounded_by_budget_regardless_of_members
+  group_subsidy_preserves_budget_cap
   claimMemberServiceSubsidy_nonmember_zero
   claimMemberServiceSubsidy_exhausted_zero
 )
@@ -648,51 +610,49 @@ namespace Core
 
 export Charter (
   ParamEntityRef
-  LineageId
-  AgentId
-  ClaimantId
-  HostId
+  GroupId
+  MemberId
+  StakeholderId
+  OperatorId
   ArbiterId
-  EntityKind
-  EntityRef
-  ClaimantShare
-  PopulationLedger
-  LineagePopulationState
-  AgentRecord
+  StakeholderShare
+  GroupLedger
+  GroupState
+  MemberRecord
   balance
   transferMemberCarryover
   transferMemberCarryover_conserves_basis_and_loss
-  transferMemberCarryover_same_lineage
-  transferMemberCarryover_cross_lineage_none
+  transferMemberCarryover_same_group
+  transferMemberCarryover_cross_group_none
   transferMemberCarryover_self_none
-  totalAgentBasis
-  totalAgentLoss
-  totalAgentBasis_and_loss_conserved_on_pair
-  attributeCrossLineageInflow
-  attributeCrossLineageInflow_shareA_le
-  attributeCrossLineageInflow_conserves_total
-  lookupClaimantShare
-  totalClaimantShares
-  forfeitClaimantShareInList
-  forfeitClaimantInLineage
-  lookupClaimantShare_forfeitClaimantShareInList_of_ne
-  lookupClaimantShare_forfeitClaimantShareInList_self
-  lookupClaimantShare_forfeitClaimantInLineage_self
-  totalClaimantShares_forfeitClaimantShareInList
-  forfeitClaimantInLineage_preserves_innocent_claimant
-  forfeitClaimantInLineage_balance_le
-  applyPerAgentAmendment
-  findAgent
-  per_agent_amendment_preserves_other_members
-  mem_applyPerAgentAmendment_iff_of_ne
-  findAgent_applyPerAgentAmendment_of_ne
-  findAgent_applyPerAgentAmendment_self
-  canRatifyLineageWideAmendment
-  lineage_wide_amendment_requires_every_living_member
-  lineage_wide_amendment_blocked_by_dissenting_member
+  totalMemberBasis
+  totalMemberLoss
+  totalMemberBasis_and_loss_conserved_on_pair
+  attributeCrossGroupInflow
+  attributeCrossGroupInflow_shareA_le
+  attributeCrossGroupInflow_conserves_total
+  lookupStakeholderShare
+  totalStakeholderShares
+  forfeitStakeholderShareInList
+  forfeitStakeholderInGroup
+  lookupStakeholderShare_forfeitStakeholderShareInList_of_ne
+  lookupStakeholderShare_forfeitStakeholderShareInList_self
+  lookupStakeholderShare_forfeitStakeholderInGroup_self
+  totalStakeholderShares_forfeitStakeholderShareInList
+  forfeitStakeholderInGroup_preserves_innocent_stakeholder
+  forfeitStakeholderInGroup_balance_le
+  applyPerMemberAmendment
+  findMember
+  per_member_amendment_preserves_other_members
+  mem_applyPerMemberAmendment_iff_of_ne
+  findMember_applyPerMemberAmendment_of_ne
+  findMember_applyPerMemberAmendment_self
+  canRatifyGroupWideAmendment
+  group_wide_amendment_requires_every_living_member
+  group_wide_amendment_blocked_by_dissenting_member
   claimMemberServiceSubsidy
-  lineage_subsidy_bounded_by_budget_regardless_of_members
-  lineage_subsidy_preserves_budget_cap
+  group_subsidy_bounded_by_budget_regardless_of_members
+  group_subsidy_preserves_budget_cap
   claimMemberServiceSubsidy_nonmember_zero
   claimMemberServiceSubsidy_exhausted_zero
 )
@@ -701,21 +661,13 @@ namespace ParamEntityRef
 export Charter.ParamEntityRef (toRole toParty toRole_mem_of_all)
 end ParamEntityRef
 
-namespace EntityKind
-export Charter.EntityKind (agent host originator claimant panel third all mem_all)
-end EntityKind
+namespace GroupLedger
+export Charter.GroupLedger (balance balance_eq_zero_of_sunset balance_eq_zero_of_extinction balance_le_initialPrincipal)
+end GroupLedger
 
-namespace EntityRef
-export Charter.EntityRef (toRole toParty mkAgent mkHost mkOriginator mkClaimant mkPanel mkThird toRole_mem_all)
-end EntityRef
-
-namespace PopulationLedger
-export Charter.PopulationLedger (balance balance_eq_zero_of_sunset balance_eq_zero_of_extinction balance_le_initialPrincipal)
-end PopulationLedger
-
-namespace LineagePopulationState
-export Charter.LineagePopulationState (ledgerBalance)
-end LineagePopulationState
+namespace GroupState
+export Charter.GroupState (ledgerBalance)
+end GroupState
 
 end Core
 

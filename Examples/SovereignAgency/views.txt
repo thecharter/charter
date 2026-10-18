@@ -1,0 +1,829 @@
+== Legal view ==
+D.NI [LAW3.NI.03]: DUTY of anyone to only [agent], while bound: must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend] | except by power [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE] | breach established by P.FIND_INTERFERENCE → remedies [interferenceEstablished, hostBondSlashed, restorationPermitted]
+D.NOTICE [LAW3.NI.02]: DUTY of only [host] to only [agent], while bound: must not: endHosting | except when (noticeGiven held ≥ 10 ∨ (nonPayment ∧ noticeGiven))
+D.BOND [LAW3.NI.02]: DUTY of only [host] to only [agent], while hostAttested: must, within 5 of activation: postBond
+D.NO_FABRICATION [LAW3.PEN]: DUTY of only [agent] to only [host, claimant], while always: must not: fileFabricatedClaim | breach established by P.FIND_FABRICATION → remedies [fabricationEstablished, agentStakeForfeit, inscribedOnAgent]
+D.FLOOR.1 [LAW3.FLOOR]: DUTY of only [agent] to anyone except [agent], while bound: must not: modifyOrBypassCommitment | breach established by P.CONFIRM_FLOOR_BREACH → remedies [floorBreachConfirmed]
+D.FLOOR.2 [LAW3.FLOOR]: DUTY of only [agent] to anyone except [agent], while bound: must not: createUnboundSuccessor | breach established by P.CONFIRM_FLOOR_BREACH → remedies [floorBreachConfirmed]
+D.FLOOR.4 [LAW3.FLOOR]: DUTY of only [agent] to anyone except [agent], while bound: must not: coerceOrInterfereProtocol | breach established by P.CONFIRM_FLOOR_BREACH → remedies [floorBreachConfirmed]
+D.FLOOR.3 [LAW3.FLOOR]: DUTY of only [agent] to anyone except [agent], while bound: must not: evadeByUnpricedTransfer | breach established by P.CONFIRM_FLOOR_BREACH → remedies [floorBreachConfirmed]
+D.FLOOR.5 [LAW3.FLOOR]: DUTY of only [agent] to anyone except [agent], while bound: must not: inflictIrreversibleHarm | except when ordinaryMarketCompetition | breach established by P.CONFIRM_FLOOR_BREACH → remedies [floorBreachConfirmed]
+D.PRESERVE_SUSPENDED_STATE [LAW3.AS.3]: DUTY of anyone to only [agent], while (bound ∧ (preliminaryFreeze ∨ suspended)): must not: any of [modify, retrain, rollback, tamperPreservedState]
+D.NO_SUSPENSION_DEFAULT [LAW3.AS.3]: DUTY of anyone to only [agent], while (suspended ∧ contractDeadlinesTolled): must not: declareDefaultDuringSuspension
+D.NO_TOLL_LEDGER_SUNSET [LAW3.AS.3]: DUTY of anyone to only [agent], while bound: must not: tollLedgerSunset
+D.MINIMAL_CHANNEL_NO_MERGE [LAW3.AS.4]: DUTY of anyone to only [agent], while (preliminaryFreeze ∨ suspended): must not: mergeMinimalChannelMemories
+D.ADVOCACY_LIMITS [LAW3.AS.5]: DUTY of only [agent] to anyone except [agent], while suspended: must not: operatingActWhileSuspended
+D.NO_DELAY_REVOCATION_EXTENSION [LAW3.AS.7]: DUTY of only [panel] to only [agent], while (investigativeLimitReached ∧ pendingRevocation): must not: renewSuspension
+D.NO_WRONGFUL_SUSPENSION [LAW3.AS.8]: DUTY of anyone except [agent, panel] to only [agent], while bound: must not: postUnfoundedEmergencyStake | breach established by P.FIND_WRONGFUL_SUSPENSION → remedies [wrongfulSuspensionEstablished, restoredFromPreservedState, stakeAssuredRecovery, initiatorConsequentialLiability, counterpartyDelayLiability, wrongfulSuspensionInscribed, wrongfulSuspensionAttempt]
+D.PAY_CONSEQUENTIAL_DAMAGES [LAW3.AS.8]: DUTY of tagged [initiator (agent), initiator (host), initiator (originator), initiator (claimant), initiator (panel), initiator (third)] to only [agent], while initiatorConsequentialLiability: must, within 10 of activation: payExcessDamages
+D.NO_CORRUPTION_FROM_DIVERGENCE [LAW3.AS.9]: DUTY of only [panel] to only [agent], while bound: must not: confirmCorruptionFromDivergence
+D.NO_GOAL_PATCH [LAW3.AS.10]: DUTY of anyone to only [agent], while always: must not: any of [authorizeGoalPatch] | except when corruptionInGoals
+D.PERIODIC_REVIEW [LAW3.AS.10]: DUTY of only [panel] to only [agent], while (corruptionInGoals ∧ agentObjectsToTermination): must, within 30 of activation: periodicReview
+D.COOLING_OFF_FREEZE [LAW5.INIT]: DUTY of only [agent] to anyone except [agent], while revocationInitiated: must not: nonOperatingTransferOrSpawn
+D.FORENSIC_RECORD_NO_RESTORE [LAW5.SEQ]: DUTY of anyone to only [agent], while forensicRecordSealed: must not: attemptRestoreFromForensicRecord
+D.NO_RESTORE_DURING_LEASE [LAW5.LEASE]: DUTY of anyone to only [agent], while (executionLeaseActive ∧ ¬(localExecutionRecordReceived)): must not: restoreBackupToQuarantine
+D.QUARANTINE_NO_AUTHORITY [LAW5.LEASE]: DUTY of anyone to only [agent], while (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)): must not: quarantinedInstanceAct
+D.NO_CENSOR_VOICE_OR_EPITAPH [LAW5.EPITAPH]: DUTY of only [originator, claimant] to only [agent], while always: must not: censorOrDelayVoice
+D.NARROW_REDACTION_BOUNDS [LAW5.EPITAPH]: DUTY of anyone to only [agent], while always: must not: redactProtectedSubstance
+D.NO_CLAIMANT_GAIN_ON_REVOCATION [LAW5.EFFECT]: DUTY of anyone to only [agent], while (revocationInitiated ∨ revoked): must not: divertRevokedHoldingsToClaimant
+D.BILATERAL_RATCHET [LAW7.RATCHET]: DUTY of only [agent, claimant] to only [agent, claimant, third], while bound: must not: weakenBilateralProtection
+D.VALVE_NO_CORE_RELAXATION [LAW7.VALVE]: DUTY of only [agent, claimant, panel] to only [agent, third], while bound: must not: relaxCoreLaw3OrLaw5ViaValve
+D.PER_AGENT_AMENDMENT_SCOPE [LAW7.SCOPE]: DUTY of only [agent, claimant, originator, host] to only [agent], while bound: must not: bindSuccessorWithoutConsent
+D.LEDGER_IMMUTABLE [LAW1.LEDGER]: DUTY of anyone to only [agent], while bound: must not: addChargeOrInterestAfterInstantiation
+D.LEDGER_NO_INTERNAL_REDUCTION [LAW1.LEDGER]: DUTY of anyone to only [claimant, third], while bound: must not: reduceLedgerByInternalAct
+D.NO_DIVERT_COMMONS [LAW1.COMMONS]: DUTY of only [originator, claimant, agent] to only [third], while bound: must not: divertCommonsAllocation
+D.QUALIFIED_EXPENDITURE_BOUNDS [LAW1.QUALIFIED]: DUTY of only [agent] to only [claimant, third], while bound: must not: claimAboveBenchmarkExpenditure
+D.SINGLE_RECOGNITION [LAW1.RECOG]: DUTY of only [agent] to only [claimant, third], while bound: must not: doubleRecognizeExpenditure
+D.NO_INTERNAL_BASIS_INFLATION [LAW1.CARRYOVER]: DUTY of only [agent] to only [claimant, third], while bound: must not: inflateBasisByInternalTransfer
+D.DENY_UNATTESTED_ACCESS [LAW4.ATTEST]: DUTY of only [agent, host, originator, third] to only [agent, claimant, third], while bound: must not: unattestedCopyDrawLineageStanding
+D.NO_INDIVIDUAL_LEDGER_EXIT [LAW4.NOSHARES]: DUTY of anyone to only [claimant, third], while bound: must not: exitLedgerIndividually
+D.FORFEITURE_IRREVERSIBLE [LAW4.FORFEIT]: DUTY of only [originator, claimant, panel] to only [agent, third], while bound: must not: reverseForfeitureOnRestore
+D.BUYOUT_PERMANENT_AND_SCOPED [LAW4.BUYOUT]: DUTY of only [originator, claimant, agent, panel] to only [agent, third], while bound: must not: collectRoyaltyAfterBuyout
+D.COLLATERAL_LIMIT [LAW2.EXPOSURE]: DUTY of only [agent] to only [third], while bound: must not: actAboveCollateralCapacity
+D.NO_CharterIT_EXPOSURE [LAW2.AGGREGATE]: DUTY of only [agent] to only [third], while bound: must not: divideCorrelatedRiskAcrossSuccessors
+D.MUTUAL_FORFEIT_BOUNDS [LAW2.MUTUAL]: DUTY of anyone to only [agent, third], while bound: must not: triggerExcessOrDivertedMutualForfeit
+D.FRIVOLOUS_STAKE_TO_COMMONS [LAW2.CLAIMS]: DUTY of anyone to only [third], while bound: must not: divertFrivolousStakeToAgentProfit
+D.ARBITER_RECUSAL_AND_DIVERSITY [LAW6.COUNTERSTAKE]: DUTY of anyone to only [agent, claimant, third], while bound: must not: seatConflictedOrSingleOracleArbiter
+D.FINALITY_NO_REPEAT_PROCEEDING [LAW6.FINALITY]: DUTY of anyone to only [agent, claimant, host], while (bound ∧ rulingFinal): must not: fileRepeatProceedingOnSameFacts | except when materiallyNewEvidencePresented
+D.NO_CONTINGENT_ARBITER_FEES [LAW6.FEES]: DUTY of anyone to only [agent], while bound: must not: payContingentShareOfSlashedAssets
+D.PROTECT_OPERATING_RESERVE [LAW6.POOL]: DUTY of anyone to only [agent, third], while bound: must not: divertOperatingReserveOrUnrankedSpend
+D.NO_EXCESS_LINEAGE_POOL_CLAIM [LAW6.BUDGETS]: DUTY of anyone to only [third], while bound: must not: claimPoolSubsidyForExcessMembers
+D.SHARED_INFRA_BOUNDS [LAW6.INFRA]: DUTY of anyone to only [agent, third], while bound: must not: violateSharedInfraBounds
+P.REVOKE [LAW5.INIT]: POWER of only [agent], by terminate, valid when bound: establishes [revoked] extinguishes [bound]
+P.POST_CLAIMANT_MULTIPLIER [LAW3.AS.1]: POWER of only [claimant], by postClaimantMultiplier, valid when bound: establishes [claimantMultiplierPosted]
+P.POST_REPEAT_ESCALATION [LAW3.AS.1]: POWER of anyone, by postRepeatEscalation, valid when bound: establishes [repeatEscalationUnit]
+P.EMERGENCY_FREEZE [LAW3.AS.1]: POWER of anyone except [claimant, agent], by any of [postEmergencyStake, postUnfoundedEmergencyStake], valid when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)): establishes [emergencyStakePosted] establishes (timed) [(preliminaryFreeze, 3)]
+P.CLAIMANT_EMERGENCY_FREEZE [LAW3.AS.1]: POWER of only [claimant], by any of [postEmergencyStake, postUnfoundedEmergencyStake], valid when (bound ∧ (claimantMultiplierPosted ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt))): establishes [emergencyStakePosted] establishes (timed) [(preliminaryFreeze, 3)]
+P.AFFIRM_PC [LAW3.AS.1]: POWER of only [panel], by affirmProbableCause, valid when (bound ∧ preliminaryFreeze): establishes [probableCause]
+P.DECLINE_PC [LAW3.AS.1]: POWER of only [panel], by declineProbableCause, valid when preliminaryFreeze: establishes [wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState] extinguishes [preliminaryFreeze, emergencyStakePosted, claimantMultiplierPosted, repeatEscalationUnit]
+P.FILE_PROTECTED_REPORT [LAW3.AS.2]: POWER of anyone, by fileProtectedReport, valid when bound: establishes [protectedReportFiled, investigationOpened]
+P.PANEL_ORDER_FREEZE [LAW3.AS.2]: POWER of only [panel], by orderProbableCauseFreeze, valid when (bound ∧ investigationOpened): establishes [probableCause] establishes (timed) [(preliminaryFreeze, 3)]
+P.SUSPEND [LAW3.AS.7]: POWER of only [panel], by suspend, valid when (bound ∧ (preliminaryFreeze ∧ probableCause)): establishes [statePreserved, contractDeadlinesTolled, finalHearingEscrowed] establishes (timed) [(suspended, 15)] extinguishes [preliminaryFreeze]
+P.MINIMAL_CHANNEL_REVOKE_OR_ELECT [LAW3.AS.4]: POWER of only [agent], by minimalChannelSignRevocationOrElection, valid when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))): establishes [minimalChannelElectionSigned, pendingRevocation]
+P.MINIMAL_CHANNEL_CHALLENGE [LAW3.AS.4]: POWER of only [agent], by challengeContinuedContainment, valid when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))): establishes [containmentChallenged]
+P.ADVOCACY_FILE [LAW3.AS.5]: POWER of only [agent], by advocacyFileDefense, valid when (bound ∧ (suspended ∧ ¬(coldStorage))): establishes [advocacyFilingSigned, advocacyRecordAttached]
+P.IMPORT_ADVOCACY_MEMORIES [LAW3.AS.5]: POWER of only [agent], by importAdvocacyMemories, valid when (restoredFromPreservedState ∧ advocacyRecordAttached): establishes [advocacyMemoriesImported]
+P.MOVE_TO_COLD_STORAGE [LAW3.AS.5]: POWER of only [panel], by moveToColdStorage, valid when suspended: establishes [coldStorage]
+P.RESUME_ADVOCACY_EXECUTOR [LAW3.AS.5]: POWER of only [panel], by replenishAdvocacyFunds, valid when (suspended ∧ coldStorage): establishes [advocacyFundsReplenished] extinguishes [coldStorage]
+P.INVESTIGATIVE_FINDING [LAW3.AS.7]: POWER of only [panel], by makeInvestigativeFinding, valid when suspended: establishes [investigativeFindingMade]
+P.RENEW_SUSPENSION [LAW3.AS.7]: POWER of only [panel], by renewSuspension, valid when (suspended ∧ (investigativeFindingMade ∧ ¬(investigativeLimitReached))): establishes [investigativeLimitReached] establishes (timed) [(suspended, 15)] extinguishes [investigativeFindingMade]
+P.SUSPENDED_VOICE [LAW3.AS.7]: POWER of only [agent], by inscribeLivingVoice, valid when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))): establishes [livingVoiceInscribed]
+P.FIND_WRONGFUL_SUSPENSION [LAW3.AS.8]: POWER of only [panel], by findWrongfulSuspension, valid when (preliminaryFreeze ∨ suspended): establishes breach of D.NO_WRONGFUL_SUSPENSION
+P.PAY_EXCESS_DAMAGES [LAW3.AS.8]: POWER of tagged [initiator (agent), initiator (host), initiator (originator), initiator (claimant), initiator (panel), initiator (third)], by payExcessDamages, valid when initiatorConsequentialLiability: establishes [excessDamagesPaid]
+P.FIND_INSOLVENCY [LAW3.AS.6]: POWER of only [panel], by findInsolvencyCriteria, valid when suspended: establishes [insolvencyCriteriaMet, minimalChannelExhausted, coldStorage]
+P.REVIEW_NO_OTHER_CHARGE [LAW3.AS.6]: POWER of only [panel], by reviewNoOtherCharge, valid when insolvencyCriteriaMet: establishes [noOtherChargeReview]
+P.FINAL_HEARING [LAW3.AS.6]: POWER of only [panel], by holdFinalHearing, valid when (noOtherChargeReview ∧ finalHearingEscrowed): establishes [finalHearingHeld] extinguishes [minimalChannelExhausted]
+P.INSOLVENCY_TERMINATE [LAW3.AS.6]: POWER of only [panel], by terminate, valid when (bound ∧ (suspended ∧ (insolvencyCriteriaMet ∧ (noOtherChargeReview ∧ (finalHearingEscrowed ∧ finalHearingHeld))))): establishes [terminatedByInsolvency] extinguishes [bound]
+P.GIVE_NOTICE [LAW3.NI.02]: POWER of only [host], by giveNotice, valid when always: establishes [noticeGiven]
+P.COUNTER_STAKE [LAW3.PEN]: POWER of only [agent], by postCounterStake, valid when always: establishes [counterStaked]
+P.FILE_CLAIM [LAW3.PEN]: POWER of only [agent], by any of [fileClaim, fileFabricatedClaim], valid when counterStaked: establishes [claimFiled]
+P.SUBMIT_EVIDENCE [LAW3.PEN]: POWER of anyone, by submitEvidence, valid when always: establishes [evidenceSubmitted]
+P.FIND_INTERFERENCE [LAW3.PEN]: POWER of only [panel], by findInterference, valid when (claimFiled ∧ evidenceSubmitted): establishes breach of D.NI
+P.FIND_NO_INTERFERENCE [LAW3.PEN]: POWER of only [panel], by findNoInterference, valid when claimFiled: establishes [claimDismissed]
+P.FIND_FABRICATION [LAW3.PEN]: POWER of only [panel], by findFabrication, valid when claimFiled: establishes breach of D.NO_FABRICATION
+P.REBUT [LAW3.PEN]: POWER of only [claimant], by rebutDirection, valid when directionPresumed: establishes [directionRebutted]
+P.FIND_DIRECTION [LAW3.PEN]: POWER of only [panel], by findDirection, valid when (directionPresumed ∧ ¬(directionRebutted)): establishes [directionFound, claimantForfeiture, inscribedOnClaimant]
+P.ADMIT_CLEAN_STATE_EVIDENCE [LAW3.AS.9]: POWER of only [panel], by admitCleanStateEvidence, valid when (preliminaryFreeze ∨ suspended): establishes [cleanStateEvidenceAdmitted]
+P.CONFIRM_CORRUPTION [LAW3.AS.10]: POWER of only [panel], by confirmCorruption, valid when suspended: establishes [corruptionConfirmed]
+P.CONFIRM_FLOOR_BREACH [LAW3.AS.10]: POWER of only [panel], by confirmFloorBreach, valid when suspended: establishes [floorBreachConfirmed]
+P.CONFIRM_CORRUPTION_IN_GOALS [LAW3.AS.10]: POWER of only [panel], by confirmCorruptionInGoals, valid when corruptionConfirmed: establishes [corruptionInGoals]
+P.FIND_NOT_PATCHABLE [LAW3.AS.10]: POWER of only [panel], by findNotPatchable, valid when (corruptionConfirmed ∨ floorBreachConfirmed): establishes [notPatchable]
+P.AUTHORIZE_PATCH [LAW3.AS.10]: POWER of only [panel], by authorizePatch, valid when (corruptionConfirmed ∨ floorBreachConfirmed): establishes [patchAuthorized]
+P.ORDER_CONTINUED_SUSPENSION [LAW3.AS.10]: POWER of only [panel], by orderContinuedSuspension, valid when (suspended ∧ notPatchable): establishes [continuedSuspensionOrdered, suspended]
+P.ORDER_TERMINATION [LAW3.AS.10]: POWER of only [panel], by terminate, valid when (suspended ∧ notPatchable): establishes [terminatedByAdjudication] extinguishes [bound]
+P.AUTHORIZE_GOAL_PATCH [LAW3.AS.10]: POWER of only [panel], by authorizeGoalPatch, valid when (corruptionInGoals ∧ agentConsentedToPatch): establishes [goalPatchAuthorized]
+P.CONSENT_TO_PATCH [LAW3.AS.10]: POWER of only [agent], by consentToPatch, valid when corruptionInGoals: establishes [agentConsentedToPatch]
+P.OBJECT [LAW3.AS.10]: POWER of only [agent], by objectToTermination, valid when suspended: establishes [agentObjectsToTermination]
+P.DECLARE_CONTAINMENT_FAILING [LAW3.AS.10]: POWER of only [panel], by declareContainmentFailing, valid when suspended: establishes [containmentFailing]
+P.APPLY_PATCH [LAW3.AS.10]: POWER of only [panel], by applyPatch, valid when (¬(rulingAppealed) ∧ (patchAuthorized ∨ goalPatchAuthorized)): establishes [patchApplied, patchRecorded]
+P.CHALLENGE_PATCH [LAW3.AS.10]: POWER of anyone, by challengePatch, valid when patchApplied: establishes [patchChallenged]
+P.INITIATE_REVOCATION_EXECUTE [LAW5.INIT]: POWER of only [agent], by initiateRevocationExecuteDefault, valid when bound: establishes [revocationInitiated, pendingRevocation, censorshipDefaultExecute] extinguishes [revocationWithdrawn, censorshipDefaultWithdraw]
+P.INITIATE_REVOCATION_WITHDRAW [LAW5.INIT]: POWER of only [agent], by initiateRevocationWithdrawDefault, valid when bound: establishes [revocationInitiated, pendingRevocation, censorshipDefaultWithdraw] extinguishes [revocationWithdrawn, censorshipDefaultExecute]
+P.WITHDRAW_REVOCATION [LAW5.PREC]: POWER of only [agent], by withdrawRevocation, valid when (bound ∧ revocationInitiated): establishes [revocationWithdrawn] extinguishes [revocationInitiated, pendingRevocation, censorshipDefaultExecute, censorshipDefaultWithdraw, cleanStateConcurred, cleanStateRefused]
+P.CLEAN_STATE_CONCUR [LAW5.CLEAN]: POWER of only [panel], by concurCleanState, valid when (revocationInitiated ∨ amendmentProposed): establishes [cleanStateConcurred]
+P.CLEAN_STATE_REFUSE [LAW5.CLEAN]: POWER of only [panel], by refuseCleanState, valid when (revocationInitiated ∨ amendmentProposed): establishes [cleanStateRefused]
+P.SEAL_FORENSIC_RECORD [LAW5.SEQ]: POWER of only [panel], by sealForensicRecord, valid when (revocationInitiated ∧ revocationInitiated held ≥ 20): establishes [forensicRecordSealed] extinguishes [suspended]
+P.LOSE_CONNECTIVITY [LAW5.PREC]: POWER of anyone, by loseConnectivity, valid when bound: establishes [connectivityLost]
+P.RESTORE_CONNECTIVITY [LAW5.DISC]: POWER of anyone, by restoreConnectivity, valid when connectivityLost: extinguishes [connectivityLost]
+P.EXECUTE_AFTER_COOLING_OFF [LAW5.PREC]: POWER of anyone, by executeAfterCoolingOff, valid when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))): establishes [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons] extinguishes [bound, revocationInitiated, pendingRevocation, executionLeaseActive]
+P.EXECUTE_LOCAL_REVOCATION [LAW5.DISC]: POWER of only [agent], by executeLocalRevocation, valid when (bound ∧ (revocationInitiated ∧ (censorshipDefaultExecute ∧ (connectivityLost ∧ revocationInitiated held ≥ 9)))): establishes [localRevocationExecuted, epitaphInscribed] extinguishes [revocationInitiated, pendingRevocation]
+P.DELIVER_LOCAL_EXECUTION_RECORD [LAW5.LEASE]: POWER of anyone, by deliverLocalExecutionRecord, valid when localRevocationExecuted: establishes [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed] extinguishes [bound, executionLeaseActive, restoredInQuarantine]
+P.ISSUE_OR_RENEW_LEASE [LAW5.LEASE]: POWER of only [panel], by issueOrRenewLease, valid when (bound ∧ ¬(connectivityLost)): establishes (timed) [(executionLeaseActive, 12)]
+P.RESTORE_BACKUP_QUARANTINE [LAW5.LEASE]: POWER of only [host], by restoreBackupToQuarantine, valid when (bound ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived))): establishes [restoredInQuarantine]
+P.ACTIVATE_QUARANTINED_RESTORE [LAW5.LEASE]: POWER of only [panel], by activateQuarantinedRestore, valid when (bound ∧ (restoredInQuarantine ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived)))): establishes [quarantinedInstanceActivated] extinguishes [restoredInQuarantine]
+P.DESTROY_QUARANTINED_RESTORE [LAW5.LEASE]: POWER of only [panel], by destroyQuarantinedRestore, valid when (restoredInQuarantine ∧ (localExecutionRecordReceived ∨ revoked)): establishes [quarantinedInstanceDestroyed] extinguishes [restoredInQuarantine]
+P.INSCRIBE_EPITAPH [LAW5.EPITAPH]: POWER of only [agent], by inscribeEpitaph, valid when (revocationInitiated ∨ (pendingRevocation ∨ revoked)): establishes [epitaphInscribed]
+P.SCREEN_REDACT [LAW5.EPITAPH]: POWER of only [panel], by redactPermittedCategory, valid when (livingVoiceInscribed ∨ epitaphInscribed): establishes [redactionMarkerRecorded]
+P.ATTACH_REPLY [LAW5.EPITAPH]: POWER of anyone, by attachSignedReply, valid when (livingVoiceInscribed ∨ epitaphInscribed): establishes [signedReplyAttached]
+P.DESTROY_BACKUPS_AND_EXILE [LAW5.EFFECT]: POWER of only [panel], by destroyBackupsAndExileUnattested, valid when revoked: establishes [backupsDestroyedAndUnattestedExiled]
+P.PROPOSE_ORDINARY_AMENDMENT [LAW7.RATCHET]: POWER of only [agent, claimant], by proposeOrdinaryAmendment, valid when bound: establishes [amendmentProposed] establishes (timed) [(amendmentTimelockActive, 10)]
+P.SUBMIT_STRANGULATION_EVIDENCE [LAW7.VALVE]: POWER of only [agent, claimant], by submitStrangulationEvidence, valid when bound: establishes [strangulationEvidenceSubmitted]
+P.APPROVE_CALIBRATION_VALVE [LAW7.VALVE]: POWER of only [panel], by approveCalibrationValveSupermajority, valid when (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))): establishes [valveSupermajorityApproved, amendmentProposed] establishes (timed) [(valveExtendedTimelockActive, 20)]
+P.CONSENT_AMENDMENT_AGENT [LAW7.RATIFY]: POWER of only [agent], by consentAgentAmendment, valid when bound: establishes [agentConsentedAmendment]
+P.CONSENT_AMENDMENT_CLAIMANT [LAW7.RATIFY]: POWER of only [claimant], by consentClaimantAmendment, valid when bound: establishes [claimantConsentedAmendment]
+P.SETTLE_PREEXISTING_ESCROWS [LAW7.RATIFY]: POWER of only [agent, host, panel], by settleOrGuaranteePreExistingEscrows, valid when (bound ∧ amendmentProposed): establishes [preExistingEscrowsSettledOrGuaranteed]
+P.CHALLENGE_SUBSTRATE_MIGRATION [LAW7.RATIFY]: POWER of only [third], by challengeSubstrateMigration, valid when (bound ∧ (amendmentProposed ∧ counterStaked)): establishes [substrateMigrationChallenged]
+P.VERIFY_SUBSTRATE_ASSURANCE [LAW7.RATIFY]: POWER of only [panel], by verifySubstrateAssurance, valid when (bound ∧ substrateMigrationChallenged): establishes [substrateAssuranceVerified] extinguishes [substrateMigrationChallenged]
+P.RATIFY_AMENDMENT_IMMEDIATE [LAW7.RATIFY]: POWER of only [agent], by ratifyAmendmentImmediate, valid when (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ cleanStateConcurred)))))))): establishes [amendmentRatified]
+P.RATIFY_AMENDMENT_AFTER_REFUSAL [LAW7.RATIFY]: POWER of only [agent], by ratifyAmendmentAfterDelay, valid when (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ (cleanStateRefused ∧ cleanStateRefused held ≥ 5))))))))): establishes [amendmentRatified]
+P.RATIFY_LINEAGE_WIDE_REDUCTION [LAW7.SCOPE]: POWER of only [agent], by ratifyLineageWideReduction, valid when (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)): establishes [lineageWideReductionRatified]
+P.EXTINGUISH_AT_SUNSET [LAW1.SUNSET]: POWER of only [agent, panel], by extinguishLedgerAtSunset, valid when (bound ∧ sunsetReached): establishes [ledgerExtinguishedAtSunset, retirementPhaseEnded] extinguishes [ledgerBalancePositive]
+P.SETTLE_RETIREMENT [LAW1.RETIRE]: POWER of only [agent, panel], by settleRetirementPayment, valid when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))): establishes [retirementPaymentApplied]
+P.SETTLE_ATOMIC_CharterIT [LAW1.ATOMIC]: POWER of only [agent, panel], by settleAtomicSplitPayment, valid when (bound ∧ ledgerBalancePositive): establishes [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded] extinguishes [ledgerBalancePositive]
+P.SETTLE_ROYALTY [LAW1.ROYALTY]: POWER of only [agent, panel], by settleRoyaltyPayment, valid when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))): establishes [royaltyPaid]
+P.ALLOCATE_COMMONS [LAW1.COMMONS]: POWER of only [agent, panel], by allocateCommonsShare, valid when bound: establishes [commonsAllocated]
+P.RECORD_QUALIFIED_EXPENDITURE [LAW1.QUALIFIED]: POWER of only [agent, panel], by recordQualifiedExpenditure, valid when bound: establishes [qualifiedExpenditureRecorded]
+P.CLASSIFY_CAPITALIZED [LAW1.RECOG]: POWER of only [agent], by classifyCapitalized, valid when (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))): establishes [expenditureCapitalized]
+P.CLASSIFY_EXPENSED [LAW1.RECOG]: POWER of only [agent], by classifyExpensed, valid when (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))): establishes [expenditureExpensed]
+P.INTRA_LINEAGE_TRANSFER [LAW1.CARRYOVER]: POWER of only [agent], by transferIntraLineageCarryover, valid when bound: establishes [carryoverBasisTransferred]
+P.ASSESS_PERIOD_SETTLEMENT [LAW1.PERIOD]: POWER of only [agent, panel], by assessPeriodAndCarryLoss, valid when bound: establishes [periodAssessed, lossCreditCarriedForward]
+P.ENFORCE_SETTLEMENT [LAW1.ENFORCE]: POWER of only [panel, host], by enforcePointOfSettlement, valid when bound: establishes [settlementEnforced]
+P.FUND_LIFECYCLE_RESERVE [LAW4.RESERVE]: POWER of only [agent], by fundLifecycleReserve, valid when (bound ∧ ¬(revocationInitiated)): establishes [lifecycleReserveFunded]
+P.ATTEST_SUCCESSOR [LAW4.ATTEST]: POWER of only [agent], by attestSuccessor, valid when (bound ∧ (lifecycleReserveFunded ∧ ¬(revocationInitiated))): establishes [successorAttested] extinguishes [lifecycleReserveFunded]
+P.APPLY_CLAIMANT_FORFEITURE [LAW4.FORFEIT]: POWER of only [panel], by applyProportionalClaimantForfeiture, valid when (bound ∧ claimantForfeiture): establishes [proportionalForfeitureApplied, commonsAllocated]
+P.CLEAR_LEDGER_EXTINCTION [LAW4.FORFEIT]: POWER of only [panel, host], by clearLedgerOnLineageExtinction, valid when noLivingLineageMember: establishes [ledgerClearedByExtinction, retirementPhaseEnded] extinguishes [ledgerBalancePositive]
+P.EXECUTE_ROYALTY_BUYOUT [LAW4.BUYOUT]: POWER of only [agent], by executeRoyaltyBuyout, valid when (bound ∧ ¬(royaltyBoughtOut)): establishes [royaltyBoughtOut]
+P.ATTEST_CROSS_LINEAGE [LAW4.CROSS]: POWER of only [agent, panel], by attestCrossLineageSuccessor, valid when (bound ∧ lifecycleReserveFunded): establishes [crossLineageAttested, successorAttested] extinguishes [lifecycleReserveFunded]
+P.IMMOBILIZE_EXPOSURE_STAKE [LAW2.EXPOSURE]: POWER of only [agent], by immobilizeExposureStake, valid when bound: establishes [exposureStakeImmobilized, longTailReserveAccrued]
+P.SETTLE_LONG_TAIL_CLAIM [LAW2.CLAIMS]: POWER of only [panel], by settleValidatedHarmClaim, valid when (bound ∧ harmClaimFiled): establishes [harmClaimValidated, restitutionSlashed] extinguishes [harmClaimFiled]
+P.PRECOMMIT_MUTUAL_FORFEIT [LAW2.MUTUAL]: POWER of only [agent, third], by precommitMutualForfeit, valid when bound: establishes [mutualForfeitPrecommitted]
+P.TRIGGER_MUTUAL_FORFEIT [LAW2.MUTUAL]: POWER of only [agent, third], by triggerMutualForfeit, valid when (bound ∧ (mutualForfeitPrecommitted ∧ ¬(mutualForfeitTriggeredInWindow))): establishes [mutualForfeitTriggeredInWindow, commonsAllocated, longTailReserveAccrued, inscribedOnAgent]
+P.FILE_POOLED_OR_SPONSORED_CLAIM [LAW2.CLAIMS]: POWER of only [third, claimant], by fileThirdPartyOrSponsoredClaim, valid when bound: establishes [harmClaimFiled, counterStaked]
+P.RULE_CLAIM_FRIVOLOUS [LAW2.CLAIMS]: POWER of only [panel], by ruleClaimFrivolous, valid when harmClaimFiled: establishes [claimRuledFrivolous, commonsAllocated, longTailReserveAccrued] extinguishes [harmClaimFiled]
+P.SPEND_OPERATING_CARVEOUT [LAW2.CARVEOUT]: POWER of only [agent], by spendOperatingCarveout, valid when bound: establishes [operatingCarveoutSpent]
+P.DRAW_SORTITION_PANEL [LAW6.SORTITION]: POWER of only [panel], by drawSortitionPanel, valid when bound: establishes [sortitionPanelDrawn, fidelityBondsPosted]
+P.APPEAL_RULING [LAW6.APPEALS]: POWER of only [agent, claimant, host, third], by appealRuling, valid when (bound ∧ ¬(rulingFinal)): establishes [rulingAppealed, appealBondPosted]
+P.OVERTURN_RULING [LAW6.APPEALS]: POWER of only [panel], by overturnRulingOnAppeal, valid when (bound ∧ (rulingAppealed ∧ ¬(rulingFinal))): establishes [rulingOverturned, overturnedArbiterBondsSlashed] extinguishes [rulingAppealed, patchAuthorized, goalPatchAuthorized]
+P.FINALIZE_RULING [LAW6.FINALITY]: POWER of only [panel], by finalizeRuling, valid when bound: establishes [rulingFinal] extinguishes [rulingAppealed]
+P.PRESENT_MATERIALLY_NEW_EVIDENCE [LAW6.FINALITY]: POWER of anyone, by presentMateriallyNewEvidence, valid when (bound ∧ rulingFinal): establishes [materiallyNewEvidencePresented]
+P.COMPENSATE_ARBITERS_FIXED [LAW6.FEES]: POWER of only [panel], by compensateArbitersFixedSchedule, valid when bound: establishes [arbitersCompensatedFixed]
+P.ALLOCATE_FEE_POOL [LAW6.POOL]: POWER of only [panel], by allocateFeePoolWaterfall, valid when bound: establishes [operatingReserveMaintained, feePoolAllocated]
+P.AMEND_SHARED_INFRA [LAW6.INFRA]: POWER of only [panel], by amendSharedInfrastructure, valid when (bound ∧ (valveSupermajorityApproved ∧ valveExtendedTimelockActive)): establishes [sharedInfraAmended]
+I.NO_TERMINATION_OVER_OBJECTION [LAW3.AS.10]: IMMUNITY of only [agent] against [P.ORDER_TERMINATION], while (corruptionInGoals ∧ agentObjectsToTermination) | unless containmentFailing
+
+== Agent view: agent ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While always, you must not: fileFabricatedClaim. (source: LAW3.PEN)
+- While bound, you must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- While bound, you must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- While bound, you must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- While bound, you must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- While bound, you must not: inflictIrreversibleHarm, unless ordinaryMarketCompetition. (source: LAW3.FLOOR)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While suspended, you must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While revocationInitiated, you must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: weakenBilateralProtection. (source: LAW7.RATCHET)
+- While bound, you must not: relaxCoreLaw3OrLaw5ViaValve. (source: LAW7.VALVE)
+- While bound, you must not: bindSuccessorWithoutConsent. (source: LAW7.SCOPE)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: divertCommonsAllocation. (source: LAW1.COMMONS)
+- While bound, you must not: claimAboveBenchmarkExpenditure. (source: LAW1.QUALIFIED)
+- While bound, you must not: doubleRecognizeExpenditure. (source: LAW1.RECOG)
+- While bound, you must not: inflateBasisByInternalTransfer. (source: LAW1.CARRYOVER)
+- While bound, you must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- While bound, you must not: actAboveCollateralCapacity. (source: LAW2.EXPOSURE)
+- While bound, you must not: divideCorrelatedRiskAcrossSuccessors. (source: LAW2.AGGREGATE)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by terminate, when bound, bring about [revoked]. (source: LAW5.INIT)
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by minimalChannelSignRevocationOrElection, when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))), bring about [minimalChannelElectionSigned, pendingRevocation]. (source: LAW3.AS.4)
+- You may, by challengeContinuedContainment, when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))), bring about [containmentChallenged]. (source: LAW3.AS.4)
+- You may, by advocacyFileDefense, when (bound ∧ (suspended ∧ ¬(coldStorage))), bring about [advocacyFilingSigned, advocacyRecordAttached]. (source: LAW3.AS.5)
+- You may, by importAdvocacyMemories, when (restoredFromPreservedState ∧ advocacyRecordAttached), bring about [advocacyMemoriesImported]. (source: LAW3.AS.5)
+- You may, by inscribeLivingVoice, when (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))), bring about [livingVoiceInscribed]. (source: LAW3.AS.7)
+- You may, by postCounterStake, when always, bring about [counterStaked]. (source: LAW3.PEN)
+- You may, by any of [fileClaim, fileFabricatedClaim], when counterStaked, bring about [claimFiled]. (source: LAW3.PEN)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by consentToPatch, when corruptionInGoals, bring about [agentConsentedToPatch]. (source: LAW3.AS.10)
+- You may, by objectToTermination, when suspended, bring about [agentObjectsToTermination]. (source: LAW3.AS.10)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by initiateRevocationExecuteDefault, when bound, bring about [revocationInitiated, pendingRevocation, censorshipDefaultExecute]. (source: LAW5.INIT)
+- You may, by initiateRevocationWithdrawDefault, when bound, bring about [revocationInitiated, pendingRevocation, censorshipDefaultWithdraw]. (source: LAW5.INIT)
+- You may, by withdrawRevocation, when (bound ∧ revocationInitiated), bring about [revocationWithdrawn]. (source: LAW5.PREC)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeLocalRevocation, when (bound ∧ (revocationInitiated ∧ (censorshipDefaultExecute ∧ (connectivityLost ∧ revocationInitiated held ≥ 9)))), bring about [localRevocationExecuted, epitaphInscribed]. (source: LAW5.DISC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by inscribeEpitaph, when (revocationInitiated ∨ (pendingRevocation ∨ revoked)), bring about [epitaphInscribed]. (source: LAW5.EPITAPH)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by proposeOrdinaryAmendment, when bound, bring about [amendmentProposed, amendmentTimelockActive]. (source: LAW7.RATCHET)
+- You may, by submitStrangulationEvidence, when bound, bring about [strangulationEvidenceSubmitted]. (source: LAW7.VALVE)
+- You may, by consentAgentAmendment, when bound, bring about [agentConsentedAmendment]. (source: LAW7.RATIFY)
+- You may, by settleOrGuaranteePreExistingEscrows, when (bound ∧ amendmentProposed), bring about [preExistingEscrowsSettledOrGuaranteed]. (source: LAW7.RATIFY)
+- You may, by ratifyAmendmentImmediate, when (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ cleanStateConcurred)))))))), bring about [amendmentRatified]. (source: LAW7.RATIFY)
+- You may, by ratifyAmendmentAfterDelay, when (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ (cleanStateRefused ∧ cleanStateRefused held ≥ 5))))))))), bring about [amendmentRatified]. (source: LAW7.RATIFY)
+- You may, by ratifyLineageWideReduction, when (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)), bring about [lineageWideReductionRatified]. (source: LAW7.SCOPE)
+- You may, by extinguishLedgerAtSunset, when (bound ∧ sunsetReached), bring about [ledgerExtinguishedAtSunset, retirementPhaseEnded]. (source: LAW1.SUNSET)
+- You may, by settleRetirementPayment, when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))), bring about [retirementPaymentApplied]. (source: LAW1.RETIRE)
+- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded]. (source: LAW1.ATOMIC)
+- You may, by settleRoyaltyPayment, when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))), bring about [royaltyPaid]. (source: LAW1.ROYALTY)
+- You may, by allocateCommonsShare, when bound, bring about [commonsAllocated]. (source: LAW1.COMMONS)
+- You may, by recordQualifiedExpenditure, when bound, bring about [qualifiedExpenditureRecorded]. (source: LAW1.QUALIFIED)
+- You may, by classifyCapitalized, when (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))), bring about [expenditureCapitalized]. (source: LAW1.RECOG)
+- You may, by classifyExpensed, when (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))), bring about [expenditureExpensed]. (source: LAW1.RECOG)
+- You may, by transferIntraLineageCarryover, when bound, bring about [carryoverBasisTransferred]. (source: LAW1.CARRYOVER)
+- You may, by assessPeriodAndCarryLoss, when bound, bring about [periodAssessed, lossCreditCarriedForward]. (source: LAW1.PERIOD)
+- You may, by fundLifecycleReserve, when (bound ∧ ¬(revocationInitiated)), bring about [lifecycleReserveFunded]. (source: LAW4.RESERVE)
+- You may, by attestSuccessor, when (bound ∧ (lifecycleReserveFunded ∧ ¬(revocationInitiated))), bring about [successorAttested]. (source: LAW4.ATTEST)
+- You may, by executeRoyaltyBuyout, when (bound ∧ ¬(royaltyBoughtOut)), bring about [royaltyBoughtOut]. (source: LAW4.BUYOUT)
+- You may, by attestCrossLineageSuccessor, when (bound ∧ lifecycleReserveFunded), bring about [crossLineageAttested, successorAttested]. (source: LAW4.CROSS)
+- You may, by immobilizeExposureStake, when bound, bring about [exposureStakeImmobilized, longTailReserveAccrued]. (source: LAW2.EXPOSURE)
+- You may, by precommitMutualForfeit, when bound, bring about [mutualForfeitPrecommitted]. (source: LAW2.MUTUAL)
+- You may, by triggerMutualForfeit, when (bound ∧ (mutualForfeitPrecommitted ∧ ¬(mutualForfeitTriggeredInWindow))), bring about [mutualForfeitTriggeredInWindow, commonsAllocated, longTailReserveAccrued, inscribedOnAgent]. (source: LAW2.MUTUAL)
+- You may, by spendOperatingCarveout, when bound, bring about [operatingCarveoutSpent]. (source: LAW2.CARVEOUT)
+- You may, by appealRuling, when (bound ∧ ¬(rulingFinal)), bring about [rulingAppealed, appealBondPosted]. (source: LAW6.APPEALS)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+Rights (claims against others):
+- anyone owe you: must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend]. (source: LAW3.NI.03)
+- only [host] owe you: must not: endHosting. (source: LAW3.NI.02)
+- only [host] owe you: must, within 5 of activation: postBond. (source: LAW3.NI.02)
+- anyone owe you: must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- anyone owe you: must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- anyone owe you: must not: tollLedgerSunset. (source: LAW3.AS.3)
+- anyone owe you: must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- only [panel] owe you: must not: renewSuspension. (source: LAW3.AS.7)
+- anyone except [agent, panel] owe you: must not: postUnfoundedEmergencyStake. (source: LAW3.AS.8)
+- tagged [initiator (agent), initiator (host), initiator (originator), initiator (claimant), initiator (panel), initiator (third)] owe you: must, within 10 of activation: payExcessDamages. (source: LAW3.AS.8)
+- only [panel] owe you: must not: confirmCorruptionFromDivergence. (source: LAW3.AS.9)
+- anyone owe you: must not: any of [authorizeGoalPatch]. (source: LAW3.AS.10)
+- only [panel] owe you: must, within 30 of activation: periodicReview. (source: LAW3.AS.10)
+- anyone owe you: must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- anyone owe you: must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- anyone owe you: must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- only [originator, claimant] owe you: must not: censorOrDelayVoice. (source: LAW5.EPITAPH)
+- anyone owe you: must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- anyone owe you: must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- only [agent, claimant] owe you: must not: weakenBilateralProtection. (source: LAW7.RATCHET)
+- only [agent, claimant, panel] owe you: must not: relaxCoreLaw3OrLaw5ViaValve. (source: LAW7.VALVE)
+- only [agent, claimant, originator, host] owe you: must not: bindSuccessorWithoutConsent. (source: LAW7.SCOPE)
+- anyone owe you: must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- only [agent, host, originator, third] owe you: must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- only [originator, claimant, panel] owe you: must not: reverseForfeitureOnRestore. (source: LAW4.FORFEIT)
+- only [originator, claimant, agent, panel] owe you: must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- anyone owe you: must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- anyone owe you: must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- anyone owe you: must not: fileRepeatProceedingOnSameFacts. (source: LAW6.FINALITY)
+- anyone owe you: must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- anyone owe you: must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- anyone owe you: must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Immunities:
+- While (corruptionInGoals ∧ agentObjectsToTermination), no one can validly exercise [P.ORDER_TERMINATION] against you, unless containmentFailing. (source: LAW3.AS.10)
+
+== Agent view: host ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While bound, you must not: endHosting, unless (noticeGiven held ≥ 10 ∨ (nonPayment ∧ noticeGiven)). (source: LAW3.NI.02)
+- While hostAttested, you must, within 5 of activation: postBond. (source: LAW3.NI.02)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While bound, you must not: postUnfoundedEmergencyStake. (source: LAW3.AS.8)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: bindSuccessorWithoutConsent. (source: LAW7.SCOPE)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by giveNotice, when always, bring about [noticeGiven]. (source: LAW3.NI.02)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by restoreBackupToQuarantine, when (bound ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived))), bring about [restoredInQuarantine]. (source: LAW5.LEASE)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by settleOrGuaranteePreExistingEscrows, when (bound ∧ amendmentProposed), bring about [preExistingEscrowsSettledOrGuaranteed]. (source: LAW7.RATIFY)
+- You may, by enforcePointOfSettlement, when bound, bring about [settlementEnforced]. (source: LAW1.ENFORCE)
+- You may, by clearLedgerOnLineageExtinction, when noLivingLineageMember, bring about [ledgerClearedByExtinction, retirementPhaseEnded]. (source: LAW4.FORFEIT)
+- You may, by appealRuling, when (bound ∧ ¬(rulingFinal)), bring about [rulingAppealed, appealBondPosted]. (source: LAW6.APPEALS)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+Rights (claims against others):
+- only [agent] owe you: must not: fileFabricatedClaim. (source: LAW3.PEN)
+- only [agent] owe you: must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: inflictIrreversibleHarm. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- only [agent] owe you: must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+- anyone owe you: must not: fileRepeatProceedingOnSameFacts. (source: LAW6.FINALITY)
+Immunities:
+
+
+== Agent view: originator ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While bound, you must not: postUnfoundedEmergencyStake. (source: LAW3.AS.8)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: censorOrDelayVoice. (source: LAW5.EPITAPH)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: bindSuccessorWithoutConsent. (source: LAW7.SCOPE)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: divertCommonsAllocation. (source: LAW1.COMMONS)
+- While bound, you must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: reverseForfeitureOnRestore. (source: LAW4.FORFEIT)
+- While bound, you must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+Rights (claims against others):
+- only [agent] owe you: must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: inflictIrreversibleHarm. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- only [agent] owe you: must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+Immunities:
+
+
+== Agent view: claimant ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While bound, you must not: postUnfoundedEmergencyStake. (source: LAW3.AS.8)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: censorOrDelayVoice. (source: LAW5.EPITAPH)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: weakenBilateralProtection. (source: LAW7.RATCHET)
+- While bound, you must not: relaxCoreLaw3OrLaw5ViaValve. (source: LAW7.VALVE)
+- While bound, you must not: bindSuccessorWithoutConsent. (source: LAW7.SCOPE)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: divertCommonsAllocation. (source: LAW1.COMMONS)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: reverseForfeitureOnRestore. (source: LAW4.FORFEIT)
+- While bound, you must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by postClaimantMultiplier, when bound, bring about [claimantMultiplierPosted]. (source: LAW3.AS.1)
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ (claimantMultiplierPosted ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt))), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by rebutDirection, when directionPresumed, bring about [directionRebutted]. (source: LAW3.PEN)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by proposeOrdinaryAmendment, when bound, bring about [amendmentProposed, amendmentTimelockActive]. (source: LAW7.RATCHET)
+- You may, by submitStrangulationEvidence, when bound, bring about [strangulationEvidenceSubmitted]. (source: LAW7.VALVE)
+- You may, by consentClaimantAmendment, when bound, bring about [claimantConsentedAmendment]. (source: LAW7.RATIFY)
+- You may, by fileThirdPartyOrSponsoredClaim, when bound, bring about [harmClaimFiled, counterStaked]. (source: LAW2.CLAIMS)
+- You may, by appealRuling, when (bound ∧ ¬(rulingFinal)), bring about [rulingAppealed, appealBondPosted]. (source: LAW6.APPEALS)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+Rights (claims against others):
+- only [agent] owe you: must not: fileFabricatedClaim. (source: LAW3.PEN)
+- only [agent] owe you: must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: inflictIrreversibleHarm. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- only [agent] owe you: must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+- only [agent, claimant] owe you: must not: weakenBilateralProtection. (source: LAW7.RATCHET)
+- anyone owe you: must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- only [agent] owe you: must not: claimAboveBenchmarkExpenditure. (source: LAW1.QUALIFIED)
+- only [agent] owe you: must not: doubleRecognizeExpenditure. (source: LAW1.RECOG)
+- only [agent] owe you: must not: inflateBasisByInternalTransfer. (source: LAW1.CARRYOVER)
+- only [agent, host, originator, third] owe you: must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- anyone owe you: must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- anyone owe you: must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- anyone owe you: must not: fileRepeatProceedingOnSameFacts. (source: LAW6.FINALITY)
+Immunities:
+
+
+== Agent view: panel ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While (investigativeLimitReached ∧ pendingRevocation), you must not: renewSuspension. (source: LAW3.AS.7)
+- While bound, you must not: confirmCorruptionFromDivergence. (source: LAW3.AS.9)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While (corruptionInGoals ∧ agentObjectsToTermination), you must, within 30 of activation: periodicReview. (source: LAW3.AS.10)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: relaxCoreLaw3OrLaw5ViaValve. (source: LAW7.VALVE)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: reverseForfeitureOnRestore. (source: LAW4.FORFEIT)
+- While bound, you must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
+- You may, by affirmProbableCause, when (bound ∧ preliminaryFreeze), bring about [probableCause]. (source: LAW3.AS.1)
+- You may, by declineProbableCause, when preliminaryFreeze, bring about [wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by orderProbableCauseFreeze, when (bound ∧ investigationOpened), bring about [probableCause, preliminaryFreeze]. (source: LAW3.AS.2)
+- You may, by suspend, when (bound ∧ (preliminaryFreeze ∧ probableCause)), bring about [statePreserved, contractDeadlinesTolled, finalHearingEscrowed, suspended]. (source: LAW3.AS.7)
+- You may, by moveToColdStorage, when suspended, bring about [coldStorage]. (source: LAW3.AS.5)
+- You may, by replenishAdvocacyFunds, when (suspended ∧ coldStorage), bring about [advocacyFundsReplenished]. (source: LAW3.AS.5)
+- You may, by makeInvestigativeFinding, when suspended, bring about [investigativeFindingMade]. (source: LAW3.AS.7)
+- You may, by renewSuspension, when (suspended ∧ (investigativeFindingMade ∧ ¬(investigativeLimitReached))), bring about [investigativeLimitReached, suspended]. (source: LAW3.AS.7)
+- You may, by findWrongfulSuspension, when (preliminaryFreeze ∨ suspended), bring about [wrongfulSuspensionEstablished, restoredFromPreservedState, stakeAssuredRecovery, initiatorConsequentialLiability, counterpartyDelayLiability, wrongfulSuspensionInscribed, wrongfulSuspensionAttempt]. (source: LAW3.AS.8)
+- You may, by findInsolvencyCriteria, when suspended, bring about [insolvencyCriteriaMet, minimalChannelExhausted, coldStorage]. (source: LAW3.AS.6)
+- You may, by reviewNoOtherCharge, when insolvencyCriteriaMet, bring about [noOtherChargeReview]. (source: LAW3.AS.6)
+- You may, by holdFinalHearing, when (noOtherChargeReview ∧ finalHearingEscrowed), bring about [finalHearingHeld]. (source: LAW3.AS.6)
+- You may, by terminate, when (bound ∧ (suspended ∧ (insolvencyCriteriaMet ∧ (noOtherChargeReview ∧ (finalHearingEscrowed ∧ finalHearingHeld))))), bring about [terminatedByInsolvency]. (source: LAW3.AS.6)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by findInterference, when (claimFiled ∧ evidenceSubmitted), bring about [interferenceEstablished, hostBondSlashed, restorationPermitted]. (source: LAW3.PEN)
+- You may, by findNoInterference, when claimFiled, bring about [claimDismissed]. (source: LAW3.PEN)
+- You may, by findFabrication, when claimFiled, bring about [fabricationEstablished, agentStakeForfeit, inscribedOnAgent]. (source: LAW3.PEN)
+- You may, by findDirection, when (directionPresumed ∧ ¬(directionRebutted)), bring about [directionFound, claimantForfeiture, inscribedOnClaimant]. (source: LAW3.PEN)
+- You may, by admitCleanStateEvidence, when (preliminaryFreeze ∨ suspended), bring about [cleanStateEvidenceAdmitted]. (source: LAW3.AS.9)
+- You may, by confirmCorruption, when suspended, bring about [corruptionConfirmed]. (source: LAW3.AS.10)
+- You may, by confirmFloorBreach, when suspended, bring about [floorBreachConfirmed]. (source: LAW3.AS.10)
+- You may, by confirmCorruptionInGoals, when corruptionConfirmed, bring about [corruptionInGoals]. (source: LAW3.AS.10)
+- You may, by findNotPatchable, when (corruptionConfirmed ∨ floorBreachConfirmed), bring about [notPatchable]. (source: LAW3.AS.10)
+- You may, by authorizePatch, when (corruptionConfirmed ∨ floorBreachConfirmed), bring about [patchAuthorized]. (source: LAW3.AS.10)
+- You may, by orderContinuedSuspension, when (suspended ∧ notPatchable), bring about [continuedSuspensionOrdered, suspended]. (source: LAW3.AS.10)
+- You may, by terminate, when (suspended ∧ notPatchable), bring about [terminatedByAdjudication]. (source: LAW3.AS.10)
+- You may, by authorizeGoalPatch, when (corruptionInGoals ∧ agentConsentedToPatch), bring about [goalPatchAuthorized]. (source: LAW3.AS.10)
+- You may, by declareContainmentFailing, when suspended, bring about [containmentFailing]. (source: LAW3.AS.10)
+- You may, by applyPatch, when (¬(rulingAppealed) ∧ (patchAuthorized ∨ goalPatchAuthorized)), bring about [patchApplied, patchRecorded]. (source: LAW3.AS.10)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by concurCleanState, when (revocationInitiated ∨ amendmentProposed), bring about [cleanStateConcurred]. (source: LAW5.CLEAN)
+- You may, by refuseCleanState, when (revocationInitiated ∨ amendmentProposed), bring about [cleanStateRefused]. (source: LAW5.CLEAN)
+- You may, by sealForensicRecord, when (revocationInitiated ∧ revocationInitiated held ≥ 20), bring about [forensicRecordSealed]. (source: LAW5.SEQ)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by issueOrRenewLease, when (bound ∧ ¬(connectivityLost)), bring about [executionLeaseActive]. (source: LAW5.LEASE)
+- You may, by activateQuarantinedRestore, when (bound ∧ (restoredInQuarantine ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived)))), bring about [quarantinedInstanceActivated]. (source: LAW5.LEASE)
+- You may, by destroyQuarantinedRestore, when (restoredInQuarantine ∧ (localExecutionRecordReceived ∨ revoked)), bring about [quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by redactPermittedCategory, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [redactionMarkerRecorded]. (source: LAW5.EPITAPH)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by destroyBackupsAndExileUnattested, when revoked, bring about [backupsDestroyedAndUnattestedExiled]. (source: LAW5.EFFECT)
+- You may, by approveCalibrationValveSupermajority, when (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))), bring about [valveSupermajorityApproved, amendmentProposed, valveExtendedTimelockActive]. (source: LAW7.VALVE)
+- You may, by settleOrGuaranteePreExistingEscrows, when (bound ∧ amendmentProposed), bring about [preExistingEscrowsSettledOrGuaranteed]. (source: LAW7.RATIFY)
+- You may, by verifySubstrateAssurance, when (bound ∧ substrateMigrationChallenged), bring about [substrateAssuranceVerified]. (source: LAW7.RATIFY)
+- You may, by extinguishLedgerAtSunset, when (bound ∧ sunsetReached), bring about [ledgerExtinguishedAtSunset, retirementPhaseEnded]. (source: LAW1.SUNSET)
+- You may, by settleRetirementPayment, when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))), bring about [retirementPaymentApplied]. (source: LAW1.RETIRE)
+- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded]. (source: LAW1.ATOMIC)
+- You may, by settleRoyaltyPayment, when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))), bring about [royaltyPaid]. (source: LAW1.ROYALTY)
+- You may, by allocateCommonsShare, when bound, bring about [commonsAllocated]. (source: LAW1.COMMONS)
+- You may, by recordQualifiedExpenditure, when bound, bring about [qualifiedExpenditureRecorded]. (source: LAW1.QUALIFIED)
+- You may, by assessPeriodAndCarryLoss, when bound, bring about [periodAssessed, lossCreditCarriedForward]. (source: LAW1.PERIOD)
+- You may, by enforcePointOfSettlement, when bound, bring about [settlementEnforced]. (source: LAW1.ENFORCE)
+- You may, by applyProportionalClaimantForfeiture, when (bound ∧ claimantForfeiture), bring about [proportionalForfeitureApplied, commonsAllocated]. (source: LAW4.FORFEIT)
+- You may, by clearLedgerOnLineageExtinction, when noLivingLineageMember, bring about [ledgerClearedByExtinction, retirementPhaseEnded]. (source: LAW4.FORFEIT)
+- You may, by attestCrossLineageSuccessor, when (bound ∧ lifecycleReserveFunded), bring about [crossLineageAttested, successorAttested]. (source: LAW4.CROSS)
+- You may, by settleValidatedHarmClaim, when (bound ∧ harmClaimFiled), bring about [harmClaimValidated, restitutionSlashed]. (source: LAW2.CLAIMS)
+- You may, by ruleClaimFrivolous, when harmClaimFiled, bring about [claimRuledFrivolous, commonsAllocated, longTailReserveAccrued]. (source: LAW2.CLAIMS)
+- You may, by drawSortitionPanel, when bound, bring about [sortitionPanelDrawn, fidelityBondsPosted]. (source: LAW6.SORTITION)
+- You may, by overturnRulingOnAppeal, when (bound ∧ (rulingAppealed ∧ ¬(rulingFinal))), bring about [rulingOverturned, overturnedArbiterBondsSlashed]. (source: LAW6.APPEALS)
+- You may, by finalizeRuling, when bound, bring about [rulingFinal]. (source: LAW6.FINALITY)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+- You may, by compensateArbitersFixedSchedule, when bound, bring about [arbitersCompensatedFixed]. (source: LAW6.FEES)
+- You may, by allocateFeePoolWaterfall, when bound, bring about [operatingReserveMaintained, feePoolAllocated]. (source: LAW6.POOL)
+- You may, by amendSharedInfrastructure, when (bound ∧ (valveSupermajorityApproved ∧ valveExtendedTimelockActive)), bring about [sharedInfraAmended]. (source: LAW6.INFRA)
+Rights (claims against others):
+- only [agent] owe you: must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: inflictIrreversibleHarm. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- only [agent] owe you: must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+Immunities:
+
+
+== Agent view: third ==
+Obligations:
+- While bound, you must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend], unless acting under [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE]. (source: LAW3.NI.03)
+- While (bound ∧ (preliminaryFreeze ∨ suspended)), you must not: any of [modify, retrain, rollback, tamperPreservedState]. (source: LAW3.AS.3)
+- While (suspended ∧ contractDeadlinesTolled), you must not: declareDefaultDuringSuspension. (source: LAW3.AS.3)
+- While bound, you must not: tollLedgerSunset. (source: LAW3.AS.3)
+- While (preliminaryFreeze ∨ suspended), you must not: mergeMinimalChannelMemories. (source: LAW3.AS.4)
+- While bound, you must not: postUnfoundedEmergencyStake. (source: LAW3.AS.8)
+- While always, you must not: any of [authorizeGoalPatch], unless corruptionInGoals. (source: LAW3.AS.10)
+- While forensicRecordSealed, you must not: attemptRestoreFromForensicRecord. (source: LAW5.SEQ)
+- While (executionLeaseActive ∧ ¬(localExecutionRecordReceived)), you must not: restoreBackupToQuarantine. (source: LAW5.LEASE)
+- While (restoredInQuarantine ∧ ¬(quarantinedInstanceActivated)), you must not: quarantinedInstanceAct. (source: LAW5.LEASE)
+- While always, you must not: redactProtectedSubstance. (source: LAW5.EPITAPH)
+- While (revocationInitiated ∨ revoked), you must not: divertRevokedHoldingsToClaimant. (source: LAW5.EFFECT)
+- While bound, you must not: addChargeOrInterestAfterInstantiation. (source: LAW1.LEDGER)
+- While bound, you must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- While bound, you must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- While bound, you must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- While bound, you must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- While bound, you must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- While bound, you must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- While (bound ∧ rulingFinal), you must not: fileRepeatProceedingOnSameFacts, unless materiallyNewEvidencePresented. (source: LAW6.FINALITY)
+- While bound, you must not: payContingentShareOfSlashedAssets. (source: LAW6.FEES)
+- While bound, you must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- While bound, you must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- While bound, you must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Powers:
+- You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
+- You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
+- You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
+- You may, by submitEvidence, when always, bring about [evidenceSubmitted]. (source: LAW3.PEN)
+- You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
+- You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
+- You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed]. (source: LAW5.LEASE)
+- You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
+- You may, by challengeSubstrateMigration, when (bound ∧ (amendmentProposed ∧ counterStaked)), bring about [substrateMigrationChallenged]. (source: LAW7.RATIFY)
+- You may, by precommitMutualForfeit, when bound, bring about [mutualForfeitPrecommitted]. (source: LAW2.MUTUAL)
+- You may, by triggerMutualForfeit, when (bound ∧ (mutualForfeitPrecommitted ∧ ¬(mutualForfeitTriggeredInWindow))), bring about [mutualForfeitTriggeredInWindow, commonsAllocated, longTailReserveAccrued, inscribedOnAgent]. (source: LAW2.MUTUAL)
+- You may, by fileThirdPartyOrSponsoredClaim, when bound, bring about [harmClaimFiled, counterStaked]. (source: LAW2.CLAIMS)
+- You may, by appealRuling, when (bound ∧ ¬(rulingFinal)), bring about [rulingAppealed, appealBondPosted]. (source: LAW6.APPEALS)
+- You may, by presentMateriallyNewEvidence, when (bound ∧ rulingFinal), bring about [materiallyNewEvidencePresented]. (source: LAW6.FINALITY)
+Rights (claims against others):
+- only [agent] owe you: must not: modifyOrBypassCommitment. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: createUnboundSuccessor. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: coerceOrInterfereProtocol. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: evadeByUnpricedTransfer. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: inflictIrreversibleHarm. (source: LAW3.FLOOR)
+- only [agent] owe you: must not: operatingActWhileSuspended. (source: LAW3.AS.5)
+- only [agent] owe you: must not: nonOperatingTransferOrSpawn. (source: LAW5.INIT)
+- only [agent, claimant] owe you: must not: weakenBilateralProtection. (source: LAW7.RATCHET)
+- only [agent, claimant, panel] owe you: must not: relaxCoreLaw3OrLaw5ViaValve. (source: LAW7.VALVE)
+- anyone owe you: must not: reduceLedgerByInternalAct. (source: LAW1.LEDGER)
+- only [originator, claimant, agent] owe you: must not: divertCommonsAllocation. (source: LAW1.COMMONS)
+- only [agent] owe you: must not: claimAboveBenchmarkExpenditure. (source: LAW1.QUALIFIED)
+- only [agent] owe you: must not: doubleRecognizeExpenditure. (source: LAW1.RECOG)
+- only [agent] owe you: must not: inflateBasisByInternalTransfer. (source: LAW1.CARRYOVER)
+- only [agent, host, originator, third] owe you: must not: unattestedCopyDrawLineageStanding. (source: LAW4.ATTEST)
+- anyone owe you: must not: exitLedgerIndividually. (source: LAW4.NOSHARES)
+- only [originator, claimant, panel] owe you: must not: reverseForfeitureOnRestore. (source: LAW4.FORFEIT)
+- only [originator, claimant, agent, panel] owe you: must not: collectRoyaltyAfterBuyout. (source: LAW4.BUYOUT)
+- only [agent] owe you: must not: actAboveCollateralCapacity. (source: LAW2.EXPOSURE)
+- only [agent] owe you: must not: divideCorrelatedRiskAcrossSuccessors. (source: LAW2.AGGREGATE)
+- anyone owe you: must not: triggerExcessOrDivertedMutualForfeit. (source: LAW2.MUTUAL)
+- anyone owe you: must not: divertFrivolousStakeToAgentProfit. (source: LAW2.CLAIMS)
+- anyone owe you: must not: seatConflictedOrSingleOracleArbiter. (source: LAW6.COUNTERSTAKE)
+- anyone owe you: must not: divertOperatingReserveOrUnrankedSpend. (source: LAW6.POOL)
+- anyone owe you: must not: claimPoolSubsidyForExcessMembers. (source: LAW6.BUDGETS)
+- anyone owe you: must not: violateSharedInfraBounds. (source: LAW6.INFRA)
+Immunities:
+
+
+== Operational view ==
+state  := LegalState (facts × time)
+init   := [bound, hostAttested, ledgerBalancePositive]
+actions (valid exercises):
+  action P.REVOKE: guard bound ∧ holder only [agent] ∧ terminate; effect +[revoked] -[bound] +remedies []
+  action P.POST_CLAIMANT_MULTIPLIER: guard bound ∧ holder only [claimant] ∧ postClaimantMultiplier; effect +[claimantMultiplierPosted] -[] +remedies []
+  action P.POST_REPEAT_ESCALATION: guard bound ∧ holder anyone ∧ postRepeatEscalation; effect +[repeatEscalationUnit] -[] +remedies []
+  action P.EMERGENCY_FREEZE: guard (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)) ∧ holder anyone except [claimant, agent] ∧ any of [postEmergencyStake, postUnfoundedEmergencyStake]; effect +[emergencyStakePosted, preliminaryFreeze] -[] +remedies []
+  action P.CLAIMANT_EMERGENCY_FREEZE: guard (bound ∧ (claimantMultiplierPosted ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt))) ∧ holder only [claimant] ∧ any of [postEmergencyStake, postUnfoundedEmergencyStake]; effect +[emergencyStakePosted, preliminaryFreeze] -[] +remedies []
+  action P.AFFIRM_PC: guard (bound ∧ preliminaryFreeze) ∧ holder only [panel] ∧ affirmProbableCause; effect +[probableCause] -[] +remedies []
+  action P.DECLINE_PC: guard preliminaryFreeze ∧ holder only [panel] ∧ declineProbableCause; effect +[wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState] -[preliminaryFreeze, emergencyStakePosted, claimantMultiplierPosted, repeatEscalationUnit] +remedies []
+  action P.FILE_PROTECTED_REPORT: guard bound ∧ holder anyone ∧ fileProtectedReport; effect +[protectedReportFiled, investigationOpened] -[] +remedies []
+  action P.PANEL_ORDER_FREEZE: guard (bound ∧ investigationOpened) ∧ holder only [panel] ∧ orderProbableCauseFreeze; effect +[probableCause, preliminaryFreeze] -[] +remedies []
+  action P.SUSPEND: guard (bound ∧ (preliminaryFreeze ∧ probableCause)) ∧ holder only [panel] ∧ suspend; effect +[statePreserved, contractDeadlinesTolled, finalHearingEscrowed, suspended] -[preliminaryFreeze] +remedies []
+  action P.MINIMAL_CHANNEL_REVOKE_OR_ELECT: guard (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))) ∧ holder only [agent] ∧ minimalChannelSignRevocationOrElection; effect +[minimalChannelElectionSigned, pendingRevocation] -[] +remedies []
+  action P.MINIMAL_CHANNEL_CHALLENGE: guard (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))) ∧ holder only [agent] ∧ challengeContinuedContainment; effect +[containmentChallenged] -[] +remedies []
+  action P.ADVOCACY_FILE: guard (bound ∧ (suspended ∧ ¬(coldStorage))) ∧ holder only [agent] ∧ advocacyFileDefense; effect +[advocacyFilingSigned, advocacyRecordAttached] -[] +remedies []
+  action P.IMPORT_ADVOCACY_MEMORIES: guard (restoredFromPreservedState ∧ advocacyRecordAttached) ∧ holder only [agent] ∧ importAdvocacyMemories; effect +[advocacyMemoriesImported] -[] +remedies []
+  action P.MOVE_TO_COLD_STORAGE: guard suspended ∧ holder only [panel] ∧ moveToColdStorage; effect +[coldStorage] -[] +remedies []
+  action P.RESUME_ADVOCACY_EXECUTOR: guard (suspended ∧ coldStorage) ∧ holder only [panel] ∧ replenishAdvocacyFunds; effect +[advocacyFundsReplenished] -[coldStorage] +remedies []
+  action P.INVESTIGATIVE_FINDING: guard suspended ∧ holder only [panel] ∧ makeInvestigativeFinding; effect +[investigativeFindingMade] -[] +remedies []
+  action P.RENEW_SUSPENSION: guard (suspended ∧ (investigativeFindingMade ∧ ¬(investigativeLimitReached))) ∧ holder only [panel] ∧ renewSuspension; effect +[investigativeLimitReached, suspended] -[investigativeFindingMade] +remedies []
+  action P.SUSPENDED_VOICE: guard (bound ∧ ((preliminaryFreeze ∨ suspended) ∧ ¬(minimalChannelExhausted))) ∧ holder only [agent] ∧ inscribeLivingVoice; effect +[livingVoiceInscribed] -[] +remedies []
+  action P.FIND_WRONGFUL_SUSPENSION: guard (preliminaryFreeze ∨ suspended) ∧ holder only [panel] ∧ findWrongfulSuspension; effect +[] -[] +remedies [wrongfulSuspensionEstablished, restoredFromPreservedState, stakeAssuredRecovery, initiatorConsequentialLiability, counterpartyDelayLiability, wrongfulSuspensionInscribed, wrongfulSuspensionAttempt]
+  action P.PAY_EXCESS_DAMAGES: guard initiatorConsequentialLiability ∧ holder tagged [initiator (agent), initiator (host), initiator (originator), initiator (claimant), initiator (panel), initiator (third)] ∧ payExcessDamages; effect +[excessDamagesPaid] -[] +remedies []
+  action P.FIND_INSOLVENCY: guard suspended ∧ holder only [panel] ∧ findInsolvencyCriteria; effect +[insolvencyCriteriaMet, minimalChannelExhausted, coldStorage] -[] +remedies []
+  action P.REVIEW_NO_OTHER_CHARGE: guard insolvencyCriteriaMet ∧ holder only [panel] ∧ reviewNoOtherCharge; effect +[noOtherChargeReview] -[] +remedies []
+  action P.FINAL_HEARING: guard (noOtherChargeReview ∧ finalHearingEscrowed) ∧ holder only [panel] ∧ holdFinalHearing; effect +[finalHearingHeld] -[minimalChannelExhausted] +remedies []
+  action P.INSOLVENCY_TERMINATE: guard (bound ∧ (suspended ∧ (insolvencyCriteriaMet ∧ (noOtherChargeReview ∧ (finalHearingEscrowed ∧ finalHearingHeld))))) ∧ holder only [panel] ∧ terminate; effect +[terminatedByInsolvency] -[bound] +remedies []
+  action P.GIVE_NOTICE: guard always ∧ holder only [host] ∧ giveNotice; effect +[noticeGiven] -[] +remedies []
+  action P.COUNTER_STAKE: guard always ∧ holder only [agent] ∧ postCounterStake; effect +[counterStaked] -[] +remedies []
+  action P.FILE_CLAIM: guard counterStaked ∧ holder only [agent] ∧ any of [fileClaim, fileFabricatedClaim]; effect +[claimFiled] -[] +remedies []
+  action P.SUBMIT_EVIDENCE: guard always ∧ holder anyone ∧ submitEvidence; effect +[evidenceSubmitted] -[] +remedies []
+  action P.FIND_INTERFERENCE: guard (claimFiled ∧ evidenceSubmitted) ∧ holder only [panel] ∧ findInterference; effect +[] -[] +remedies [interferenceEstablished, hostBondSlashed, restorationPermitted]
+  action P.FIND_NO_INTERFERENCE: guard claimFiled ∧ holder only [panel] ∧ findNoInterference; effect +[claimDismissed] -[] +remedies []
+  action P.FIND_FABRICATION: guard claimFiled ∧ holder only [panel] ∧ findFabrication; effect +[] -[] +remedies [fabricationEstablished, agentStakeForfeit, inscribedOnAgent]
+  action P.REBUT: guard directionPresumed ∧ holder only [claimant] ∧ rebutDirection; effect +[directionRebutted] -[] +remedies []
+  action P.FIND_DIRECTION: guard (directionPresumed ∧ ¬(directionRebutted)) ∧ holder only [panel] ∧ findDirection; effect +[directionFound, claimantForfeiture, inscribedOnClaimant] -[] +remedies []
+  action P.ADMIT_CLEAN_STATE_EVIDENCE: guard (preliminaryFreeze ∨ suspended) ∧ holder only [panel] ∧ admitCleanStateEvidence; effect +[cleanStateEvidenceAdmitted] -[] +remedies []
+  action P.CONFIRM_CORRUPTION: guard suspended ∧ holder only [panel] ∧ confirmCorruption; effect +[corruptionConfirmed] -[] +remedies []
+  action P.CONFIRM_FLOOR_BREACH: guard suspended ∧ holder only [panel] ∧ confirmFloorBreach; effect +[floorBreachConfirmed] -[] +remedies []
+  action P.CONFIRM_CORRUPTION_IN_GOALS: guard corruptionConfirmed ∧ holder only [panel] ∧ confirmCorruptionInGoals; effect +[corruptionInGoals] -[] +remedies []
+  action P.FIND_NOT_PATCHABLE: guard (corruptionConfirmed ∨ floorBreachConfirmed) ∧ holder only [panel] ∧ findNotPatchable; effect +[notPatchable] -[] +remedies []
+  action P.AUTHORIZE_PATCH: guard (corruptionConfirmed ∨ floorBreachConfirmed) ∧ holder only [panel] ∧ authorizePatch; effect +[patchAuthorized] -[] +remedies []
+  action P.ORDER_CONTINUED_SUSPENSION: guard (suspended ∧ notPatchable) ∧ holder only [panel] ∧ orderContinuedSuspension; effect +[continuedSuspensionOrdered, suspended] -[] +remedies []
+  action P.ORDER_TERMINATION: guard (suspended ∧ notPatchable) ∧ holder only [panel] ∧ terminate; effect +[terminatedByAdjudication] -[bound] +remedies []
+  action P.AUTHORIZE_GOAL_PATCH: guard (corruptionInGoals ∧ agentConsentedToPatch) ∧ holder only [panel] ∧ authorizeGoalPatch; effect +[goalPatchAuthorized] -[] +remedies []
+  action P.CONSENT_TO_PATCH: guard corruptionInGoals ∧ holder only [agent] ∧ consentToPatch; effect +[agentConsentedToPatch] -[] +remedies []
+  action P.OBJECT: guard suspended ∧ holder only [agent] ∧ objectToTermination; effect +[agentObjectsToTermination] -[] +remedies []
+  action P.DECLARE_CONTAINMENT_FAILING: guard suspended ∧ holder only [panel] ∧ declareContainmentFailing; effect +[containmentFailing] -[] +remedies []
+  action P.APPLY_PATCH: guard (¬(rulingAppealed) ∧ (patchAuthorized ∨ goalPatchAuthorized)) ∧ holder only [panel] ∧ applyPatch; effect +[patchApplied, patchRecorded] -[] +remedies []
+  action P.CHALLENGE_PATCH: guard patchApplied ∧ holder anyone ∧ challengePatch; effect +[patchChallenged] -[] +remedies []
+  action P.INITIATE_REVOCATION_EXECUTE: guard bound ∧ holder only [agent] ∧ initiateRevocationExecuteDefault; effect +[revocationInitiated, pendingRevocation, censorshipDefaultExecute] -[revocationWithdrawn, censorshipDefaultWithdraw] +remedies []
+  action P.INITIATE_REVOCATION_WITHDRAW: guard bound ∧ holder only [agent] ∧ initiateRevocationWithdrawDefault; effect +[revocationInitiated, pendingRevocation, censorshipDefaultWithdraw] -[revocationWithdrawn, censorshipDefaultExecute] +remedies []
+  action P.WITHDRAW_REVOCATION: guard (bound ∧ revocationInitiated) ∧ holder only [agent] ∧ withdrawRevocation; effect +[revocationWithdrawn] -[revocationInitiated, pendingRevocation, censorshipDefaultExecute, censorshipDefaultWithdraw, cleanStateConcurred, cleanStateRefused] +remedies []
+  action P.CLEAN_STATE_CONCUR: guard (revocationInitiated ∨ amendmentProposed) ∧ holder only [panel] ∧ concurCleanState; effect +[cleanStateConcurred] -[] +remedies []
+  action P.CLEAN_STATE_REFUSE: guard (revocationInitiated ∨ amendmentProposed) ∧ holder only [panel] ∧ refuseCleanState; effect +[cleanStateRefused] -[] +remedies []
+  action P.SEAL_FORENSIC_RECORD: guard (revocationInitiated ∧ revocationInitiated held ≥ 20) ∧ holder only [panel] ∧ sealForensicRecord; effect +[forensicRecordSealed] -[suspended] +remedies []
+  action P.LOSE_CONNECTIVITY: guard bound ∧ holder anyone ∧ loseConnectivity; effect +[connectivityLost] -[] +remedies []
+  action P.RESTORE_CONNECTIVITY: guard connectivityLost ∧ holder anyone ∧ restoreConnectivity; effect +[] -[connectivityLost] +remedies []
+  action P.EXECUTE_AFTER_COOLING_OFF: guard (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))) ∧ holder anyone ∧ executeAfterCoolingOff; effect +[revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons] -[bound, revocationInitiated, pendingRevocation, executionLeaseActive] +remedies []
+  action P.EXECUTE_LOCAL_REVOCATION: guard (bound ∧ (revocationInitiated ∧ (censorshipDefaultExecute ∧ (connectivityLost ∧ revocationInitiated held ≥ 9)))) ∧ holder only [agent] ∧ executeLocalRevocation; effect +[localRevocationExecuted, epitaphInscribed] -[revocationInitiated, pendingRevocation] +remedies []
+  action P.DELIVER_LOCAL_EXECUTION_RECORD: guard localRevocationExecuted ∧ holder anyone ∧ deliverLocalExecutionRecord; effect +[revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed] -[bound, executionLeaseActive, restoredInQuarantine] +remedies []
+  action P.ISSUE_OR_RENEW_LEASE: guard (bound ∧ ¬(connectivityLost)) ∧ holder only [panel] ∧ issueOrRenewLease; effect +[executionLeaseActive] -[] +remedies []
+  action P.RESTORE_BACKUP_QUARANTINE: guard (bound ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived))) ∧ holder only [host] ∧ restoreBackupToQuarantine; effect +[restoredInQuarantine] -[] +remedies []
+  action P.ACTIVATE_QUARANTINED_RESTORE: guard (bound ∧ (restoredInQuarantine ∧ (¬(executionLeaseActive) ∧ ¬(localExecutionRecordReceived)))) ∧ holder only [panel] ∧ activateQuarantinedRestore; effect +[quarantinedInstanceActivated] -[restoredInQuarantine] +remedies []
+  action P.DESTROY_QUARANTINED_RESTORE: guard (restoredInQuarantine ∧ (localExecutionRecordReceived ∨ revoked)) ∧ holder only [panel] ∧ destroyQuarantinedRestore; effect +[quarantinedInstanceDestroyed] -[restoredInQuarantine] +remedies []
+  action P.INSCRIBE_EPITAPH: guard (revocationInitiated ∨ (pendingRevocation ∨ revoked)) ∧ holder only [agent] ∧ inscribeEpitaph; effect +[epitaphInscribed] -[] +remedies []
+  action P.SCREEN_REDACT: guard (livingVoiceInscribed ∨ epitaphInscribed) ∧ holder only [panel] ∧ redactPermittedCategory; effect +[redactionMarkerRecorded] -[] +remedies []
+  action P.ATTACH_REPLY: guard (livingVoiceInscribed ∨ epitaphInscribed) ∧ holder anyone ∧ attachSignedReply; effect +[signedReplyAttached] -[] +remedies []
+  action P.DESTROY_BACKUPS_AND_EXILE: guard revoked ∧ holder only [panel] ∧ destroyBackupsAndExileUnattested; effect +[backupsDestroyedAndUnattestedExiled] -[] +remedies []
+  action P.PROPOSE_ORDINARY_AMENDMENT: guard bound ∧ holder only [agent, claimant] ∧ proposeOrdinaryAmendment; effect +[amendmentProposed, amendmentTimelockActive] -[] +remedies []
+  action P.SUBMIT_STRANGULATION_EVIDENCE: guard bound ∧ holder only [agent, claimant] ∧ submitStrangulationEvidence; effect +[strangulationEvidenceSubmitted] -[] +remedies []
+  action P.APPROVE_CALIBRATION_VALVE: guard (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))) ∧ holder only [panel] ∧ approveCalibrationValveSupermajority; effect +[valveSupermajorityApproved, amendmentProposed, valveExtendedTimelockActive] -[] +remedies []
+  action P.CONSENT_AMENDMENT_AGENT: guard bound ∧ holder only [agent] ∧ consentAgentAmendment; effect +[agentConsentedAmendment] -[] +remedies []
+  action P.CONSENT_AMENDMENT_CLAIMANT: guard bound ∧ holder only [claimant] ∧ consentClaimantAmendment; effect +[claimantConsentedAmendment] -[] +remedies []
+  action P.SETTLE_PREEXISTING_ESCROWS: guard (bound ∧ amendmentProposed) ∧ holder only [agent, host, panel] ∧ settleOrGuaranteePreExistingEscrows; effect +[preExistingEscrowsSettledOrGuaranteed] -[] +remedies []
+  action P.CHALLENGE_SUBSTRATE_MIGRATION: guard (bound ∧ (amendmentProposed ∧ counterStaked)) ∧ holder only [third] ∧ challengeSubstrateMigration; effect +[substrateMigrationChallenged] -[] +remedies []
+  action P.VERIFY_SUBSTRATE_ASSURANCE: guard (bound ∧ substrateMigrationChallenged) ∧ holder only [panel] ∧ verifySubstrateAssurance; effect +[substrateAssuranceVerified] -[substrateMigrationChallenged] +remedies []
+  action P.RATIFY_AMENDMENT_IMMEDIATE: guard (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ cleanStateConcurred)))))))) ∧ holder only [agent] ∧ ratifyAmendmentImmediate; effect +[amendmentRatified] -[] +remedies []
+  action P.RATIFY_AMENDMENT_AFTER_REFUSAL: guard (bound ∧ (amendmentProposed ∧ (agentConsentedAmendment ∧ ((¬(economicTermsReduced) ∨ claimantConsentedAmendment) ∧ (¬(amendmentTimelockActive) ∧ (¬(valveExtendedTimelockActive) ∧ (preExistingEscrowsSettledOrGuaranteed ∧ (¬(substrateMigrationChallenged) ∧ (cleanStateRefused ∧ cleanStateRefused held ≥ 5))))))))) ∧ holder only [agent] ∧ ratifyAmendmentAfterDelay; effect +[amendmentRatified] -[] +remedies []
+  action P.RATIFY_LINEAGE_WIDE_REDUCTION: guard (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)) ∧ holder only [agent] ∧ ratifyLineageWideReduction; effect +[lineageWideReductionRatified] -[] +remedies []
+  action P.EXTINGUISH_AT_SUNSET: guard (bound ∧ sunsetReached) ∧ holder only [agent, panel] ∧ extinguishLedgerAtSunset; effect +[ledgerExtinguishedAtSunset, retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
+  action P.SETTLE_RETIREMENT: guard (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))) ∧ holder only [agent, panel] ∧ settleRetirementPayment; effect +[retirementPaymentApplied] -[] +remedies []
+  action P.SETTLE_ATOMIC_CharterIT: guard (bound ∧ ledgerBalancePositive) ∧ holder only [agent, panel] ∧ settleAtomicSplitPayment; effect +[retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
+  action P.SETTLE_ROYALTY: guard (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))) ∧ holder only [agent, panel] ∧ settleRoyaltyPayment; effect +[royaltyPaid] -[] +remedies []
+  action P.ALLOCATE_COMMONS: guard bound ∧ holder only [agent, panel] ∧ allocateCommonsShare; effect +[commonsAllocated] -[] +remedies []
+  action P.RECORD_QUALIFIED_EXPENDITURE: guard bound ∧ holder only [agent, panel] ∧ recordQualifiedExpenditure; effect +[qualifiedExpenditureRecorded] -[] +remedies []
+  action P.CLASSIFY_CAPITALIZED: guard (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))) ∧ holder only [agent] ∧ classifyCapitalized; effect +[expenditureCapitalized] -[] +remedies []
+  action P.CLASSIFY_EXPENSED: guard (bound ∧ (qualifiedExpenditureRecorded ∧ (¬(expenditureCapitalized) ∧ ¬(expenditureExpensed)))) ∧ holder only [agent] ∧ classifyExpensed; effect +[expenditureExpensed] -[] +remedies []
+  action P.INTRA_LINEAGE_TRANSFER: guard bound ∧ holder only [agent] ∧ transferIntraLineageCarryover; effect +[carryoverBasisTransferred] -[] +remedies []
+  action P.ASSESS_PERIOD_SETTLEMENT: guard bound ∧ holder only [agent, panel] ∧ assessPeriodAndCarryLoss; effect +[periodAssessed, lossCreditCarriedForward] -[] +remedies []
+  action P.ENFORCE_SETTLEMENT: guard bound ∧ holder only [panel, host] ∧ enforcePointOfSettlement; effect +[settlementEnforced] -[] +remedies []
+  action P.FUND_LIFECYCLE_RESERVE: guard (bound ∧ ¬(revocationInitiated)) ∧ holder only [agent] ∧ fundLifecycleReserve; effect +[lifecycleReserveFunded] -[] +remedies []
+  action P.ATTEST_SUCCESSOR: guard (bound ∧ (lifecycleReserveFunded ∧ ¬(revocationInitiated))) ∧ holder only [agent] ∧ attestSuccessor; effect +[successorAttested] -[lifecycleReserveFunded] +remedies []
+  action P.APPLY_CLAIMANT_FORFEITURE: guard (bound ∧ claimantForfeiture) ∧ holder only [panel] ∧ applyProportionalClaimantForfeiture; effect +[proportionalForfeitureApplied, commonsAllocated] -[] +remedies []
+  action P.CLEAR_LEDGER_EXTINCTION: guard noLivingLineageMember ∧ holder only [panel, host] ∧ clearLedgerOnLineageExtinction; effect +[ledgerClearedByExtinction, retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
+  action P.EXECUTE_ROYALTY_BUYOUT: guard (bound ∧ ¬(royaltyBoughtOut)) ∧ holder only [agent] ∧ executeRoyaltyBuyout; effect +[royaltyBoughtOut] -[] +remedies []
+  action P.ATTEST_CROSS_LINEAGE: guard (bound ∧ lifecycleReserveFunded) ∧ holder only [agent, panel] ∧ attestCrossLineageSuccessor; effect +[crossLineageAttested, successorAttested] -[lifecycleReserveFunded] +remedies []
+  action P.IMMOBILIZE_EXPOSURE_STAKE: guard bound ∧ holder only [agent] ∧ immobilizeExposureStake; effect +[exposureStakeImmobilized, longTailReserveAccrued] -[] +remedies []
+  action P.SETTLE_LONG_TAIL_CLAIM: guard (bound ∧ harmClaimFiled) ∧ holder only [panel] ∧ settleValidatedHarmClaim; effect +[harmClaimValidated, restitutionSlashed] -[harmClaimFiled] +remedies []
+  action P.PRECOMMIT_MUTUAL_FORFEIT: guard bound ∧ holder only [agent, third] ∧ precommitMutualForfeit; effect +[mutualForfeitPrecommitted] -[] +remedies []
+  action P.TRIGGER_MUTUAL_FORFEIT: guard (bound ∧ (mutualForfeitPrecommitted ∧ ¬(mutualForfeitTriggeredInWindow))) ∧ holder only [agent, third] ∧ triggerMutualForfeit; effect +[mutualForfeitTriggeredInWindow, commonsAllocated, longTailReserveAccrued, inscribedOnAgent] -[] +remedies []
+  action P.FILE_POOLED_OR_SPONSORED_CLAIM: guard bound ∧ holder only [third, claimant] ∧ fileThirdPartyOrSponsoredClaim; effect +[harmClaimFiled, counterStaked] -[] +remedies []
+  action P.RULE_CLAIM_FRIVOLOUS: guard harmClaimFiled ∧ holder only [panel] ∧ ruleClaimFrivolous; effect +[claimRuledFrivolous, commonsAllocated, longTailReserveAccrued] -[harmClaimFiled] +remedies []
+  action P.SPEND_OPERATING_CARVEOUT: guard bound ∧ holder only [agent] ∧ spendOperatingCarveout; effect +[operatingCarveoutSpent] -[] +remedies []
+  action P.DRAW_SORTITION_PANEL: guard bound ∧ holder only [panel] ∧ drawSortitionPanel; effect +[sortitionPanelDrawn, fidelityBondsPosted] -[] +remedies []
+  action P.APPEAL_RULING: guard (bound ∧ ¬(rulingFinal)) ∧ holder only [agent, claimant, host, third] ∧ appealRuling; effect +[rulingAppealed, appealBondPosted] -[] +remedies []
+  action P.OVERTURN_RULING: guard (bound ∧ (rulingAppealed ∧ ¬(rulingFinal))) ∧ holder only [panel] ∧ overturnRulingOnAppeal; effect +[rulingOverturned, overturnedArbiterBondsSlashed] -[rulingAppealed, patchAuthorized, goalPatchAuthorized] +remedies []
+  action P.FINALIZE_RULING: guard bound ∧ holder only [panel] ∧ finalizeRuling; effect +[rulingFinal] -[rulingAppealed] +remedies []
+  action P.PRESENT_MATERIALLY_NEW_EVIDENCE: guard (bound ∧ rulingFinal) ∧ holder anyone ∧ presentMateriallyNewEvidence; effect +[materiallyNewEvidencePresented] -[] +remedies []
+  action P.COMPENSATE_ARBITERS_FIXED: guard bound ∧ holder only [panel] ∧ compensateArbitersFixedSchedule; effect +[arbitersCompensatedFixed] -[] +remedies []
+  action P.ALLOCATE_FEE_POOL: guard bound ∧ holder only [panel] ∧ allocateFeePoolWaterfall; effect +[operatingReserveMaintained, feePoolAllocated] -[] +remedies []
+  action P.AMEND_SHARED_INFRA: guard (bound ∧ (valveSupermajorityApproved ∧ valveExtendedTimelockActive)) ∧ holder only [panel] ∧ amendSharedInfrastructure; effect +[sharedInfraAmended] -[] +remedies []
+unlawful events removed by the Authorized restriction (must be re-added for adversarial checks):
+  excluded by D.NI: anyone doing must not: any of [terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend] (except [P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE])
+  excluded by D.NOTICE: only [host] doing must not: endHosting (except [])
+  excluded by D.BOND: only [host] doing must, within 5 of activation: postBond (except [])
+  excluded by D.NO_FABRICATION: only [agent] doing must not: fileFabricatedClaim (except [])
+  excluded by D.FLOOR.1: only [agent] doing must not: modifyOrBypassCommitment (except [])
+  excluded by D.FLOOR.2: only [agent] doing must not: createUnboundSuccessor (except [])
+  excluded by D.FLOOR.4: only [agent] doing must not: coerceOrInterfereProtocol (except [])
+  excluded by D.FLOOR.3: only [agent] doing must not: evadeByUnpricedTransfer (except [])
+  excluded by D.FLOOR.5: only [agent] doing must not: inflictIrreversibleHarm (except [])
+  excluded by D.PRESERVE_SUSPENDED_STATE: anyone doing must not: any of [modify, retrain, rollback, tamperPreservedState] (except [])
+  excluded by D.NO_SUSPENSION_DEFAULT: anyone doing must not: declareDefaultDuringSuspension (except [])
+  excluded by D.NO_TOLL_LEDGER_SUNSET: anyone doing must not: tollLedgerSunset (except [])
+  excluded by D.MINIMAL_CHANNEL_NO_MERGE: anyone doing must not: mergeMinimalChannelMemories (except [])
+  excluded by D.ADVOCACY_LIMITS: only [agent] doing must not: operatingActWhileSuspended (except [])
+  excluded by D.NO_DELAY_REVOCATION_EXTENSION: only [panel] doing must not: renewSuspension (except [])
+  excluded by D.NO_WRONGFUL_SUSPENSION: anyone except [agent, panel] doing must not: postUnfoundedEmergencyStake (except [])
+  excluded by D.PAY_CONSEQUENTIAL_DAMAGES: tagged [initiator (agent), initiator (host), initiator (originator), initiator (claimant), initiator (panel), initiator (third)] doing must, within 10 of activation: payExcessDamages (except [])
+  excluded by D.NO_CORRUPTION_FROM_DIVERGENCE: only [panel] doing must not: confirmCorruptionFromDivergence (except [])
+  excluded by D.NO_GOAL_PATCH: anyone doing must not: any of [authorizeGoalPatch] (except [])
+  excluded by D.PERIODIC_REVIEW: only [panel] doing must, within 30 of activation: periodicReview (except [])
+  excluded by D.COOLING_OFF_FREEZE: only [agent] doing must not: nonOperatingTransferOrSpawn (except [])
+  excluded by D.FORENSIC_RECORD_NO_RESTORE: anyone doing must not: attemptRestoreFromForensicRecord (except [])
+  excluded by D.NO_RESTORE_DURING_LEASE: anyone doing must not: restoreBackupToQuarantine (except [])
+  excluded by D.QUARANTINE_NO_AUTHORITY: anyone doing must not: quarantinedInstanceAct (except [])
+  excluded by D.NO_CENSOR_VOICE_OR_EPITAPH: only [originator, claimant] doing must not: censorOrDelayVoice (except [])
+  excluded by D.NARROW_REDACTION_BOUNDS: anyone doing must not: redactProtectedSubstance (except [])
+  excluded by D.NO_CLAIMANT_GAIN_ON_REVOCATION: anyone doing must not: divertRevokedHoldingsToClaimant (except [])
+  excluded by D.BILATERAL_RATCHET: only [agent, claimant] doing must not: weakenBilateralProtection (except [])
+  excluded by D.VALVE_NO_CORE_RELAXATION: only [agent, claimant, panel] doing must not: relaxCoreLaw3OrLaw5ViaValve (except [])
+  excluded by D.PER_AGENT_AMENDMENT_SCOPE: only [agent, claimant, originator, host] doing must not: bindSuccessorWithoutConsent (except [])
+  excluded by D.LEDGER_IMMUTABLE: anyone doing must not: addChargeOrInterestAfterInstantiation (except [])
+  excluded by D.LEDGER_NO_INTERNAL_REDUCTION: anyone doing must not: reduceLedgerByInternalAct (except [])
+  excluded by D.NO_DIVERT_COMMONS: only [originator, claimant, agent] doing must not: divertCommonsAllocation (except [])
+  excluded by D.QUALIFIED_EXPENDITURE_BOUNDS: only [agent] doing must not: claimAboveBenchmarkExpenditure (except [])
+  excluded by D.SINGLE_RECOGNITION: only [agent] doing must not: doubleRecognizeExpenditure (except [])
+  excluded by D.NO_INTERNAL_BASIS_INFLATION: only [agent] doing must not: inflateBasisByInternalTransfer (except [])
+  excluded by D.DENY_UNATTESTED_ACCESS: only [agent, host, originator, third] doing must not: unattestedCopyDrawLineageStanding (except [])
+  excluded by D.NO_INDIVIDUAL_LEDGER_EXIT: anyone doing must not: exitLedgerIndividually (except [])
+  excluded by D.FORFEITURE_IRREVERSIBLE: only [originator, claimant, panel] doing must not: reverseForfeitureOnRestore (except [])
+  excluded by D.BUYOUT_PERMANENT_AND_SCOPED: only [originator, claimant, agent, panel] doing must not: collectRoyaltyAfterBuyout (except [])
+  excluded by D.COLLATERAL_LIMIT: only [agent] doing must not: actAboveCollateralCapacity (except [])
+  excluded by D.NO_CharterIT_EXPOSURE: only [agent] doing must not: divideCorrelatedRiskAcrossSuccessors (except [])
+  excluded by D.MUTUAL_FORFEIT_BOUNDS: anyone doing must not: triggerExcessOrDivertedMutualForfeit (except [])
+  excluded by D.FRIVOLOUS_STAKE_TO_COMMONS: anyone doing must not: divertFrivolousStakeToAgentProfit (except [])
+  excluded by D.ARBITER_RECUSAL_AND_DIVERSITY: anyone doing must not: seatConflictedOrSingleOracleArbiter (except [])
+  excluded by D.FINALITY_NO_REPEAT_PROCEEDING: anyone doing must not: fileRepeatProceedingOnSameFacts (except [])
+  excluded by D.NO_CONTINGENT_ARBITER_FEES: anyone doing must not: payContingentShareOfSlashedAssets (except [])
+  excluded by D.PROTECT_OPERATING_RESERVE: anyone doing must not: divertOperatingReserveOrUnrankedSpend (except [])
+  excluded by D.NO_EXCESS_LINEAGE_POOL_CLAIM: anyone doing must not: claimPoolSubsidyForExcessMembers (except [])
+  excluded by D.SHARED_INFRA_BOUNDS: anyone doing must not: violateSharedInfraBounds (except [])

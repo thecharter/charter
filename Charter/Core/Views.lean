@@ -21,21 +21,41 @@ namespace Charter
 
 variable {σ : Sig} [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
 
-/-- `reprStr` with `Charter.…` namespace prefixes stripped from constructor
-names, so views read `host terminate` rather than `Charter.Law3.Party.host`.
-Only runs of the form `Charter.<idents>.` are removed; free text is untouched. -/
-def rs {α : Type} [Repr α] (a : α) : String :=
-  let raw := reprStr a
+/-- Strip namespace qualification from constructor names inside a rendered string.
+Every maximal run of identifier characters of the form `Ns.Sub.ctor` whose leading
+segments are capitalised (namespaces and type names) and whose final segment starts
+with a lowercase letter (a constructor) is replaced by `ctor`, so views read
+`host terminate` rather than `MyInstitution.Party.host`, whatever namespace the
+institution lives in. Free text, numerals (`3.14`), abbreviations (`e.g.`) and
+dotted identifiers such as `P.REVOKE` are untouched. Defined over `List Char` so it
+reduces in the kernel. -/
+def stripNamespaces (raw : String) : String :=
   let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
-  match raw.splitOn "Charter." with
-  | [] => raw
-  | first :: rest =>
-    first ++ String.join (rest.map fun piece =>
-      let run := piece.takeWhile isIdent
-      let after := piece.drop run.length
-      -- keep only what follows the last '.' of the identifier run
-      let parts := run.splitOn "."
-      (parts.getLastD run) ++ after)
+  let nsSeg (seg : List Char) : Bool := match seg with | c :: _ => c.isUpper | [] => false
+  let ctorSeg (seg : List Char) : Bool := match seg with | c :: _ => c.isLower | [] => false
+  let rec segs : List Char → List Char → List (List Char)
+    | [], acc => [acc.reverse]
+    | '.' :: cs, acc => acc.reverse :: segs cs []
+    | c :: cs, acc => segs cs (c :: acc)
+  let shorten (run : List Char) : List Char :=
+    let parts := segs run []
+    match parts.getLast? with
+    | some last =>
+      let pre := parts.dropLast
+      if !pre.isEmpty && ctorSeg last && pre.all nsSeg then last else run
+    | none => run
+  let rec go : List Char → List Char → List Char → List Char
+    | [], run, acc => acc ++ shorten run.reverse
+    | c :: cs, run, acc =>
+      if isIdent c then go cs (c :: run) acc
+      else go cs [] (acc ++ shorten run.reverse ++ [c])
+  String.mk (go raw.data [] [])
+
+/-- `repr` rendered on a single line (no width-dependent wrapping, so generated views
+do not depend on how long a program's namespace is) with namespace prefixes stripped
+from constructor names (`stripNamespaces`). -/
+def rs {α : Type} [Repr α] (a : α) : String :=
+  stripNamespaces ((reprPrec a 0).pretty 1000000)
 
 def Who.render : Who σ → String
   | .anyone => "anyone"

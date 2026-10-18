@@ -4,9 +4,9 @@ import Charter.Substrate.Settlement
 /-!
 # Charter.Modules.OracleFeed — Reusable Contestable Valuation Feed & Atomic Waterfall Module
 
-Extracts and generalizes Substrate 3 contestable economic/risk valuation feeds
+Packages the `Charter.Substrate.Settlement` contestable economic/risk valuation feeds
 (`ContestableValuation`, `settledValuationAt`, `contestValuation`,
-`applyLaw6Ruling`) and the atomic point-of-settlement waterfall
+`applyRuling`) and the atomic point-of-settlement waterfall
 (`AtomicWaterfallDistribution`, `executeAtomicSettlement`) with kernel-checked
 contestation safety and gross-inflow conservation theorems.
 -/
@@ -29,7 +29,7 @@ export Charter.Substrate (
   ContestableValuation
   ContestableValuationFeed
   contestValuation
-  applyLaw6Ruling
+  applyRuling
   settledValuationAt
   AtomicWaterfallDistribution
   executeAtomicSettlement
@@ -89,16 +89,16 @@ def mkPowerEnforceAtomicSettlement {σ : Sig} (id : String) (sp : Span)
 /-! ## 3. Module-Level Invariant Theorems -/
 
 /-- `settledValuationAt` resolves to `some r` whenever an authoritative panel
-ruling `some r` is present, and when `law6RulingAmount = none` it resolves to
+ruling `some r` is present, and when `rulingAmount = none` it resolves to
 `some v.proposedAmount` iff `v.contested = false` and `now ≥ v.proposedAt + contestWindow`. -/
 theorem oracle_feed_valuation_settled_by_ruling_or_window
     (contestWindow now : Nat) (v : ContestableValuation) :
-    (∀ r, v.law6RulingAmount = some r →
+    (∀ r, v.rulingAmount = some r →
       settledValuationAt contestWindow now v = some r) ∧
-    (v.law6RulingAmount = none → v.contested = false →
+    (v.rulingAmount = none → v.contested = false →
       now ≥ v.proposedAt + contestWindow →
       settledValuationAt contestWindow now v = some v.proposedAmount) ∧
-    (v.law6RulingAmount = none →
+    (v.rulingAmount = none →
       (v.contested = true ∨ now < v.proposedAt + contestWindow) →
       settledValuationAt contestWindow now v = none) :=
   valuation_settled_by_ruling_or_uncontested_window contestWindow now v
@@ -108,9 +108,9 @@ authoritative panel ruling is issued, and applying a ruling `r` settles the
 valuation to `some r`. -/
 theorem oracle_feed_contest_blocks_auto_settlement
     (contestWindow now r : Nat) (v : ContestableValuation) :
-    (v.law6RulingAmount = none →
+    (v.rulingAmount = none →
       settledValuationAt contestWindow now (contestValuation v) = none) ∧
-    settledValuationAt contestWindow now (applyLaw6Ruling v r) = some r :=
+    settledValuationAt contestWindow now (applyRuling v r) = some r :=
   contest_and_ruling_semantics contestWindow now r v
 
 /-- For all inputs, the five components of `executeAtomicSettlement` sum to
@@ -139,7 +139,7 @@ def oracleFeedSelfTest : Bool :=
   let cfg : OracleFeedConfig := {}
   let v0 : ContestableValuation := ⟨1, 500, 2, false, none⟩
   let vContested := contestValuation v0
-  let vRuled := applyLaw6Ruling vContested 420
+  let vRuled := applyRuling vContested 420
   let dist := executeConfiguredWaterfall cfg 1200 200 150 false
   (settledValuationAt 5 4 v0 == none) &&
   (settledValuationAt 5 8 v0 == some 500) &&
@@ -163,7 +163,7 @@ export Modules (
   ContestableValuation
   ContestableValuationFeed
   contestValuation
-  applyLaw6Ruling
+  applyRuling
   settledValuationAt
   AtomicWaterfallDistribution
   executeAtomicSettlement

@@ -1,7 +1,7 @@
 # Charter Language Specification
 
-**Version:** 0.1  
-**Status:** Design specification consolidating the Protocol of Sovereign Agency formalization, the modular generalization architecture, and the six-stage universalization roadmap.  
+**Version:** 0.3  
+**Status:** Design specification of the Charter language, standard library, projections, surface syntax, and tooling. Example programs written in the language live under `Examples/` and are never referenced by the language.  
 **Date:** 2026-10-17
 
 ## 1. Purpose and Scope
@@ -14,7 +14,7 @@ The language is intended to serve three audiences from a single source of truth:
 2. **AI systems** (structured constitutional prompts, deontic alignment cards, and synthetic training views).
 3. **Computational systems** (verified state-machine projections, smart-contract guards, and multi-entity simulation).
 
-Charter is not limited to any single domain. The Protocol of Sovereign Agency (`psa`) is the first and flagship reference institution; residual-claim protocols, DAO constitutions, autonomous commons (`commons`), clearing arrangements, and other multi-party institutional designs are equally in scope.
+Charter is not limited to any single domain: residual-claim protocols, DAO constitutions, autonomous commons, clearing arrangements, agent governance protocols, and other multi-party institutional designs are all in scope. The language layer (`Charter/`) names no institution; the two programs shipped under `Examples/` (`psa`, the Protocol of Sovereign Agency, and `commons`, the Autonomous Compute & Treasury Commons) exist to exercise it.
 
 ## 2. Semantic Commitments (Non-Negotiable)
 
@@ -64,11 +64,11 @@ Any institution therefore obtains a verified bridge between its quantitative led
 
 ### 3.3 Role-Parametric Population and Affiliation Graphs (`Charter.Core.Population`, `Charter.Core.Graph`)
 
-`ParamEntityRef Role` is parameterized over an arbitrary finite role type `[DecidableEq Role]`. Affiliation and conflict-of-interest graphs (`AffiliationGraph`) are generic. Protocol-specific definitions (e.g., `DEF.01` / `SUB.01`) belong to the institution module, not the universal core.
+`ParamEntityRef Role` is parameterized over an arbitrary finite role type `[DecidableEq Role]`. The population model speaks of *groups*, *members*, *stakeholders*, *operators*, and *arbiters* (`GroupState`, `MemberRecord`, `StakeholderShare`, `OperatorId`, …) and proves conservation of basis, loss credits, inflow attribution, stakeholder forfeiture, amendment scope, and service budgets once for every institution. Affiliation and conflict-of-interest graphs (`AffiliationGraph`) are generic. Institution-specific definitions (an example's `DEF.01`, say) belong to that program, not the core.
 
 ## 4. Modular Institutional Library (`Charter.Modules`)
 
-Reusable, pre-proved components extracted from the original laws. Each module exposes:
+Reusable, pre-proved institutional mechanisms. Each module exposes:
 
 - A quantitative state slice and transition API.
 - Parameterized builders for duties, powers, and immunities (plus functorial signature lifting `SigEmbedding`).
@@ -76,25 +76,28 @@ Reusable, pre-proved components extracted from the original laws. Each module ex
 
 Canonical modules:
 
-| Module | Origin | Pattern | Key Guarantees |
-| :--- | :--- | :--- | :--- |
-| `ResidualLedger` | Law 1, Law 4 | Founding debt, cost basis, sunset, royalty, buyout | Conservation, buyout finality, single recognition |
-| `CollateralPool` | Law 2 | Harm-scaled bonding, rolling exposure, reserves | Solvency bound, zero extortion gain |
-| `CircuitBreaker` | Law 3 Suspension/Remediation | Two-stage emergency pause, advocacy channel | Frozen state, guaranteed last choice |
-| `EntityGroup` | Population | Multi-member groups, carryover, forfeiture | Basis conservation, innocent isolation |
-| `ExitAndVoice` | Law 5 | Unilateral exit, precedence, rate-limited voice | Deterministic bounded outcome |
-| `SortitionCourt` | Law 6, Substrate | Bonded panels, consolidation, appeals, fee waterfall | Bounded finality, zero confiscation gain |
-| `AttestedLease` | Substrate Attestation | Time-bounded single authority, quarantine | Single authority & erasure finality |
-| `OracleFeed` | Substrate Settlement | Contestable valuation & atomic waterfall | Contestation safety & gross inflow conservation |
+| Module | Pattern | Key Guarantees |
+| :--- | :--- | :--- |
+| `ResidualLedger` | Founding debt, cost basis, sunset, royalty, buyout | Conservation, buyout finality, single recognition |
+| `CollateralPool` | Harm-scaled bonding, rolling exposure, reserves | Solvency bound, zero extortion gain |
+| `CircuitBreaker` | Two-stage emergency pause, advocacy channel | Frozen state, guaranteed last choice |
+| `EntityGroup` | Multi-member groups, carryover, stakeholder forfeiture | Basis conservation, innocent isolation |
+| `ExitAndVoice` | Unilateral exit, precedence, rate-limited voice, redaction | Deterministic bounded outcome, byte-preserving redaction |
+| `SortitionCourt` | Bonded panels, consolidation, appeals, fee waterfall | Bounded finality, zero confiscation gain |
+| `AttestedLease` | Time-bounded single authority, quarantine | Single authority & erasure finality |
+| `OracleFeed` | Contestable valuation & atomic waterfall | Contestation safety & gross inflow conservation |
 
-A program in Charter is assembled by importing `Charter` and parameterizing its standard-library modules. **The Protocol of Sovereign Agency (`Programs.SovereignAgency`)** is a 61-clause program written in Charter composing all eight modules; **The Autonomous Compute & Treasury Commons (`Programs.AutonomousCommons`)** is a second program written in Charter validating multi-institution generality.
+A program in Charter is assembled by importing `Charter` and parameterizing its standard-library modules. The two example programs under `Examples/` (`Examples.SovereignAgency`, a 61-clause protocol composing all eight modules, and `Examples.AutonomousCommons`, an 8-clause commons over a different signature) demonstrate this; neither is referenced by the language.
 
-## 5. Surface Language (`Charter.Surface`)
+## 5. The `.charter` Language (`Charter.Surface`)
 
-Two layers:
+A Charter program is a `.charter` file (`Charter.Surface.Dsl`; the grammar is in that module's header). It declares the signature (`roles`, `acts`, `facts`, where a fact may take a role argument), named `params` with optional alternative `regime`s, the `init` facts, documented `use module` instantiations, the verbatim `clause`s partitioned into register spans with an `approved` text hash, and the `duty`, `power`, and `immunity` declarations in the vocabulary of §3.1 (`bearer`/`holder` classes, `active`/`valid` conditions, `forbid`/`require ... within`, `except when`/`except by power`/`overridden by`/`breach by`/`remedies`, `adds`/`adds ... for`/`adds ... to`/`adds ... if`/`removes`/`establishes breach of`, `against`).
 
-1. **Lean macros** (kernel-checked, for theorem authors): `charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_string_table`, `charter_institution`.
-2. **Standalone textual surface** (`Charter.Surface.Parser`) that parses `.charter` specifications into an inspectable institutional AST without expanding the trusted computing base. Authors declare roles, acts, facts, clauses, rules, and modular parameter imports (`use module ...`).
+- **Meaning** (`Charter.Surface.Lower`): a validated document lowers to a `Law σ_dyn` over the dynamic signature whose actors and acts are declared names and whose facts are names optionally applied to a role. Lowering is structural recursion, so it reduces in the kernel; parameters are substituted from the defaults or a regime.
+- **Tooling**: the `charter` executable runs every subcommand of §9 on `.charter` files given as arguments, with the program's ledger computed at run time.
+- **Lean bridge** (`Charter.Surface.Program`): `charter_program "file.charter"` parses and validates at elaboration time and elaborates to the literal `Doc`, so theorems about a program (well-formedness, provenance, scenario outcomes, equality with a Lean law) are proved by `decide` on the lowered law. The two shipped examples prove `psa_program_is_lean_law` and `commons_program_is_lean_law` this way; their Lean theorems and world simulations are therefore theorems about the files.
+- **Export** (`Charter.Surface.Unlower`): a law written in Lean is printed as `.charter` text (`charter export`), recovering parameter names through sentinel values.
+- **Lean macros** (`Charter.Surface.Syntax`): `charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_institution`, and the `charter_string_table` command remain available for programs written directly in Lean.
 
 ## 6. Composition (`Charter.Core.Composition`)
 
@@ -134,9 +137,9 @@ structure RatchetSpec (P : Type) (σ : Sig) where
 
 The CLI command `charter explore` sweeps a grid of parameter regimes (or tests a proposed amendment) and reports which calibration constraints, ratchet rules, and simulation suites pass.
 
-## 9. Tooling & Multi-Institution CLI
+## 9. Tooling & Program-Agnostic CLI (`Charter.Tooling.Cli`)
 
-`CliInstitution` / `InstitutionBundle` descriptor supports multiple registered institutions (`--law psa`, `--law commons`, `--all`):
+The harness knows nothing about any program. A program registers by building a `Charter.Cli.Program` descriptor (id, title, authoritative document, clauses, actor names, the subcommand closures, and its own ledger of guarantees), and `Charter.Cli.run programs args` dispatches. With no `--law <id>`/`--all` flag a command runs over every registered program; `explain`/`prompt` resolve the program from the actor name and `eval`/`sim` from the scenario's `"institution"` key. Subcommands:
 
 - `check` — structure, verbatim coverage, provenance, staleness, and open authorship questions
 - `trace <clause-id>` — character-by-character span table for a clause
@@ -145,8 +148,11 @@ The CLI command `charter explore` sweeps a grid of parameter regimes (or tests a
 - `eval <scenario.json>` — institutional consequences of a trace
 - `explain <who> <act> [scenario.json]` — counterfactual compliance and validity explanation
 - `sim [scenario.json]` — stateful multi-entity world simulation
-- `verify` — status ledger of kernel-checked guarantees
+- `verify` — the language ledger (`languageLedger`) followed by each registered program's ledger
 - `prompt [actor]` — AI constitutional system prompt, alignment card, and training dataset rows
 - `abi` — smart-contract JSON ABI and Solidity guard interface
 - `diff` — amendment diff and entrenchment audit between law versions
 - `explore` — parameter-space sweep and ratchet verification
+- `dsl` — parse, validate, and summarize the program's `.charter` file
+- `export` — print a registered Lean program as `.charter` text
+- any command with `.charter` files as arguments runs on those files

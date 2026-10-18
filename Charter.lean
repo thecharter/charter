@@ -24,6 +24,12 @@ import Charter.Projection.Prompt
 import Charter.Projection.ContractABI
 import Charter.Projection.Visualization
 import Charter.Surface.Syntax
+import Charter.Surface.Dsl
+import Charter.Surface.Lower
+import Charter.Surface.Unlower
+import Charter.Surface.Program
+import Charter.Surface.DslSample
+import Charter.Tooling.Cli
 
 /-!
 # `Charter` — Universal Institutional Specification Language & Standard Library
@@ -45,12 +51,20 @@ Top-level umbrella module for the **Charter** language and standard library:
    constitutional system prompts & synthetic training rows (`Prompt`),
    smart-contract state-transition guards & JSON ABI (`ContractABI`), and
    step-by-step trace visualization & amendment diffs (`Visualization`).
-5. **`Charter.Surface`**: Kernel-checked `charter_*` macros and standalone
-   `.charter` textual DSL parser (`parseCharterText`).
+5. **`Charter.Surface`**: The `.charter` language itself — AST, parser, validator,
+   and printer (`Dsl`), its meaning as a `Law` over the dynamic signature
+   (`Lower`), the reverse direction for exporting Lean laws (`Unlower`), the
+   `charter_program "file.charter"` elaborator that embeds a program as a Lean term
+   (`Program`), a kernel-decided toy program (`DslSample`), and the kernel-checked
+   `charter_*` Lean macros (`Syntax`).
+6. **`Charter.Tooling`**: The program-agnostic `charter` command-line harness
+   (`Charter.Cli.Program`, `Charter.Cli.run`) that any program registers with.
 
-Programs written in Charter (such as **The Protocol of Sovereign Agency** in
-`Programs.SovereignAgency` and **The Autonomous Compute & Treasury Commons** in
-`Programs.AutonomousCommons`) live in `Programs/` and `import Charter`.
+Nothing in this library refers to any particular institution. A Charter program is a
+`.charter` file; the `charter` executable runs every subcommand on it directly, and a
+Lean module may embed it with `charter_program` to prove things about it. The example
+programs under `Examples/` are such files, each with an optional Lean companion that
+`import Charter`; the dependency never runs the other way.
 -/
 
 namespace Charter

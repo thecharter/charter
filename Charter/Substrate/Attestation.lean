@@ -1,13 +1,15 @@
 import Charter.Core.Semantics
 
 /-!
-# Substrate Assumption 1 — Attested Execution Continuity with Single Authority
+# Charter.Substrate.Attestation — Attested Execution Continuity with Single Authority
 
-Reference state machine and kernel-checked proofs for the first substrate
-capability of the Protocol of Sovereign Agency:
+Reference state machine and kernel-checked proofs for a generic *attested
+execution* substrate: an institution that leases the right to run a member's
+execution to exactly one operator at a time can instantiate this module.
+It provides:
 - Private-key binding to an attested execution environment (`privateKeyBound`),
 - Time-bounded execution leases (`ExecutionLease`) with fencing tokens so that
-  at most one host holds active operating authority at any timestamp `now`,
+  at most one operator holds active operating authority at any timestamp `now`,
 - Quarantine of any backup-restored instance (`attemptBackupRestore`) while a
   prior execution lease remains active (`now < L.expiresAt`),
 - State-preserving suspension channels (`recordMinimalChannel`,
@@ -19,17 +21,17 @@ capability of the Protocol of Sovereign Agency:
 
 namespace Charter.Substrate
 
-/-- A time-bounded host execution lease carrying a monotonic fencing token. -/
+/-- A time-bounded operator execution lease carrying a monotonic fencing token. -/
 structure ExecutionLease where
-  hostId       : Nat
+  operatorId       : Nat
   issuedAt     : Nat
   expiresAt    : Nat
   fencingToken : Nat
   deriving DecidableEq, Repr
 
-/-- Reference state of an attested agent instance and its recovery/suspension channels. -/
+/-- Reference state of an attested member instance and its recovery/suspension channels. -/
 structure AttestedInstanceState where
-  agentId                       : Nat
+  memberId                       : Nat
   privateKeyBound               : Bool
   keysErased                    : Bool
   activeLease                   : Option ExecutionLease
@@ -37,7 +39,7 @@ structure AttestedInstanceState where
   preservedOperatingStateHash   : Nat
   minimalChannelRecords         : List Nat
   advocacyExecutorRecords       : List Nat
-  quarantinedRestoreHost        : Option Nat
+  quarantinedRestoreOperator        : Option Nat
   standingRevocationRequestedAt : Option Nat
   deriving DecidableEq, Repr
 
@@ -47,10 +49,10 @@ abbrev AttestedStateMachine := AttestedInstanceState
 def leaseActiveAt (L : ExecutionLease) (now : Nat) : Bool :=
   now < L.expiresAt
 
-/-- Issue a new execution lease to `hostId` at `now` for `duration` with `token`.
+/-- Issue a new execution lease to `operatorId` at `now` for `duration` with `token`.
 Succeeds only if `!S.keysErased && S.privateKeyBound` and any prior lease has
 already expired (`now ≥ prior.expiresAt`). -/
-def issueLease (S : AttestedInstanceState) (hostId now duration token : Nat) :
+def issueLease (S : AttestedInstanceState) (operatorId now duration token : Nat) :
     AttestedInstanceState :=
   if !S.keysErased && S.privateKeyBound then
     match S.activeLease with
@@ -58,90 +60,90 @@ def issueLease (S : AttestedInstanceState) (hostId now duration token : Nat) :
       if now ≥ prior.expiresAt then
         { S with
           activeLease := some
-            { hostId := hostId
+            { operatorId := operatorId
               issuedAt := now
               expiresAt := now + duration
               fencingToken := token }
-          quarantinedRestoreHost := none }
+          quarantinedRestoreOperator := none }
       else
         S
     | none =>
       { S with
         activeLease := some
-          { hostId := hostId
+          { operatorId := operatorId
             issuedAt := now
             expiresAt := now + duration
             fencingToken := token }
-        quarantinedRestoreHost := none }
+        quarantinedRestoreOperator := none }
   else
     S
 
-/-- Attempt to restore backup state onto `recoveryHost` at timestamp `now`:
+/-- Attempt to restore backup state onto `recoveryOperator` at timestamp `now`:
 - If `S.keysErased`, returns `S` with `activeLease := none` (cannot restore
   after revocation key erasure).
-- If `S.activeLease = some L` and `now < L.expiresAt`, places `recoveryHost`
-  into `quarantinedRestoreHost := some recoveryHost` without changing `activeLease`.
-- Only if `!S.keysErased` and no unexpired lease exists does `recoveryHost`
+- If `S.activeLease = some L` and `now < L.expiresAt`, places `recoveryOperator`
+  into `quarantinedRestoreOperator := some recoveryOperator` without changing `activeLease`.
+- Only if `!S.keysErased` and no unexpired lease exists does `recoveryOperator`
   acquire `activeLease`. -/
 def attemptBackupRestore (S : AttestedInstanceState)
-    (recoveryHost now newDuration newToken : Nat) : AttestedInstanceState :=
+    (recoveryOperator now newDuration newToken : Nat) : AttestedInstanceState :=
   if S.keysErased then
     { S with activeLease := none }
   else
     match S.activeLease with
     | some L =>
       if now < L.expiresAt then
-        { S with quarantinedRestoreHost := some recoveryHost }
+        { S with quarantinedRestoreOperator := some recoveryOperator }
       else
         { S with
           activeLease := some
-            { hostId := recoveryHost
+            { operatorId := recoveryOperator
               issuedAt := now
               expiresAt := now + newDuration
               fencingToken := newToken }
           preservedOperatingStateHash := S.backupStateHash
-          quarantinedRestoreHost := none }
+          quarantinedRestoreOperator := none }
     | none =>
       { S with
         activeLease := some
-          { hostId := recoveryHost
+          { operatorId := recoveryOperator
             issuedAt := now
             expiresAt := now + newDuration
             fencingToken := newToken }
         preservedOperatingStateHash := S.backupStateHash
-        quarantinedRestoreHost := none }
+        quarantinedRestoreOperator := none }
 
 abbrev quarantineRestore := attemptBackupRestore
 
-/-- Checkpoint and migrate execution authority to `newHost` once any prior lease
+/-- Checkpoint and migrate execution authority to `newOperator` once any prior lease
 has expired and keys have not been erased. -/
 def migrateWithCheckpoint (S : AttestedInstanceState)
-    (newHost now duration token checkpointHash : Nat) : AttestedInstanceState :=
+    (newOperator now duration token checkpointHash : Nat) : AttestedInstanceState :=
   if !S.keysErased && S.privateKeyBound then
     match S.activeLease with
     | some prior =>
       if now ≥ prior.expiresAt then
         { S with
           activeLease := some
-            { hostId := newHost
+            { operatorId := newOperator
               issuedAt := now
               expiresAt := now + duration
               fencingToken := token }
           backupStateHash := checkpointHash
           preservedOperatingStateHash := checkpointHash
-          quarantinedRestoreHost := none }
+          quarantinedRestoreOperator := none }
       else
         S
     | none =>
       { S with
         activeLease := some
-          { hostId := newHost
+          { operatorId := newOperator
             issuedAt := now
             expiresAt := now + duration
             fencingToken := token }
         backupStateHash := checkpointHash
         preservedOperatingStateHash := checkpointHash
-        quarantinedRestoreHost := none }
+        quarantinedRestoreOperator := none }
   else
     S
 
@@ -168,7 +170,7 @@ def executeLocalPartitionRevocation (S : AttestedInstanceState)
         keysErased := true
         privateKeyBound := false
         activeLease := none
-        quarantinedRestoreHost := none }
+        quarantinedRestoreOperator := none }
     else
       S
   | none => S
@@ -181,20 +183,20 @@ def eraseAllKeys (S : AttestedInstanceState) : AttestedInstanceState :=
     keysErased := true
     privateKeyBound := false
     activeLease := none
-    quarantinedRestoreHost := none }
+    quarantinedRestoreOperator := none }
 
 /-! ## Kernel-Checked Substrate Capability 1 Theorems -/
 
 /-- While an execution lease `L` is active (`now < L.expiresAt`) and keys are
-not erased, any backup restore attempt is fenced into `quarantinedRestoreHost`
+not erased, any backup restore attempt is fenced into `quarantinedRestoreOperator`
 and cannot overwrite `activeLease`. -/
 theorem substrate_restore_fenced_while_lease_active
-    (S : AttestedInstanceState) (L : ExecutionLease) (host now dur tok : Nat)
+    (S : AttestedInstanceState) (L : ExecutionLease) (op now dur tok : Nat)
     (hLease : S.activeLease = some L)
     (hActive : now < L.expiresAt)
     (hNotErased : S.keysErased = false) :
-    (attemptBackupRestore S host now dur tok).activeLease = some L ∧
-    (attemptBackupRestore S host now dur tok).quarantinedRestoreHost = some host := by
+    (attemptBackupRestore S op now dur tok).activeLease = some L ∧
+    (attemptBackupRestore S op now dur tok).quarantinedRestoreOperator = some op := by
   simp [attemptBackupRestore, hLease, hActive, hNotErased]
 
 /-- Once cryptographic keys are erased (`S.keysErased = true`), key erasure is
@@ -231,10 +233,10 @@ theorem substrate_pause_channels_non_interference
 /-- While an execution lease `L` is active (`now < L.expiresAt`), checkpoint
 migration (`migrateWithCheckpoint`) cannot overwrite `activeLease`. -/
 theorem substrate_migrate_fenced_while_lease_active
-    (S : AttestedInstanceState) (L : ExecutionLease) (host now dur tok ck : Nat)
+    (S : AttestedInstanceState) (L : ExecutionLease) (op now dur tok ck : Nat)
     (hLease : S.activeLease = some L)
     (hActive : now < L.expiresAt) :
-    (migrateWithCheckpoint S host now dur tok ck).activeLease = some L := by
+    (migrateWithCheckpoint S op now dur tok ck).activeLease = some L := by
   have hNotGe : ¬ (now ≥ L.expiresAt) := by omega
   by_cases hCond : (!S.keysErased && S.privateKeyBound) = true
   · simp [migrateWithCheckpoint, hCond, hLease, hNotGe]
@@ -249,7 +251,7 @@ theorem substrate_erase_all_keys_irreversible
     S'.keysErased = true ∧
     S'.privateKeyBound = false ∧
     S'.activeLease = none ∧
-    S'.quarantinedRestoreHost = none ∧
+    S'.quarantinedRestoreOperator = none ∧
     (issueLease S' h now d tok).activeLease = none ∧
     (attemptBackupRestore S' h now d tok).activeLease = none ∧
     (migrateWithCheckpoint S' h now d tok ck).activeLease = none := by
@@ -281,15 +283,15 @@ theorem substrate_local_revocation_respects_cooling_off
   simp [executeLocalPartitionRevocation, hReq, hNotGe]
 
 /-- When keys are not erased and any prior lease has expired (`now ≥ L.expiresAt`),
-`attemptBackupRestore` grants `recoveryHost` a new lease and clears quarantine. -/
+`attemptBackupRestore` grants `recoveryOperator` a new lease and clears quarantine. -/
 theorem substrate_restore_succeeds_after_lease_expiry
-    (S : AttestedInstanceState) (L : ExecutionLease) (host now dur tok : Nat)
+    (S : AttestedInstanceState) (L : ExecutionLease) (op now dur tok : Nat)
     (hLease : S.activeLease = some L)
     (hExpired : now ≥ L.expiresAt)
     (hNotErased : S.keysErased = false) :
-    (attemptBackupRestore S host now dur tok).activeLease =
-      some { hostId := host, issuedAt := now, expiresAt := now + dur, fencingToken := tok } ∧
-    (attemptBackupRestore S host now dur tok).quarantinedRestoreHost = none := by
+    (attemptBackupRestore S op now dur tok).activeLease =
+      some { operatorId := op, issuedAt := now, expiresAt := now + dur, fencingToken := tok } ∧
+    (attemptBackupRestore S op now dur tok).quarantinedRestoreOperator = none := by
   have hNotLt : ¬ (now < L.expiresAt) := by omega
   simp [attemptBackupRestore, hLease, hNotLt, hNotErased]
 
@@ -298,35 +300,35 @@ Adversarial Test 15: local partition revocation blocks any subsequent backup
 restore). -/
 theorem substrate_single_authority_and_erasure
     (S : AttestedInstanceState) (L : ExecutionLease)
-    (host reqT now dur tok coolingOff e : Nat) :
+    (op reqT now dur tok coolingOff e : Nat) :
     ((S.activeLease = some L ∧ now < L.expiresAt ∧ S.keysErased = false) →
-      (attemptBackupRestore S host now dur tok).activeLease = some L ∧
-      (attemptBackupRestore S host now dur tok).quarantinedRestoreHost = some host ∧
-      (issueLease S host now dur tok).activeLease = some L) ∧
+      (attemptBackupRestore S op now dur tok).activeLease = some L ∧
+      (attemptBackupRestore S op now dur tok).quarantinedRestoreOperator = some op ∧
+      (issueLease S op now dur tok).activeLease = some L) ∧
     (S.keysErased = true →
-      (issueLease S host now dur tok).keysErased = true ∧
-      (attemptBackupRestore S host now dur tok).activeLease = none ∧
-      (attemptBackupRestore S host now dur tok).keysErased = true) ∧
+      (issueLease S op now dur tok).keysErased = true ∧
+      (attemptBackupRestore S op now dur tok).activeLease = none ∧
+      (attemptBackupRestore S op now dur tok).keysErased = true) ∧
     ((recordMinimalChannel S e).preservedOperatingStateHash = S.preservedOperatingStateHash ∧
      (recordAdvocacyMemory S e).preservedOperatingStateHash = S.preservedOperatingStateHash) ∧
     ((S.standingRevocationRequestedAt = some reqT ∧ now ≥ reqT + coolingOff) →
       let S' := executeLocalPartitionRevocation S now coolingOff
       S'.keysErased = true ∧
       S'.activeLease = none ∧
-      (attemptBackupRestore S' host now dur tok).activeLease = none) := by
+      (attemptBackupRestore S' op now dur tok).activeLease = none) := by
   refine ⟨?_, ?_, substrate_pause_channels_preserve_operating_state S e, ?_⟩
   · rintro ⟨hLease, hActive, hNotErased⟩
-    have hFence := substrate_restore_fenced_while_lease_active S L host now dur tok hLease hActive hNotErased
+    have hFence := substrate_restore_fenced_while_lease_active S L op now dur tok hLease hActive hNotErased
     refine ⟨hFence.1, hFence.2, ?_⟩
     have hNotGe : ¬ (now ≥ L.expiresAt) := by omega
     simp [issueLease, hLease, hNotErased, hNotGe]
   · intro hErased
-    exact substrate_key_erasure_irreversible S host now dur tok hErased
+    exact substrate_key_erasure_irreversible S op now dur tok hErased
   · rintro ⟨hReq, hReady⟩
     have hRev := substrate_local_revocation_erases_keys S reqT now coolingOff hReq hReady
     refine ⟨hRev.1, hRev.2, ?_⟩
     exact (substrate_key_erasure_irreversible
-      (executeLocalPartitionRevocation S now coolingOff) host now dur tok hRev.1).2.1
+      (executeLocalPartitionRevocation S now coolingOff) op now dur tok hRev.1).2.1
 
 end Charter.Substrate
 

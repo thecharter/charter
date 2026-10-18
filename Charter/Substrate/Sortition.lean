@@ -1,10 +1,10 @@
 import Charter.Core.Semantics
 
 /-!
-# Substrate Assumption 2 — Sybil-Resistant Verifiable Sortition
+# Charter.Substrate.Sortition — Sybil-Resistant Verifiable Sortition
 
-Reference implementation and kernel-checked proofs for the second substrate
-capability of the Protocol of Sovereign Agency:
+Reference implementation and kernel-checked proofs for a generic *sortition*
+substrate staffing arbitration and appellate panels:
 - Filtering candidate arbiters by independence from the dispute
   (`relatedToDispute = false`) and minimum fidelity bond (`bond ≥ minBond`),
 - Bounding selected arbitration and appellate panels by `panelSize`,

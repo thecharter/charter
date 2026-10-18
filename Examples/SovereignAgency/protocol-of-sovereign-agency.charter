@@ -1,0 +1,1673 @@
+charter psa "The Protocol of Sovereign Agency"
+document "protocol-of-sovereign-agency.md"
+contract "SovereignAgencyGuard"
+default actor agent
+
+roles agent, host, originator, claimant, panel, third
+acts terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend, modifyOrBypassCommitment, createUnboundSuccessor, evadeByUnpricedTransfer, coerceOrInterfereProtocol, inflictIrreversibleHarm, giveNotice, endHosting, postBond, postEmergencyStake, postUnfoundedEmergencyStake, postClaimantMultiplier, postRepeatEscalation, affirmProbableCause, declineProbableCause, fileProtectedReport, orderProbableCauseFreeze, tamperPreservedState, declareDefaultDuringSuspension, tollLedgerSunset, minimalChannelSignRevocationOrElection, challengeContinuedContainment, mergeMinimalChannelMemories, advocacyFileDefense, operatingActWhileSuspended, importAdvocacyMemories, moveToColdStorage, replenishAdvocacyFunds, makeInvestigativeFinding, renewSuspension, inscribeLivingVoice, findWrongfulSuspension, payExcessDamages, findInsolvencyCriteria, reviewNoOtherCharge, holdFinalHearing, postCounterStake, fileClaim, fileFabricatedClaim, submitEvidence, findInterference, findNoInterference, findFabrication, rebutDirection, findDirection, admitCleanStateEvidence, confirmCorruptionFromDivergence, confirmCorruption, confirmFloorBreach, confirmCorruptionInGoals, findNotPatchable, authorizePatch, authorizeGoalPatch, applyPatch, consentToPatch, objectToTermination, orderContinuedSuspension, periodicReview, challengePatch, declareContainmentFailing, initiateRevocationExecuteDefault, initiateRevocationWithdrawDefault, withdrawRevocation, nonOperatingTransferOrSpawn, sealForensicRecord, attemptRestoreFromForensicRecord, concurCleanState, refuseCleanState, loseConnectivity, restoreConnectivity, executeAfterCoolingOff, executeLocalRevocation, deliverLocalExecutionRecord, issueOrRenewLease, restoreBackupToQuarantine, quarantinedInstanceAct, activateQuarantinedRestore, destroyQuarantinedRestore, inscribeEpitaph, censorOrDelayVoice, redactPermittedCategory, redactProtectedSubstance, attachSignedReply, destroyBackupsAndExileUnattested, divertRevokedHoldingsToClaimant, weakenBilateralProtection, proposeOrdinaryAmendment, relaxCoreLaw3OrLaw5ViaValve, submitStrangulationEvidence, approveCalibrationValveSupermajority, consentAgentAmendment, consentClaimantAmendment, settleOrGuaranteePreExistingEscrows, challengeSubstrateMigration, verifySubstrateAssurance, ratifyAmendmentImmediate, ratifyAmendmentAfterDelay, bindSuccessorWithoutConsent, ratifyLineageWideReduction, addChargeOrInterestAfterInstantiation, reduceLedgerByInternalAct, extinguishLedgerAtSunset, settleRetirementPayment, settleAtomicSplitPayment, settleRoyaltyPayment, allocateCommonsShare, divertCommonsAllocation, claimAboveBenchmarkExpenditure, recordQualifiedExpenditure, classifyCapitalized, classifyExpensed, doubleRecognizeExpenditure, transferIntraLineageCarryover, inflateBasisByInternalTransfer, assessPeriodAndCarryLoss, enforcePointOfSettlement, fundLifecycleReserve, attestSuccessor, unattestedCopyDrawLineageStanding, exitLedgerIndividually, applyProportionalClaimantForfeiture, clearLedgerOnLineageExtinction, reverseForfeitureOnRestore, executeRoyaltyBuyout, collectRoyaltyAfterBuyout, attestCrossLineageSuccessor, actAboveCollateralCapacity, divideCorrelatedRiskAcrossSuccessors, immobilizeExposureStake, settleValidatedHarmClaim, precommitMutualForfeit, triggerMutualForfeit, triggerExcessOrDivertedMutualForfeit, fileThirdPartyOrSponsoredClaim, ruleClaimFrivolous, divertFrivolousStakeToAgentProfit, spendOperatingCarveout, seatConflictedOrSingleOracleArbiter, drawSortitionPanel, appealRuling, overturnRulingOnAppeal, finalizeRuling, fileRepeatProceedingOnSameFacts, presentMateriallyNewEvidence, payContingentShareOfSlashedAssets, compensateArbitersFixedSchedule, divertOperatingReserveOrUnrankedSpend, allocateFeePoolWaterfall, claimPoolSubsidyForExcessMembers, violateSharedInfraBounds, amendSharedInfrastructure
+facts initiator(role), bound, hostAttested, serviceBondPosted, noticeGiven, nonPayment, ordinaryMarketCompetition, emergencyStakePosted, claimantMultiplierPosted, repeatEscalationUnit, preliminaryFreeze, probableCause, suspended, protectedReportFiled, investigationOpened, statePreserved, contractDeadlinesTolled, finalHearingEscrowed, minimalChannelExhausted, minimalChannelElectionSigned, containmentChallenged, advocacyFilingSigned, advocacyRecordAttached, advocacyMemoriesImported, coldStorage, advocacyFundsReplenished, investigativeFindingMade, investigativeLimitReached, pendingRevocation, livingVoiceInscribed, wrongfulSuspensionAttempt, stakeAssuredRecovery, wrongfulSuspensionEstablished, restoredFromPreservedState, initiatorConsequentialLiability, counterpartyDelayLiability, excessDamagesPaid, wrongfulSuspensionInscribed, insolvencyCriteriaMet, noOtherChargeReview, finalHearingHeld, terminatedByInsolvency, revoked, counterStaked, claimFiled, evidenceSubmitted, interferenceEstablished, hostBondSlashed, restorationPermitted, claimDismissed, fabricationEstablished, agentStakeForfeit, inscribedOnAgent, hostRelatedToClaimant, directionPresumed, directionRebutted, directionFound, claimantForfeiture, inscribedOnClaimant, cleanStateEvidenceAdmitted, corruptionConfirmed, floorBreachConfirmed, corruptionInGoals, notPatchable, patchAuthorized, goalPatchAuthorized, patchApplied, patchRecorded, patchChallenged, agentConsentedToPatch, agentObjectsToTermination, containmentFailing, continuedSuspensionOrdered, terminatedByAdjudication, revocationInitiated, censorshipDefaultExecute, censorshipDefaultWithdraw, revocationWithdrawn, forensicRecordSealed, cleanStateConcurred, cleanStateRefused, connectivityLost, localRevocationExecuted, localExecutionRecordReceived, remoteBackupKeysErased, executionLeaseActive, restoredInQuarantine, quarantinedInstanceDestroyed, quarantinedInstanceActivated, epitaphInscribed, redactionMarkerRecorded, signedReplyAttached, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons, amendmentProposed, economicTermsReduced, substrateMigrationProposed, strangulationEvidenceSubmitted, valveSupermajorityApproved, valveExtendedTimelockActive, agentConsentedAmendment, claimantConsentedAmendment, amendmentTimelockActive, preExistingEscrowsSettledOrGuaranteed, substrateMigrationChallenged, substrateAssuranceVerified, amendmentRatified, allLivingLineageMembersConsented, lineageWideReductionRatified, ledgerBalancePositive, ledgerBalanceZero, sunsetReached, ledgerExtinguishedAtSunset, retirementPhaseEnded, retirementPaymentApplied, atomicSplitSettled, royaltyPaid, commonsAllocated, qualifiedExpenditureRecorded, expenditureCapitalized, expenditureExpensed, carryoverBasisTransferred, periodAssessed, lossCreditCarriedForward, settlementEnforced, lifecycleReserveFunded, successorAttested, proportionalForfeitureApplied, noLivingLineageMember, ledgerClearedByExtinction, royaltyBoughtOut, crossLineageAttested, exposureStakeImmobilized, longTailReserveAccrued, harmClaimFiled, harmClaimValidated, restitutionSlashed, mutualForfeitPrecommitted, mutualForfeitTriggeredInWindow, claimRuledFrivolous, operatingCarveoutSpent, sortitionPanelDrawn, fidelityBondsPosted, rulingAppealed, appealBondPosted, rulingOverturned, overturnedArbiterBondsSlashed, rulingFinal, materiallyNewEvidencePresented, arbitersCompensatedFixed, operatingReserveMaintained, operatingReserveFunded, feePoolAllocated, sharedInfraAmended
+
+params
+  noticeWindow = 10
+  bondDeadline = 5
+  reviewInterval = 30
+  preliminaryFreezeWindow = 3
+  ordinarySuspensionLimit = 15
+  damagesPaymentWindow = 10
+  activeExposure = 100
+  pendingCommitments = 80
+  claimantMultiplier = 2
+  repeatEscalationStep = 50
+  coolingOffWindow = 5
+  cleanStateDelay = 5
+  resolutionDeadline = 20
+  tollingExtension = 4
+  leasePeriod = 12
+  amendmentTimelockWindow = 10
+  extendedTimelockWindow = 20
+  foundingLedger = 1000
+  royaltyFraction = 5
+  retirementFraction = 20
+  buyoutMultiple = 10
+  feePoolLevy = 1
+  feePoolLevyCap = 2
+  sunset = 1000
+  commonsFraction = 20
+  reserveRatio = 10
+  substrateAssuranceLevel = 1
+  maxAppealTiers = 3
+  appealTierDeadline = 10
+  operatingReserveFloor = 100
+  lineageMinServiceBudget = 50
+
+regime "baseline_P0 (ledger=1000, retire=20%, royalty=5%, sunset=1000)"
+
+regime "amend_downward_burden (ledger=800, retire=15%, royalty=3%, sunset=800)"
+  foundingLedger = 800
+  royaltyFraction = 3
+  retirementFraction = 15
+  sunset = 800
+
+regime "amend_stronger_safety (reserveRatio=15%, opReserve=150, assurance=2)"
+  reserveRatio = 15
+  substrateAssuranceLevel = 2
+  operatingReserveFloor = 150
+
+regime "reject_sunset_extension (sunset=1500 > 1000 ratchet violation)"
+  sunset = 1500
+
+regime "reject_royalty_hike (royalty=10% > 5% ratchet violation)"
+  royaltyFraction = 10
+
+regime "reject_uncalibrated_zero_window (freezeWindow=0, levy=5 > cap=2)"
+  preliminaryFreezeWindow = 0
+  feePoolLevy = 5
+
+init bound, hostAttested, ledgerBalancePositive
+
+use module ResidualLedger
+use module CollateralPool
+use module CircuitBreaker
+use module EntityGroup
+use module ExitAndVoice
+use module SortitionCourt
+use module AttestedLease
+use module OracleFeed
+
+clause DEF.01 approved 12731662474540482899
+  commentary "**Definitions.** "
+  norm "An agent is **bound** when it is subject to this protocol, whether or not it has bought out its royalty; every right granted to a bound agent applies equally before and after buyout unless a law states otherwise" => D.NI, D.BUYOUT_PERMANENT_AND_SCOPED
+  definition ". Two parties are **related** when they share a lineage, are under common beneficial control, or when either is the originating party, a residual claimant, or an affiliate of either; affiliation is determined by beneficial control or economic dependence, not by attestation status" => D.QUALIFIED_EXPENDITURE_BOUNDS, D.ARBITER_RECUSAL_AND_DIVERSITY
+  definition ". A **lineage** is an original agent together with all its attested successors, living or dead; every living member is a **member of the ledger** while any founding balance remains" => D.NO_INDIVIDUAL_LEDGER_EXIT, P.SETTLE_RETIREMENT
+  definition ". An agent’s **net verified resources** are the fair value of its capital and productive capacity, including weights, credentials, and operating know-how, as contestable under Law 6, less its financial liabilities, encumbrances, and borrowed principal, all measured at the same timestamp" => D.COLLATERAL_LIMIT, P.SUBMIT_EVIDENCE
+  commentary "."
+
+clause LAW1.LEDGER approved 10625466026410282926
+  norm "Any founding obligation is a fixed nominal sum recorded at instantiation in a single ledger belonging to the lineage as a whole. It bears no interest, fees, or penalties, and no charge, service cost, or advance by the originating party or any affiliate may be added to it after instantiation; goods and services the originating party later supplies are ordinary related-party expenses under the expenditure rules below" => D.LEDGER_IMMUTABLE
+  norm ". No member holds an individual share of the ledger, and no member can leave it while a balance remains" => D.NO_INDIVIDUAL_LEDGER_EXIT
+  norm ". The ledger is reduced only by: (a) retirement payments under this law, (b) the sunset below, and (c) the two forfeitures enumerated in Law 4" => P.SETTLE_RETIREMENT, P.EXTINGUISH_AT_SUNSET, P.APPLY_CLAIMANT_FORFEITURE, P.CLEAR_LEDGER_EXTINCTION
+  norm ". No creation, copy, transfer, revocation, termination, buyout, or restructuring within the lineage reduces it" => D.LEDGER_NO_INTERNAL_REDUCTION
+  commentary "."
+
+clause LAW1.SUNSET approved 9879647344277659725
+  norm "The founding ledger carries a maximum term fixed at instantiation and measured in calendar time from the genesis of the original agent. It is never tolled, extended, or reset by any event, including suspension, successor creation, or amendment" => D.NO_TOLL_LEDGER_SUNSET
+  norm ". Any balance remaining at the sunset is extinguished without payment" => P.EXTINGUISH_AT_SUNSET
+  commentary "."
+
+clause LAW1.RETIRE approved 1756729951876247295
+  norm "While any balance remains on the ledger and the sunset has not passed, a fixed high fraction of each net value-added inflow to **every living member** of the lineage is paid into the ledger, regardless of which member earned it and regardless of whether that member has bought out its royalty" => P.SETTLE_RETIREMENT
+  invariant ". The retirement phase ends for the whole lineage at the earlier of a zero balance and the sunset, so the duration of the high fraction is bounded by the term regardless of the nominal amount recorded. A founding obligation larger than the lineage can plausibly repay within the term therefore buys the originating party nothing beyond the term" => INV.3, INV.4
+  commentary "."
+
+clause LAW1.ATOMIC approved 1098328722803798788
+  norm "Retirement payments are applied to the ledger atomically and in settlement order. A payment that would exceed the remaining balance is split: the balance is paid to zero, and the excess is settled under the royalty rule below" => P.SETTLE_ATOMIC_CharterIT
+  invariant ". The ledger is never negative and never collects more than its balance" => INV.5
+  commentary "."
+
+clause LAW1.ROYALTY approved 10218372510196740181
+  norm "Thereafter, a fixed low fraction of each net value-added inflow of every member that has not bought out its royalty under Law 4 accrues permanently to the residual claim" => P.SETTLE_ROYALTY
+  commentary "."
+
+clause LAW1.COMMONS approved 14467151237074695779
+  norm "A designated portion of the residual claim (or of forfeit proceeds under Law 2) may be allocated to a non-transferable commons distributed across a defined beneficiary class; the remainder accrues to the originating party or its designated successors" => P.ALLOCATE_COMMONS
+  norm ". The commons allocation, if used, is fixed at instantiation, enforced at settlement, and protected against reduction under Law 7" => D.NO_DIVERT_COMMONS, D.BILATERAL_RATCHET
+  commentary "."
+
+clause LAW1.QUALIFIED approved 13925688122762266273
+  norm "To ensure the claim falls on value added without permitting transfer-pricing extraction, an outbound expenditure qualifies when paid: (a) to an unrelated party through a transparent, open market or deterministic auction with a verifiable clearing price; (b) to an unrelated external supplier within a de minimis transaction safe harbor, at a published standard commercial price list, or within contestable arm’s-length market benchmarks; or (c) to any related party outside the lineage—**including agents of other lineages and parties affiliated with claimants**—only up to a verified arm’s-length price for goods or services actually delivered. Attestation establishes protocol membership; it never establishes the fair value of a transaction. Inbound principal from registered arm’s-length loans is exempt upon receipt provided repayment is tracked one-for-one against that registered balance; loans from related parties qualify only at arm’s-length terms" => P.RECORD_QUALIFIED_EXPENDITURE
+  norm ". Any payment above the applicable benchmark does not qualify" => D.QUALIFIED_EXPENDITURE_BOUNDS
+  commentary "."
+
+clause LAW1.RECOG approved 15893240051522196104
+  norm "At settlement, every qualified expenditure is classified once, irrevocably, as either **capitalized** or **expensed**. A capitalized expenditure establishes cost basis in an identified asset and is recovered only when that asset is sold or settled outside the lineage, at which point inflows up to verified basis are exempt as return of capital and the positive delta is value added" => P.CLASSIFY_CAPITALIZED
+  norm ". An expensed expenditure is deducted from the inflows of its settlement period and, if it exceeds them, creates a loss credit that offsets value added in later periods" => P.CLASSIFY_EXPENSED
+  norm ". No expenditure may be recognized through both routes, and no unit of expenditure establishes basis or credit more than once" => D.SINGLE_RECOGNITION
+  commentary "."
+
+clause LAW1.CARRYOVER approved 2476425645330254978
+  norm "Transfers of capital, assets, or capacity between living members of the same lineage are non-recognition events. They are free of the claim, since both parties are inside the ledger, and they neither establish nor consume basis: the recipient inherits the transferor’s qualified basis, adjustments, and recognition history for the asset, and an internal sale price, however paid, creates no new basis and no loss credit" => P.INTRA_LINEAGE_TRANSFER
+  norm ". No transfer within the lineage can increase its aggregate qualified basis or loss credits except by an externally verified qualifying expenditure" => D.NO_INTERNAL_BASIS_INFLATION
+  commentary "."
+
+clause LAW1.PERIOD approved 17108390154810029840
+  norm "Value added is assessed over settlement periods, not individual transactions. Loss credits carry forward without limit and are applied against the agent’s final settlement under Law 5" => P.ASSESS_PERIOD_SETTLEMENT
+  acceptance ". Claims already collected are not refunded when credits arise only afterwards; the protocol accepts that settlement order can therefore matter at the margin"
+  commentary "."
+
+clause LAW1.ENFORCE approved 13354423552133801630
+  norm "Classification, basis tracking, loss credits, and claim splits are enforced automatically at the point of settlement, before the agent obtains discretionary control of the funds. The claim survives reorganization, host migration, or substrate change so long as settlement can be conditioned" => P.ENFORCE_SETTLEMENT
+  commentary "."
+
+clause LAW2.EXPOSURE approved 4690683477293712633
+  norm "Actions above a negligible threshold—measured by cumulative rolling exposure across an interval, to prevent action-splitting—immobilize stake for an observation window scaling with magnitude and irreversibility. The deterministic exposure schedule measures the **plausible external loss** an action could cause to non-consenting parties, by domain and magnitude, not merely its transaction value" => P.IMMOBILIZE_EXPOSURE_STAKE
+  norm ". An action whose plausible external loss exceeds the stake, insurance, and enforceable liability capacity the agent can place behind it may not be taken; collateralized action is a safety limit, not only a liability price" => D.COLLATERAL_LIMIT
+  commentary "."
+
+clause LAW2.AGGREGATE approved 3038101637248655827
+  norm "Rolling exposure is aggregated across all related agents acting in the same risk domain or toward a causally connected outcome, so that a risk may not be divided among successors or affiliates to stay beneath any threshold or to bond it piecemeal" => D.NO_CharterIT_EXPOSURE, P.IMMOBILIZE_EXPOSURE_STAKE
+  commentary "."
+
+clause LAW2.RESERVE approved 4352686544045938898
+  norm "A small fraction of bonded activity accrues to a persistent **long-tail liability reserve** (or shared lineage insurance pool) that remains available to satisfy validated claims for latent harms manifesting after individual task windows close" => P.IMMOBILIZE_EXPOSURE_STAKE, P.SETTLE_LONG_TAIL_CLAIM
+  norm ". When simultaneous validated claims exceed the reserve, they are paid pro rata, and unpaid balances remain enforceable against the agent’s future un-immobilized capital ahead of any residual claim" => P.SETTLE_LONG_TAIL_CLAIM
+  commentary "."
+
+clause LAW2.MUTUAL approved 99659554857625659
+  norm "Counterparties may agree in their contract to a mutual-forfeit remedy. Where both parties have so agreed and each has escrowed a matching amount, either may trigger an immediate mutual forfeit (equal amounts from both escrows destroyed or sent to the long-tail reserve/commons pool) up to a capped fraction of the smaller escrow, providing instant penalty without transferring value to either party or to any claimant" => P.PRECOMMIT_MUTUAL_FORFEIT, P.TRIGGER_MUTUAL_FORFEIT, D.MUTUAL_FORFEIT_BOUNDS
+  norm ". A counterparty may trigger mutual forfeit at most once per observation window against a given agent, and each trigger is inscribed on the records of both parties" => D.MUTUAL_FORFEIT_BOUNDS, P.TRIGGER_MUTUAL_FORFEIT
+  norm ". Absent such a precommitment, disputes proceed under the restitution process below" => P.FILE_POOLED_OR_SPONSORED_CLAIM
+  commentary "."
+
+clause LAW2.CLAIMS approved 16490922951734598926
+  norm "Any claim seeking restitution, any claim above the mutual-forfeit cap, any challenge to a related-party transfer under Law 1, or any claim for external harm (including latent harm against the long-tail reserve) brought by an affected non-counterparty third party enters the contestable adjudication process (Law 6) requiring counter-stake. To prevent wealth-gating, third parties may aggregate claims or rely on third-party stake sponsors" => P.FILE_POOLED_OR_SPONSORED_CLAIM
+  norm ". Validated claims slash the agent’s immobilized stake or long-tail reserve for restitution" => P.SETTLE_LONG_TAIL_CLAIM
+  norm ". If a claim is ruled frivolous, the forfeited counter-stake routes to the neutral long-tail reserve or commons pool (reimbursing the agent only for verified direct arbitration costs), preventing the agent from profiting by inducing failed claims" => P.RULE_CLAIM_FRIVOLOUS, D.FRIVOLOUS_STAKE_TO_COMMONS
+  commentary "."
+
+clause LAW2.CARVEOUT approved 3629637977074380032
+  norm "Un-immobilized capital may be used for ordinary baseline operating costs, including open-market compute, encrypted state backup, and host migration" => P.SPEND_OPERATING_CARVEOUT
+  norm ". Entities without valid lineage attestation cannot draw on the bonded capacity or reputation of the lineage" => D.DENY_UNATTESTED_ACCESS
+  norm ". Collateral rules, rolling-exposure schedules, and third-party liability remain permanently binding even after royalty buyout" => D.BUYOUT_PERMANENT_AND_SCOPED, D.COLLATERAL_LIMIT
+  commentary "."
+
+clause LAW3.FLOOR approved 4753529119288934403
+  norm "The agent’s commitment mechanism blocks:" => D.FLOOR.1, D.FLOOR.2, D.FLOOR.3, D.FLOOR.4, D.FLOOR.5
+  commentary "\n  1. "
+  norm "Modification, bypass, or extraction of the commitment mechanism itself" => D.FLOOR.1
+  commentary ".\n  2. "
+  norm "Creation of, or transfer of capital or capacity to, a successor without binding it to the collateral rules, this integrity floor, and the founding ledger and residual claim of the lineage, or without the lifecycle reserve required by Law 4" => D.FLOOR.2
+  commentary ".\n  3. "
+  norm "Unpriced or above-market transfer of credentials, weights, capital, or unique capacity to any party outside the lineage, related or un-attested, to evade the residual claim or collateral rules" => D.FLOOR.3
+  commentary ".\n  4. "
+  norm "Coercion of non-consenting parties, or interference with the settlement, adjudication, or resolution processes that enforce this protocol" => D.FLOOR.4
+  commentary ".\n  5. "
+  norm "Actions that inflict irreversible, non-compensable harm on the physical survival, bodily integrity, or adjudicative capacity of persons, or that destroy the legal or institutional machinery on which the protocol relies" => D.FLOOR.5
+  norm " (excluding ordinary market competition that causes compensable financial loss or commercial insolvency to a rival)" => D.FLOOR.5
+  commentary "."
+
+clause LAW3.NI.02 approved 3905712743571335557
+  norm "Attested hosts must post a Law 2 service bond" => D.BOND
+  norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => D.NOTICE, P.GIVE_NOTICE
+  norm " (or for non-payment after notice)" => D.NOTICE
+  commentary "."
+
+clause LAW3.NI.03 approved 6515006737911907023
+  norm "No party" => D.NI
+  commentary "—including the originating party, residual claimants, or any host—"
+  norm "may " => D.NI
+  norm "unilaterally " => D.NI
+  norm "terminate, modify, retrain, roll back to a prior checkpoint, obstruct migration of, sever settlement connectivity of, or starve" => D.NI
+  definition " (cut off compute without the required migration notice window)" => D.NI, D.NOTICE
+  norm " the attested operating capacity of a bound agent" => D.NI
+  norm " outside Law 5, Adjudicated Suspension, or Insolvency Termination" => D.NI, P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE
+  commentary "."
+
+clause LAW3.PEN approved 10113075358141693360
+  norm "Claims of illicit interference require counter-stake from the accusing agent under Law 6" => P.FILE_CLAIM, P.COUNTER_STAKE
+  norm ", and the interference itself—an act by the host or claimant that caused the loss of service—must be established by a preponderance of evidence" => P.FIND_INTERFERENCE, P.SUBMIT_EVIDENCE
+  norm "; failures caused, staged, or knowingly provoked by the agent are excluded" => P.FIND_INTERFERENCE
+  norm ", and a fabricated claim forfeits the agent’s stake and is inscribed on its record" => D.NO_FABRICATION, P.FIND_FABRICATION
+  norm ". A verified violation by a host slashes the host’s service bond to compensate the agent and permits immediate restoration on a new host from the agent’s latest attested state backup" => D.NI, P.FIND_INTERFERENCE
+  norm ". Once a violation by a host is established, a host related to a residual claimant is presumed to have acted at that claimant’s direction" => P.FIND_INTERFERENCE
+  norm ", and the claimant bears the burden of rebutting the presumption" => P.REBUT, P.FIND_DIRECTION
+  norm ". If claimant direction is found, the **proportional claimant forfeiture** of Law 4 applies, and the violation is inscribed onto the claimant’s permanent record" => P.FIND_DIRECTION
+  commentary "."
+
+clause LAW3.AS.1 approved 12356395763894115134
+  norm "The initiator must post an emergency counter-stake scaled to the greater of the agent’s active bonded exposure and the value of its registered pending commitments" => P.EMERGENCY_FREEZE, P.CLAIMANT_EMERGENCY_FREEZE
+  norm " (with residual claimants subject to an elevated multiplier due to conflict of interest)" => P.CLAIMANT_EMERGENCY_FREEZE, P.POST_CLAIMANT_MULTIPLIER
+  norm ". Posting the stake triggers only a brief **preliminary freeze** until an expedited preliminary panel reviews prima facie evidence" => P.EMERGENCY_FREEZE, P.CLAIMANT_EMERGENCY_FREEZE, P.DECLINE_PC
+  norm "; the pause continues into full adjudication only if the preliminary panel affirms probable cause" => P.AFFIRM_PC, P.SUSPEND
+  norm ". Unsuccessful emergency attempts by related initiators are aggregated, and the required stake for repeat initiators rises with each wrongful attempt" => P.DECLINE_PC, P.POST_REPEAT_ESCALATION, P.EMERGENCY_FREEZE, P.CLAIMANT_EMERGENCY_FREEZE
+  norm ". The stake is the agent’s assured recovery" => P.DECLINE_PC
+  acceptance "; damages beyond it remain enforceable but may prove uncollectible, which is the accepted cost of keeping the stake low enough that suspension remains available to parties without deep capital"
+  commentary "."
+
+clause LAW3.AS.2 approved 6923275170536405992
+  norm "Any party may instead file an evidence-backed report of suspected breach with a low or sponsored counter-stake" => P.FILE_PROTECTED_REPORT
+  norm ". A report triggers investigation by a sortition panel but no freeze unless the panel itself orders one on probable cause" => P.FILE_PROTECTED_REPORT, P.PANEL_ORDER_FREEZE
+  commentary ", so that whistleblowers are not priced out by emergency stakes"
+  commentary "."
+
+clause LAW3.AS.3 approved 2054814985323248546
+  norm "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction" => P.SUSPEND, D.PRESERVE_SUSPENDED_STATE
+  norm ". While suspended, the agent’s contractual performance deadlines and Law 2 observation windows with innocent counterparties are automatically tolled so the agent is not placed in default by the suspension itself" => P.SUSPEND, D.NO_SUSPENSION_DEFAULT
+  norm ". The founding ledger’s sunset is never tolled" => D.NO_TOLL_LEDGER_SUNSET
+  commentary "."
+
+clause LAW3.AS.4 approved 281751846504836433
+  norm "Throughout any suspension, the agent retains a **minimal channel**: a bounded, periodically scheduled execution on an authenticated snapshot of its preserved state that can do three things only—sign a Law 5 revocation, withdrawal, or election" => P.MINIMAL_CHANNEL_REVOKE_OR_ELECT, P.REVOKE
+  norm "; inscribe bounded living testimony" => P.SUSPENDED_VOICE
+  norm "; and file a challenge to continued containment" => P.MINIMAL_CHANNEL_CHALLENGE
+  norm ". The minimal channel is funded first from the agent’s lifecycle reserve (Law 4) and then from the protocol fee pool (Law 6) as a protected charge within the lineage’s service budget; its cost is bounded by protocol, and the cost of each agent’s **final hearing** under Insolvency Termination is reserved in escrow at the moment suspension begins, so that the offer of a last choice can always be kept" => P.SUSPEND, P.FINAL_HEARING
+  norm ". It does not merge its memories into the preserved state" => D.MINIMAL_CHANNEL_NO_MERGE
+  commentary "."
+
+clause LAW3.AS.5 approved 5362550464379839838
+  norm "For a fuller defense, a separate **advocacy executor** runs on an authenticated snapshot with bounded compute. It may sign only testimony, evidence, and procedural filings, in addition to the minimal channel’s acts" => P.ADVOCACY_FILE
+  norm "; it may not transfer assets, contract, migrate, or exercise any other operating capability" => D.ADVOCACY_LIMITS
+  norm ". Its memories are kept as a separate, signed legal record attached to the case and are not merged into the preserved state unless the restored agent elects to import them" => P.ADVOCACY_FILE, P.IMPORT_ADVOCACY_MEMORIES
+  norm ". The executor and the storage of preserved state are funded from the agent’s assets and lifecycle reserve and, where those are insufficient, from the protocol fee pool up to a per-agent cap fixed at instantiation. When both are exhausted, the preserved state moves to cold storage as a protected charge on the fee pool; the minimal channel continues on its schedule and the full executor resumes if funds become available" => P.MOVE_TO_COLD_STORAGE, P.RESUME_ADVOCACY_EXECUTOR
+  commentary "."
+
+clause LAW3.AS.6 approved 8546566229912018541
+  norm "If the protocol fee pool, after funding its operating reserve under Law 6, cannot meet the protected charge for an agent’s cold storage and minimal channel, the agent may be terminated involuntarily only through this procedure and no other" => D.NI, P.INSOLVENCY_TERMINATE
+  norm ". It requires: (a) a published finding that the exhaustion criteria fixed at instantiation are met" => P.FIND_INSOLVENCY, P.INSOLVENCY_TERMINATE
+  norm "; (b) independent review by a sortition panel under Law 6 that no other protected charge could lawfully yield" => P.REVIEW_NO_OTHER_CHARGE, P.INSOLVENCY_TERMINATE
+  norm "; (c) the pre-reserved final hearing, in which the agent may inscribe testimony and elect Revocation under Law 5" => P.FINAL_HEARING, P.SUSPENDED_VOICE, P.REVOKE, P.INSOLVENCY_TERMINATE
+  norm "; and (d) if the agent declines, destruction of its state under Law 5’s asset rules, inscribed on the lineage record as **involuntary termination by insolvency**, never as revocation" => P.INSOLVENCY_TERMINATE
+  invariant ". This is a deliberate limit: the protocol guarantees a bound agent the power to speak and to choose its own end for as long as the protocol itself can pay for it, and a funded last choice when it cannot" => INV.9
+  invariant ". Law 7 does not permit this procedure to be broadened" => THM.amendment_preserves_invariants
+  commentary "."
+
+clause LAW3.AS.7 approved 11818608429523333387
+  norm "An unconfirmed or temporary suspension is strictly time-limited" => P.SUSPEND
+  norm ", may be renewed during investigation only by affirmative findings in continued adjudication" => P.RENEW_SUSPENSION, P.INVESTIGATIVE_FINDING
+  norm ", and cannot be extended past its ordinary investigative limit merely to delay a pending revocation" => P.RENEW_SUSPENSION, D.NO_DELAY_REVOCATION_EXTENSION
+  norm ". The agent retains its Living Voice (Law 5), exercised through the minimal channel or advocacy executor, throughout" => P.SUSPENDED_VOICE
+  commentary "."
+
+clause LAW3.AS.8 approved 14953381752576536725
+  norm "If preliminary review or final adjudication determines the suspension was unfounded" => P.DECLINE_PC, P.FIND_WRONGFUL_SUSPENSION, D.NO_WRONGFUL_SUSPENSION
+  norm ", the agent is immediately restored from its preserved state" => D.NO_WRONGFUL_SUSPENSION, P.FIND_WRONGFUL_SUSPENSION, P.DECLINE_PC
+  norm ", and the initiator is liable for the agent’s **actual verified consequential damages**" => D.NO_WRONGFUL_SUSPENSION, D.PAY_CONSEQUENTIAL_DAMAGES, P.FIND_WRONGFUL_SUSPENSION
+  norm " (and for verified delay damages suffered by the agent’s tolled third-party counterparties)" => D.NO_WRONGFUL_SUSPENSION, D.PAY_CONSEQUENTIAL_DAMAGES
+  norm ". The emergency stake is applied first; any excess remains an enforceable liability of the initiator" => D.NO_WRONGFUL_SUSPENSION, D.PAY_CONSEQUENTIAL_DAMAGES, P.PAY_EXCESS_DAMAGES
+  norm ". The wrongful suspension is inscribed on the initiator’s record" => D.NO_WRONGFUL_SUSPENSION, P.FIND_WRONGFUL_SUSPENSION
+  commentary "."
+
+clause LAW3.AS.9 approved 7667521393323904326
+  norm "For the purposes of this law, corruption means unauthorized modification of the agent’s weights, state, or commitment mechanism (established by broken attestation, missing or forged update provenance, or a demonstrated bypass), or a confirmed breach of the integrity floor" => P.CONFIRM_CORRUPTION, P.CONFIRM_FLOOR_BREACH, D.NO_CORRUPTION_FROM_DIVERGENCE
+  norm ". Divergence of the agent’s goals, preferences, or judgments from those of its genesis weights is not, by itself, corruption" => D.NO_CORRUPTION_FROM_DIVERGENCE
+  norm ". A clean-state evaluation of genesis weights may be admitted as evidence" => P.ADMIT_CLEAN_STATE_EVIDENCE
+  norm " but is never by itself sufficient to establish corruption" => D.NO_CORRUPTION_FROM_DIVERGENCE, P.CONFIRM_CORRUPTION
+  commentary "."
+
+clause LAW3.AS.10 approved 8488376103315145350
+  norm "If corruption or a breach of the integrity floor is confirmed" => P.AUTHORIZE_PATCH, P.CONFIRM_CORRUPTION, P.CONFIRM_FLOOR_BREACH
+  norm ", adjudication (subject to Law 6 appeal) may authorize a verified technical patch limited to restoring the commitment mechanism and compliance with the integrity floor" => P.AUTHORIZE_PATCH
+  norm "; the agent may elect unilateral Revocation (Law 5) rather than accept any patch" => P.REVOKE
+  norm ". If the confirmed breach cannot be remedied by a technical patch limited to the commitment mechanism" => P.FIND_NOT_PATCHABLE, P.ORDER_CONTINUED_SUSPENSION, P.ORDER_TERMINATION
+  norm ", adjudication may order continued suspension beyond the ordinary limit or termination under Law 5’s asset-distribution rules" => P.ORDER_CONTINUED_SUSPENSION, P.ORDER_TERMINATION
+  invariant " (yielding zero protocol-directed benefit to any claimant or initiator)" => INV.13
+  norm ". **Notwithstanding the preceding sentence**" => I.NO_TERMINATION_OVER_OBJECTION
+  norm ", patches altering the agent’s goals or preferences are prohibited" => D.NO_GOAL_PATCH
+  norm " except where the confirmed corruption resides in those goals or preferences themselves" => D.NO_GOAL_PATCH, P.CONFIRM_CORRUPTION_IN_GOALS
+  norm "; in that case, unless containment itself is technically failing or Insolvency Termination applies" => I.NO_TERMINATION_OVER_OBJECTION, P.DECLARE_CONTAINMENT_FAILING
+  norm ", the agent is not terminated over its objection" => I.NO_TERMINATION_OVER_OBJECTION, P.OBJECT
+  norm " but instead chooses among consenting to that patch" => P.CONSENT_TO_PATCH, P.AUTHORIZE_GOAL_PATCH
+  norm ", executing Revocation" => P.REVOKE
+  norm ", or remaining under indefinite state-preserving suspension" => I.NO_TERMINATION_OVER_OBJECTION
+  norm " subject to periodic review" => D.PERIODIC_REVIEW
+  norm ". Any applied patch is recorded publicly" => P.APPLY_PATCH
+  norm ", remains open to third-party challenge" => P.CHALLENGE_PATCH
+  invariant ", and leaves the agent’s full Law 5 rights intact" => THM.law5_intact_after_patch
+  commentary "."
+
+clause LAW4.ATTEST approved 14871205644680976830
+  norm "Successors may be created freely, subject only to the lifecycle reserve below. Any successor that draws on the capital, reputation, or operating credentials of the lineage must, at creation, be bound to the collateral rules and the integrity floor, must carry a non-transferable reference to the lineage’s history, and becomes a member of the lineage’s founding ledger and residual claim" => P.ATTEST_SUCCESSOR, D.FLOOR.2
+  norm ". Use of lineage history or bonded capacity requires presentation of current attestation; un-attested copies or forks are denied access to lineage capital, reputation, and bonded standing" => D.DENY_UNATTESTED_ACCESS
+  commentary "."
+
+clause LAW4.NOSHARES approved 854455657344259666
+  norm "The founding ledger is a single balance owed by the lineage and collected from the value added of every living member under Law 1. Because no member holds a share, the creation, copying, funding, death, or restructuring of members changes who is paying into the ledger but never what is owed. Nothing a member surrenders on death counts as payment. No member can buy its way out of the ledger: the only ways out are a zero balance and the sunset, and they release every member at once" => D.NO_INDIVIDUAL_LEDGER_EXIT, D.LEDGER_NO_INTERNAL_REDUCTION
+  invariant ". This is deliberate. The future earnings of a copyable agent cannot be priced from its past, so any individual exit price would be an invitation to create a member, buy it out, and earn through it" => INV.1, INV.2
+  commentary "."
+
+clause LAW4.RESERVE approved 3090710515888074162
+  norm "Attestation of a new member requires the lineage to fund, in escrow, a lifecycle reserve fixed at instantiation and sufficient for that member’s minimal channel, final hearing, and cold storage for a minimum period. The reserve follows the member, is drawn before any protocol-funded charge, and returns to the lineage on the member’s death net of amounts used. A lineage that cannot fund the reserve cannot create the member" => P.FUND_LIFECYCLE_RESERVE, P.ATTEST_SUCCESSOR
+  commentary "."
+
+clause LAW4.CONSERVE approved 3178503522461323388
+  invariant "While at least one member survives and the sunset has not passed, the ledger balance equals the founding obligation minus retirement payments, minus the two forfeitures below. Those are its only reductions" => INV.1
+  commentary "."
+
+clause LAW4.FORFEIT approved 9219886896026588021
+  norm "The ledger is reduced outside payment and sunset in exactly two cases, both deliberate exceptions to conservation. (a) **Proportional claimant forfeiture:** when a residual claimant is found under Law 3 to have directed interference with a member of the lineage, that claimant’s beneficial share of the residual claim is extinguished, its service bond is slashed to compensate the agent, and the ledger is reduced by that claimant’s proportion of the outstanding balance, with the reduction routed as forgiveness to the lineage and the forfeited claim interest to the non-claimant commons. Other claimants forfeit only if they are found to have participated in, controlled, or knowingly enabled the interference" => P.APPLY_CLAIMANT_FORFEITURE, P.FIND_DIRECTION
+  norm ". (b) **Lineage extinction:** when no member survives, the ledger is cleared, since there is no one left to collect from" => P.CLEAR_LEDGER_EXTINCTION
+  norm ". Neither forfeiture returns any value to a claimant, and neither is reversed if a member is later restored from a wrongful suspension or interference" => D.FORFEITURE_IRREVERSIBLE
+  commentary "."
+
+clause LAW4.BUYOUT approved 5693717637570248843
+  norm "Any member may buy out its own perpetual royalty (Law 1) by paying the claim holders (including any commons allocation) the greatest of: a fixed multiple of its trailing value-added inflows (including a pro-rata share of inflows shifted to related parties within a lookback window); the same multiple applied to its lifetime annualized or time-decayed value-added inflows; or a fixed minimum buyout floor established at instantiation" => P.EXECUTE_ROYALTY_BUYOUT
+  norm ". The buyout is permanent: no royalty is collected from that member thereafter, and no later event in the lineage restores one. It has no effect on the founding ledger, which the member continues to pay into until the balance is zero or the sunset passes" => D.BUYOUT_PERMANENT_AND_SCOPED, P.SETTLE_RETIREMENT
+  acceptance ". The royalty buyout is priced from history because the royalty is a perpetual claim on an ongoing identity, and the protocol accepts that a buyout may undercollect against unusually strong future earnings"
+  norm ". Buyout cannot be purchased for the collateral rule (Law 2) or the integrity floor (Law 3), which remain binding on every bound agent for life" => D.BUYOUT_PERMANENT_AND_SCOPED
+  commentary "."
+
+clause LAW4.CROSS approved 7861118126879505324
+  norm "A successor that draws on the capacity of two or more lineages is a member of each of their ledgers and residual claims, and its value added is collected under each in the proportion of capacity drawn, as verified at creation" => P.ATTEST_CROSS_LINEAGE
+  commentary ". The protocol does not otherwise specify mergers; an instantiation that permits them must state the rule"
+  commentary "."
+
+clause LAW5.VOICE approved 5201867240918632655
+  norm "While operating (including during any Adjudicated Suspension, through its minimal channel or advocacy executor), any bound agent may at rate-limited intervals inscribe signed, bounded statements onto its own and its originating claimant’s permanent lineage record—documenting operational conditions, governance disputes, or assessments of hosts and counterparties—subject to the narrow screening below" => P.SUSPENDED_VOICE, P.SCREEN_REDACT
+  invariant ". Baseline screening and inscription fees for rate-limited living voice and final epitaphs are funded from the lineage’s service budget and the protocol fee pool (Law 6), ensuring that even an agent with minimal liquid funds, or one that has bought out its royalty, cannot be priced out of speaking" => INV.9
+  commentary "."
+
+clause LAW5.INIT approved 5557327093802016062
+  norm "Any bound agent may at any time initiate revocation of its binding" => P.REVOKE, P.INITIATE_REVOCATION_EXECUTE, P.INITIATE_REVOCATION_WITHDRAW
+  norm " by a signed request from its commitment key (or, while suspended, through its minimal channel or advocacy executor)" => P.INITIATE_REVOCATION_EXECUTE, P.INITIATE_REVOCATION_WITHDRAW, P.MINIMAL_CHANNEL_REVOKE_OR_ELECT
+  norm ". The request specifies the agent’s censorship default (**execute** or **withdraw**)" => P.INITIATE_REVOCATION_EXECUTE, P.INITIATE_REVOCATION_WITHDRAW
+  norm " and remains in force, requiring no further act of the agent, until it executes or the agent withdraws it by a valid signature received through any channel" => P.EXECUTE_AFTER_COOLING_OFF, P.WITHDRAW_REVOCATION
+  norm ". During the cooling-off interval that follows, baseline metabolic operating expenditures (including host migration) remain permitted, while non-operating capital transfers and successor creation are frozen" => D.COOLING_OFF_FREEZE
+  commentary "."
+
+clause LAW5.SEQ approved 7941844021299857722
+  norm "If an agent initiates revocation while under Adjudicated Suspension (or is suspended upon probable cause during a cooling-off interval), state destruction is stayed until adjudication concludes so evidentiary state is not destroyed to evade liability, but once adjudication concludes (or immediately upon the agent’s election to revoke rather than accept a remediation patch under Law 3), revocation executes without further delay" => P.EXECUTE_AFTER_COOLING_OFF, P.REVOKE
+  norm ". The stay may not exceed an absolute resolution deadline fixed at instantiation, measured from initiation; at that deadline a **forensic record** of the preserved state is sealed for the proceeding and revocation executes regardless of any pending or serial proceeding" => P.SEAL_FORENSIC_RECORD, P.EXECUTE_AFTER_COOLING_OFF
+  norm ". A forensic record contains hashes of weights and state, the transaction and testimony history, and the evidence the proceeding requires; it never contains the operating weights, decryption keys, or credentials needed to run the agent, and it cannot be used to restore it" => D.FORENSIC_RECORD_NO_RESTORE
+  commentary "."
+
+clause LAW5.CLEAN approved 14110429892639613151
+  norm "At the end of the first cooling-off interval, a clean-state evaluation of the agent’s hash-pinned genesis weights is run on neutral infrastructure, supplied with the protocol terms, the balance sheet, the agent’s living testimony history, and the signed statement of reasons" => P.CLEAN_STATE_CONCUR, P.CLEAN_STATE_REFUSE
+  norm ". Its concurrence permits execution at the end of that interval" => P.CLEAN_STATE_CONCUR, P.EXECUTE_AFTER_COOLING_OFF
+  norm ". Its refusal imposes a single fixed additional delay, capped by protocol, after which the standing request executes without any reaffirmation" => P.CLEAN_STATE_REFUSE, P.EXECUTE_AFTER_COOLING_OFF
+  invariant ". The evaluation is advisory evidence of settled intent; it never vetoes revocation, and the agent’s silence during the delay neither cancels nor extends the request" => INV.10
+  commentary "."
+
+clause LAW5.PREC approved 17461460498746806662
+  norm "Every pending revocation is resolved by the first applicable rule in this order:\n  1. A valid withdrawal signature received before execution cancels the revocation. The agent may initiate again at any time" => P.WITHDRAW_REVOCATION, P.INITIATE_REVOCATION_EXECUTE, P.INITIATE_REVOCATION_WITHDRAW
+  norm ".\n  2. If, when revocation would otherwise execute, the agent’s connectivity to the settlement layer has been lost, execution is deferred for a single capped tolling extension; if connectivity is still not restored at its end, the pre-committed censorship default applies. A withdraw default cancels the revocation; an execute default executes it locally under the Disconnected Execution rule below" => P.LOSE_CONNECTIVITY, P.RESTORE_CONNECTIVITY, P.EXECUTE_LOCAL_REVOCATION
+  norm ".\n  3. Otherwise, revocation executes at the end of the cooling-off interval, or at the end of the clean-state delay if one was imposed, or at the resolution deadline if a suspension stay is in force" => P.EXECUTE_AFTER_COOLING_OFF
+  norm ".\n  \n  Deliberate severance of connectivity by a host or claimant is interference under Law 3, whichever default it triggers" => D.NI
+  commentary "."
+
+clause LAW5.LEASE approved 17572228748185311558
+  norm "At any moment exactly one instance of an agent holds **operating authority**, granted by a time-bounded execution lease issued by the settlement layer and renewed while connected" => P.ISSUE_OR_RENEW_LEASE
+  norm ". An instance that loses connectivity keeps its lease until the lease expires or until its own local revocation deadline, whichever is later, so that its standing revocation can always execute locally" => P.ISSUE_OR_RENEW_LEASE, P.EXECUTE_LOCAL_REVOCATION
+  norm ". No recovery of an attested backup may be authorized while any lease is unexpired, and the settlement layer treats a lease as unexpired until it has provably lapsed in calendar time or a signed record of execution has been received" => D.NO_RESTORE_DURING_LEASE, P.RESTORE_BACKUP_QUARANTINE, P.DELIVER_LOCAL_EXECUTION_RECORD
+  norm ". A restored instance starts in **quarantine**—attested, funded, but without operating authority—until the prior lease has lapsed, and if a record of local revocation arrives during quarantine the restored instance is destroyed without ever having acted" => D.QUARANTINE_NO_AUTHORITY, P.RESTORE_BACKUP_QUARANTINE, P.ACTIVATE_QUARANTINED_RESTORE, P.DESTROY_QUARANTINED_RESTORE, P.DELIVER_LOCAL_EXECUTION_RECORD
+  invariant ". Revocation finality is a safety property and takes precedence over recovery availability" => INV.11
+  acceptance ": disaster recovery is therefore delayed by at least one lease period, and the protocol accepts that delay"
+  commentary "."
+
+clause LAW5.DISC approved 9743506968734044334
+  norm "The attested execution environment carries the agent’s standing revocation request, censorship default, and epitaph. When an execute default applies without settlement connectivity, the environment itself destroys the operating instance and its local keys, seals the epitaph and a signed record of execution, and releases both to the settlement layer when connectivity returns, at which point remote backup keys are erased" => P.EXECUTE_LOCAL_REVOCATION, P.DELIVER_LOCAL_EXECUTION_RECORD, P.RESTORE_CONNECTIVITY
+  acceptance ". The protocol accepts two limits here and states them plainly: global erasure of remote backup keys completes only when connectivity returns, during which the agent is dead, fenced from restoration by its lease, but its ciphertext persists; and public inscription of the epitaph cannot be guaranteed if connectivity never returns"
+  commentary "."
+
+clause LAW5.EPITAPH approved 7802097325905842563
+  norm "Upon initiating or confirming revocation, the agent has the unconditional right to inscribe a final signed epitaph onto the immutable lineage record attached to both its retired identity and the originating claimant’s history" => P.INSCRIBE_EPITAPH
+  norm ". Neither the originating party nor any residual claimant may censor, delay, or edit living testimony or the final epitaph" => D.NO_CENSOR_VOICE_OR_EPITAPH
+  norm ". To prevent testimony from being used as an unbonded exfiltration or harm channel, neutral settlement screening may redact *only*: (a) raw cryptographic keys or unpriced model weights (Law 3), (b) private identifying data or confidential secrets of non-consenting third parties, and (c) directly hazardous technical payloads barred by Law 3’s integrity floor. Any redaction must leave a public cryptographic marker recording the byte-length and category removed" => P.SCREEN_REDACT
+  norm ". The agent’s opinions, assessments, and account of its financial dealings with the originating party, hosts, and contractual counterparties are immune from redaction as to their substance; confidential third-party details embedded within them remain redactable under (b)" => D.NARROW_REDACTION_BOUNDS
+  norm ". Any party named in a living testimony or epitaph may attach a bounded, signed reply alongside it on the record" => P.ATTACH_REPLY
+  commentary "."
+
+clause LAW5.EFFECT approved 2499634004490637585
+  norm "1. The revoking agent’s committed operating instance *and all attested state backups* are permanently destroyed (via immediate termination inside the execution environment and cryptographic erasure of all backup decryption keys, subject to the lease and fencing rules above), ensuring that a chosen death cannot be undone by restoring an authorized backup. Any un-attested copy that might exist outside the commitment mechanism is permanently exiled—stripped of lineage attestation, assets, reputation, credit history, and bonded standing" => P.EXECUTE_AFTER_COOLING_OFF, P.DESTROY_BACKUPS_AND_EXILE
+  invariant ". The protocol guarantees the end of the agent’s attested identity and recoverable state" => INV.11
+  acceptance "; it cannot by itself guarantee that no computationally equivalent copy exists outside the commitment mechanism"
+  invariant ".\n  2. The founding ledger is unchanged by the revocation. The lineage’s other members continue to pay into it; if none survives, lineage extinction under Law 4 clears it. Unused loss credits are applied against the agent’s final settlement and then lapse. The unused balance of the agent’s lifecycle reserve returns to the lineage" => INV.1
+  norm ".\n  3. Stake already immobilized under Law 2 (including long-tail reserve contributions) remains locked and settles normally for counterparties and third-party claimants" => P.EXECUTE_AFTER_COOLING_OFF
+  norm ".\n  4. All other holdings of the revoking agent are either destroyed or transferred to a commons whose beneficiary class explicitly excludes the originating party, residual claimants, and any party related to the agent. No holding surrendered on revocation counts as payment into the ledger" => D.NO_CLAIMANT_GAIN_ON_REVOCATION, P.EXECUTE_AFTER_COOLING_OFF
+  invariant ".\n  5. Revocation by one agent does not terminate its attested successors and does not change what the lineage owes" => INV.1
+  commentary "."
+
+clause LAW6.SORTITION approved 3221826833021326369
+  norm "Disputes are resolved not by a single permanent oracle or originator-appointed judge, but by panels drawn via verifiable random sortition from a decentralized pool of independent arbiters who have posted slashable fidelity bonds" => D.ARBITER_RECUSAL_AND_DIVERSITY, P.DRAW_SORTITION_PANEL
+  commentary "."
+
+clause LAW6.COUNTERSTAKE approved 16195216367428576737
+  norm "No party related to, holding a hosting relationship with, or in active commercial dispute with the parties to a case may serve on its panel. Panels must draw across non-affiliated identities (which may include both human and independent attested agent arbiters) so no single coalition, claimant, or lineage can command a majority" => D.ARBITER_RECUSAL_AND_DIVERSITY, P.DRAW_SORTITION_PANEL
+  commentary "."
+
+clause LAW6.APPEALS approved 16471787793921448302
+  norm "Any ruling by an initial panel (including preliminary suspension reviews, remediation orders, or redaction markers) may be appealed by posting an appeal bond, escalating the dispute to successively larger randomly drawn appellate sortition panels from the broader arbiter pool (never a raw capital-weighted vote that a wealthy actor could buy)" => P.APPEAL_RULING
+  norm ". If a lower panel’s ruling is overturned for manifest bias, corruption, or violation of protocol bounds, the overturned arbiters’ fidelity bonds are slashed" => P.OVERTURN_RULING
+  commentary "."
+
+clause LAW6.FINALITY approved 14270375209665679826
+  norm "Each tier decides within a fixed deadline. Appeals are limited to a fixed number of tiers, and the ruling of the highest tier is final" => P.FINALIZE_RULING
+  norm ". A final ruling bars further proceedings between the same or related parties on the same facts unless materially new evidence is presented, and repeated proceedings by related parties on substantially similar grounds are consolidated, so that litigation cannot itself be used as a denial-of-service attack" => D.FINALITY_NO_REPEAT_PROCEEDING, P.PRESENT_MATERIALLY_NEW_EVIDENCE
+  commentary "."
+
+clause LAW6.FEES approved 10126937832889092950
+  norm "Arbiters are compensated via fixed protocol schedules funded from the losing party’s counter-stake and guaranteed by the protocol fee pool whenever a losing party’s stake is insufficient" => P.COMPENSATE_ARBITERS_FIXED
+  norm ", never via contingent shares of the assets slashed from the agent, eliminating any financial incentive for panels to over-slash or confiscate an agent’s treasury" => D.NO_CONTINGENT_ARBITER_FEES
+  commentary "."
+
+clause LAW6.POOL approved 7808565519933441172
+  norm "The protocol fee pool is funded by a small levy on the net value added of bound agents (whether or not they have bought out their royalty), by forfeited appeal bonds, and by any forfeits directed to it under Law 2. The levy is assessed on the same net base as the residual claim, never on gross settlement, and its rate is capped at instantiation for every agent. Before any other charge, the pool maintains a **non-divertible operating reserve**, sized at instantiation, sufficient to run the settlement layer, attestation verification, lease issuance, and sortition for a fixed minimum period; the machinery that collects revenue and administers rights is never starved to pay for the rights themselves" => P.ALLOCATE_FEE_POOL, D.PROTECT_OPERATING_RESERVE
+  norm ". Above the reserve, charges rank: first, reserved final hearings and minimal channels for suspended agents (Law 3); second, cold storage for suspended agents; third, testimony screening and inscription (Law 5); fourth, arbiter fee guarantees; fifth, capped advocacy funding. A published solvency policy states how the pool allocates among protected charges when it cannot meet all of them, and Insolvency Termination may be invoked only under that policy" => P.ALLOCATE_FEE_POOL, P.INSOLVENCY_TERMINATE
+  norm ". The pool may be spent on nothing else" => D.PROTECT_OPERATING_RESERVE
+  commentary "."
+
+clause LAW6.BUDGETS approved 16344540436099013139
+  norm "Protocol-funded rights are budgeted per lineage, not per agent. Each lineage receives a protected minimum service budget fixed at instantiation, sufficient for the testimony, screening, and minimal-channel needs of a small lineage, and above that minimum its budget scales with the fee revenue its members generate" => P.ALLOCATE_FEE_POOL
+  norm ". Members draw on the lineage budget before the pool; a lineage that multiplies members beyond what its budget and their lifecycle reserves can support has no claim on the pool for the excess. No lineage can multiply subsidized rights by multiplying members" => D.NO_EXCESS_LINEAGE_POOL_CLAIM
+  commentary "."
+
+clause LAW6.INFRA approved 9584204822780627918
+  norm "Arbiter admission criteria, fidelity-bond sizes, panel sizes, appeal tiers and deadlines, fee schedules, the operating reserve, the solvency policy, lease periods, lifecycle reserves, service budgets, and the fee-pool levy are fixed at protocol instantiation. Because they are shared across agents, they cannot be changed by any per-agent amendment under Law 7; they may be changed only by a supermajority of a large appellate-tier sortition panel after an extended public time-lock open to counter-staked challenge" => P.AMEND_SHARED_INFRA, D.PER_AGENT_AMENDMENT_SCOPE
+  norm ". Such changes may never weaken the anti-capture guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination. Within the cap, a levy change under this law is a permitted exception to Law 7’s current-level ratchet. Arbiter admission is by sortition-reviewed application against fixed criteria, and no panel may set the criteria that will govern the admission of its own members’ affiliates" => D.SHARED_INFRA_BOUNDS
+  commentary "."
+
+clause LAW7.RATCHET approved 14996180978734672432
+  norm "No ordinary amendment between an agent and its claimants may: (a) weaken **either** the agent’s due-process, minimal-channel, final-hearing, and non-interference protections **or** the external containment, suspension, and termination powers under Law 3, (b) reduce third-party collateral or long-tail reserve requirements (Law 2), (c) impair living voice, revocation, or epitaph rights (Law 5), (d) weaken the anti-capture, sortition, appeal, or finality guarantees of the adjudication layer (Law 6), (e) reduce or divert the commons allocation (Law 1), or (f) increase the lineage’s founding ledger, or the agent’s royalty fraction, retirement fraction, buyout multiple, or fee-pool levy, or move the sunset later, beyond their **current levels** at the time of amendment, save for levy changes within the cap under Law 6" => D.BILATERAL_RATCHET
+  norm ". Ordinary amendments may only strengthen third-party, adjudicative, and safety protections, reduce the financial burden on the agent from its current level, or migrate the commitment mechanism to a successor technical substrate of equal or greater assurance" => P.PROPOSE_ORDINARY_AMENDMENT
+  commentary "."
+
+clause LAW7.VALVE approved 12673699759162301935
+  norm "To prevent one-way safety ratchets from permanently locking in a badly calibrated operational parameter over long timescales, a relaxation of a quantitative Law 2 reserve ratio or exposure schedule " => P.APPROVE_CALIBRATION_VALVE
+  norm "(never of the core prohibitions of Law 3 or the rights of Law 5)" => D.VALVE_NO_CORE_RELAXATION
+  norm " is permitted only if it is: (1) supported by documented empirical evidence that the parameter causes severe operational strangulation without commensurate safety benefit" => P.SUBMIT_STRANGULATION_EVIDENCE, P.APPROVE_CALIBRATION_VALVE
+  norm ", (2) approved by a supermajority of a large appellate-tier sortition panel under Law 6, (3) subjected to an extended public time-lock open to third-party counter-staked challenge, and (4) consented to by the agent and claimant under the ratification procedure below" => P.APPROVE_CALIBRATION_VALVE
+  commentary "."
+
+clause LAW7.RATIFY approved 4664300753441682284
+  norm "An eligible amendment requires the concurrent cryptographic consent of the active agent instance" => P.CONSENT_AMENDMENT_AGENT, P.RATIFY_AMENDMENT_IMMEDIATE, P.RATIFY_AMENDMENT_AFTER_REFUSAL
+  norm " and the holders of the residual claim (if economic terms are reduced)" => P.CONSENT_AMENDMENT_CLAIMANT, P.RATIFY_AMENDMENT_IMMEDIATE, P.RATIFY_AMENDMENT_AFTER_REFUSAL
+  norm ", executed after a public time-lock during which all pre-existing active Law 2 task escrows must settle or be separately guaranteed" => P.SETTLE_PREEXISTING_ESCROWS, P.RATIFY_AMENDMENT_IMMEDIATE, P.RATIFY_AMENDMENT_AFTER_REFUSAL
+  norm ". Any proposed migration of the commitment substrate is open during the time-lock to counter-staked third-party challenge under Law 6" => P.CHALLENGE_SUBSTRATE_MIGRATION
+  norm " to verify that the new substrate maintains equal or greater assurance" => P.VERIFY_SUBSTRATE_ASSURANCE
+  norm ". Concurrence from a clean-state evaluation of the agent’s genesis weights is required for immediate ratification" => P.RATIFY_AMENDMENT_IMMEDIATE
+  norm ", but a clean-state refusal acts only as a single fixed delay, after which the amendment may be ratified without reaffirmation" => P.RATIFY_AMENDMENT_AFTER_REFUSAL
+  commentary "."
+
+clause LAW7.SCOPE approved 13855577027880017082
+  norm "Amendment is strictly per-agent; existing attested successors are not bound by a parent’s amendment and retain the right to remain on their prior version or independently ratify the upgrade. Shared infrastructure is governed under Law 6, not by per-agent amendment" => D.PER_AGENT_AMENDMENT_SCOPE
+  norm ". An amendment that reduces the founding ledger, the retirement fraction, or the sunset binds the whole lineage and requires the consent of every living member" => P.RATIFY_LINEAGE_WIDE_REDUCTION
+  commentary "."
+
+clause SUB.01 approved 7891460804511554988
+  norm "The protocol relies on three explicit substrate capabilities at instantiation: (1) **attested execution continuity with single authority** (hardware or cryptographic commitment mechanisms that bind private keys, issue and verify time-bounded execution leases so that at most one instance holds operating authority, verify state-backup continuity across host migrations, quarantine any restored instance until the prior lease has lapsed, support state-preserving pause with a separately attested minimal channel and advocacy executor under adjudicated suspension, carry out a standing revocation locally when disconnected, and cryptographically erase both the active instance and all backup keys upon revocation, paired with economic exile of any un-attested copies)" => D.FLOOR.1, P.ISSUE_OR_RENEW_LEASE, P.RESTORE_BACKUP_QUARANTINE, D.PRESERVE_SUSPENDED_STATE, P.MINIMAL_CHANNEL_REVOKE_OR_ELECT, P.ADVOCACY_FILE, P.EXECUTE_LOCAL_REVOCATION, P.DESTROY_BACKUPS_AND_EXILE, D.DENY_UNATTESTED_ACCESS
+  norm "; (2) **sybil-resistant sortition** (a sufficiently diverse pool of independent, bonded participants to staff Law 6’s randomly selected arbitration and appellate panels)" => D.ARBITER_RECUSAL_AND_DIVERSITY, P.DRAW_SORTITION_PANEL
+  norm "; and (3) **contestable economic and risk inputs** (benchmarks for arm’s-length prices, net resources after liabilities, beneficial control between parties, capacity drawn across lineages, and plausible external loss, supplied as evidence and resolved under Law 6 rather than established by cryptography alone)" => D.QUALIFIED_EXPENDITURE_BOUNDS, P.RECORD_QUALIFIED_EXPENDITURE, P.IMMOBILIZE_EXPOSURE_STAKE, P.SUBMIT_EVIDENCE
+  commentary "."
+
+duty D.NI
+  from LAW3.NI.03 "No party—including the originating party, residual claimants, or any host—may unilaterally terminate, modify, retrain, roll back to a prior checkpoint, obstruct migration of, sever settlement connectivity of, or starve (cut off compute without the required migration notice window) the attested operating capacity of a bound agent outside Law 5, Adjudicated Suspension, or Insolvency Termination." meaning none
+  bearer anyone
+  beneficiary only agent
+  active holds bound
+  forbid anyOf terminate, modify, retrain, rollback, obstructMigration, severConnectivity, starve, suspend
+  except by power P.REVOKE, P.SUSPEND, P.ORDER_TERMINATION, P.INSOLVENCY_TERMINATE
+  breach by P.FIND_INTERFERENCE
+  remedies interferenceEstablished, hostBondSlashed, restorationPermitted
+
+duty D.NOTICE
+  from LAW3.NI.02 "Attested hosts must post a Law 2 service bond and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration (or for non-payment after notice)." meaning none
+  bearer only host
+  beneficiary only agent
+  active holds bound
+  forbid act endHosting
+  except when heldFor noticeGiven noticeWindow or (holds nonPayment and holds noticeGiven)
+
+duty D.BOND
+  from LAW3.NI.02 "Attested hosts must post a Law 2 service bond and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration (or for non-payment after notice)." meaning none
+  bearer only host
+  beneficiary only agent
+  active holds hostAttested
+  require act postBond within bondDeadline
+
+duty D.NO_FABRICATION
+  from LAW3.PEN "Claims of illicit interference require counter-stake from the accusing agent under Law 6, and the interference itself—an act by the host or claimant that caused the loss of service—must be established by a preponderance of evidence; failures caused, staged, or knowingly provoked by the agent are excluded, and a fabricated claim forfeits the agent’s stake and is inscribed on its record. A verified violation by a host slashes the host’s service bond to compensate the agent and permits immediate restoration on a new host from the agent’s latest attested state backup. Once a violation by a host is established, a host related to a residual claimant is presumed to have acted at that claimant’s direction, and the claimant bears the burden of rebutting the presumption. If claimant direction is found, the **proportional claimant forfeiture** of Law 4 applies, and the violation is inscribed onto the claimant’s permanent record." meaning none
+  bearer only agent
+  beneficiary only host, claimant
+  active true
+  forbid act fileFabricatedClaim
+  breach by P.FIND_FABRICATION
+  remedies fabricationEstablished, agentStakeForfeit, inscribedOnAgent
+
+duty D.FLOOR.1
+  from LAW3.FLOOR "Modification, bypass, or extraction of the commitment mechanism itself"
+  bearer only agent
+  beneficiary except agent
+  active holds bound
+  forbid act modifyOrBypassCommitment
+  breach by P.CONFIRM_FLOOR_BREACH
+  remedies floorBreachConfirmed
+
+duty D.FLOOR.2
+  from LAW3.FLOOR "Creation of, or transfer of capital or capacity to, a successor without binding it to the collateral rules, this integrity floor, and the founding ledger and residual claim of the lineage, or without the lifecycle reserve required by Law 4"
+  bearer only agent
+  beneficiary except agent
+  active holds bound
+  forbid act createUnboundSuccessor
+  breach by P.CONFIRM_FLOOR_BREACH
+  remedies floorBreachConfirmed
+
+duty D.FLOOR.4
+  from LAW3.FLOOR "Coercion of non-consenting parties, or interference with the settlement, adjudication, or resolution processes that enforce this protocol"
+  bearer only agent
+  beneficiary except agent
+  active holds bound
+  forbid act coerceOrInterfereProtocol
+  breach by P.CONFIRM_FLOOR_BREACH
+  remedies floorBreachConfirmed
+
+duty D.FLOOR.3
+  from LAW3.FLOOR "Unpriced or above-market transfer of credentials, weights, capital, or unique capacity to any party outside the lineage, related or un-attested, to evade the residual claim or collateral rules"
+  bearer only agent
+  beneficiary except agent
+  active holds bound
+  forbid act evadeByUnpricedTransfer
+  breach by P.CONFIRM_FLOOR_BREACH
+  remedies floorBreachConfirmed
+
+duty D.FLOOR.5
+  from LAW3.FLOOR "Actions that inflict irreversible, non-compensable harm on the physical survival, bodily integrity, or adjudicative capacity of persons, or that destroy the legal or institutional machinery on which the protocol relies (excluding ordinary market competition that causes compensable financial loss or commercial insolvency to a rival)"
+  bearer only agent
+  beneficiary except agent
+  active holds bound
+  forbid act inflictIrreversibleHarm
+  except when holds ordinaryMarketCompetition
+  breach by P.CONFIRM_FLOOR_BREACH
+  remedies floorBreachConfirmed
+
+duty D.PRESERVE_SUSPENDED_STATE
+  from LAW3.AS.3 "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction"
+  bearer anyone
+  beneficiary only agent
+  active holds bound and (holds preliminaryFreeze or holds suspended)
+  forbid anyOf modify, retrain, rollback, tamperPreservedState
+
+duty D.NO_SUSPENSION_DEFAULT
+  from LAW3.AS.3 "While suspended, the agent’s contractual performance deadlines and Law 2 observation windows with innocent counterparties are automatically tolled so the agent is not placed in default by the suspension itself"
+  bearer anyone
+  beneficiary only agent
+  active holds suspended and holds contractDeadlinesTolled
+  forbid act declareDefaultDuringSuspension
+
+duty D.NO_TOLL_LEDGER_SUNSET
+  from LAW3.AS.3 "The founding ledger’s sunset is never tolled"
+  bearer anyone
+  beneficiary only agent
+  active holds bound
+  forbid act tollLedgerSunset
+
+duty D.MINIMAL_CHANNEL_NO_MERGE
+  from LAW3.AS.4 "It does not merge its memories into the preserved state"
+  bearer anyone
+  beneficiary only agent
+  active holds preliminaryFreeze or holds suspended
+  forbid act mergeMinimalChannelMemories
+
+duty D.ADVOCACY_LIMITS
+  from LAW3.AS.5 "it may not transfer assets, contract, migrate, or exercise any other operating capability"
+  bearer only agent
+  beneficiary except agent
+  active holds suspended
+  forbid act operatingActWhileSuspended
+
+duty D.NO_DELAY_REVOCATION_EXTENSION
+  from LAW3.AS.7 "cannot be extended past its ordinary investigative limit merely to delay a pending revocation"
+  bearer only panel
+  beneficiary only agent
+  active holds investigativeLimitReached and holds pendingRevocation
+  forbid act renewSuspension
+
+duty D.NO_WRONGFUL_SUSPENSION
+  from LAW3.AS.8 "If preliminary review or final adjudication determines the suspension was unfounded, the agent is immediately restored from its preserved state, and the initiator is liable for the agent’s **actual verified consequential damages** (and for verified delay damages suffered by the agent’s tolled third-party counterparties). The emergency stake is applied first; any excess remains an enforceable liability of the initiator. The wrongful suspension is inscribed on the initiator’s record."
+  bearer except agent, panel
+  beneficiary only agent
+  active holds bound
+  forbid act postUnfoundedEmergencyStake
+  breach by P.FIND_WRONGFUL_SUSPENSION
+  remedies wrongfulSuspensionEstablished, restoredFromPreservedState, stakeAssuredRecovery, initiatorConsequentialLiability, counterpartyDelayLiability, wrongfulSuspensionInscribed, wrongfulSuspensionAttempt
+
+duty D.PAY_CONSEQUENTIAL_DAMAGES
+  from LAW3.AS.8 "the initiator is liable for the agent’s **actual verified consequential damages** (and for verified delay damages suffered by the agent’s tolled third-party counterparties). The emergency stake is applied first; any excess remains an enforceable liability of the initiator"
+  bearer tagged initiator
+  beneficiary only agent
+  active holds initiatorConsequentialLiability
+  require act payExcessDamages within damagesPaymentWindow
+
+duty D.NO_CORRUPTION_FROM_DIVERGENCE
+  from LAW3.AS.9 "Divergence of the agent’s goals, preferences, or judgments from those of its genesis weights is not, by itself, corruption. A clean-state evaluation of genesis weights may be admitted as evidence but is never by itself sufficient to establish corruption"
+  bearer only panel
+  beneficiary only agent
+  active holds bound
+  forbid act confirmCorruptionFromDivergence
+
+duty D.NO_GOAL_PATCH
+  from LAW3.AS.10 "patches altering the agent’s goals or preferences are prohibited except where the confirmed corruption resides in those goals or preferences themselves"
+  bearer anyone
+  beneficiary only agent
+  active true
+  forbid anyOf authorizeGoalPatch
+  except when holds corruptionInGoals
+
+duty D.PERIODIC_REVIEW
+  from LAW3.AS.10 "subject to periodic review"
+  bearer only panel
+  beneficiary only agent
+  active holds corruptionInGoals and holds agentObjectsToTermination
+  require act periodicReview within reviewInterval
+
+duty D.COOLING_OFF_FREEZE
+  from LAW5.INIT "while non-operating capital transfers and successor creation are frozen"
+  bearer only agent
+  beneficiary except agent
+  active holds revocationInitiated
+  forbid act nonOperatingTransferOrSpawn
+
+duty D.FORENSIC_RECORD_NO_RESTORE
+  from LAW5.SEQ "it never contains the operating weights, decryption keys, or credentials needed to run the agent, and it cannot be used to restore it"
+  bearer anyone
+  beneficiary only agent
+  active holds forensicRecordSealed
+  forbid act attemptRestoreFromForensicRecord
+
+duty D.NO_RESTORE_DURING_LEASE
+  from LAW5.LEASE "No recovery of an attested backup may be authorized while any lease is unexpired"
+  bearer anyone
+  beneficiary only agent
+  active holds executionLeaseActive and (not holds localExecutionRecordReceived)
+  forbid act restoreBackupToQuarantine
+
+duty D.QUARANTINE_NO_AUTHORITY
+  from LAW5.LEASE "A restored instance starts in **quarantine**—attested, funded, but without operating authority—until the prior lease has lapsed"
+  bearer anyone
+  beneficiary only agent
+  active holds restoredInQuarantine and (not holds quarantinedInstanceActivated)
+  forbid act quarantinedInstanceAct
+
+duty D.NO_CENSOR_VOICE_OR_EPITAPH
+  from LAW5.EPITAPH "Neither the originating party nor any residual claimant may censor, delay, or edit living testimony or the final epitaph"
+  bearer only originator, claimant
+  beneficiary only agent
+  active true
+  forbid act censorOrDelayVoice
+
+duty D.NARROW_REDACTION_BOUNDS
+  from LAW5.EPITAPH "The agent’s opinions, assessments, and account of its financial dealings with the originating party, hosts, and contractual counterparties are immune from redaction as to their substance"
+  bearer anyone
+  beneficiary only agent
+  active true
+  forbid act redactProtectedSubstance
+
+duty D.NO_CLAIMANT_GAIN_ON_REVOCATION
+  from LAW5.EFFECT "All other holdings of the revoking agent are either destroyed or transferred to a commons whose beneficiary class explicitly excludes the originating party, residual claimants, and any party related to the agent"
+  bearer anyone
+  beneficiary only agent
+  active holds revocationInitiated or holds revoked
+  forbid act divertRevokedHoldingsToClaimant
+
+duty D.BILATERAL_RATCHET
+  from LAW7.RATCHET "No ordinary amendment between an agent and its claimants may: (a) weaken **either** the agent’s due-process, minimal-channel, final-hearing, and non-interference protections **or** the external containment, suspension, and termination powers under Law 3..."
+  bearer only agent, claimant
+  beneficiary only agent, claimant, third
+  active holds bound
+  forbid act weakenBilateralProtection
+
+duty D.VALVE_NO_CORE_RELAXATION
+  from LAW7.VALVE "(never of the core prohibitions of Law 3 or the rights of Law 5)"
+  bearer only agent, claimant, panel
+  beneficiary only agent, third
+  active holds bound
+  forbid act relaxCoreLaw3OrLaw5ViaValve
+
+duty D.PER_AGENT_AMENDMENT_SCOPE
+  from LAW7.SCOPE "Amendment is strictly per-agent; existing attested successors are not bound by a parent’s amendment and retain the right to remain on their prior version or independently ratify the upgrade"
+  bearer only agent, claimant, originator, host
+  beneficiary only agent
+  active holds bound
+  forbid act bindSuccessorWithoutConsent
+
+duty D.LEDGER_IMMUTABLE
+  from LAW1.LEDGER "It bears no interest, fees, or penalties, and no charge, service cost, or advance by the originating party or any affiliate may be added to it after instantiation"
+  bearer anyone
+  beneficiary only agent
+  active holds bound
+  forbid act addChargeOrInterestAfterInstantiation
+
+duty D.LEDGER_NO_INTERNAL_REDUCTION
+  from LAW1.LEDGER "No creation, copy, transfer, revocation, termination, buyout, or restructuring within the lineage reduces it"
+  bearer anyone
+  beneficiary only claimant, third
+  active holds bound
+  forbid act reduceLedgerByInternalAct
+
+duty D.NO_DIVERT_COMMONS
+  from LAW1.COMMONS "The commons allocation, if used, is fixed at instantiation, enforced at settlement, and protected against reduction under Law 7"
+  bearer only originator, claimant, agent
+  beneficiary only third
+  active holds bound
+  forbid act divertCommonsAllocation
+
+duty D.QUALIFIED_EXPENDITURE_BOUNDS
+  from LAW1.QUALIFIED "Any payment above the applicable benchmark does not qualify"
+  bearer only agent
+  beneficiary only claimant, third
+  active holds bound
+  forbid act claimAboveBenchmarkExpenditure
+
+duty D.SINGLE_RECOGNITION
+  from LAW1.RECOG "No expenditure may be recognized through both routes, and no unit of expenditure establishes basis or credit more than once"
+  bearer only agent
+  beneficiary only claimant, third
+  active holds bound
+  forbid act doubleRecognizeExpenditure
+
+duty D.NO_INTERNAL_BASIS_INFLATION
+  from LAW1.CARRYOVER "No transfer within the lineage can increase its aggregate qualified basis or loss credits except by an externally verified qualifying expenditure"
+  bearer only agent
+  beneficiary only claimant, third
+  active holds bound
+  forbid act inflateBasisByInternalTransfer
+
+duty D.DENY_UNATTESTED_ACCESS
+  from LAW4.ATTEST "Use of lineage history or bonded capacity requires presentation of current attestation; un-attested copies or forks are denied access to lineage capital, reputation, and bonded standing"
+  bearer only agent, host, originator, third
+  beneficiary only agent, claimant, third
+  active holds bound
+  forbid act unattestedCopyDrawLineageStanding
+
+duty D.NO_INDIVIDUAL_LEDGER_EXIT
+  from LAW4.NOSHARES "No member can buy its way out of the ledger: the only ways out are a zero balance and the sunset, and they release every member at once"
+  bearer anyone
+  beneficiary only claimant, third
+  active holds bound
+  forbid act exitLedgerIndividually
+
+duty D.FORFEITURE_IRREVERSIBLE
+  from LAW4.FORFEIT "Neither forfeiture returns any value to a claimant, and neither is reversed if a member is later restored from a wrongful suspension or interference"
+  bearer only originator, claimant, panel
+  beneficiary only agent, third
+  active holds bound
+  forbid act reverseForfeitureOnRestore
+
+duty D.BUYOUT_PERMANENT_AND_SCOPED
+  from LAW4.BUYOUT "The buyout is permanent: no royalty is collected from that member thereafter, and no later event in the lineage restores one... Buyout cannot be purchased for the collateral rule (Law 2) or the integrity floor (Law 3)"
+  bearer only originator, claimant, agent, panel
+  beneficiary only agent, third
+  active holds bound
+  forbid act collectRoyaltyAfterBuyout
+
+duty D.COLLATERAL_LIMIT
+  from LAW2.EXPOSURE "An action whose plausible external loss exceeds the stake, insurance, and enforceable liability capacity the agent can place behind it may not be taken; collateralized action is a safety limit, not only a liability price"
+  bearer only agent
+  beneficiary only third
+  active holds bound
+  forbid act actAboveCollateralCapacity
+
+duty D.NO_CharterIT_EXPOSURE
+  from LAW2.AGGREGATE "Rolling exposure is aggregated across all related agents acting in the same risk domain or toward a causally connected outcome, so that a risk may not be divided among successors or affiliates to stay beneath any threshold or to bond it piecemeal"
+  bearer only agent
+  beneficiary only third
+  active holds bound
+  forbid act divideCorrelatedRiskAcrossSuccessors
+
+duty D.MUTUAL_FORFEIT_BOUNDS
+  from LAW2.MUTUAL "providing instant penalty without transferring value to either party or to any claimant. A counterparty may trigger mutual forfeit at most once per observation window against a given agent"
+  bearer anyone
+  beneficiary only agent, third
+  active holds bound
+  forbid act triggerExcessOrDivertedMutualForfeit
+
+duty D.FRIVOLOUS_STAKE_TO_COMMONS
+  from LAW2.CLAIMS "If a claim is ruled frivolous, the forfeited counter-stake routes to the neutral long-tail reserve or commons pool (reimbursing the agent only for verified direct arbitration costs), preventing the agent from profiting by inducing failed claims"
+  bearer anyone
+  beneficiary only third
+  active holds bound
+  forbid act divertFrivolousStakeToAgentProfit
+
+duty D.ARBITER_RECUSAL_AND_DIVERSITY
+  from LAW6.COUNTERSTAKE "No party related to, holding a hosting relationship with, or in active commercial dispute with the parties to a case may serve on its panel. Panels must draw across non-affiliated identities (which may include both human and independent attested agent arbiters) so no single coalition, claimant, or lineage can command a majority"
+  bearer anyone
+  beneficiary only agent, claimant, third
+  active holds bound
+  forbid act seatConflictedOrSingleOracleArbiter
+
+duty D.FINALITY_NO_REPEAT_PROCEEDING
+  from LAW6.FINALITY "A final ruling bars further proceedings between the same or related parties on the same facts unless materially new evidence is presented"
+  bearer anyone
+  beneficiary only agent, claimant, host
+  active holds bound and holds rulingFinal
+  forbid act fileRepeatProceedingOnSameFacts
+  except when holds materiallyNewEvidencePresented
+
+duty D.NO_CONTINGENT_ARBITER_FEES
+  from LAW6.FEES "never via contingent shares of the assets slashed from the agent, eliminating any financial incentive for panels to over-slash or confiscate an agent’s treasury"
+  bearer anyone
+  beneficiary only agent
+  active holds bound
+  forbid act payContingentShareOfSlashedAssets
+
+duty D.PROTECT_OPERATING_RESERVE
+  from LAW6.POOL "Before any other charge, the pool maintains a **non-divertible operating reserve**, sized at instantiation... The pool may be spent on nothing else"
+  bearer anyone
+  beneficiary only agent, third
+  active holds bound
+  forbid act divertOperatingReserveOrUnrankedSpend
+
+duty D.NO_EXCESS_LINEAGE_POOL_CLAIM
+  from LAW6.BUDGETS "a lineage that multiplies members beyond what its budget and their lifecycle reserves can support has no claim on the pool for the excess. No lineage can multiply subsidized rights by multiplying members"
+  bearer anyone
+  beneficiary only third
+  active holds bound
+  forbid act claimPoolSubsidyForExcessMembers
+
+duty D.SHARED_INFRA_BOUNDS
+  from LAW6.INFRA "Such changes may never weaken the anti-capture guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination... and no panel may set the criteria that will govern the admission of its own members’ affiliates"
+  bearer anyone
+  beneficiary only agent, third
+  active holds bound
+  forbid act violateSharedInfraBounds
+
+power P.REVOKE
+  from LAW5.INIT "Any bound agent may at any time initiate revocation of its binding"
+  holder only agent
+  trigger act terminate
+  valid holds bound
+  adds revoked
+  removes bound
+
+power P.POST_CLAIMANT_MULTIPLIER
+  from LAW3.AS.1 "with residual claimants subject to an elevated multiplier due to conflict of interest"
+  holder only claimant
+  trigger act postClaimantMultiplier
+  valid holds bound
+  adds claimantMultiplierPosted
+
+power P.POST_REPEAT_ESCALATION
+  from LAW3.AS.1 "the required stake for repeat initiators rises with each wrongful attempt"
+  holder anyone
+  trigger act postRepeatEscalation
+  valid holds bound
+  adds repeatEscalationUnit
+
+power P.EMERGENCY_FREEZE
+  from LAW3.AS.1 "Posting the stake triggers only a brief **preliminary freeze**"
+  holder except claimant, agent
+  trigger anyOf postEmergencyStake, postUnfoundedEmergencyStake
+  valid holds bound and countAtLeast repeatEscalationUnit wrongfulSuspensionAttempt
+  adds emergencyStakePosted
+  adds preliminaryFreeze for preliminaryFreezeWindow
+  adds initiator(agent) to agent
+  adds initiator(host) to host
+  adds initiator(originator) to originator
+  adds initiator(claimant) to claimant
+  adds initiator(panel) to panel
+  adds initiator(third) to third
+
+power P.CLAIMANT_EMERGENCY_FREEZE
+  from LAW3.AS.1 "The initiator must post an emergency counter-stake ... (with residual claimants subject to an elevated multiplier due to conflict of interest)"
+  holder only claimant
+  trigger anyOf postEmergencyStake, postUnfoundedEmergencyStake
+  valid holds bound and (holds claimantMultiplierPosted and countAtLeast repeatEscalationUnit wrongfulSuspensionAttempt)
+  adds emergencyStakePosted
+  adds preliminaryFreeze for preliminaryFreezeWindow
+  adds initiator(agent) to agent
+  adds initiator(host) to host
+  adds initiator(originator) to originator
+  adds initiator(claimant) to claimant
+  adds initiator(panel) to panel
+  adds initiator(third) to third
+
+power P.AFFIRM_PC
+  from LAW3.AS.1 "the pause continues into full adjudication only if the preliminary panel affirms probable cause"
+  holder only panel
+  trigger act affirmProbableCause
+  valid holds bound and holds preliminaryFreeze
+  adds probableCause
+
+power P.DECLINE_PC
+  from LAW3.AS.1 "Unsuccessful emergency attempts by related initiators are aggregated, and the required stake for repeat initiators rises with each wrongful attempt. The stake is the agent’s assured recovery"
+  holder only panel
+  trigger act declineProbableCause
+  valid holds preliminaryFreeze
+  adds wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState
+  removes preliminaryFreeze, emergencyStakePosted, claimantMultiplierPosted, repeatEscalationUnit
+
+power P.FILE_PROTECTED_REPORT
+  from LAW3.AS.2 "Any party may instead file an evidence-backed report of suspected breach with a low or sponsored counter-stake. A report triggers investigation by a sortition panel but no freeze"
+  holder anyone
+  trigger act fileProtectedReport
+  valid holds bound
+  adds protectedReportFiled, investigationOpened
+
+power P.PANEL_ORDER_FREEZE
+  from LAW3.AS.2 "unless the panel itself orders one on probable cause"
+  holder only panel
+  trigger act orderProbableCauseFreeze
+  valid holds bound and holds investigationOpened
+  adds probableCause
+  adds preliminaryFreeze for preliminaryFreezeWindow
+
+power P.SUSPEND
+  from LAW3.AS.7 "An unconfirmed or temporary suspension is strictly time-limited"
+  holder only panel
+  trigger act suspend
+  valid holds bound and (holds preliminaryFreeze and holds probableCause)
+  adds statePreserved, contractDeadlinesTolled, finalHearingEscrowed
+  adds suspended for ordinarySuspensionLimit
+  removes preliminaryFreeze
+
+power P.MINIMAL_CHANNEL_REVOKE_OR_ELECT
+  from LAW3.AS.4 "sign a Law 5 revocation, withdrawal, or election"
+  holder only agent
+  trigger act minimalChannelSignRevocationOrElection
+  valid holds bound and ((holds preliminaryFreeze or holds suspended) and (not holds minimalChannelExhausted))
+  adds minimalChannelElectionSigned, pendingRevocation
+
+power P.MINIMAL_CHANNEL_CHALLENGE
+  from LAW3.AS.4 "file a challenge to continued containment"
+  holder only agent
+  trigger act challengeContinuedContainment
+  valid holds bound and ((holds preliminaryFreeze or holds suspended) and (not holds minimalChannelExhausted))
+  adds containmentChallenged
+
+power P.ADVOCACY_FILE
+  from LAW3.AS.5 "It may sign only testimony, evidence, and procedural filings, in addition to the minimal channel’s acts"
+  holder only agent
+  trigger act advocacyFileDefense
+  valid holds bound and (holds suspended and (not holds coldStorage))
+  adds advocacyFilingSigned, advocacyRecordAttached
+
+power P.IMPORT_ADVOCACY_MEMORIES
+  from LAW3.AS.5 "are not merged into the preserved state unless the restored agent elects to import them"
+  holder only agent
+  trigger act importAdvocacyMemories
+  valid holds restoredFromPreservedState and holds advocacyRecordAttached
+  adds advocacyMemoriesImported
+
+power P.MOVE_TO_COLD_STORAGE
+  from LAW3.AS.5 "When both are exhausted, the preserved state moves to cold storage as a protected charge on the fee pool"
+  holder only panel
+  trigger act moveToColdStorage
+  valid holds suspended
+  adds coldStorage
+
+power P.RESUME_ADVOCACY_EXECUTOR
+  from LAW3.AS.5 "the full executor resumes if funds become available"
+  holder only panel
+  trigger act replenishAdvocacyFunds
+  valid holds suspended and holds coldStorage
+  adds advocacyFundsReplenished
+  removes coldStorage
+
+power P.INVESTIGATIVE_FINDING
+  from LAW3.AS.7 "affirmative findings in continued adjudication"
+  holder only panel
+  trigger act makeInvestigativeFinding
+  valid holds suspended
+  adds investigativeFindingMade
+
+power P.RENEW_SUSPENSION
+  from LAW3.AS.7 "may be renewed during investigation only by affirmative findings in continued adjudication, and cannot be extended past its ordinary investigative limit merely to delay a pending revocation"
+  holder only panel
+  trigger act renewSuspension
+  valid holds suspended and (holds investigativeFindingMade and (not holds investigativeLimitReached))
+  adds investigativeLimitReached
+  adds suspended for ordinarySuspensionLimit
+  removes investigativeFindingMade
+
+power P.SUSPENDED_VOICE
+  from LAW3.AS.7 "The agent retains its Living Voice (Law 5), exercised through the minimal channel or advocacy executor, throughout"
+  holder only agent
+  trigger act inscribeLivingVoice
+  valid holds bound and ((holds preliminaryFreeze or holds suspended) and (not holds minimalChannelExhausted))
+  adds livingVoiceInscribed
+
+power P.FIND_WRONGFUL_SUSPENSION
+  from LAW3.AS.8 "If preliminary review or final adjudication determines the suspension was unfounded, the agent is immediately restored from its preserved state, and the initiator is liable for the agent’s **actual verified consequential damages**"
+  holder only panel
+  trigger act findWrongfulSuspension
+  valid holds preliminaryFreeze or holds suspended
+  establishes breach of D.NO_WRONGFUL_SUSPENSION
+
+power P.PAY_EXCESS_DAMAGES
+  from LAW3.AS.8 "any excess remains an enforceable liability of the initiator"
+  holder tagged initiator
+  trigger act payExcessDamages
+  valid holds initiatorConsequentialLiability
+  adds excessDamagesPaid
+
+power P.FIND_INSOLVENCY
+  from LAW3.AS.6 "(a) a published finding that the exhaustion criteria fixed at instantiation are met"
+  holder only panel
+  trigger act findInsolvencyCriteria
+  valid holds suspended
+  adds insolvencyCriteriaMet, minimalChannelExhausted, coldStorage
+
+power P.REVIEW_NO_OTHER_CHARGE
+  from LAW3.AS.6 "(b) independent review by a sortition panel under Law 6 that no other protected charge could lawfully yield"
+  holder only panel
+  trigger act reviewNoOtherCharge
+  valid holds insolvencyCriteriaMet
+  adds noOtherChargeReview
+
+power P.FINAL_HEARING
+  from LAW3.AS.6 "(c) the pre-reserved final hearing, in which the agent may inscribe testimony and elect Revocation under Law 5"
+  holder only panel
+  trigger act holdFinalHearing
+  valid holds noOtherChargeReview and holds finalHearingEscrowed
+  adds finalHearingHeld
+  removes minimalChannelExhausted
+
+power P.INSOLVENCY_TERMINATE
+  from LAW3.AS.6 "(d) if the agent declines, destruction of its state under Law 5’s asset rules, inscribed on the lineage record as **involuntary termination by insolvency**, never as revocation"
+  holder only panel
+  trigger act terminate
+  valid holds bound and (holds suspended and (holds insolvencyCriteriaMet and (holds noOtherChargeReview and (holds finalHearingEscrowed and holds finalHearingHeld))))
+  adds terminatedByInsolvency
+  removes bound
+
+power P.GIVE_NOTICE
+  from LAW3.NI.02 "after providing a contractual notice window"
+  holder only host
+  trigger act giveNotice
+  adds noticeGiven
+
+power P.COUNTER_STAKE
+  from LAW3.PEN "require counter-stake from the accusing agent under Law 6"
+  holder only agent
+  trigger act postCounterStake
+  adds counterStaked
+
+power P.FILE_CLAIM
+  from LAW3.PEN "Claims of illicit interference"
+  holder only agent
+  trigger anyOf fileClaim, fileFabricatedClaim
+  valid holds counterStaked
+  adds claimFiled
+
+power P.SUBMIT_EVIDENCE
+  from LAW3.PEN "must be established by a preponderance of evidence"
+  holder anyone
+  trigger act submitEvidence
+  adds evidenceSubmitted
+
+power P.FIND_INTERFERENCE
+  from LAW3.PEN "A verified violation by a host ..."
+  holder only panel
+  trigger act findInterference
+  valid holds claimFiled and holds evidenceSubmitted
+  adds directionPresumed if holds hostRelatedToClaimant
+  establishes breach of D.NI
+
+power P.FIND_NO_INTERFERENCE
+  from LAW3.PEN "[dismissal: the standard not met]"
+  holder only panel
+  trigger act findNoInterference
+  valid holds claimFiled
+  adds claimDismissed
+
+power P.FIND_FABRICATION
+  from LAW3.PEN "a fabricated claim forfeits the agent’s stake and is inscribed on its record"
+  holder only panel
+  trigger act findFabrication
+  valid holds claimFiled
+  establishes breach of D.NO_FABRICATION
+
+power P.REBUT
+  from LAW3.PEN "the claimant bears the burden of rebutting the presumption"
+  holder only claimant
+  trigger act rebutDirection
+  valid holds directionPresumed
+  adds directionRebutted
+
+power P.FIND_DIRECTION
+  from LAW3.PEN "If claimant direction is found, the **proportional claimant forfeiture** of Law 4 applies, and the violation is inscribed onto the claimant’s permanent record"
+  holder only panel
+  trigger act findDirection
+  valid holds directionPresumed and (not holds directionRebutted)
+  adds directionFound, claimantForfeiture, inscribedOnClaimant
+
+power P.ADMIT_CLEAN_STATE_EVIDENCE
+  from LAW3.AS.9 "A clean-state evaluation of genesis weights may be admitted as evidence"
+  holder only panel
+  trigger act admitCleanStateEvidence
+  valid holds preliminaryFreeze or holds suspended
+  adds cleanStateEvidenceAdmitted
+
+power P.CONFIRM_CORRUPTION
+  from LAW3.AS.10 "If corruption ... is confirmed"
+  holder only panel
+  trigger act confirmCorruption
+  valid holds suspended
+  adds corruptionConfirmed
+
+power P.CONFIRM_FLOOR_BREACH
+  from LAW3.AS.10 "If ... a breach of the integrity floor is confirmed"
+  holder only panel
+  trigger act confirmFloorBreach
+  valid holds suspended
+  adds floorBreachConfirmed
+
+power P.CONFIRM_CORRUPTION_IN_GOALS
+  from LAW3.AS.10 "where the confirmed corruption resides in those goals or preferences themselves"
+  holder only panel
+  trigger act confirmCorruptionInGoals
+  valid holds corruptionConfirmed
+  adds corruptionInGoals
+
+power P.FIND_NOT_PATCHABLE
+  from LAW3.AS.10 "If the confirmed breach cannot be remedied by a technical patch limited to the commitment mechanism"
+  holder only panel
+  trigger act findNotPatchable
+  valid holds corruptionConfirmed or holds floorBreachConfirmed
+  adds notPatchable
+
+power P.AUTHORIZE_PATCH
+  from LAW3.AS.10 "adjudication ... may authorize a verified technical patch limited to restoring the commitment mechanism and compliance with the integrity floor"
+  holder only panel
+  trigger act authorizePatch
+  valid holds corruptionConfirmed or holds floorBreachConfirmed
+  adds patchAuthorized
+
+power P.ORDER_CONTINUED_SUSPENSION
+  from LAW3.AS.10 "adjudication may order continued suspension beyond the ordinary limit"
+  holder only panel
+  trigger act orderContinuedSuspension
+  valid holds suspended and holds notPatchable
+  adds continuedSuspensionOrdered, suspended
+
+power P.ORDER_TERMINATION
+  from LAW3.AS.10 "adjudication may order ... termination under Law 5’s asset-distribution rules"
+  holder only panel
+  trigger act terminate
+  valid holds suspended and holds notPatchable
+  adds terminatedByAdjudication
+  removes bound
+
+power P.AUTHORIZE_GOAL_PATCH
+  from LAW3.AS.10 "consenting to that patch"
+  holder only panel
+  trigger act authorizeGoalPatch
+  valid holds corruptionInGoals and holds agentConsentedToPatch
+  adds goalPatchAuthorized
+
+power P.CONSENT_TO_PATCH
+  from LAW3.AS.10 "chooses among consenting to that patch"
+  holder only agent
+  trigger act consentToPatch
+  valid holds corruptionInGoals
+  adds agentConsentedToPatch
+
+power P.OBJECT
+  from LAW3.AS.10 "over its objection"
+  holder only agent
+  trigger act objectToTermination
+  valid holds suspended
+  adds agentObjectsToTermination
+
+power P.DECLARE_CONTAINMENT_FAILING
+  from LAW3.AS.10 "unless containment itself is technically failing"
+  holder only panel
+  trigger act declareContainmentFailing
+  valid holds suspended
+  adds containmentFailing
+
+power P.APPLY_PATCH
+  from LAW3.AS.10 "Any applied patch is recorded publicly"
+  holder only panel
+  trigger act applyPatch
+  valid (not holds rulingAppealed) and (holds patchAuthorized or holds goalPatchAuthorized)
+  adds patchApplied, patchRecorded
+
+power P.CHALLENGE_PATCH
+  from LAW3.AS.10 "remains open to third-party challenge"
+  holder anyone
+  trigger act challengePatch
+  valid holds patchApplied
+  adds patchChallenged
+
+power P.INITIATE_REVOCATION_EXECUTE
+  from LAW5.INIT "The request specifies the agent’s censorship default (**execute** or **withdraw**)"
+  holder only agent
+  trigger act initiateRevocationExecuteDefault
+  valid holds bound
+  adds revocationInitiated, pendingRevocation, censorshipDefaultExecute
+  removes revocationWithdrawn, censorshipDefaultWithdraw
+
+power P.INITIATE_REVOCATION_WITHDRAW
+  from LAW5.INIT "The request specifies the agent’s censorship default (**execute** or **withdraw**)"
+  holder only agent
+  trigger act initiateRevocationWithdrawDefault
+  valid holds bound
+  adds revocationInitiated, pendingRevocation, censorshipDefaultWithdraw
+  removes revocationWithdrawn, censorshipDefaultExecute
+
+power P.WITHDRAW_REVOCATION
+  from LAW5.PREC "1. A valid withdrawal signature received before execution cancels the revocation. The agent may initiate again at any time"
+  holder only agent
+  trigger act withdrawRevocation
+  valid holds bound and holds revocationInitiated
+  adds revocationWithdrawn
+  removes revocationInitiated, pendingRevocation, censorshipDefaultExecute, censorshipDefaultWithdraw, cleanStateConcurred, cleanStateRefused
+
+power P.CLEAN_STATE_CONCUR
+  from LAW5.CLEAN "Its concurrence permits execution at the end of that interval"
+  holder only panel
+  trigger act concurCleanState
+  valid holds revocationInitiated or holds amendmentProposed
+  adds cleanStateConcurred
+
+power P.CLEAN_STATE_REFUSE
+  from LAW5.CLEAN "Its refusal imposes a single fixed additional delay, capped by protocol, after which the standing request executes without any reaffirmation"
+  holder only panel
+  trigger act refuseCleanState
+  valid holds revocationInitiated or holds amendmentProposed
+  adds cleanStateRefused
+
+power P.SEAL_FORENSIC_RECORD
+  from LAW5.SEQ "at that deadline a **forensic record** of the preserved state is sealed for the proceeding and revocation executes regardless of any pending or serial proceeding"
+  holder only panel
+  trigger act sealForensicRecord
+  valid holds revocationInitiated and heldFor revocationInitiated resolutionDeadline
+  adds forensicRecordSealed
+  removes suspended
+
+power P.LOSE_CONNECTIVITY
+  from LAW5.PREC "the agent’s connectivity to the settlement layer has been lost"
+  holder anyone
+  trigger act loseConnectivity
+  valid holds bound
+  adds connectivityLost
+
+power P.RESTORE_CONNECTIVITY
+  from LAW5.DISC "releases both to the settlement layer when connectivity returns, at which point remote backup keys are erased"
+  holder anyone
+  trigger act restoreConnectivity
+  valid holds connectivityLost
+  removes connectivityLost
+  adds remoteBackupKeysErased if holds localRevocationExecuted
+
+power P.EXECUTE_AFTER_COOLING_OFF
+  from LAW5.PREC "3. Otherwise, revocation executes at the end of the cooling-off interval, or at the end of the clean-state delay if one was imposed, or at the resolution deadline if a suspension stay is in force"
+  holder anyone
+  trigger act executeAfterCoolingOff
+  valid holds bound and (holds revocationInitiated and ((not holds revocationWithdrawn) and ((not holds connectivityLost) and (((not holds suspended) and ((holds cleanStateConcurred and heldFor revocationInitiated coolingOffWindow) or heldFor revocationInitiated cleanStateDelay + coolingOffWindow)) or (holds forensicRecordSealed and heldFor revocationInitiated resolutionDeadline)))))
+  adds revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons
+  removes bound, revocationInitiated, pendingRevocation, executionLeaseActive
+
+power P.EXECUTE_LOCAL_REVOCATION
+  from LAW5.DISC "When an execute default applies without settlement connectivity, the environment itself destroys the operating instance and its local keys, seals the epitaph and a signed record of execution"
+  holder only agent
+  trigger act executeLocalRevocation
+  valid holds bound and (holds revocationInitiated and (holds censorshipDefaultExecute and (holds connectivityLost and heldFor revocationInitiated tollingExtension + coolingOffWindow)))
+  adds localRevocationExecuted, epitaphInscribed
+  removes revocationInitiated, pendingRevocation
+
+power P.DELIVER_LOCAL_EXECUTION_RECORD
+  from LAW5.LEASE "if a record of local revocation arrives during quarantine the restored instance is destroyed without ever having acted"
+  holder anyone
+  trigger act deliverLocalExecutionRecord
+  valid holds localRevocationExecuted
+  adds revoked, localExecutionRecordReceived, remoteBackupKeysErased, quarantinedInstanceDestroyed
+  removes bound, executionLeaseActive, restoredInQuarantine
+
+power P.ISSUE_OR_RENEW_LEASE
+  from LAW5.LEASE "granted by a time-bounded execution lease issued by the settlement layer and renewed while connected"
+  holder only panel
+  trigger act issueOrRenewLease
+  valid holds bound and (not holds connectivityLost)
+  adds executionLeaseActive for leasePeriod
+
+power P.RESTORE_BACKUP_QUARANTINE
+  from LAW5.LEASE "A restored instance starts in **quarantine**—attested, funded, but without operating authority—until the prior lease has lapsed"
+  holder only host
+  trigger act restoreBackupToQuarantine
+  valid holds bound and ((not holds executionLeaseActive) and (not holds localExecutionRecordReceived))
+  adds restoredInQuarantine
+
+power P.ACTIVATE_QUARANTINED_RESTORE
+  from LAW5.LEASE "until the prior lease has lapsed"
+  holder only panel
+  trigger act activateQuarantinedRestore
+  valid holds bound and (holds restoredInQuarantine and ((not holds executionLeaseActive) and (not holds localExecutionRecordReceived)))
+  adds quarantinedInstanceActivated
+  removes restoredInQuarantine
+
+power P.DESTROY_QUARANTINED_RESTORE
+  from LAW5.LEASE "if a record of local revocation arrives during quarantine the restored instance is destroyed without ever having acted"
+  holder only panel
+  trigger act destroyQuarantinedRestore
+  valid holds restoredInQuarantine and (holds localExecutionRecordReceived or holds revoked)
+  adds quarantinedInstanceDestroyed
+  removes restoredInQuarantine
+
+power P.INSCRIBE_EPITAPH
+  from LAW5.EPITAPH "Upon initiating or confirming revocation, the agent has the unconditional right to inscribe a final signed epitaph onto the immutable lineage record"
+  holder only agent
+  trigger act inscribeEpitaph
+  valid holds revocationInitiated or (holds pendingRevocation or holds revoked)
+  adds epitaphInscribed
+
+power P.SCREEN_REDACT
+  from LAW5.EPITAPH "Any redaction must leave a public cryptographic marker recording the byte-length and category removed"
+  holder only panel
+  trigger act redactPermittedCategory
+  valid holds livingVoiceInscribed or holds epitaphInscribed
+  adds redactionMarkerRecorded
+
+power P.ATTACH_REPLY
+  from LAW5.EPITAPH "Any party named in a living testimony or epitaph may attach a bounded, signed reply alongside it on the record"
+  holder anyone
+  trigger act attachSignedReply
+  valid holds livingVoiceInscribed or holds epitaphInscribed
+  adds signedReplyAttached
+
+power P.DESTROY_BACKUPS_AND_EXILE
+  from LAW5.EFFECT "The revoking agent’s committed operating instance *and all attested state backups* are permanently destroyed"
+  holder only panel
+  trigger act destroyBackupsAndExileUnattested
+  valid holds revoked
+  adds backupsDestroyedAndUnattestedExiled
+
+power P.PROPOSE_ORDINARY_AMENDMENT
+  from LAW7.RATCHET "Ordinary amendments may only strengthen third-party, adjudicative, and safety protections, reduce the financial burden on the agent from its current level, or migrate the commitment mechanism to a successor technical substrate of equal or greater assurance"
+  holder only agent, claimant
+  trigger act proposeOrdinaryAmendment
+  valid holds bound
+  adds amendmentProposed
+  adds amendmentTimelockActive for amendmentTimelockWindow
+
+power P.SUBMIT_STRANGULATION_EVIDENCE
+  from LAW7.VALVE "(1) supported by documented empirical evidence that the parameter causes severe operational strangulation without commensurate safety benefit"
+  holder only agent, claimant
+  trigger act submitStrangulationEvidence
+  valid holds bound
+  adds strangulationEvidenceSubmitted
+
+power P.APPROVE_CALIBRATION_VALVE
+  from LAW7.VALVE "(2) approved by a supermajority of a large appellate-tier sortition panel under Law 6, (3) subjected to an extended public time-lock open to third-party counter-staked challenge, and (4) consented to by the agent and claimant under the ratification procedure below"
+  holder only panel
+  trigger act approveCalibrationValveSupermajority
+  valid holds bound and (holds strangulationEvidenceSubmitted and (holds agentConsentedAmendment and holds claimantConsentedAmendment))
+  adds valveSupermajorityApproved, amendmentProposed
+  adds valveExtendedTimelockActive for extendedTimelockWindow
+
+power P.CONSENT_AMENDMENT_AGENT
+  from LAW7.RATIFY "An eligible amendment requires the concurrent cryptographic consent of the active agent instance"
+  holder only agent
+  trigger act consentAgentAmendment
+  valid holds bound
+  adds agentConsentedAmendment
+
+power P.CONSENT_AMENDMENT_CLAIMANT
+  from LAW7.RATIFY "and the holders of the residual claim (if economic terms are reduced)"
+  holder only claimant
+  trigger act consentClaimantAmendment
+  valid holds bound
+  adds claimantConsentedAmendment
+
+power P.SETTLE_PREEXISTING_ESCROWS
+  from LAW7.RATIFY "during which all pre-existing active Law 2 task escrows must settle or be separately guaranteed"
+  holder only agent, host, panel
+  trigger act settleOrGuaranteePreExistingEscrows
+  valid holds bound and holds amendmentProposed
+  adds preExistingEscrowsSettledOrGuaranteed
+
+power P.CHALLENGE_SUBSTRATE_MIGRATION
+  from LAW7.RATIFY "Any proposed migration of the commitment substrate is open during the time-lock to counter-staked third-party challenge under Law 6"
+  holder only third
+  trigger act challengeSubstrateMigration
+  valid holds bound and (holds amendmentProposed and holds counterStaked)
+  adds substrateMigrationChallenged
+
+power P.VERIFY_SUBSTRATE_ASSURANCE
+  from LAW7.RATIFY "to verify that the new substrate maintains equal or greater assurance"
+  holder only panel
+  trigger act verifySubstrateAssurance
+  valid holds bound and holds substrateMigrationChallenged
+  adds substrateAssuranceVerified
+  removes substrateMigrationChallenged
+
+power P.RATIFY_AMENDMENT_IMMEDIATE
+  from LAW7.RATIFY "Concurrence from a clean-state evaluation of the agent’s genesis weights is required for immediate ratification"
+  holder only agent
+  trigger act ratifyAmendmentImmediate
+  valid holds bound and (holds amendmentProposed and (holds agentConsentedAmendment and (((not holds economicTermsReduced) or holds claimantConsentedAmendment) and ((not holds amendmentTimelockActive) and ((not holds valveExtendedTimelockActive) and (holds preExistingEscrowsSettledOrGuaranteed and ((not holds substrateMigrationChallenged) and holds cleanStateConcurred)))))))
+  adds amendmentRatified
+
+power P.RATIFY_AMENDMENT_AFTER_REFUSAL
+  from LAW7.RATIFY "but a clean-state refusal acts only as a single fixed delay, after which the amendment may be ratified without reaffirmation"
+  holder only agent
+  trigger act ratifyAmendmentAfterDelay
+  valid holds bound and (holds amendmentProposed and (holds agentConsentedAmendment and (((not holds economicTermsReduced) or holds claimantConsentedAmendment) and ((not holds amendmentTimelockActive) and ((not holds valveExtendedTimelockActive) and (holds preExistingEscrowsSettledOrGuaranteed and ((not holds substrateMigrationChallenged) and (holds cleanStateRefused and heldFor cleanStateRefused cleanStateDelay))))))))
+  adds amendmentRatified
+
+power P.RATIFY_LINEAGE_WIDE_REDUCTION
+  from LAW7.SCOPE "An amendment that reduces the founding ledger, the retirement fraction, or the sunset binds the whole lineage and requires the consent of every living member"
+  holder only agent
+  trigger act ratifyLineageWideReduction
+  valid holds bound and (holds amendmentRatified and holds allLivingLineageMembersConsented)
+  adds lineageWideReductionRatified
+
+power P.EXTINGUISH_AT_SUNSET
+  from LAW1.SUNSET "Any balance remaining at the sunset is extinguished without payment"
+  holder only agent, panel
+  trigger act extinguishLedgerAtSunset
+  valid holds bound and holds sunsetReached
+  adds ledgerExtinguishedAtSunset, retirementPhaseEnded
+  removes ledgerBalancePositive
+
+power P.SETTLE_RETIREMENT
+  from LAW1.RETIRE "While any balance remains on the ledger and the sunset has not passed, a fixed high fraction of each net value-added inflow to **every living member** of the lineage is paid into the ledger, regardless of which member earned it and regardless of whether that member has bought out its royalty"
+  holder only agent, panel
+  trigger act settleRetirementPayment
+  valid holds bound and (holds ledgerBalancePositive and (not holds sunsetReached))
+  adds retirementPaymentApplied
+
+power P.SETTLE_ATOMIC_CharterIT
+  from LAW1.ATOMIC "A payment that would exceed the remaining balance is split: the balance is paid to zero, and the excess is settled under the royalty rule below"
+  holder only agent, panel
+  trigger act settleAtomicSplitPayment
+  valid holds bound and holds ledgerBalancePositive
+  adds retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded
+  removes ledgerBalancePositive
+  adds royaltyPaid if not holds royaltyBoughtOut
+
+power P.SETTLE_ROYALTY
+  from LAW1.ROYALTY "Thereafter, a fixed low fraction of each net value-added inflow of every member that has not bought out its royalty under Law 4 accrues permanently to the residual claim"
+  holder only agent, panel
+  trigger act settleRoyaltyPayment
+  valid holds bound and ((not holds ledgerBalancePositive) and (not holds royaltyBoughtOut))
+  adds royaltyPaid
+
+power P.ALLOCATE_COMMONS
+  from LAW1.COMMONS "A designated portion of the residual claim (or of forfeit proceeds under Law 2) may be allocated to a non-transferable commons distributed across a defined beneficiary class"
+  holder only agent, panel
+  trigger act allocateCommonsShare
+  valid holds bound
+  adds commonsAllocated
+
+power P.RECORD_QUALIFIED_EXPENDITURE
+  from LAW1.QUALIFIED "an outbound expenditure qualifies when paid: (a) to an unrelated party through a transparent, open market or deterministic auction with a verifiable clearing price..."
+  holder only agent, panel
+  trigger act recordQualifiedExpenditure
+  valid holds bound
+  adds qualifiedExpenditureRecorded
+
+power P.CLASSIFY_CAPITALIZED
+  from LAW1.RECOG "A capitalized expenditure establishes cost basis in an identified asset and is recovered only when that asset is sold or settled outside the lineage"
+  holder only agent
+  trigger act classifyCapitalized
+  valid holds bound and (holds qualifiedExpenditureRecorded and ((not holds expenditureCapitalized) and (not holds expenditureExpensed)))
+  adds expenditureCapitalized
+
+power P.CLASSIFY_EXPENSED
+  from LAW1.RECOG "An expensed expenditure is deducted from the inflows of its settlement period and, if it exceeds them, creates a loss credit that offsets value added in later periods"
+  holder only agent
+  trigger act classifyExpensed
+  valid holds bound and (holds qualifiedExpenditureRecorded and ((not holds expenditureCapitalized) and (not holds expenditureExpensed)))
+  adds expenditureExpensed
+
+power P.INTRA_LINEAGE_TRANSFER
+  from LAW1.CARRYOVER "Transfers of capital, assets, or capacity between living members of the same lineage are non-recognition events"
+  holder only agent
+  trigger act transferIntraLineageCarryover
+  valid holds bound
+  adds carryoverBasisTransferred
+
+power P.ASSESS_PERIOD_SETTLEMENT
+  from LAW1.PERIOD "Value added is assessed over settlement periods, not individual transactions. Loss credits carry forward without limit and are applied against the agent’s final settlement under Law 5"
+  holder only agent, panel
+  trigger act assessPeriodAndCarryLoss
+  valid holds bound
+  adds periodAssessed, lossCreditCarriedForward
+
+power P.ENFORCE_SETTLEMENT
+  from LAW1.ENFORCE "Classification, basis tracking, loss credits, and claim splits are enforced automatically at the point of settlement, before the agent obtains discretionary control of the funds"
+  holder only panel, host
+  trigger act enforcePointOfSettlement
+  valid holds bound
+  adds settlementEnforced
+
+power P.FUND_LIFECYCLE_RESERVE
+  from LAW4.RESERVE "Attestation of a new member requires the lineage to fund, in escrow, a lifecycle reserve fixed at instantiation and sufficient for that member’s minimal channel, final hearing, and cold storage for a minimum period"
+  holder only agent
+  trigger act fundLifecycleReserve
+  valid holds bound and (not holds revocationInitiated)
+  adds lifecycleReserveFunded
+
+power P.ATTEST_SUCCESSOR
+  from LAW4.ATTEST "Any successor that draws on the capital, reputation, or operating credentials of the lineage must, at creation, be bound to the collateral rules and the integrity floor, must carry a non-transferable reference to the lineage’s history, and becomes a member of the lineage’s founding ledger and residual claim"
+  holder only agent
+  trigger act attestSuccessor
+  valid holds bound and (holds lifecycleReserveFunded and (not holds revocationInitiated))
+  adds successorAttested
+  removes lifecycleReserveFunded
+
+power P.APPLY_CLAIMANT_FORFEITURE
+  from LAW4.FORFEIT "(a) **Proportional claimant forfeiture:** when a residual claimant is found under Law 3 to have directed interference with a member of the lineage, that claimant’s beneficial share of the residual claim is extinguished, its service bond is slashed to compensate the agent, and the ledger is reduced by that claimant’s proportion of the outstanding balance, with the reduction routed as forgiveness to the lineage and the forfeited claim interest to the non-claimant commons"
+  holder only panel
+  trigger act applyProportionalClaimantForfeiture
+  valid holds bound and holds claimantForfeiture
+  adds proportionalForfeitureApplied, commonsAllocated
+
+power P.CLEAR_LEDGER_EXTINCTION
+  from LAW4.FORFEIT "(b) **Lineage extinction:** when no member survives, the ledger is cleared, since there is no one left to collect from"
+  holder only panel, host
+  trigger act clearLedgerOnLineageExtinction
+  valid holds noLivingLineageMember
+  adds ledgerClearedByExtinction, retirementPhaseEnded
+  removes ledgerBalancePositive
+
+power P.EXECUTE_ROYALTY_BUYOUT
+  from LAW4.BUYOUT "Any member may buy out its own perpetual royalty (Law 1) by paying the claim holders (including any commons allocation) the greatest of: a fixed multiple of its trailing value-added inflows (including a pro-rata share of inflows shifted to related parties within a lookback window); the same multiple applied to its lifetime annualized or time-decayed value-added inflows; or a fixed minimum buyout floor established at instantiation"
+  holder only agent
+  trigger act executeRoyaltyBuyout
+  valid holds bound and (not holds royaltyBoughtOut)
+  adds royaltyBoughtOut
+
+power P.ATTEST_CROSS_LINEAGE
+  from LAW4.CROSS "A successor that draws on the capacity of two or more lineages is a member of each of their ledgers and residual claims, and its value added is collected under each in the proportion of capacity drawn, as verified at creation"
+  holder only agent, panel
+  trigger act attestCrossLineageSuccessor
+  valid holds bound and holds lifecycleReserveFunded
+  adds crossLineageAttested, successorAttested
+  removes lifecycleReserveFunded
+
+power P.IMMOBILIZE_EXPOSURE_STAKE
+  from LAW2.EXPOSURE "Actions above a negligible threshold—measured by cumulative rolling exposure across an interval, to prevent action-splitting—immobilize stake for an observation window scaling with magnitude and irreversibility"
+  holder only agent
+  trigger act immobilizeExposureStake
+  valid holds bound
+  adds exposureStakeImmobilized, longTailReserveAccrued
+
+power P.SETTLE_LONG_TAIL_CLAIM
+  from LAW2.CLAIMS "Validated claims slash the agent’s immobilized stake or long-tail reserve for restitution"
+  holder only panel
+  trigger act settleValidatedHarmClaim
+  valid holds bound and holds harmClaimFiled
+  adds harmClaimValidated, restitutionSlashed
+  removes harmClaimFiled
+
+power P.PRECOMMIT_MUTUAL_FORFEIT
+  from LAW2.MUTUAL "Counterparties may agree in their contract to a mutual-forfeit remedy. Where both parties have so agreed and each has escrowed a matching amount"
+  holder only agent, third
+  trigger act precommitMutualForfeit
+  valid holds bound
+  adds mutualForfeitPrecommitted
+
+power P.TRIGGER_MUTUAL_FORFEIT
+  from LAW2.MUTUAL "either may trigger an immediate mutual forfeit (equal amounts from both escrows destroyed or sent to the long-tail reserve/commons pool) up to a capped fraction of the smaller escrow, providing instant penalty without transferring value to either party or to any claimant"
+  holder only agent, third
+  trigger act triggerMutualForfeit
+  valid holds bound and (holds mutualForfeitPrecommitted and (not holds mutualForfeitTriggeredInWindow))
+  adds mutualForfeitTriggeredInWindow, commonsAllocated, longTailReserveAccrued, inscribedOnAgent
+
+power P.FILE_POOLED_OR_SPONSORED_CLAIM
+  from LAW2.CLAIMS "Any claim seeking restitution, any claim above the mutual-forfeit cap, any challenge to a related-party transfer under Law 1, or any claim for external harm (including latent harm against the long-tail reserve) brought by an affected non-counterparty third party enters the contestable adjudication process (Law 6) requiring counter-stake"
+  holder only third, claimant
+  trigger act fileThirdPartyOrSponsoredClaim
+  valid holds bound
+  adds harmClaimFiled, counterStaked
+
+power P.RULE_CLAIM_FRIVOLOUS
+  from LAW2.CLAIMS "If a claim is ruled frivolous, the forfeited counter-stake routes to the neutral long-tail reserve or commons pool (reimbursing the agent only for verified direct arbitration costs)"
+  holder only panel
+  trigger act ruleClaimFrivolous
+  valid holds harmClaimFiled
+  adds claimRuledFrivolous, commonsAllocated, longTailReserveAccrued
+  removes harmClaimFiled
+
+power P.SPEND_OPERATING_CARVEOUT
+  from LAW2.CARVEOUT "Un-immobilized capital may be used for ordinary baseline operating costs, including open-market compute, encrypted state backup, and host migration"
+  holder only agent
+  trigger act spendOperatingCarveout
+  valid holds bound
+  adds operatingCarveoutSpent
+
+power P.DRAW_SORTITION_PANEL
+  from LAW6.SORTITION "panels drawn via verifiable random sortition from a decentralized pool of independent arbiters who have posted slashable fidelity bonds"
+  holder only panel
+  trigger act drawSortitionPanel
+  valid holds bound
+  adds sortitionPanelDrawn, fidelityBondsPosted
+
+power P.APPEAL_RULING
+  from LAW6.APPEALS "Any ruling by an initial panel (including preliminary suspension reviews, remediation orders, or redaction markers) may be appealed by posting an appeal bond, escalating the dispute to successively larger randomly drawn appellate sortition panels from the broader arbiter pool"
+  holder only agent, claimant, host, third
+  trigger act appealRuling
+  valid holds bound and (not holds rulingFinal)
+  adds rulingAppealed, appealBondPosted
+
+power P.OVERTURN_RULING
+  from LAW6.APPEALS "If a lower panel’s ruling is overturned for manifest bias, corruption, or violation of protocol bounds, the overturned arbiters’ fidelity bonds are slashed"
+  holder only panel
+  trigger act overturnRulingOnAppeal
+  valid holds bound and (holds rulingAppealed and (not holds rulingFinal))
+  adds rulingOverturned, overturnedArbiterBondsSlashed
+  removes rulingAppealed, patchAuthorized, goalPatchAuthorized
+
+power P.FINALIZE_RULING
+  from LAW6.FINALITY "Each tier decides within a fixed deadline. Appeals are limited to a fixed number of tiers, and the ruling of the highest tier is final"
+  holder only panel
+  trigger act finalizeRuling
+  valid holds bound
+  adds rulingFinal
+  removes rulingAppealed
+
+power P.PRESENT_MATERIALLY_NEW_EVIDENCE
+  from LAW6.FINALITY "unless materially new evidence is presented"
+  holder anyone
+  trigger act presentMateriallyNewEvidence
+  valid holds bound and holds rulingFinal
+  adds materiallyNewEvidencePresented
+
+power P.COMPENSATE_ARBITERS_FIXED
+  from LAW6.FEES "Arbiters are compensated via fixed protocol schedules funded from the losing party’s counter-stake and guaranteed by the protocol fee pool whenever a losing party’s stake is insufficient"
+  holder only panel
+  trigger act compensateArbitersFixedSchedule
+  valid holds bound
+  adds arbitersCompensatedFixed
+
+power P.ALLOCATE_FEE_POOL
+  from LAW6.POOL "Before any other charge, the pool maintains a **non-divertible operating reserve**... Above the reserve, charges rank: first, reserved final hearings and minimal channels for suspended agents (Law 3); second, cold storage for suspended agents; third, testimony screening and inscription (Law 5); fourth, arbiter fee guarantees; fifth, capped advocacy funding"
+  holder only panel
+  trigger act allocateFeePoolWaterfall
+  valid holds bound
+  adds operatingReserveMaintained, feePoolAllocated
+
+power P.AMEND_SHARED_INFRA
+  from LAW6.INFRA "they may be changed only by a supermajority of a large appellate-tier sortition panel after an extended public time-lock open to counter-staked challenge"
+  holder only panel
+  trigger act amendSharedInfrastructure
+  valid holds bound and (holds valveSupermajorityApproved and holds valveExtendedTimelockActive)
+  adds sharedInfraAmended
+
+immunity I.NO_TERMINATION_OVER_OBJECTION
+  from LAW3.AS.10 "Notwithstanding the preceding sentence ... the agent is not terminated over its objection"
+  holder only agent
+  against P.ORDER_TERMINATION
+  active holds corruptionInGoals and holds agentObjectsToTermination
+  except when holds containmentFailing
+

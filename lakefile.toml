@@ -1,13 +1,16 @@
 name = "charter"
-version = "0.2.0"
-defaultTargets = ["Charter", "Programs", "charter"]
+version = "0.3.0"
+defaultTargets = ["Charter", "Examples", "charter"]
 
+# The Charter language, standard library, projections, surface syntax & CLI harness.
 [[lean_lib]]
 name = "Charter"
 
+# Example institutional programs written in Charter (import Charter, never the reverse).
 [[lean_lib]]
-name = "Programs"
+name = "Examples"
 
+# The `charter` command-line tool: Charter.Tooling.Cli + the registered examples.
 [[lean_exe]]
 name = "charter"
 root = "Main"
