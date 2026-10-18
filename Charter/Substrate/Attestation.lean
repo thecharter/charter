@@ -359,33 +359,3 @@ export Substrate (
 )
 
 end Charter
-
-namespace Charter.Law3
-
-export Charter.Substrate (
-  ExecutionLease
-  AttestedInstanceState
-  AttestedStateMachine
-  leaseActiveAt
-  issueLease
-  attemptBackupRestore
-  quarantineRestore
-  migrateWithCheckpoint
-  recordMinimalChannel
-  recordAdvocacyMemory
-  executeLocalPartitionRevocation
-  executeLocalRevocation
-  eraseAllKeys
-  substrate_restore_fenced_while_lease_active
-  substrate_key_erasure_irreversible
-  substrate_pause_channels_preserve_operating_state
-  substrate_pause_channels_non_interference
-  substrate_migrate_fenced_while_lease_active
-  substrate_erase_all_keys_irreversible
-  substrate_local_revocation_erases_keys
-  substrate_local_revocation_respects_cooling_off
-  substrate_restore_succeeds_after_lease_expiry
-  substrate_single_authority_and_erasure
-)
-
-end Charter.Law3

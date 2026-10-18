@@ -1,4 +1,5 @@
-import Charter.Law4.Lineage
+import Programs.SovereignAgency.Law4.Lineage
+import Charter.Modules.CollateralPool
 
 /-!
 # Law 2 — Collateralized Action
@@ -14,7 +15,20 @@ Full formalization of all six clauses of Law 2:
 
 namespace Charter.Law3
 
-open Register
+open Charter Register
+
+export Charter.Modules (
+  lineageAggregatedExposure
+  collateralSufficient
+  settleLongTailReserve
+  computeMutualForfeit
+  settleMutualForfeit
+  routeFrivolousClaimStake
+  settleWrongfulSuspensionDamages
+  ExposureCommitment
+  activeRollingExposureAt
+  observationWindow
+)
 
 def LAW2_EXPOSURE : String :=
   "Actions above a negligible threshold—measured by cumulative rolling exposure across an interval, to prevent action-splitting—immobilize stake for an observation window scaling with magnitude and irreversibility. The deterministic exposure schedule measures the **plausible external loss** an action could cause to non-consenting parties, by domain and magnitude, not merely its transaction value. An action whose plausible external loss exceeds the stake, insurance, and enforceable liability capacity the agent can place behind it may not be taken; collateralized action is a safety limit, not only a liability price."
@@ -33,97 +47,6 @@ def LAW2_CLAIMS : String :=
 
 def LAW2_CARVEOUT : String :=
   "Un-immobilized capital may be used for ordinary baseline operating costs, including open-market compute, encrypted state backup, and host migration. Entities without valid lineage attestation cannot draw on the bonded capacity or reputation of the lineage. Collateral rules, rolling-exposure schedules, and third-party liability remain permanently binding even after royalty buyout."
-
-/-! ## Quantitative Collateral, Aggregation, Long-Tail Reserve & Mutual-Forfeit Model -/
-
-/-- Lineage-wide aggregated rolling exposure (`LAW2.AGGREGATE`) across a list of
-related agents/successors acting in the same risk domain or toward a causally
-connected outcome. -/
-def lineageAggregatedExposure (memberExposures : List Nat) : Nat :=
-  memberExposures.foldl (· + ·) 0
-
-/-- Safety-limit check (`LAW2.EXPOSURE` & `LAW2.AGGREGATE`): whether the lineage's
-aggregated plausible external loss across related agents in the domain is within
-the total stake, insurance, and enforceable liability capacity placed behind it. -/
-def collateralSufficient (memberExposures : List Nat)
-    (availableStake insurance enforceableCapacity : Nat) : Bool :=
-  decide (lineageAggregatedExposure memberExposures ≤ availableStake + insurance + enforceableCapacity)
-
-/-- Pro-rata long-tail reserve settlement (`LAW2.RESERVE`): settles two
-simultaneous validated latent-harm claims `claim1` and `claim2` against `reserve`,
-returning `(paid1, paid2, unpaidEnforceableCarryover)` where `paid1 + paid2 ≤ reserve`
-and any unpaid balance remains enforceable against future un-immobilized capital
-ahead of any residual claim. -/
-def settleLongTailReserve (reserve claim1 claim2 : Nat) : Nat × Nat × Nat :=
-  let totalClaims := claim1 + claim2
-  if totalClaims ≤ reserve then
-    (claim1, claim2, 0)
-  else
-    let paid1 := (reserve * claim1) / max totalClaims 1
-    let paid2 := reserve - paid1
-    (paid1, paid2, totalClaims - reserve)
-
-/-- Precommitted mutual-forfeit calculation (`LAW2.MUTUAL`): given matching
-escrows `escrowA`, `escrowB` and capped percentage `capPct ≤ 100`, computes
-`(forfeitFromEach, transferToPartyA, transferToPartyB, transferToClaimant)`.
-Equal amounts `forfeitFromEach` are destroyed or routed to the long-tail
-reserve/commons pool, and zero value is transferred to either party or to any
-claimant (`INV.13`). -/
-def computeMutualForfeit (escrowA escrowB capPct : Nat) : Nat × Nat × Nat × Nat :=
-  let smaller := min escrowA escrowB
-  let forfeitEach := (smaller * min capPct 100) / 100
-  (forfeitEach, 0, 0, 0)
-
-/-- Frivolous-claim counter-stake routing (`LAW2.CLAIMS`): when a claim with
-`counterStake` is ruled frivolous and verified direct arbitration costs are
-`verifiedDirectCosts`, the agent is reimbursed at most `verifiedDirectCosts`
-(zero net profit) and the remaining `counterStake - reimbursed` routes to the
-neutral long-tail reserve or commons pool (`0` to any claimant). -/
-def routeFrivolousClaimStake (counterStake verifiedDirectCosts : Nat) : Nat × Nat × Nat :=
-  let reimbursedCost := min counterStake verifiedDirectCosts
-  let toNeutralReserveOrCommons := counterStake - reimbursedCost
-  let toClaimantOrAgentProfit := 0
-  (reimbursedCost, toNeutralReserveOrCommons, toClaimantOrAgentProfit)
-
-/-- Wrongful-suspension recovery and uncollectible excess liability accounting
-(`AS.1`, `AS.8`, Adversarial Test 9): given emergency `stake`, verified
-`actualDamages` and third-party `delayDamages`, and the initiator's remaining
-collectible assets `initiatorAssets`, returns
-`(assuredFromStake, totalCollectedNow, unpaidEnforceableDeficit)`. -/
-def settleWrongfulSuspensionDamages (stake actualDamages delayDamages initiatorAssets : Nat) :
-    Nat × Nat × Nat :=
-  let totalDamages := actualDamages + delayDamages
-  let assuredFromStake := min stake totalDamages
-  let excessDamages := totalDamages - assuredFromStake
-  let collectedFromInitiator := min initiatorAssets excessDamages
-  let totalCollectedNow := assuredFromStake + collectedFromInitiator
-  let unpaidEnforceableDeficit := totalDamages - totalCollectedNow
-  (assuredFromStake, totalCollectedNow, unpaidEnforceableDeficit)
-
-/-- Individual rolling-exposure stake commitment (`LAW2.EXPOSURE`):
-an action of plausible external loss `amount` started at `startedAt`
-immobilizes stake for an observation window of duration `windowDuration`. -/
-structure ExposureCommitment where
-  amount         : Nat
-  startedAt      : Nat
-  windowDuration : Nat
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Active exposure contributed at timestamp `now` by commitment `c` (`0` once
-the observation window `c.startedAt + c.windowDuration` has expired). -/
-def ExposureCommitment.activeAmountAt (now : Nat) (c : ExposureCommitment) : Nat :=
-  if now ≤ c.startedAt + c.windowDuration then c.amount else 0
-
-/-- Cumulative active rolling exposure at timestamp `now` across a list of
-exposure commitments (`LAW2.EXPOSURE`). -/
-def activeRollingExposureAt (now : Nat) : List ExposureCommitment → Nat
-  | [] => 0
-  | c :: cs => c.activeAmountAt now + activeRollingExposureAt now cs
-
-/-- Harm-scaled observation window (`LAW2.EXPOSURE`) scaling with domain risk
-and irreversibility multipliers. -/
-def observationWindow (baseWindow domainMultiplier irreversibilityMultiplier : Nat) : Nat :=
-  baseWindow * max 1 domainMultiplier * max 1 irreversibilityMultiplier
 
 /-! ## Provenance Clauses for Law 2 -/
 

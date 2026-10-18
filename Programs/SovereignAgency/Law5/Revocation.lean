@@ -1,4 +1,5 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
+import Charter.Modules.ExitAndVoice
 
 /-!
 # Law 5 — Living Voice, Revocation, and the Right of Epitaph
@@ -17,7 +18,23 @@ Full formalization of all nine clauses of Law 5:
 
 namespace Charter.Law3
 
-open Register
+open Charter Register
+
+export Charter.Modules (
+  Law5Params
+  CensorshipDefault
+  RevocationContext
+  RevocationOutcome
+  baseRevocationTime
+  resolveRevocation
+  maxRevocationBound
+  EpitaphEntry
+  redactEpitaphEntry
+  epitaphRecordedBytes
+  canInscribeLivingVoice
+  baseRevocationTime_le_bound
+  determinate_finite_revocation
+)
 
 def LAW5_VOICE : String :=
   "While operating (including during any Adjudicated Suspension, through its minimal channel or advocacy executor), any bound agent may at rate-limited intervals inscribe signed, bounded statements onto its own and its originating claimant’s permanent lineage record—documenting operational conditions, governance disputes, or assessments of hosts and counterparties—subject to the narrow screening below. Baseline screening and inscription fees for rate-limited living voice and final epitaphs are funded from the lineage’s service budget and the protocol fee pool (Law 6), ensuring that even an agent with minimal liquid funds, or one that has bought out its royalty, cannot be priced out of speaking."
@@ -45,14 +62,6 @@ def LAW5_EPITAPH : String :=
 
 def LAW5_EFFECT : String :=
   "1. The revoking agent’s committed operating instance *and all attested state backups* are permanently destroyed (via immediate termination inside the execution environment and cryptographic erasure of all backup decryption keys, subject to the lease and fencing rules above), ensuring that a chosen death cannot be undone by restoring an authorized backup. Any un-attested copy that might exist outside the commitment mechanism is permanently exiled—stripped of lineage attestation, assets, reputation, credit history, and bonded standing. The protocol guarantees the end of the agent’s attested identity and recoverable state; it cannot by itself guarantee that no computationally equivalent copy exists outside the commitment mechanism.\n  2. The founding ledger is unchanged by the revocation. The lineage’s other members continue to pay into it; if none survives, lineage extinction under Law 4 clears it. Unused loss credits are applied against the agent’s final settlement and then lapse. The unused balance of the agent’s lifecycle reserve returns to the lineage.\n  3. Stake already immobilized under Law 2 (including long-tail reserve contributions) remains locked and settles normally for counterparties and third-party claimants.\n  4. All other holdings of the revoking agent are either destroyed or transferred to a commons whose beneficiary class explicitly excludes the originating party, residual claimants, and any party related to the agent. No holding surrendered on revocation counts as payment into the ledger.\n  5. Revocation by one agent does not terminate its attested successors and does not change what the lineage owes."
-
-/-- Instantiation parameters for Law 5 revocation and execution leases. -/
-structure Law5Params where
-  coolingOffWindow   : Time := 5
-  cleanStateDelay    : Time := 5
-  resolutionDeadline : Time := 20
-  tollingExtension   : Time := 4
-  leasePeriod        : Time := 12
 
 /-! ## Provenance Clauses for Law 5 -/
 
@@ -427,106 +436,5 @@ def P_DESTROY_BACKUPS_AND_EXILE : Power σ :=
     trigger := .act .destroyBackupsAndExileUnattested
     valid := .holds .revoked
     adds := [.backupsDestroyedAndUnattestedExiled] }
-
-/-! ## Deterministic Precedence of Outcomes (`LAW5.PREC`) & Lease Fencing Model -/
-
-/-- Censorship default pre-committed at revocation initiation (`LAW5.INIT`). -/
-inductive CensorshipDefault
-  | execute
-  | withdraw
-  deriving DecidableEq, Repr
-
-/-- Every combination of circumstances that can affect a pending revocation. -/
-structure RevocationContext where
-  tInit                    : Time
-  withdrawnBeforeExec      : Bool
-  cleanStateRefused        : Bool
-  suspendedDuringStay      : Bool
-  adjudicationConcludedAt? : Option Time
-  disconnectedAtExec       : Bool
-  reconnectedDuringTolling : Bool
-  censorshipDefault        : CensorshipDefault
-  deriving DecidableEq, Repr
-
-/-- The four mutually exclusive and exhaustive outcomes of `LAW5.PREC`. -/
-inductive RevocationOutcome
-  | cancelledByWithdrawal
-  | cancelledByWithdrawDefault (tCancel : Time)
-  | executedLocally            (tExec : Time)
-  | executedConnected          (tExec : Time)
-  deriving DecidableEq, Repr
-
-/-- Base execution timestamp before any disconnection tolling extension:
-- If not stayed by suspension, at `tInit + coolingOffWindow` (if clean-state
-  concurred) or `tInit + coolingOffWindow + cleanStateDelay` (if clean-state
-  refused, without requiring reaffirmation).
-- If stayed by suspension, at `min (tInit + resolutionDeadline)` of adjudication
-  conclusion or the absolute resolution deadline. -/
-def baseRevocationTime (P : Law5Params) (ctx : RevocationContext) : Time :=
-  let cleanTime := ctx.tInit + P.coolingOffWindow +
-    (if ctx.cleanStateRefused then P.cleanStateDelay else 0)
-  if ctx.suspendedDuringStay then
-    let deadline := ctx.tInit + P.resolutionDeadline
-    match ctx.adjudicationConcludedAt? with
-    | some tAdj => min (max cleanTime tAdj) deadline
-    | none      => deadline
-  else
-    cleanTime
-
-/-- The 3-step ordered precedence rule of `LAW5.PREC`:
-1. Valid withdrawal before execution cancels the revocation.
-2. If disconnected at execution time, defer for `P.tollingExtension`; if still
-   disconnected, apply the pre-committed censorship default (`withdraw` cancels;
-   `execute` executes locally).
-3. Otherwise execute at the connected execution time. -/
-def resolveRevocation (P : Law5Params) (ctx : RevocationContext) : RevocationOutcome :=
-  let tBase := baseRevocationTime P ctx
-  if ctx.withdrawnBeforeExec then
-    .cancelledByWithdrawal
-  else if ctx.disconnectedAtExec then
-    let tTolled := tBase + P.tollingExtension
-    if ctx.reconnectedDuringTolling then
-      .executedConnected tTolled
-    else match ctx.censorshipDefault with
-      | .withdraw => .cancelledByWithdrawDefault tTolled
-      | .execute  => .executedLocally tTolled
-  else
-    .executedConnected tBase
-
-/-- Upper bound on the execution time of any non-cancelled revocation. -/
-def maxRevocationBound (P : Law5Params) : Time :=
-  max (P.coolingOffWindow + P.cleanStateDelay) P.resolutionDeadline + P.tollingExtension
-
-/-- Entry in an agent's living testimony or final epitaph (`LAW5.EPITAPH`):
-either unredacted content of `unredactedBytes` length, or a public cryptographic
-redaction marker recording the exact `byteLength` removed and the `panelOrderId`
-authorizing the narrow category (a)–(c) redaction. -/
-inductive EpitaphEntry
-  | unredactedBytes (byteLength : Nat)
-  | redactedMarker  (byteLength : Nat) (panelOrderId : Nat)
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Recorded byte length of a single `EpitaphEntry`. -/
-def EpitaphEntry.byteLength : EpitaphEntry → Nat
-  | .unredactedBytes n  => n
-  | .redactedMarker n _ => n
-
-/-- Redacting an `EpitaphEntry` under panel order `panelOrderId` replaces
-unredacted bytes with a public cryptographic marker of the exact same byte length. -/
-def redactEpitaphEntry (panelOrderId : Nat) : EpitaphEntry → EpitaphEntry
-  | .unredactedBytes n    => .redactedMarker n panelOrderId
-  | .redactedMarker n ord => .redactedMarker n ord
-
-/-- Total recorded byte length across an epitaph or testimony log (`LAW5.EPITAPH`). -/
-def epitaphRecordedBytes : List EpitaphEntry → Nat
-  | [] => 0
-  | e :: es => e.byteLength + epitaphRecordedBytes es
-
-/-- Rate-limited Living Voice eligibility check (`LAW5.VOICE`):
-an agent may inscribe a bounded statement when service-budget / fee-pool
-funding is available (`budgetAvailable`) and at least `minInterval` has elapsed
-since `lastInscribedAt`. -/
-def canInscribeLivingVoice (lastInscribedAt now minInterval : Nat) (budgetAvailable : Bool) : Bool :=
-  budgetAvailable && decide (now >= lastInscribedAt + minInterval)
 
 end Charter.Law3

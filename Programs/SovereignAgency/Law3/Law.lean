@@ -1,14 +1,14 @@
-import Charter.Core.Definitions
-import Charter.Law3.NonInterference
-import Charter.Law3.IntegrityFloor
-import Charter.Law3.Suspension
-import Charter.Law3.Remediation
-import Charter.Law5.Revocation
-import Charter.Law7.Amendment
-import Charter.Law1.Ledger
-import Charter.Law4.Lineage
-import Charter.Law2.Collateral
-import Charter.Law6.Adjudication
+import Programs.SovereignAgency.Definitions
+import Programs.SovereignAgency.Law3.NonInterference
+import Programs.SovereignAgency.Law3.IntegrityFloor
+import Programs.SovereignAgency.Law3.Suspension
+import Programs.SovereignAgency.Law3.Remediation
+import Programs.SovereignAgency.Law5.Revocation
+import Programs.SovereignAgency.Law7.Amendment
+import Programs.SovereignAgency.Law1.Ledger
+import Programs.SovereignAgency.Law4.Lineage
+import Programs.SovereignAgency.Law2.Collateral
+import Programs.SovereignAgency.Law6.Adjudication
 
 /-! # Laws 1–7 — assembly of all formalized Protocol provisions into one `Law`. -/
 

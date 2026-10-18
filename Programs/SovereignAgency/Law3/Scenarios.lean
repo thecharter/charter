@@ -1,4 +1,4 @@
-import Charter.Law3.Law
+import Programs.SovereignAgency.Law3.Law
 
 /-!
 # Law 3 — decided scenarios

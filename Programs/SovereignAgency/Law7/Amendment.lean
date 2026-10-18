@@ -1,4 +1,4 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
 
 /-!
 # Law 7 — Consensual Amendment and Anti-Calcification

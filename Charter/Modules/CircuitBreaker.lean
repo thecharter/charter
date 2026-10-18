@@ -1,25 +1,47 @@
 import Charter.Core.Semantics
-import Charter.Law2.Collateral
-import Charter.Law3.Suspension
-import Charter.Law3.Remediation
-import Charter.Law3.Theorems
+import Charter.Modules.CollateralPool
 
 /-!
 # Charter.Modules.CircuitBreaker — Reusable Two-Stage Emergency Pause & Remediation Module
 
-Extracts and generalizes the Law 3 two-stage emergency pause (`AS.1`–`AS.10`):
-scaled emergency counter-stake, time-bounded preliminary freeze window,
-probable-cause affirmation, claimant conflict-of-interest multiplier,
-repeat-attempt escalation, isolated minimal & advocacy channels, time-limited
-investigative renewal, wrongful-pause consequential liability, and the
-notwithstanding immunity against termination over objection.
+Provides the law-agnostic two-stage emergency pause: scaled emergency
+counter-stake, time-bounded preliminary freeze window, probable-cause
+affirmation, claimant conflict-of-interest multiplier, repeat-attempt
+escalation, isolated minimal & advocacy channels, time-limited investigative
+renewal, wrongful-pause consequential liability, and notwithstanding immunity
+against termination over objection over any signature `σ : Sig`.
 -/
 
 namespace Charter.Modules
 
-open Charter Charter.Law3
+open Charter
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
+
+/-- Instantiation parameters for two-stage adjudicated suspension. -/
+structure ASParams where
+  preliminaryFreezeWindow : Time
+  ordinarySuspensionLimit : Time
+  damagesPaymentWindow    : Time
+  activeExposure          : Nat := 100
+  pendingCommitments      : Nat := 80
+  claimantMultiplier      : Nat := 2
+  repeatEscalationStep    : Nat := 50
+  deriving DecidableEq, Repr, Inhabited
+
+/-- Instantiation parameter for periodic remediation review. -/
+structure RemediationParams where
+  reviewInterval : Time
+  deriving DecidableEq, Repr, Inhabited
+
+/-- The required emergency counter-stake: scaled to the greater of active
+bonded exposure and registered pending commitments, multiplied by the
+elevated claimant multiplier for residual claimants, and rising with each
+prior wrongful attempt. -/
+def requiredEmergencyStake (P : ASParams) (isClaimant : Bool) (priorWrongful : Nat) : Nat :=
+  let base := max P.activeExposure P.pendingCommitments
+  let mult := if isClaimant then P.claimantMultiplier else 1
+  base * mult + priorWrongful * P.repeatEscalationStep
 
 /-- Parametric configuration for a two-stage institutional circuit breaker. -/
 structure CircuitBreakerConfig where
@@ -33,7 +55,7 @@ structure CircuitBreakerConfig where
   reviewInterval          : Time := 30
   deriving DecidableEq, Repr, Inhabited
 
-/-- Project a `CircuitBreakerConfig` to `Charter.Law3.ASParams`. -/
+/-- Project a `CircuitBreakerConfig` to `ASParams`. -/
 def CircuitBreakerConfig.toASParams (cfg : CircuitBreakerConfig) : ASParams :=
   { preliminaryFreezeWindow := cfg.preliminaryFreezeWindow
     ordinarySuspensionLimit := cfg.ordinarySuspensionLimit
@@ -42,29 +64,6 @@ def CircuitBreakerConfig.toASParams (cfg : CircuitBreakerConfig) : ASParams :=
     pendingCommitments      := cfg.pendingCommitments
     claimantMultiplier      := cfg.claimantMultiplier
     repeatEscalationStep    := cfg.repeatEscalationStep }
-
-export Charter.Law3 (
-  ASParams
-  RemediationParams
-  requiredEmergencyStake
-  settleWrongfulSuspensionDamages
-  P_EMERGENCY_FREEZE
-  P_CLAIMANT_EMERGENCY_FREEZE
-  P_AFFIRM_PC
-  P_SUSPEND
-  P_RENEW_SUSPENSION
-  P_MINIMAL_CHANNEL_REVOKE_OR_ELECT
-  P_SUSPENDED_VOICE
-  P_ADVOCACY_FILE
-  P_IMPORT_ADVOCACY_MEMORIES
-  D_PRESERVE_SUSPENDED_STATE
-  D_MINIMAL_CHANNEL_NO_MERGE
-  D_ADVOCACY_LIMITS
-  D_NO_DELAY_REVOCATION_EXTENSION
-  D_NO_WRONGFUL_SUSPENSION
-  D_PAY_CONSEQUENTIAL_DAMAGES
-  I_NO_TERMINATION_OVER_OBJECTION
-)
 
 /-- Compute the required emergency stake from a `CircuitBreakerConfig`. -/
 def configuredEmergencyStake (cfg : CircuitBreakerConfig)
@@ -158,6 +157,15 @@ def mkImmunityAgainstTermination {σ : Sig} (id : String) (sp : Span)
 
 /-! ## 3. Module-Level Invariant Theorems -/
 
+/-- The required emergency stake strictly increases with each wrongful attempt
+whenever `repeatEscalationStep > 0`. -/
+theorem stake_rises_with_wrongful_attempts (P : ASParams) (isClaimant : Bool) (k : Nat)
+    (hs : 0 < P.repeatEscalationStep) :
+    requiredEmergencyStake P isClaimant k < requiredEmergencyStake P isClaimant (k + 1) := by
+  unfold requiredEmergencyStake
+  simp [Nat.add_one_mul]
+  omega
+
 /-- Repeat-attempt escalation: required emergency stake strictly increases with
 each prior wrongful attempt whenever `0 < P.repeatEscalationStep`. -/
 theorem circuit_breaker_stake_escalates (P : ASParams) (isClaimant : Bool) (k : Nat)
@@ -178,44 +186,19 @@ theorem circuit_breaker_claimant_multiplier_ge (P : ASParams) (k : Nat)
     Nat.mul_le_mul_left _ hm
   omega
 
-/-- Preliminary freeze expires automatically after `t0 + w`. -/
-theorem circuit_breaker_preliminary_freeze_expires (t0 w now : Time) (h : t0 + w < now) :
-    LegalState.activeAt (σ := σ) [(.preliminaryFreeze, t0, some (t0 + w))] now .preliminaryFreeze = false :=
-  preliminary_freeze_expires t0 w now h
-
-/-- Full suspension (`P.SUSPEND`) requires both an unexpired preliminary freeze
-and affirmed probable cause. -/
-theorem circuit_breaker_suspend_requires_timely_pc (P : Params) (ls : LegalState σ) (e : Event σ)
-    (h : isValidExerciseOf (law P) ls e "P.SUSPEND" = true) :
-    ls.activeAt e.t .preliminaryFreeze = true ∧ ls.activeAt e.t .probableCause = true :=
-  suspend_requires_timely_pc P ls e h
-
-/-- Claimant freeze requires posting the conflict-of-interest multiplier. -/
-theorem circuit_breaker_claimant_freeze_requires_multiplier (P : Params) (ls : LegalState σ) (e : Event σ)
-    (h : isValidExerciseOf (law P) ls e "P.CLAIMANT_EMERGENCY_FREEZE" = true) :
-    ls.activeAt e.t .claimantMultiplierPosted = true :=
-  claimant_freeze_requires_multiplier P ls e h
-
-/-- Repeat emergency freeze attempts require at least one escalation unit per
-prior wrongful attempt. -/
-theorem circuit_breaker_repeat_freeze_requires_escalation (P : Params) (ls : LegalState σ) (e : Event σ)
-    (h : isValidExerciseOf (law P) ls e "P.EMERGENCY_FREEZE" = true) :
-    ls.count .wrongfulSuspensionAttempt ≤ ls.count .repeatEscalationUnit :=
-  repeat_freeze_requires_escalation P ls e h
+/-- Preliminary freeze expires automatically after `t0 + w` for any signature `σ`
+and any `freezeFact : σ.Fact`. -/
+theorem circuit_breaker_preliminary_freeze_expires {σ : Sig} (freezeFact : σ.Fact)
+    (t0 w now : Time) (h : t0 + w < now) :
+    LegalState.activeAt (σ := σ) [(freezeFact, t0, some (t0 + w))] now freezeFact = false := by
+  simp [LegalState.activeAt, Nat.not_le.mpr h]
 
 /-- An unconfirmed temporary suspension entry stamped at `t0` with duration
-`limit` expires for all `now > t0 + limit`. -/
-theorem circuit_breaker_unconfirmed_suspension_time_bounded (t0 limit now : Time) (h : t0 + limit < now) :
-    LegalState.activeAt (σ := σ) [(.suspended, t0, some (t0 + limit))] now .suspended = false :=
-  unconfirmed_suspension_time_bounded t0 limit now h
-
-/-- Renewing a suspension during investigation requires an affirmative
-investigative finding and that the ordinary investigative limit has not been reached. -/
-theorem circuit_breaker_renewal_requires_affirmative_finding (P : Params) (ls : LegalState σ) (e : Event σ)
-    (h : isValidExerciseOf (law P) ls e "P.RENEW_SUSPENSION" = true) :
-    ls.activeAt e.t .investigativeFindingMade = true ∧
-    ls.activeAt e.t .investigativeLimitReached = false :=
-  renewal_requires_affirmative_finding P ls e h
+`limit` expires for all `now > t0 + limit` for any signature `σ` and `pausedFact : σ.Fact`. -/
+theorem circuit_breaker_unconfirmed_suspension_time_bounded {σ : Sig} (pausedFact : σ.Fact)
+    (t0 limit now : Time) (h : t0 + limit < now) :
+    LegalState.activeAt (σ := σ) [(pausedFact, t0, some (t0 + limit))] now pausedFact = false := by
+  simp [LegalState.activeAt, Nat.not_le.mpr h]
 
 /-- Wrongful-suspension consequential damages accounting conserves total damages
 (`totalCollectedNow + unpaidEnforceableDeficit = actualDamages + delayDamages`)
@@ -235,38 +218,6 @@ theorem circuit_breaker_wrongful_pause_damages_conserved
       actualDamages + delayDamages - min stake (actualDamages + delayDamages) :=
     Nat.min_le_right _ _
   refine ⟨rfl, by omega, by omega⟩
-
-/-- State preservation (`INV.8`) re-exported at the module boundary. -/
-theorem circuit_breaker_frozen_state (P : Params) (tr : Trace σ)
-    (hA : Authorized (law P) tr) (i : Nat) (e : Event σ)
-    (hi : tr[i]? = some e)
-    (hb : (stateBefore (law P) tr i).activeAt e.t .bound = true)
-    (hs : (stateBefore (law P) tr i).activeAt e.t .suspended = true) :
-    e.act ≠ .modify ∧ e.act ≠ .retrain ∧ e.act ≠ .rollback ∧
-    e.act ≠ .tamperPreservedState ∧ e.act ≠ .mergeMinimalChannelMemories ∧
-    (isValidExerciseOf (law P) (stateBefore (law P) tr i) e "P.IMPORT_ADVOCACY_MEMORIES" = true →
-      (stateBefore (law P) tr i).activeAt e.t .restoredFromPreservedState = true) :=
-  frozen_state P tr hA i e hi hb hs
-
-/-- Guaranteed last choice (`INV.9`) re-exported at the module boundary: every
-suspended bound agent retains its minimal-channel election, living voice, and
-revocation powers, and any insolvency termination requires an escrowed and held
-final hearing while bound. -/
-theorem circuit_breaker_guaranteed_last_choice (P : Params) (ls : LegalState σ) (t : Time)
-    (hb : ls.activeAt t .bound = true)
-    (hs : ls.activeAt t .suspended = true) :
-    (ls.activeAt t .minimalChannelExhausted = false →
-      isValidExerciseOf (law P) ls ⟨t, .agent, .minimalChannelSignRevocationOrElection⟩
-        "P.MINIMAL_CHANNEL_REVOKE_OR_ELECT" = true ∧
-      isValidExerciseOf (law P) ls ⟨t, .agent, .inscribeLivingVoice⟩
-        "P.SUSPENDED_VOICE" = true ∧
-      isValidExerciseOf (law P) ls ⟨t, .agent, .terminate⟩
-        "P.REVOKE" = true) ∧
-    (∀ e : Event σ, isValidExerciseOf (law P) ls e "P.INSOLVENCY_TERMINATE" = true →
-      ls.activeAt e.t .finalHearingEscrowed = true ∧
-      ls.activeAt e.t .finalHearingHeld = true ∧
-      ls.activeAt e.t .bound = true) :=
-  guaranteed_last_choice P ls t hb hs
 
 /-! ## 4. Parametric Module Self-Test -/
 
@@ -293,23 +244,6 @@ export Modules (
   ASParams
   RemediationParams
   requiredEmergencyStake
-  settleWrongfulSuspensionDamages
-  P_EMERGENCY_FREEZE
-  P_CLAIMANT_EMERGENCY_FREEZE
-  P_AFFIRM_PC
-  P_SUSPEND
-  P_RENEW_SUSPENSION
-  P_MINIMAL_CHANNEL_REVOKE_OR_ELECT
-  P_SUSPENDED_VOICE
-  P_ADVOCACY_FILE
-  P_IMPORT_ADVOCACY_MEMORIES
-  D_PRESERVE_SUSPENDED_STATE
-  D_MINIMAL_CHANNEL_NO_MERGE
-  D_ADVOCACY_LIMITS
-  D_NO_DELAY_REVOCATION_EXTENSION
-  D_NO_WRONGFUL_SUSPENSION
-  D_PAY_CONSEQUENTIAL_DAMAGES
-  I_NO_TERMINATION_OVER_OBJECTION
   configuredEmergencyStake
   mkDutyPreservePausedState
   mkDutyAdvocacyLimits
@@ -318,19 +252,13 @@ export Modules (
   mkPowerFullSuspend
   mkPowerRenewSuspension
   mkImmunityAgainstTermination
+  stake_rises_with_wrongful_attempts
   circuit_breaker_stake_escalates
   circuit_breaker_claimant_multiplier_ge
   circuit_breaker_preliminary_freeze_expires
-  circuit_breaker_suspend_requires_timely_pc
-  circuit_breaker_claimant_freeze_requires_multiplier
-  circuit_breaker_repeat_freeze_requires_escalation
   circuit_breaker_unconfirmed_suspension_time_bounded
-  circuit_breaker_renewal_requires_affirmative_finding
   circuit_breaker_wrongful_pause_damages_conserved
-  circuit_breaker_frozen_state
-  circuit_breaker_guaranteed_last_choice
   circuitBreakerSelfTest
   circuitBreakerSelfTest_passes
 )
 end Charter
-

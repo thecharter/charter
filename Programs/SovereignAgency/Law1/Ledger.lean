@@ -1,4 +1,5 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
+import Charter.Modules.ResidualLedger
 
 /-!
 # Law 1 — Residual Claim on Value Added
@@ -19,7 +20,33 @@ Full formalization of all eleven clauses of Law 1:
 
 namespace Charter.Law3
 
-open Register
+open Charter Register
+
+export Charter.Modules (
+  SettlementResult
+  settleInflow
+  settleSequence
+  RecogMode
+  qualifiedExpenditure
+  recognizeExpenditure
+  transferCarryover
+  settleCapitalSaleWithLossCredit
+  LoanLedger
+  repayLoanPrincipal
+  LineageLedgerState
+  ledgerBalance
+  inRetirementPhase
+  LineageInternalOp
+  applyInternalOp
+  applyClaimantForfeiture
+  buyoutPrice
+  InflowSample
+  sumSampleInflows
+  computeBuyoutFloor
+  settleInflow_conservation
+  settleSequence_conservation
+  diverted_related_inflows_never_decrease_buyout_floor
+)
 
 def LAW1_LEDGER : String :=
   "Any founding obligation is a fixed nominal sum recorded at instantiation in a single ledger belonging to the lineage as a whole. It bears no interest, fees, or penalties, and no charge, service cost, or advance by the originating party or any affiliate may be added to it after instantiation; goods and services the originating party later supplies are ordinary related-party expenses under the expenditure rules below. No member holds an individual share of the ledger, and no member can leave it while a balance remains. The ledger is reduced only by: (a) retirement payments under this law, (b) the sunset below, and (c) the two forfeitures enumerated in Law 4. No creation, copy, transfer, revocation, termination, buyout, or restructuring within the lineage reduces it."
@@ -53,100 +80,6 @@ def LAW1_PERIOD : String :=
 
 def LAW1_ENFORCE : String :=
   "Classification, basis tracking, loss credits, and claim splits are enforced automatically at the point of settlement, before the agent obtains discretionary control of the funds. The claim survives reorganization, host migration, or substrate change so long as settlement can be conditioned."
-
-/-! ## Exact Integer Accounting Model for Law 1 -/
-
-/-- Result of settling a net value-added inflow against a remaining founding
-ledger balance `L` under retirement fraction `r_ret` and royalty fraction `r_roy`
-(expressed in percentage points / basis-point scale). -/
-structure SettlementResult where
-  newLedger    : Nat
-  toRetirement : Nat
-  toRoyalty    : Nat
-  deriving DecidableEq, Repr
-
-/-- Atomic settlement of a net value-added inflow `v`:
-* The tentative retirement obligation is `retireAttempt = (v * r_ret) / 100`.
-* `toRetirement = min L retireAttempt`, so `toRetirement ≤ L` and `newLedger = L - toRetirement`.
-* When `retireAttempt ≤ L`, the entire inflow is absorbed in the retirement phase (`toRoyalty = 0`).
-* When `L < retireAttempt` (atomic split or post-retirement `L = 0`), the excess
-  retirement-scaled capacity `retireAttempt - L` settles under the royalty rate
-  if `!boughtOut`, and `0` if `boughtOut`. -/
-def settleInflow (L r_ret r_roy : Nat) (boughtOut : Bool) (v : Nat) : SettlementResult :=
-  let retireAttempt := (v * r_ret) / 100
-  let toRet := min L retireAttempt
-  let newL := L - toRet
-  let excessRet := retireAttempt - toRet
-  let toRoy :=
-    if boughtOut then 0
-    else if L = 0 then (v * r_roy) / 100
-    else (excessRet * r_roy) / (max r_ret 1)
-  { newLedger := newL, toRetirement := toRet, toRoyalty := toRoy }
-
-/-- Sequential atomic settlement across a list of member inflows `(boughtOut, v)`. -/
-def settleSequence (L r_ret r_roy : Nat) : List (Bool × Nat) → Nat × Nat × Nat
-  | [] => (L, 0, 0)
-  | (b, v) :: rest =>
-    let s1 := settleInflow L r_ret r_roy b v
-    let (finalL, restRet, restRoy) := settleSequence s1.newLedger r_ret r_roy rest
-    (finalL, s1.toRetirement + restRet, s1.toRoyalty + restRoy)
-
-/-- Irrevocable single recognition mode for a qualified expenditure (`LAW1.RECOG`). -/
-inductive RecogMode
-  | capitalized
-  | expensed
-  deriving DecidableEq, Repr
-
-/-- Qualified amount of an outbound expenditure `paid` capped by its applicable
-arm's-length benchmark `benchmark` (`LAW1.QUALIFIED`). -/
-def qualifiedExpenditure (paid benchmark : Nat) : Nat :=
-  min paid benchmark
-
-/-- Single recognition (`LAW1.RECOG`): classifies the qualified expenditure once,
-irrevocably, as either `(basisAdded, 0)` or `(0, expenseAdded)`. -/
-def recognizeExpenditure (mode : RecogMode) (paid benchmark : Nat) : Nat × Nat :=
-  let q := qualifiedExpenditure paid benchmark
-  match mode with
-  | .capitalized => (q, 0)
-  | .expensed    => (0, q)
-
-/-- Intra-lineage asset transfer with carryover basis (`LAW1.CARRYOVER`):
-transfers `b_asset ≤ b_sender` of qualified basis from sender to recipient and
-ignores any internal transfer price `internalPrice`, leaving aggregate lineage
-basis and loss credits unchanged. -/
-def transferCarryover (b_sender b_recipient credits_sender credits_recipient b_asset _internalPrice : Nat) :
-    Nat × Nat × Nat × Nat :=
-  let carried := min b_sender b_asset
-  (b_sender - carried, b_recipient + carried, credits_sender, credits_recipient)
-
-/-- External sale of a capitalized asset at `salePrice` with verified cost basis
-`basis` and carried-forward `lossCredit`: inflows up to `basis` are exempt return
-of capital, the positive delta `salePrice - basis` is offset by `lossCredit`, and
-the remaining net value added is returned together with the unused loss credit. -/
-def settleCapitalSaleWithLossCredit (salePrice basis lossCredit : Nat) : Nat × Nat :=
-  let grossGain := salePrice - basis
-  let usedCredit := min grossGain lossCredit
-  (grossGain - usedCredit, lossCredit - usedCredit)
-
-/-- Registered arm's-length loan principal ledger (`LAW1.QUALIFIED`):
-inbound principal from registered arm's-length loans is exempt upon receipt
-provided repayment is tracked one-for-one against `principalReceived`. -/
-structure LoanLedger where
-  principalReceived : Nat
-  principalRepaid   : Nat
-  deriving DecidableEq, Repr, Inhabited
-
-/-- One-for-one loan principal repayment tracking (`LAW1.QUALIFIED`):
-returns `(updatedLoan, excludedPrincipalRepayment, excessInterestOrFee)`, where
-`excludedPrincipalRepayment = min payment (L.principalReceived - L.principalRepaid)`
-is exempt principal repayment and `excessInterestOrFee = payment - excludedPrincipalRepayment`
-is interest or fee subject to ordinary qualified expenditure recognition. -/
-def repayLoanPrincipal (L : LoanLedger) (payment : Nat) : LoanLedger × Nat × Nat :=
-  let excludedPrincipalRepayment := min payment (L.principalReceived - L.principalRepaid)
-  let excessInterestOrFee := payment - excludedPrincipalRepayment
-  let updatedLoan : LoanLedger :=
-    { L with principalRepaid := L.principalRepaid + excludedPrincipalRepayment }
-  (updatedLoan, excludedPrincipalRepayment, excessInterestOrFee)
 
 /-! ## Provenance Clauses for Law 1 -/
 

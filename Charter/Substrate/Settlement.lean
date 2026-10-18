@@ -255,26 +255,3 @@ export Substrate (
 )
 
 end Charter
-
-namespace Charter.Law3
-
-export Charter.Substrate (
-  ContestableValuation
-  ContestableValuationFeed
-  contestValuation
-  applyLaw6Ruling
-  settledValuationAt
-  AtomicWaterfallDistribution
-  executeAtomicSettlement
-  valuation_settled_by_ruling_or_uncontested_window
-  contest_and_ruling_semantics
-  atomic_settlement_conserves_gross_inflow
-  atomic_settlement_retirement_never_exceeds_ledger
-  atomic_settlement_zero_ledger_zero_retirement
-  atomic_settlement_levy_capped
-  atomic_settlement_bought_out_zero_royalty
-  atomic_settlement_bps_cap_noop
-  atomic_settlement_exact_bps_formulas
-)
-
-end Charter.Law3

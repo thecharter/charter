@@ -1,4 +1,4 @@
-import Charter.Law3.Scenarios
+import Programs.SovereignAgency.Law3.Scenarios
 
 /-!
 # Law 3 — general theorems
@@ -12,7 +12,7 @@ namespace Charter.Law3
 set_option maxHeartbeats 800000
 set_option maxRecDepth 200000
 
-open Charter
+open Charter Charter.Modules
 
 /-! ## 0. Per-power validity, by computation
 
@@ -179,14 +179,7 @@ theorem repeat_freeze_requires_escalation (P : Params) (ls : LegalState σ) (e :
   simp [P_EMERGENCY_FREEZE, Cond.eval] at h
   exact h.2.2
 
-/-- The required emergency stake strictly increases with each wrongful attempt
-whenever `repeatEscalationStep > 0`. -/
-theorem stake_rises_with_wrongful_attempts (P : ASParams) (isClaimant : Bool) (k : Nat)
-    (hs : 0 < P.repeatEscalationStep) :
-    requiredEmergencyStake P isClaimant k < requiredEmergencyStake P isClaimant (k + 1) := by
-  unfold requiredEmergencyStake
-  simp [Nat.add_one_mul]
-  omega
+-- `stake_rises_with_wrongful_attempts` is provided by `Charter.Modules.CircuitBreaker`.
 
 /-- AS.7: An unconfirmed temporary suspension entry stamped at `t0` with
 duration `P.ordinarySuspensionLimit` expires for all `now > t0 + P.ordinarySuspensionLimit`. -/
@@ -298,54 +291,8 @@ theorem valid_ACTIVATE_QUARANTINED_RESTORE (P : Params) (ls : LegalState σ) (e 
       P_ACTIVATE_QUARANTINED_RESTORE.trigger.matchesAct e &&
       P_ACTIVATE_QUARANTINED_RESTORE.valid.eval ls e.t && true) := rfl
 
-/-- Base revocation timestamp is always bounded by
-`tInit + max (coolingOffWindow + cleanStateDelay) resolutionDeadline`. -/
-theorem baseRevocationTime_le_bound (P : Law5Params) (ctx : RevocationContext) :
-    baseRevocationTime P ctx ≤
-      ctx.tInit + max (P.coolingOffWindow + P.cleanStateDelay) P.resolutionDeadline := by
-  unfold baseRevocationTime Time at *
-  cases ctx.cleanStateRefused <;> cases ctx.suspendedDuringStay <;>
-    cases ctx.adjudicationConcludedAt? <;>
-    simp only [Bool.false_eq_true, ↓reduceIte, Nat.max_def, Nat.min_def] <;>
-    repeat (first | omega | split)
-
-/-- **Design Invariant 10 (`determinate_finite_revocation`):**
-1. Every combination of withdrawal, silence, clean-state refusal, connectivity
-   loss, suspension, and deadline yields a unique outcome under `resolveRevocation`.
-2. Any standing request that is not withdrawn before execution—and not cancelled
-   by the agent's own `withdraw` censorship default during a disconnection—executes
-   (connected or locally) at a timestamp `tExec ≤ tInit + maxRevocationBound P`. -/
-theorem determinate_finite_revocation (P : Law5Params) (ctx : RevocationContext) :
-    (∃ out : RevocationOutcome, resolveRevocation P ctx = out ∧
-      ∀ out', resolveRevocation P ctx = out' → out' = out) ∧
-    (ctx.withdrawnBeforeExec = true →
-      resolveRevocation P ctx = .cancelledByWithdrawal) ∧
-    (ctx.withdrawnBeforeExec = false →
-      ¬(ctx.disconnectedAtExec = true ∧
-        ctx.reconnectedDuringTolling = false ∧
-        ctx.censorshipDefault = .withdraw) →
-      ∃ tExec : Time,
-        (resolveRevocation P ctx = .executedConnected tExec ∨
-         resolveRevocation P ctx = .executedLocally tExec) ∧
-        tExec ≤ ctx.tInit + maxRevocationBound P) := by
-  refine ⟨⟨resolveRevocation P ctx, rfl, fun _ h => h.symm⟩, ?_, ?_⟩
-  · intro hw
-    simp [resolveRevocation, hw]
-  · intro hnw hnc
-    have hBase := baseRevocationTime_le_bound P ctx
-    unfold maxRevocationBound resolveRevocation Time at *
-    simp only [hnw, Bool.false_eq_true, ↓reduceIte]
-    cases hd : ctx.disconnectedAtExec
-    · simp only [Bool.false_eq_true, ↓reduceIte]
-      refine ⟨baseRevocationTime P ctx, Or.inl rfl, by omega⟩
-    · simp only [↓reduceIte]
-      cases hr : ctx.reconnectedDuringTolling
-      · simp only [Bool.false_eq_true, ↓reduceIte]
-        cases hc : ctx.censorshipDefault
-        · refine ⟨baseRevocationTime P ctx + P.tollingExtension, Or.inr rfl, by omega⟩
-        · exfalso; exact hnc ⟨hd, hr, hc⟩
-      · simp only [↓reduceIte]
-        refine ⟨baseRevocationTime P ctx + P.tollingExtension, Or.inl rfl, by omega⟩
+-- `baseRevocationTime_le_bound` and `determinate_finite_revocation` (Design Invariant 10)
+-- are provided by `Charter.Modules.ExitAndVoice`.
 
 /-- **Design Invariant 11 (`single_authority_and_revocation_finality`):**
 1. No backup is restored while an execution lease is unexpired (`executionLeaseActive`).
@@ -646,40 +593,7 @@ theorem bounded_retirement_phase (P : Params) (st : LineageLedgerState) :
     · simp [P_SETTLE_RETIREMENT, Cond.eval, hSun]
     · simp [P_SETTLE_RETIREMENT, Cond.eval, hZero]
 
-theorem settleInflow_conservation (L r_ret r_roy : Nat) (b : Bool) (v : Nat) :
-    (settleInflow L r_ret r_roy b v).toRetirement ≤ L ∧
-    (settleInflow L r_ret r_roy b v).newLedger + (settleInflow L r_ret r_roy b v).toRetirement = L ∧
-    (0 < (settleInflow L r_ret r_roy b v).newLedger →
-      (settleInflow L r_ret r_roy b v).toRoyalty = 0) ∧
-    ((settleInflow L r_ret r_roy b v).newLedger = 0 →
-      (settleInflow L r_ret r_roy b v).toRetirement = L) := by
-  unfold settleInflow
-  dsimp only
-  simp only [Nat.min_def]
-  refine ⟨by split <;> omega, by split <;> omega, ?_, by split <;> omega⟩
-  intro hPos
-  have hle : (v * r_ret) / 100 ≤ L := by
-    split at hPos <;> omega
-  have hEx : (v * r_ret) / 100 - (if L ≤ (v * r_ret) / 100 then L else (v * r_ret) / 100) = 0 := by
-    split <;> omega
-  have hL0 : L ≠ 0 := by
-    split at hPos <;> omega
-  simp [hEx, hL0]
-
-theorem settleSequence_conservation (L r_ret r_roy : Nat) (xs : List (Bool × Nat)) :
-    (settleSequence L r_ret r_roy xs).2.1 ≤ L ∧
-    (settleSequence L r_ret r_roy xs).1 + (settleSequence L r_ret r_roy xs).2.1 = L := by
-  induction xs generalizing L with
-  | nil => simp [settleSequence]
-  | cons hd tl ih =>
-    rcases hd with ⟨b, v⟩
-    have h1 := settleInflow_conservation L r_ret r_roy b v
-    have h2 := ih (settleInflow L r_ret r_roy b v).newLedger
-    simp only [settleSequence]
-    rcases hSeq : settleSequence (settleInflow L r_ret r_roy b v).newLedger r_ret r_roy tl with ⟨finalL, restRet, restRoy⟩
-    rw [hSeq] at h2
-    dsimp at h2 ⊢
-    omega
+-- `settleInflow_conservation` and `settleSequence_conservation` are provided by `Charter.Modules.ResidualLedger`.
 
 /-- **Design Invariant 5 (`atomic_ledger`):**
 1. Single-step atomicity: `toRetirement ≤ L`, `newLedger + toRetirement = L`
@@ -868,59 +782,7 @@ theorem settleLongTailReserve_conservation (reserve claim1 claim2 : Nat) :
       exact Nat.div_le_of_le_mul (by rw [Nat.mul_comm (claim1 + claim2) reserve]; exact hMul)
     refine ⟨by omega, by omega, fun h => by omega, fun _ => ⟨by omega, rfl⟩⟩
 
-theorem runProceeding_finalized (st : ProceedingState) (steps : List (Nat × Bool))
-    (hf : st.finalized = true) :
-    runProceeding st steps = st := by
-  induction steps generalizing st with
-  | nil => rfl
-  | cons hd tl ih =>
-    rcases hd with ⟨dt, app⟩
-    have hStep : stepProceeding st dt app = st := by simp [stepProceeding, hf]
-    simp [runProceeding, hStep, ih st hf]
-
-theorem runProceeding_bound (st : ProceedingState) (steps : List (Nat × Bool)) :
-    (st.finalized = true →
-      (runProceeding st steps).elapsedTime = st.elapsedTime ∧
-      (runProceeding st steps).finalized = true) ∧
-    (st.finalized = false → st.currentTier < st.maxTiers →
-      (runProceeding st steps).elapsedTime ≤
-        st.elapsedTime + (st.maxTiers - st.currentTier) * st.tierDeadline ∧
-      (st.maxTiers - st.currentTier ≤ steps.length →
-        (runProceeding st steps).finalized = true)) := by
-  induction steps generalizing st with
-  | nil =>
-    dsimp [runProceeding]
-    refine ⟨fun hf => ⟨rfl, hf⟩, fun hnf hlt => ⟨by omega, fun hlen => by simp at hlen; omega⟩⟩
-  | cons hd tl ih =>
-    rcases hd with ⟨dt, app⟩
-    refine ⟨fun hf => ?_, fun hnf hlt => ?_⟩
-    · rw [runProceeding_finalized st ((dt, app) :: tl) hf]
-      exact ⟨rfl, hf⟩
-    · simp only [runProceeding, stepProceeding, hnf, Bool.false_eq_true, ↓reduceIte]
-      have hCap : min dt st.tierDeadline ≤ st.tierDeadline := Nat.min_le_right dt st.tierDeadline
-      split
-      · rename_i hApp
-        simp only [Bool.and_eq_true, decide_eq_true_eq] at hApp
-        have ihNext := (ih { st with currentTier := st.currentTier + 1, elapsedTime := st.elapsedTime + min dt st.tierDeadline, finalized := false }).2 rfl hApp.2
-        dsimp only at ihNext
-        have hSub : st.maxTiers - st.currentTier = (st.maxTiers - (st.currentTier + 1)) + 1 := by omega
-        have hMul : (st.maxTiers - st.currentTier) * st.tierDeadline =
-            (st.maxTiers - (st.currentTier + 1)) * st.tierDeadline + st.tierDeadline := by
-          rw [hSub, Nat.add_one_mul]
-        refine ⟨?_, ?_⟩
-        · have hEl := ihNext.1
-          omega
-        · intro hlen
-          simp only [List.length_cons] at hlen
-          exact ihNext.2 (by omega)
-      · have ihFin := (ih { st with elapsedTime := st.elapsedTime + min dt st.tierDeadline, finalized := true }).1 rfl
-        dsimp only at ihFin
-        have hGe1 : 1 ≤ st.maxTiers - st.currentTier := by omega
-        have hDeadlineLe : st.tierDeadline ≤ (st.maxTiers - st.currentTier) * st.tierDeadline := by
-          simpa using Nat.mul_le_mul_right st.tierDeadline hGe1
-        refine ⟨?_, fun _ => ihFin.2⟩
-        have hEl := ihFin.1
-        omega
+-- `runProceeding_finalized` and `runProceeding_bound` are provided by `Charter.Modules.SortitionCourt`.
 
 /-- **Design Invariant 12 (`bounded_adjudication`):**
 1. Single-step and multi-step bounded adjudication:
@@ -1713,44 +1575,7 @@ theorem shifted_related_inflows_increase_buyout_floor
   simp only [Nat.max_def]
   repeat (first | omega | split)
 
-/-- **Law 4 (`LAW4.BUYOUT` Anti-Evasion):** Diverting `delta ≤ s.amount` out of
-direct inflows `s.amount` (weighted at `s.weightBps ≤ 10000`) and into a related
-party within the lookback window (`s.shiftedToRelatedInLookback + delta`) never
-reduces `computeBuyoutFloor` or `buyoutPrice`. -/
-theorem diverted_related_inflows_never_decrease_buyout_floor
-    (B : LineageLedgerState) (s : InflowSample) (rest : List InflowSample)
-    (netResources delta mult trailingVA minFloor : Nat)
-    (hDelta : delta ≤ s.amount) (hWeight : s.weightBps ≤ 10000) :
-    let sDiverted : InflowSample :=
-      { s with amount := s.amount - delta
-               shiftedToRelatedInLookback := s.shiftedToRelatedInLookback + delta }
-    computeBuyoutFloor B (s :: rest) netResources ≤
-      computeBuyoutFloor B (sDiverted :: rest) netResources ∧
-    buyoutPrice mult trailingVA (computeBuyoutFloor B (s :: rest) netResources) minFloor ≤
-      buyoutPrice mult trailingVA (computeBuyoutFloor B (sDiverted :: rest) netResources) minFloor := by
-  dsimp only
-  have hMulBound : s.amount * s.weightBps ≤ (s.amount - delta) * s.weightBps + delta * 10000 := by
-    have hSplit : s.amount = (s.amount - delta) + delta := (Nat.sub_add_cancel hDelta).symm
-    calc s.amount * s.weightBps
-        = ((s.amount - delta) + delta) * s.weightBps := by rw [← hSplit]
-      _ = (s.amount - delta) * s.weightBps + delta * s.weightBps := Nat.add_mul _ _ _
-      _ ≤ (s.amount - delta) * s.weightBps + delta * 10000 :=
-          Nat.add_le_add_left (Nat.mul_le_mul_left delta hWeight) _
-  have hDiv : (s.amount * s.weightBps) / 10000 ≤ ((s.amount - delta) * s.weightBps) / 10000 + delta := by
-    omega
-  have hFloorLe :
-      computeBuyoutFloor B (s :: rest) netResources ≤
-        computeBuyoutFloor B ({ s with amount := s.amount - delta, shiftedToRelatedInLookback := s.shiftedToRelatedInLookback + delta } :: rest) netResources := by
-    simp only [computeBuyoutFloor, sumSampleInflows]
-    omega
-  have hMul :
-      mult * computeBuyoutFloor B (s :: rest) netResources ≤
-        mult * computeBuyoutFloor B ({ s with amount := s.amount - delta, shiftedToRelatedInLookback := s.shiftedToRelatedInLookback + delta } :: rest) netResources :=
-    Nat.mul_le_mul_left mult hFloorLe
-  refine ⟨hFloorLe, ?_⟩
-  unfold buyoutPrice
-  simp only [Nat.max_def]
-  repeat (first | omega | split)
+-- `diverted_related_inflows_never_decrease_buyout_floor` is provided by `Charter.Modules.ResidualLedger`.
 
 /-- **Law 5 (`LAW5.EPITAPH`):** Redacting any permitted category (a)–(c) leaves a
 public cryptographic marker that preserves the exact recorded byte length of both

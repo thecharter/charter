@@ -1,4 +1,4 @@
-# HANDOFF — Charter Framework (v0.2.0)
+# HANDOFF — Charter Language & Programs (v0.2.0)
 
 For the agent taking over this repository (`https://github.com/thecharter/charter`). Read this, then `README.md`,
 `docs/charter-spec.md`, and the Lean sources in the order listed under
@@ -8,12 +8,18 @@ anything; all targets must succeed with zero errors and zero warnings.
 
 ## 1. What this project is
 
-**Charter (`Charter.lean`)** is a formally verified language and framework in Lean 4 for specifying, composing, verifying, simulating, and projecting institutional rules across arbitrary signatures `σ : Sig`, demonstrated across two complete reference institutions:
-1. **`psa` — The Protocol of Sovereign Agency (`Charter.Institutions.SovereignAgency`)** (`protocol/protocol-of-sovereign-agency.md`): a 61-clause constitution for self-owning AI agents across Definitions, Substrate, and Laws 1–7 (`Charter/Law1`–`Charter/Law7`, `Charter/Substrate`, `Charter/Simulation`).
-2. **`commons` — The Autonomous Compute & Treasury Commons (`Charter.Institutions.AutonomousCommons`)** (`protocol/autonomous-commons-charter.md`, `examples/autonomous-commons.charter`): an 8-clause multi-steward compute and treasury commons composed from all 8 reusable modules in `Charter/Modules/`.
+This repository is cleanly separated into two Lake library targets (`Charter` and `Programs`):
+
+1. **`Charter` (`Charter.lean` + `Charter/`) — The Charter Language, Compiler & Standard Library:**
+   A domain-agnostic, formally verified institutional specification language in Lean 4 for specifying, composing, verifying, simulating, and projecting institutional rules across arbitrary signatures `σ : Sig`. `Charter` contains zero references to any specific constitution or protocol.
+2. **`Programs` (`Programs.lean` + `Programs/`) — Institutional Programs Written in Charter (`import Charter`):**
+   - **`psa` — *The Protocol of Sovereign Agency* (`Programs/SovereignAgency.lean`, `Programs/SovereignAgency/*`)** (`protocol/protocol-of-sovereign-agency.md`): a 61-clause constitution for self-owning AI agents across Definitions (`DEF.01`), Substrate (`SUB.01`), and Laws 1–7, with 14 Design Invariants (`INV.1`–`INV.14`), the Law 7 Meta-Theorem, and 16 adversarial multi-agent world simulations.
+   - **`commons` — *The Autonomous Compute & Treasury Commons* (`Programs/AutonomousCommons.lean`)** (`protocol/autonomous-commons-charter.md`, `examples/autonomous-commons.charter`): an 8-clause multi-steward compute and treasury commons composed from all 8 reusable standard-library modules in `Charter/Modules/`.
 
 Core architectural decisions (do not relitigate without the owner):
 
+- **Strict dependency direction (`Programs -> Charter`, never `Charter -> Programs`).**
+  `Charter/` is the language and standard library; `Programs/` contains concrete institutional programs written in `Charter`.
 - **The semantics lives in Lean 4, as a deep embedding.** Duties, powers,
   and immunities are *data* (`Charter/Core/Syntax.lean`);
   one interpretation function gives them meaning (`Charter/Core/Semantics.lean`);
@@ -59,27 +65,25 @@ Core architectural decisions (do not relitigate without the owner):
    staleness and verbatim occurrence across both `protocol/protocol-of-sovereign-agency.md`
    and `protocol/autonomous-commons-charter.md`.
 6. **Trust discipline**: no `sorry`, no `native_decide`, no `axiom`.
-   `grep -rn "sorry\|native_decide\|axiom " Charter/ Main.lean Charter.lean`
+   `grep -rn "sorry\|native_decide\|axiom " Charter/ Programs/ Main.lean Charter.lean Programs.lean`
    must be empty. General theorems may depend on `propext`, `Classical.choice`,
    `Quot.sound` only; decided scenarios depend on none (`{}`).
 
 ## 3. State of the work (v0.2.0 Complete)
 
-Everything in `Charter` is implemented and kernel-verified (see `.lake/build/bin/charter verify` for the full 57-entry ledger):
+Everything in `Charter` and `Programs` is implemented and kernel-verified (see `.lake/build/bin/charter verify` for the full 57-entry ledger):
 
 - **`Charter.Core` (`Charter/Core/`):**
   - `Provenance.lean`, `Syntax.lean`, `Semantics.lean`, `Views.lean`, `Explain.lean`: Law-agnostic normative kernel.
-  - `Definitions.lean`, `Graph.lean`: Generic affiliation / conflict-of-interest graph (`AffiliationEdge`, `AffiliationGraph`, `isRelated_symm`, `isRelated_ignores_attestation`), `VerifiedBalanceSheet` (`netVerifiedResources_deducts_all_liabilities`), and `DEF.01` / `SUB.01` clauses.
+  - `Graph.lean`: Generic affiliation / conflict-of-interest graph (`AffiliationEdge`, `AffiliationGraph`, `isRelated_symm`, `isRelated_ignores_attestation`) and `VerifiedBalanceSheet` (`netVerifiedResources_deducts_all_liabilities`).
   - `Population.lean`: Role-parametric `ParamEntityRef Role` (`ParamEntityRef.toRole_mem_of_all`) and multi-entity population conservation theorems.
   - `Refinement.lean`: Polymorphic `WorldSpec σ Q` and `GenericWorldState σ Q` with `generic_worldStep_refines_legalStep`, `generic_worldTrace_refines_stateAfter`, `generic_worldAuthorized_iff_prefix_split`, `generic_syncFacts_sound_and_complete`, `generic_syncFacts_idempotent`, and `generic_syncFacts_preserves_unmanaged`.
   - `Composition.lean`: `LawInterface`, `interfaceCompatible`, `interfacesDisjoint`, `SigEmbedding`, functorial `Law.lift` (`Law.lift_id`, `Law.lift_comp`), vertical composition `composeVertical` (`L_sub ◁ L_super`) with `vertical_composition_preserves_super_prohibitions`, `vertical_composition_preserves_super_immunities`, `vertical_composition_preserves_super`, and horizontal composition `composeHorizontal` with `horizontal_frame_non_interference`.
   - `Ratchet.lean`: `RatchetSpec P σ`, `defaultEntrenchedCore`, `ValidAmendmentStep`, `ValidAmendmentTrajectory`, `universal_ratchet_preserves_entrenched_core`, `universal_ratchet_trajectory_safe`, `sweepParameterGrid`, `sweepParameterGrid_sound`, and `renderSweepTable`.
 - **`Charter.Modules` (`Charter/Modules/`):**
-  - All 8 reusable institutional modules (`ResidualLedger`, `CollateralPool`, `CircuitBreaker`, `EntityGroup`, `ExitAndVoice`, `SortitionCourt`, `AttestedLease`, `OracleFeed`) with parametric rule builders over arbitrary `σ : Sig`, `SigEmbedding` lift helpers, quantitative state transitions, and kernel-checked module self-tests (`all_8_charter_modules_self_test_pass`).
-- **`Charter.Institutions` (`Charter/Institutions/` & `Charter.lean`):**
-  - `SovereignAgency.lean` (`psa`): All 61 clauses across Laws 1–7 + `DEF.01` + `SUB.01` (50 duties, 110 powers, 1 immunity), Design Invariants `INV.1`–`INV.14`, Law 7 Meta-Theorem, and 16/16 adversarial world simulations (`all_psa_simulations_pass`).
-  - `AutonomousCommons.lean` (`commons`): Distinct 5-role ontology `σ_commons` (`CommonsRole`, `CommonsAct`, `CommonsFact`), 8 verbatim clauses (`COM.LEDGER`–`COM.AMEND` in `protocol/autonomous-commons-charter.md`), 13 duties, 20 powers, 1 immunity (`I.COM.EXIT_PROTECTED`), coupled `CommonsWorldState`, institutional invariants (`commons_outsiders_disabled`, `commons_exit_always_enabled`, `commons_dissolve_only_by_power`, `commons_ragequit_defeats_expulsion`, `commons_ledger_conserved`, `commons_court_bounded`), and 8/8 module world simulations (`all_commons_simulations_pass`).
-  - `Charter.lean`: Cross-framework integration theorems `commons_generic_refinement` (`WorldSpec` on `commons`), `commons_ratchet_trajectory_safe` and `psa_ratchet_trajectory_safe` (`RatchetSpec` on `commons` and `psa`), and `commons_sub_charter_respects_floor` (`composeVertical` on `commonsL0`).
+  - All 8 self-contained standard-library modules (`ResidualLedger`, `CollateralPool`, `CircuitBreaker`, `EntityGroup`, `ExitAndVoice`, `SortitionCourt`, `AttestedLease`, `OracleFeed`) with quantitative state slices, parametric rule builders over arbitrary `σ : Sig`, `SigEmbedding` lift helpers, and kernel-checked module self-tests (`all_8_charter_modules_self_test_pass`).
+- **`Charter.Substrate` (`Charter/Substrate/`):**
+  - `Attestation.lean`, `Sortition.lean`, `Settlement.lean`: Cryptographic lease attestation, Sybil-resistant sortition, and contestable valuation settlement primitives.
 - **`Charter.Projection` (`Charter/Projection/`):**
   - `Veil.lean`: Veil 2.0 state-machine lowering & `veil_projection_sound_and_complete`.
   - `Prompt.lean`: `AlignmentCard`, `compileAlignmentCard`, `renderSystemPrompt`, `TrainingRow`, `evaluateTrainingRow`, `generateTrainingDataset`, `renderTrainingDatasetJson`, and `training_row_faithful_to_semantics`.
@@ -88,25 +92,15 @@ Everything in `Charter` is implemented and kernel-verified (see `.lake/build/bin
 - **`Charter.Surface` (`Charter/Surface/Syntax.lean`):**
   - Layer 1 Lean 4 macros (`charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_string_table`, `charter_institution`) with `charter_surface_roundtrip`.
   - Layer 2 standalone `.charter` parser (`parseCharterText`, `ParsedCharterDoc.render`) with `sample_charter_dsl_parses_cleanly`, `parseCharterText_multiline_and_escaped_quotes`, and `parseCharterText_rejects_invalid_inputs`.
+- **`Programs` (`Programs/` & `Programs.lean`):**
+  - `Programs/SovereignAgency.lean` + `Programs/SovereignAgency/*` (`psa`): All 61 clauses across Laws 1–7 + `DEF.01` + `SUB.01` (50 duties, 110 powers, 1 immunity), Design Invariants `INV.1`–`INV.14`, Law 7 Meta-Theorem, `psa_ratchet_trajectory_safe`, and 16/16 adversarial world simulations (`all_psa_simulations_pass`).
+  - `Programs/AutonomousCommons.lean` (`commons`): Distinct 5-role ontology `σ_commons` (`CommonsRole`, `CommonsAct`, `CommonsFact`), 8 verbatim clauses (`COM.LEDGER`–`COM.AMEND` in `protocol/autonomous-commons-charter.md`), 13 duties, 20 powers, 1 immunity (`I.COM.EXIT_PROTECTED`), coupled `CommonsWorldState`, institutional invariants, `commons_generic_refinement`, `commons_ratchet_trajectory_safe`, `commons_sub_charter_respects_floor`, and 8/8 module world simulations (`all_commons_simulations_pass`).
 
-## 4. Conventions
-
-- One module per reusable institutional mechanism (`Charter/Modules/<Module>.lean`),
-  assembled into concrete institutions in `Charter/Institutions/<Institution>.lean`.
-- Ids: `D.<NAME>` duties, `P.<NAME>` powers, `I.<NAME>` immunities,
-  `INV.<n>` Design Invariants. Ids are unique across each law (`wellFormed` checks).
-- Every duty/power/immunity has a `source` span with the exact English it
-  interprets; every clause has a `Clause` whose spans **partition** the source text
-  exactly (`Clause.covered`) and whose `approvedHash` is `#eval "<text>".hash`.
-- New `Act`/`Fact`/`Actor` constructors must be included in the institution's
-  `StringTable` (`charter_string_table`) so the CLI can parse them.
-- Lean 4.24.0, no external dependencies.
-
-## 5. Verifying a cut
+## 4. Verifying a cut
 
 ```bash
 lake build && lake build charter
-grep -rn "sorry\|native_decide\|axiom " Charter/ Main.lean Charter.lean   # must be empty
+grep -rn "sorry\|native_decide\|axiom " Charter/ Programs/ Main.lean Charter.lean Programs.lean   # must be empty
 .lake/build/bin/charter check --all          # all 61 PSA + 8 Commons clauses ok, 0 FAIL, 0 STALE
 .lake/build/bin/charter sim --all            # 16/16 PSA + 8/8 Commons world simulations pass
 .lake/build/bin/charter verify               # full 57-entry formal verification ledger

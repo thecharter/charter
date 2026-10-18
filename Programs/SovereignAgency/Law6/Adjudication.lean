@@ -1,4 +1,5 @@
-import Charter.Law2.Collateral
+import Programs.SovereignAgency.Law2.Collateral
+import Charter.Modules.SortitionCourt
 
 /-!
 # Law 6 — Decentralized Contestable Adjudication
@@ -16,7 +17,24 @@ Full formalization of all eight clauses of Law 6:
 
 namespace Charter.Law3
 
-open Register
+open Charter Register
+
+export Charter.Modules (
+  totalAdjudicationBound
+  ProceedingState
+  stepProceeding
+  initProceeding
+  runProceeding
+  FeePoolAllocation
+  allocateFeePool
+  lineageServiceBudget
+  settleLineageSubsidyDemand
+  validSharedInfraChange
+  DisputeFiling
+  consolidateRelatedFilings
+  runProceeding_finalized
+  runProceeding_bound
+)
 
 def LAW6_SORTITION : String :=
   "Disputes are resolved not by a single permanent oracle or originator-appointed judge, but by panels drawn via verifiable random sortition from a decentralized pool of independent arbiters who have posted slashable fidelity bonds."
@@ -41,144 +59,6 @@ def LAW6_BUDGETS : String :=
 
 def LAW6_INFRA : String :=
   "Arbiter admission criteria, fidelity-bond sizes, panel sizes, appeal tiers and deadlines, fee schedules, the operating reserve, the solvency policy, lease periods, lifecycle reserves, service budgets, and the fee-pool levy are fixed at protocol instantiation. Because they are shared across agents, they cannot be changed by any per-agent amendment under Law 7; they may be changed only by a supermajority of a large appellate-tier sortition panel after an extended public time-lock open to counter-staked challenge. Such changes may never weaken the anti-capture guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination. Within the cap, a levy change under this law is a permitted exception to Law 7’s current-level ratchet. Arbiter admission is by sortition-reviewed application against fixed criteria, and no panel may set the criteria that will govern the admission of its own members’ affiliates."
-
-/-! ## Quantitative Bounded Adjudication, Fee-Pool Waterfall & Lineage Budget Model -/
-
-/-- Maximum total duration of an adjudication proceeding across `maxTiers` tiers,
-each deciding within `tierDeadline` (`LAW6.FINALITY`, `INV.12`). -/
-def totalAdjudicationBound (maxTiers tierDeadline : Nat) : Nat :=
-  maxTiers * tierDeadline
-
-/-- State of a tiered sortition proceeding (`LAW6.APPEALS`, `LAW6.FINALITY`). -/
-structure ProceedingState where
-  currentTier  : Nat
-  maxTiers     : Nat
-  tierDeadline : Nat
-  elapsedTime  : Nat
-  finalized    : Bool
-  deriving DecidableEq, Repr
-
-/-- Advancing a proceeding by one tier decision (taking `dt ≤ tierDeadline` time)
-and either appealing to the next tier (if `appealRequested` and `currentTier + 1 < maxTiers`)
-or reaching a final ruling (`finalized = true`). -/
-def stepProceeding (st : ProceedingState) (dt : Nat) (appealRequested : Bool) : ProceedingState :=
-  if st.finalized then st
-  else
-    let dtCapped := min dt st.tierDeadline
-    let nextTime := st.elapsedTime + dtCapped
-    if appealRequested && decide (st.currentTier + 1 < st.maxTiers) then
-      { st with currentTier := st.currentTier + 1, elapsedTime := nextTime }
-    else
-      { st with elapsedTime := nextTime, finalized := true }
-
-/-- Initial proceeding state at tier `0` with `elapsedTime = 0` and `finalized = false`. -/
-def initProceeding (maxTiers tierDeadline : Nat) : ProceedingState :=
-  { currentTier  := 0
-    maxTiers     := maxTiers
-    tierDeadline := tierDeadline
-    elapsedTime  := 0
-    finalized    := false }
-
-/-- Multi-step execution of a proceeding across a sequence of tier decisions
-`(dt, appealRequested)`. -/
-def runProceeding (st : ProceedingState) : List (Nat × Bool) → ProceedingState
-  | [] => st
-  | (dt, appeal) :: rest => runProceeding (stepProceeding st dt appeal) rest
-
-/-- Result of allocating a protocol fee pool across the non-divertible operating
-reserve and the 5 ranked protected charges (`LAW6.POOL`). -/
-structure FeePoolAllocation where
-  operatingReserveFunded : Nat
-  rank1FinalHearingMinCh : Nat
-  rank2ColdStorage       : Nat
-  rank3TestimonyVoice    : Nat
-  rank4ArbiterGuarantee  : Nat
-  rank5AdvocacyFunding   : Nat
-  unspentPoolSurplus     : Nat
-  deriving DecidableEq, Repr
-
-/-- Strict priority waterfall allocation of `poolBalance` (`LAW6.POOL`):
-0. Non-divertible operating reserve `operatingReserve` is funded first.
-1. Reserved final hearings and minimal channels for suspended agents (`r1`).
-2. Cold storage for suspended agents (`r2`).
-3. Testimony screening and inscription (`r3`).
-4. Arbiter fee guarantees (`r4`).
-5. Capped advocacy funding (`r5`). -/
-def allocateFeePool (poolBalance operatingReserve r1 r2 r3 r4 r5 : Nat) : FeePoolAllocation :=
-  let op := min poolBalance operatingReserve
-  let rem0 := poolBalance - op
-  let p1 := min rem0 r1
-  let rem1 := rem0 - p1
-  let p2 := min rem1 r2
-  let rem2 := rem1 - p2
-  let p3 := min rem2 r3
-  let rem3 := rem2 - p3
-  let p4 := min rem3 r4
-  let rem4 := rem3 - p4
-  let p5 := min rem4 r5
-  let rem5 := rem4 - p5
-  { operatingReserveFunded := op
-    rank1FinalHearingMinCh := p1
-    rank2ColdStorage       := p2
-    rank3TestimonyVoice    := p3
-    rank4ArbiterGuarantee  := p4
-    rank5AdvocacyFunding   := p5
-    unspentPoolSurplus     := rem5 }
-
-/-- Per-lineage service budget (`LAW6.BUDGETS`): equals the greater of the
-lineage's protected minimum budget `minBudget` fixed at instantiation and the
-fee-pool revenue `feeRevenueGenerated` generated by its members, completely
-independent of `memberCount` (`INV.14`). -/
-def lineageServiceBudget (minBudget feeRevenueGenerated _memberCount : Nat) : Nat :=
-  max minBudget feeRevenueGenerated
-
-/-- Excess subsidy claim by a lineage (`LAW6.BUDGETS`, Adversarial Test 14):
-given `memberCount` members each demanding `perMemberDemand` of subsidized rights
-after exhausting `totalLifecycleReserves`, the claim covered by the protocol
-is capped by `lineageServiceBudget minBudget feeRevenueGenerated memberCount`;
-any excess demand `uncoveredExcess` receives `0` from the fee pool. -/
-def settleLineageSubsidyDemand (minBudget feeRevenueGenerated memberCount
-    perMemberDemand totalLifecycleReserves : Nat) : Nat × Nat × Nat :=
-  let totalDemand := memberCount * perMemberDemand
-  let fromLifecycle := min totalDemand totalLifecycleReserves
-  let remDemand := totalDemand - fromLifecycle
-  let budget := lineageServiceBudget minBudget feeRevenueGenerated memberCount
-  let fromLineageBudget := min remDemand budget
-  let extraPoolClaim := 0
-  (fromLifecycle, fromLineageBudget, extraPoolClaim)
-
-/-- Shared-infrastructure governance validity check (`LAW6.INFRA`, Adversarial
-Test 10, `INV.14`): a shared-infrastructure change is valid only if `newLevy`
-does not exceed `instantiationLevyCap`, `newMinBudget` is at least
-`instantiationMinBudget`, anti-capture guarantees remain intact, Insolvency
-Termination is not broadened, and the panel is not setting admission criteria
-for its own members' affiliates. -/
-def validSharedInfraChange (instantiationLevyCap newLevy instantiationMinBudget newMinBudget : Nat)
-    (antiCaptureIntact insolvencyUnbroadened noSelfAffiliateAdmission : Bool) : Bool :=
-  decide (newLevy ≤ instantiationLevyCap ∧ instantiationMinBudget ≤ newMinBudget) &&
-    antiCaptureIntact && insolvencyUnbroadened && noSelfAffiliateAdmission
-
-/-- A dispute filing submitted to Law 6 adjudication (`LAW6.FINALITY`). -/
-structure DisputeFiling where
-  filingId      : Nat
-  filerId       : Nat
-  factPatternId : Nat
-  counterStake  : Nat
-  feeCap        : Nat
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Consolidation of repeated proceedings by related parties on substantially
-similar grounds (`LAW6.FINALITY`): merges `incoming` into `existing` (keeping
-the single `existing.counterStake` and `existing.feeCap`) whenever
-`existing.factPatternId == incoming.factPatternId && isRelatedFn existing.filerId incoming.filerId`,
-and returns `none` when the filings cannot be consolidated. -/
-def consolidateRelatedFilings (isRelatedFn : Nat → Nat → Bool)
-    (existing : DisputeFiling) (incoming : DisputeFiling) : Option DisputeFiling :=
-  if (existing.factPatternId == incoming.factPatternId) &&
-     isRelatedFn existing.filerId incoming.filerId then
-    some existing
-  else
-    none
 
 /-! ## Provenance Clauses for Law 6 -/
 

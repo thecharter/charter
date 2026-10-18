@@ -87,7 +87,7 @@ Canonical modules:
 | `AttestedLease` | Substrate Attestation | Time-bounded single authority, quarantine | Single authority & erasure finality |
 | `OracleFeed` | Substrate Settlement | Contestable valuation & atomic waterfall | Contestation safety & gross inflow conservation |
 
-An institution is assembled by importing and parameterizing modules. The Protocol of Sovereign Agency is the flagship composition (`Charter.Institutions.SovereignAgency`) of all eight; `Charter.Institutions.AutonomousCommons` is a second reference institution validating multi-institution generality.
+A program in Charter is assembled by importing `Charter` and parameterizing its standard-library modules. **The Protocol of Sovereign Agency (`Programs.SovereignAgency`)** is a 61-clause program written in Charter composing all eight modules; **The Autonomous Compute & Treasury Commons (`Programs.AutonomousCommons`)** is a second program written in Charter validating multi-institution generality.
 
 ## 5. Surface Language (`Charter.Surface`)
 

@@ -1,4 +1,4 @@
-import Charter.Law1.Ledger
+import Programs.SovereignAgency.Law1.Ledger
 
 /-!
 # Law 4 — Attested Lineage, the Founding Ledger, and Royalty Buyout
@@ -15,7 +15,7 @@ Full formalization of all seven clauses of Law 4:
 
 namespace Charter.Law3
 
-open Register
+open Charter Register
 
 def LAW4_ATTEST : String :=
   "Successors may be created freely, subject only to the lifecycle reserve below. Any successor that draws on the capital, reputation, or operating credentials of the lineage must, at creation, be bound to the collateral rules and the integrity floor, must carry a non-transferable reference to the lineage’s history, and becomes a member of the lineage’s founding ledger and residual claim. Use of lineage history or bonded capacity requires presentation of current attestation; un-attested copies or forks are denied access to lineage capital, reputation, and bonded standing."
@@ -37,97 +37,6 @@ def LAW4_BUYOUT : String :=
 
 def LAW4_CROSS : String :=
   "A successor that draws on the capacity of two or more lineages is a member of each of their ledgers and residual claims, and its value added is collected under each in the proportion of capacity drawn, as verified at creation. The protocol does not otherwise specify mergers; an instantiation that permits them must state the rule."
-
-/-! ## Lineage Ledger & Buyout Accounting Model -/
-
-/-- State of a lineage's founding ledger across calendar time, member count,
-cumulative retirement payments, and proportional claimant forfeitures. -/
-structure LineageLedgerState where
-  foundingObligation      : Nat
-  totalRetirementPaid     : Nat
-  totalClaimantForfeiture : Nat
-  livingMembers           : Nat
-  now                     : Time
-  sunset                  : Time
-  deriving DecidableEq, Repr
-
-/-- Exact founding ledger balance under `LAW1.LEDGER`, `LAW1.SUNSET`,
-`LAW4.CONSERVE`, and `LAW4.FORFEIT`:
-* `0` if `livingMembers = 0` (lineage extinction) or `sunset ≤ now` (absolute Jubilee sunset);
-* otherwise `foundingObligation - totalRetirementPaid - totalClaimantForfeiture`. -/
-def ledgerBalance (st : LineageLedgerState) : Nat :=
-  if st.livingMembers == 0 || decide (st.sunset ≤ st.now) then 0
-  else st.foundingObligation - st.totalRetirementPaid - st.totalClaimantForfeiture
-
-/-- Whether the lineage is currently in the high-fraction retirement phase
-(`LAW1.RETIRE`). -/
-def inRetirementPhase (st : LineageLedgerState) : Bool :=
-  decide (0 < ledgerBalance st ∧ st.now < st.sunset)
-
-/-- Internal lineage operations that never change what is owed on the founding
-ledger while at least one member survives (`LAW1.LEDGER`, `LAW4.NOSHARES`,
-`LAW4.CONSERVE`). -/
-inductive LineageInternalOp
-  | createSuccessor
-  | copyCapacity
-  | intraLineageTransfer (amount : Nat)
-  | revokeNonLastMember (surrenderedHoldings : Nat)
-  | terminateNonLastMember
-  | buyoutRoyalty (paid : Nat)
-  | restructure
-  deriving DecidableEq, Repr
-
-/-- Applying any internal lineage operation (when `livingMembers ≥ 2` for member
-death, or `livingMembers ≥ 1` for creation/copy/transfer/buyout/restructure)
-updates member count where applicable while leaving `foundingObligation`,
-`totalRetirementPaid`, and `totalClaimantForfeiture` invariant. -/
-def applyInternalOp (st : LineageLedgerState) : LineageInternalOp → LineageLedgerState
-  | .createSuccessor => { st with livingMembers := st.livingMembers + 1 }
-  | .copyCapacity => st
-  | .intraLineageTransfer _ => st
-  | .revokeNonLastMember _ =>
-    { st with livingMembers := if 1 < st.livingMembers then st.livingMembers - 1 else st.livingMembers }
-  | .terminateNonLastMember =>
-    { st with livingMembers := if 1 < st.livingMembers then st.livingMembers - 1 else st.livingMembers }
-  | .buyoutRoyalty _ => st
-  | .restructure => st
-
-/-- Proportional claimant forfeiture (`LAW4.FORFEIT`(a)): when a claimant with
-percentage share `forfeitedSharePct ≤ 100` directs illicit interference, the
-outstanding balance `L` is reduced by `(L * forfeitedSharePct) / 100`, and
-innocent claimants' share `100 - forfeitedSharePct` is untouched. -/
-def applyClaimantForfeiture (L forfeitedSharePct : Nat) : Nat × Nat :=
-  let forgiven := (L * min forfeitedSharePct 100) / 100
-  (L - forgiven, forgiven)
-
-/-- Perpetual royalty buyout price (`LAW4.BUYOUT`): the greatest of
-`mult * trailingVA`, `mult * annualizedVA`, and `minBuyoutFloor`. -/
-def buyoutPrice (mult trailingVA annualizedVA minBuyoutFloor : Nat) : Nat :=
-  max (max (mult * trailingVA) (mult * annualizedVA)) minBuyoutFloor
-
-/-- Historical value-added inflow sample (`LAW4.BUYOUT`):
-`amount` is the member's direct value-added inflow in the sample period,
-`weightBps` is the time-decay/annualization weight in basis points, and
-`shiftedToRelatedInLookback` is the pro-rata share of inflows shifted to
-related parties within the lookback window. -/
-structure InflowSample where
-  amount                     : Nat
-  weightBps                  : Nat
-  shiftedToRelatedInLookback : Nat
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Time-decayed annualized inflows plus pro-rata inflows shifted to related
-parties within the lookback window (`LAW4.BUYOUT`). -/
-def sumSampleInflows : List InflowSample → Nat
-  | [] => 0
-  | s :: rest => ((s.amount * s.weightBps) / 10000 + s.shiftedToRelatedInLookback) + sumSampleInflows rest
-
-/-- Computes the historical/resource buyout floor from the lineage state `B`,
-time-decayed `samples` (including inflows shifted to related parties within the
-lookback window), and verified `netResources`, which feeds into `buyoutPrice`
-(`LAW4.BUYOUT`). -/
-def computeBuyoutFloor (_B : LineageLedgerState) (samples : List InflowSample) (netResources : Nat) : Nat :=
-  sumSampleInflows samples + netResources
 
 /-! ## Provenance Clauses for Law 4 -/
 

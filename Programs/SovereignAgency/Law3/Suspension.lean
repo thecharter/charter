@@ -1,4 +1,5 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
+import Charter.Modules.CircuitBreaker
 
 /-!
 # Law 3, AS.1–AS.8 — Adjudicated Suspension & Insolvency Termination
@@ -14,6 +15,15 @@ import Charter.Law3.NonInterference
 -/
 
 namespace Charter.Law3
+
+open Charter
+
+export Charter.Modules (
+  ASParams
+  RemediationParams
+  requiredEmergencyStake
+  stake_rises_with_wrongful_attempts
+)
 
 def AS1 : String :=
   "The initiator must post an emergency counter-stake scaled to the greater of the agent’s active bonded exposure and the value of its registered pending commitments (with residual claimants subject to an elevated multiplier due to conflict of interest). Posting the stake triggers only a brief **preliminary freeze** until an expedited preliminary panel reviews prima facie evidence; the pause continues into full adjudication only if the preliminary panel affirms probable cause. Unsuccessful emergency attempts by related initiators are aggregated, and the required stake for repeat initiators rises with each wrongful attempt. The stake is the agent’s assured recovery; damages beyond it remain enforceable but may prove uncollectible, which is the accepted cost of keeping the stake low enough that suspension remains available to parties without deep capital."
@@ -38,25 +48,6 @@ def AS7 : String :=
 
 def AS8 : String :=
   "If preliminary review or final adjudication determines the suspension was unfounded, the agent is immediately restored from its preserved state, and the initiator is liable for the agent’s **actual verified consequential damages** (and for verified delay damages suffered by the agent’s tolled third-party counterparties). The emergency stake is applied first; any excess remains an enforceable liability of the initiator. The wrongful suspension is inscribed on the initiator’s record."
-
-/-- Instantiation parameters for AS.1–AS.8. -/
-structure ASParams where
-  preliminaryFreezeWindow : Time
-  ordinarySuspensionLimit : Time
-  damagesPaymentWindow    : Time
-  activeExposure          : Nat := 100
-  pendingCommitments      : Nat := 80
-  claimantMultiplier      : Nat := 2
-  repeatEscalationStep    : Nat := 50
-
-/-- The required emergency counter-stake: scaled to the greater of active
-bonded exposure and registered pending commitments, multiplied by the
-elevated claimant multiplier for residual claimants, and rising with each
-prior wrongful attempt. -/
-def requiredEmergencyStake (P : ASParams) (isClaimant : Bool) (priorWrongful : Nat) : Nat :=
-  let base := max P.activeExposure P.pendingCommitments
-  let mult := if isClaimant then P.claimantMultiplier else 1
-  base * mult + priorWrongful * P.repeatEscalationStep
 
 /-- Actor-to-fact tag table identifying which party initiated the suspension. -/
 def initiatorTags : List (Party × Fact) :=

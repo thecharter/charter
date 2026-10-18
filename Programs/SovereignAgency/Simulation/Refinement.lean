@@ -1,6 +1,6 @@
-import Charter.Simulation.WorldState
-import Charter.Law3.Theorems
-import Charter.Law3.Scenarios
+import Programs.SovereignAgency.Simulation.WorldState
+import Programs.SovereignAgency.Law3.Theorems
+import Programs.SovereignAgency.Law3.Scenarios
 
 /-!
 # Charter.Simulation.Refinement — State-Machine Refinement, Quantitative Synchronization & 16 End-to-End Adversarial World Simulations

@@ -1,4 +1,4 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
 
 /-!
 # Law 3 — Agent Integrity Constraints (`LAW3.FLOOR`) & Corruption Defined (`LAW3.AS.9`)

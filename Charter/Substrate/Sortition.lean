@@ -283,23 +283,3 @@ export Substrate (
 )
 
 end Charter
-
-namespace Charter.Law3
-
-export Charter.Substrate (
-  ArbiterCandidate
-  eligibleCandidate
-  filterEligibleCandidates
-  selectSortitionPanel
-  supermajorityPassed
-  dedupSybilClusters
-  selectSybilResistantPanel
-  sortition_panel_all_independent_and_bonded
-  sortition_panel_bounded_size
-  sortition_supermajority_blocks_minority_coalition
-  sortition_sybil_resistant_panel_properties
-  sortition_empty_panel_never_passes
-  sortition_panel_independent_and_unbiased
-)
-
-end Charter.Law3

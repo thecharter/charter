@@ -1,6 +1,5 @@
 import Charter.Core.Semantics
 import Charter.Substrate.Attestation
-import Charter.Law5.Revocation
 
 /-!
 # Charter.Modules.AttestedLease — Reusable Single-Authority Execution Lease & Quarantine Module

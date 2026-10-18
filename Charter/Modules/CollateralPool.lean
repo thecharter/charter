@@ -1,20 +1,18 @@
 import Charter.Core.Semantics
-import Charter.Law2.Collateral
 
 /-!
 # Charter.Modules.CollateralPool — Reusable Harm-Scaled Bonding & Long-Tail Reserve Module
 
-Extracts and generalizes Law 2 harm-scaled collateralized action, rolling
-exposure window decay (`ExposureCommitment`, `activeRollingExposureAt`),
-risk-scaled `observationWindow`, persistent long-tail liability reserves
+Provides the law-agnostic harm-scaled collateralized action, rolling exposure
+window decay (`ExposureCommitment`, `activeRollingExposureAt`), risk-scaled
+`observationWindow`, persistent long-tail liability reserves
 (`settleLongTailReserve`), and anti-extortion mutual forfeit
-(`settleMutualForfeit` / `computeMutualForfeit`) into a reusable module over
-any signature `σ : Sig`.
+(`settleMutualForfeit` / `computeMutualForfeit`) over any signature `σ : Sig`.
 -/
 
 namespace Charter.Modules
 
-open Charter Charter.Law3
+open Charter
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -25,22 +23,90 @@ structure CollateralPoolConfig where
   mutualForfeitCapPct   : Nat := 50
   deriving DecidableEq, Repr, Inhabited
 
-export Charter.Law3 (
-  lineageAggregatedExposure
-  collateralSufficient
-  settleLongTailReserve
-  computeMutualForfeit
-  routeFrivolousClaimStake
-  settleWrongfulSuspensionDamages
-  ExposureCommitment
-  activeRollingExposureAt
-  observationWindow
-)
+/-- Group-wide aggregated rolling exposure across a list of related entities
+acting in the same risk domain or toward a causally connected outcome. -/
+def lineageAggregatedExposure (memberExposures : List Nat) : Nat :=
+  memberExposures.foldl (· + ·) 0
+
+/-- Safety-limit check: whether aggregated plausible external loss across
+related entities in the domain is within the total stake, insurance, and
+enforceable liability capacity placed behind it. -/
+def collateralSufficient (memberExposures : List Nat)
+    (availableStake insurance enforceableCapacity : Nat) : Bool :=
+  decide (lineageAggregatedExposure memberExposures ≤ availableStake + insurance + enforceableCapacity)
+
+/-- Pro-rata long-tail reserve settlement: settles two simultaneous validated
+latent-harm claims `claim1` and `claim2` against `reserve`, returning
+`(paid1, paid2, unpaidEnforceableCarryover)` where `paid1 + paid2 ≤ reserve`. -/
+def settleLongTailReserve (reserve claim1 claim2 : Nat) : Nat × Nat × Nat :=
+  let totalClaims := claim1 + claim2
+  if totalClaims ≤ reserve then
+    (claim1, claim2, 0)
+  else
+    let paid1 := (reserve * claim1) / max totalClaims 1
+    let paid2 := reserve - paid1
+    (paid1, paid2, totalClaims - reserve)
+
+/-- Precommitted mutual-forfeit calculation: given matching escrows `escrowA`,
+`escrowB` and capped percentage `capPct ≤ 100`, computes
+`(forfeitFromEach, transferToPartyA, transferToPartyB, transferToClaimant)`. -/
+def computeMutualForfeit (escrowA escrowB capPct : Nat) : Nat × Nat × Nat × Nat :=
+  let smaller := min escrowA escrowB
+  let forfeitEach := (smaller * min capPct 100) / 100
+  (forfeitEach, 0, 0, 0)
 
 /-- Settle a precommitted mutual forfeit between matching escrows `escrowA` and
-`escrowB` capped at `capPct ≤ 100`, returning
-`(forfeitFromEach, transferToPartyA, transferToPartyB, transferToClaimant)`. -/
+`escrowB` capped at `capPct ≤ 100`. -/
 abbrev settleMutualForfeit := computeMutualForfeit
+
+/-- Frivolous-claim counter-stake routing: when a claim with `counterStake` is
+ruled frivolous and verified direct arbitration costs are `verifiedDirectCosts`,
+reimburses at most `verifiedDirectCosts` (zero net profit) and routes the
+remaining `counterStake - reimbursed` to the neutral reserve or commons pool. -/
+def routeFrivolousClaimStake (counterStake verifiedDirectCosts : Nat) : Nat × Nat × Nat :=
+  let reimbursedCost := min counterStake verifiedDirectCosts
+  let toNeutralReserveOrCommons := counterStake - reimbursedCost
+  let toClaimantOrAgentProfit := 0
+  (reimbursedCost, toNeutralReserveOrCommons, toClaimantOrAgentProfit)
+
+/-- Wrongful-suspension recovery and uncollectible excess liability accounting:
+given emergency `stake`, verified `actualDamages` and third-party `delayDamages`,
+and the initiator's remaining collectible assets `initiatorAssets`, returns
+`(assuredFromStake, totalCollectedNow, unpaidEnforceableDeficit)`. -/
+def settleWrongfulSuspensionDamages (stake actualDamages delayDamages initiatorAssets : Nat) :
+    Nat × Nat × Nat :=
+  let totalDamages := actualDamages + delayDamages
+  let assuredFromStake := min stake totalDamages
+  let excessDamages := totalDamages - assuredFromStake
+  let collectedFromInitiator := min initiatorAssets excessDamages
+  let totalCollectedNow := assuredFromStake + collectedFromInitiator
+  let unpaidEnforceableDeficit := totalDamages - totalCollectedNow
+  (assuredFromStake, totalCollectedNow, unpaidEnforceableDeficit)
+
+/-- Individual rolling-exposure stake commitment: an action of plausible
+external loss `amount` started at `startedAt` immobilizes stake for an
+observation window of duration `windowDuration`. -/
+structure ExposureCommitment where
+  amount         : Nat
+  startedAt      : Nat
+  windowDuration : Nat
+  deriving DecidableEq, Repr, Inhabited
+
+/-- Active exposure contributed at timestamp `now` by commitment `c` (`0` once
+the observation window `c.startedAt + c.windowDuration` has expired). -/
+def ExposureCommitment.activeAmountAt (now : Nat) (c : ExposureCommitment) : Nat :=
+  if now ≤ c.startedAt + c.windowDuration then c.amount else 0
+
+/-- Cumulative active rolling exposure at timestamp `now` across a list of
+exposure commitments. -/
+def activeRollingExposureAt (now : Nat) : List ExposureCommitment → Nat
+  | [] => 0
+  | c :: cs => c.activeAmountAt now + activeRollingExposureAt now cs
+
+/-- Harm-scaled observation window scaling with domain risk and irreversibility
+multipliers. -/
+def observationWindow (baseWindow domainMultiplier irreversibilityMultiplier : Nat) : Nat :=
+  baseWindow * max 1 domainMultiplier * max 1 irreversibilityMultiplier
 
 /-! ## 2. Parametric Normative Rule Builders over Any Signature `σ : Sig` -/
 
@@ -184,12 +250,11 @@ private theorem foldl_add_acc (xs : List Nat) (acc : Nat) :
     rw [ih (acc + x), ih x]
     omega
 
-/-- Solvency bound and correlated-exposure additivity (`LAW2.EXPOSURE` & `LAW2.AGGREGATE`):
+/-- Solvency bound and correlated-exposure additivity:
 1. `collateralSufficient xs stake ins cap = true` iff aggregated exposure is
    bounded by `stake + ins + cap`.
 2. Dividing correlated risk across multiple sub-accounts or successors `xs ++ ys`
-   strictly preserves total aggregated exposure (`lineageAggregatedExposure (xs ++ ys) =
-   lineageAggregatedExposure xs + lineageAggregatedExposure ys`). -/
+   strictly preserves total aggregated exposure. -/
 theorem collateral_pool_solvency_bound (xs ys : List Nat) (stake ins cap : Nat) :
     (collateralSufficient xs stake ins cap = true ↔
       lineageAggregatedExposure xs ≤ stake + ins + cap) ∧
@@ -231,6 +296,7 @@ export Modules (
   computeMutualForfeit
   settleMutualForfeit
   routeFrivolousClaimStake
+  settleWrongfulSuspensionDamages
   ExposureCommitment
   activeRollingExposureAt
   observationWindow
@@ -250,4 +316,3 @@ export Modules (
   collateralPoolSelfTest_passes
 )
 end Charter
-

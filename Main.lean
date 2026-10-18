@@ -1,4 +1,5 @@
 import Charter
+import Programs
 import Lean.Data.Json
 
 /-!
@@ -328,8 +329,8 @@ def ledger : List (String × String × String) := [
   ("charter_surface_roundtrip / sample_charter_dsl_parses_cleanly / parseCharterText_rejects_invalid_inputs (Charter.Surface.Syntax)", "proved", "definitional (rfl) round-trip equivalence for charter_* macros and kernel-decided .charter textual DSL parser validation"),
   ("commons_wellFormed / commons_english_covered / commons_norms_interpreted / commons_reverse_provenance (AutonomousCommons)", "decided", "lexical, normative, and reverse provenance coverage of all 8 clauses of the Autonomous Compute & Treasury Commons (13 duties, 20 powers, 1 immunity)"),
   ("commons_outsiders_disabled / commons_exit_always_enabled / commons_dissolve_only_by_power / commons_ragequit_defeats_expulsion / commons_ledger_conserved / commons_court_bounded", "proved", "AutonomousCommons Hohfeldian outsider disability, unalienable ragequit exit, dissolution closure, ragequit immunity against expulsion, treasury conservation, and bounded sortition court"),
-  ("commons_generic_refinement / commons_ratchet_trajectory_safe / commons_sub_charter_respects_floor (Charter.lean)", "proved", "cross-framework instantiation of WorldSpec, RatchetSpec, and composeVertical on AutonomousCommons"),
-  ("all_commons_simulations_pass (Charter.Institutions.AutonomousCommons)", "decided", "all 8 end-to-end Autonomous Commons module world simulations (simCom1–simCom8) pass"),
+  ("commons_generic_refinement / commons_ratchet_trajectory_safe / commons_sub_charter_respects_floor (Programs.AutonomousCommons)", "proved", "cross-framework instantiation of WorldSpec, RatchetSpec, and composeVertical on AutonomousCommons"),
+  ("all_commons_simulations_pass (Programs.AutonomousCommons)", "decided", "all 8 end-to-end Autonomous Commons module world simulations (simCom1–simCom8) pass"),
   ("SoundFindings", "assumed", "a finding of interference implies interference occurred (refuted as a theorem by scenario 7)") ]
 
 def cmdVerify : IO Unit := do

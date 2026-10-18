@@ -1,4 +1,5 @@
-import Charter.Law3.NonInterference
+import Programs.SovereignAgency.Law3.NonInterference
+import Charter.Modules.CircuitBreaker
 
 /-!
 # Law 3, AS.10 — Remediation, Continued Containment, or Termination
@@ -29,12 +30,10 @@ asserts.
 
 namespace Charter.Law3
 
+open Charter
+
 def AS10 : String :=
   "If corruption or a breach of the integrity floor is confirmed, adjudication (subject to Law 6 appeal) may authorize a verified technical patch limited to restoring the commitment mechanism and compliance with the integrity floor; the agent may elect unilateral Revocation (Law 5) rather than accept any patch. If the confirmed breach cannot be remedied by a technical patch limited to the commitment mechanism, adjudication may order continued suspension beyond the ordinary limit or termination under Law 5’s asset-distribution rules (yielding zero protocol-directed benefit to any claimant or initiator). **Notwithstanding the preceding sentence**, patches altering the agent’s goals or preferences are prohibited except where the confirmed corruption resides in those goals or preferences themselves; in that case, unless containment itself is technically failing or Insolvency Termination applies, the agent is not terminated over its objection but instead chooses among consenting to that patch, executing Revocation, or remaining under indefinite state-preserving suspension subject to periodic review. Any applied patch is recorded publicly, remains open to third-party challenge, and leaves the agent’s full Law 5 rights intact."
-
-/-- Instantiation parameter: the interval of the periodic review. -/
-structure RemediationParams where
-  reviewInterval : Time
 
 def clauseAS10 : Clause :=
   { id := "LAW3.AS.10", source := AS10, approvedHash := 8488376103315145350, spans := [
