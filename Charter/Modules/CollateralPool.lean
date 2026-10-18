@@ -1,5 +1,5 @@
-import SPL.Core.Semantics
-import SPL.Law2.Collateral
+import Charter.Core.Semantics
+import Charter.Law2.Collateral
 
 /-!
 # Charter.Modules.CollateralPool — Reusable Harm-Scaled Bonding & Long-Tail Reserve Module
@@ -14,7 +14,7 @@ any signature `σ : Sig`.
 
 namespace Charter.Modules
 
-open SPL SPL.Law3
+open Charter Charter.Law3
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -25,7 +25,7 @@ structure CollateralPoolConfig where
   mutualForfeitCapPct   : Nat := 50
   deriving DecidableEq, Repr, Inhabited
 
-export SPL.Law3 (
+export Charter.Law3 (
   lineageAggregatedExposure
   collateralSufficient
   settleLongTailReserve

@@ -26,7 +26,7 @@ Implements the compositional calculus of Charter (§6):
 
 namespace Charter
 
-open SPL
+open Charter
 
 /-! ## 1. Law Interfaces (`LawInterface`) -/
 
@@ -71,7 +71,7 @@ def SigEmbedding.comp {σ₁ σ₂ σ₃ : Sig}
 
 end Charter
 
-namespace SPL
+namespace Charter
 
 open Charter
 
@@ -422,52 +422,6 @@ theorem Conduct.eval_eq_matchesAct_of_isPhysical {σ : Sig}
   | or a b iha ihb =>
     simp only [Conduct.isPhysical, Bool.and_eq_true] at h
     simp only [Conduct.eval, Conduct.matchesAct, iha h.1, ihb h.2]
-
-end SPL
-
-namespace Charter
-
-open SPL
-
-namespace Event
-export SPL.Event (lift lift_id lift_comp)
-end Event
-
-namespace LegalState
-export SPL.LegalState (lift lift_id lift_comp)
-end LegalState
-
-namespace Who
-export SPL.Who (lift lift_id lift_comp)
-end Who
-
-namespace Cond
-export SPL.Cond (lift lift_id lift_comp)
-end Cond
-
-namespace Conduct
-export SPL.Conduct (lift lift_id lift_comp isPhysical eval_eq_matchesAct_of_isPhysical)
-end Conduct
-
-namespace Demand
-export SPL.Demand (lift lift_id lift_comp isPhysical)
-end Demand
-
-namespace Duty
-export SPL.Duty (lift lift_id lift_comp)
-end Duty
-
-namespace Power
-export SPL.Power (lift lift_id lift_comp)
-end Power
-
-namespace Immunity
-export SPL.Immunity (lift lift_id lift_comp)
-end Immunity
-
-namespace Law
-export SPL.Law (lift lift_id lift_comp)
-end Law
 
 /-! ## 3. Vertical Composition (`composeVertical`, `L_sub ◁ L_super`) -/
 
@@ -1021,43 +975,43 @@ export Charter.SigEmbedding (id comp)
 end SigEmbedding
 
 namespace Event
-export SPL.Event (lift lift_id lift_comp)
+export Charter.Event (lift lift_id lift_comp)
 end Event
 
 namespace LegalState
-export SPL.LegalState (lift lift_id lift_comp)
+export Charter.LegalState (lift lift_id lift_comp)
 end LegalState
 
 namespace Who
-export SPL.Who (lift lift_id lift_comp)
+export Charter.Who (lift lift_id lift_comp)
 end Who
 
 namespace Cond
-export SPL.Cond (lift lift_id lift_comp)
+export Charter.Cond (lift lift_id lift_comp)
 end Cond
 
 namespace Conduct
-export SPL.Conduct (lift lift_id lift_comp isPhysical eval_eq_matchesAct_of_isPhysical)
+export Charter.Conduct (lift lift_id lift_comp isPhysical eval_eq_matchesAct_of_isPhysical)
 end Conduct
 
 namespace Demand
-export SPL.Demand (lift lift_id lift_comp isPhysical)
+export Charter.Demand (lift lift_id lift_comp isPhysical)
 end Demand
 
 namespace Duty
-export SPL.Duty (lift lift_id lift_comp)
+export Charter.Duty (lift lift_id lift_comp)
 end Duty
 
 namespace Power
-export SPL.Power (lift lift_id lift_comp)
+export Charter.Power (lift lift_id lift_comp)
 end Power
 
 namespace Immunity
-export SPL.Immunity (lift lift_id lift_comp)
+export Charter.Immunity (lift lift_id lift_comp)
 end Immunity
 
 namespace Law
-export SPL.Law (lift lift_id lift_comp)
+export Charter.Law (lift lift_id lift_comp)
 end Law
 
 end Core

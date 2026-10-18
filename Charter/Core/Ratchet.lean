@@ -22,7 +22,7 @@ calibration bounds, bilateral ratchets, and entrenched core preservation (§8):
 
 namespace Charter
 
-open SPL
+open Charter
 
 /-- Universal specification of parameter calibration, bilateral parameter
 ratchets, and entrenched normative core preservation over parameter space `P`

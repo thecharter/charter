@@ -18,7 +18,7 @@ Charter is not limited to any single domain. The Protocol of Sovereign Agency (`
 
 ## 2. Semantic Commitments (Non-Negotiable)
 
-These commitments are inherited from the original SPL formalization and are preserved under generalization:
+Charter enforces seven foundational semantic commitments across every institution:
 
 1. **Duties, powers, and immunities are data.** They are records in a typed abstract syntax tree, not opaque functions. Claim-rights, privileges, disabilities, and liabilities are defined from them.
 2. **Three independent questions about every event.** Occurrence (any event may occur; a trace is any list), compliance (whether the event breaches or satisfies active duties), and institutional validity (whether the event is a valid exercise of a power). An unlawful act may still be institutionally valid; a lawful act may be void.

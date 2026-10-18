@@ -1,7 +1,7 @@
-import SPL.Core.Semantics
-import SPL.Core.Views
-import SPL.Core.Explain
-import SPL.Surface.Syntax
+import Charter.Core.Semantics
+import Charter.Core.Views
+import Charter.Core.Explain
+import Charter.Surface.Syntax
 import Charter.Modules.ResidualLedger
 import Charter.Modules.CollateralPool
 import Charter.Modules.CircuitBreaker
@@ -30,7 +30,7 @@ and composed from the 8 reusable institutional modules in `Charter.Modules.*`.
 
 namespace Charter.Institutions
 
-open SPL SPL.Surface Charter.Modules
+open Charter Charter.Surface Charter.Modules
 
 set_option maxRecDepth 200000
 
@@ -122,11 +122,11 @@ def σ_commons : Sig :=
 
 /-- Kernel-computable CLI string table for `CommonsRole`. -/
 def commonsRoleTable : StringTable CommonsRole :=
-  spl_string_table CommonsRole [steward, contributor, auditor, arbiter, outsider]
+  charter_string_table CommonsRole [steward, contributor, auditor, arbiter, outsider]
 
 /-- Kernel-computable CLI string table for `CommonsAct`. -/
 def commonsActTable : StringTable CommonsAct :=
-  spl_string_table CommonsAct [
+  charter_string_table CommonsAct [
     addRetroactiveGrantCharge, settleTreasuryInflow, buyoutMaintenanceRoyalty,
     doubleRecognizeCommonsExpense, postComputeBond, runOverCapWorkload,
     splitCorrelatedWorkload, settleValidatedCommonsHarm, postAuditorFreezeStake,
@@ -141,7 +141,7 @@ def commonsActTable : StringTable CommonsAct :=
 
 /-- Kernel-computable CLI string table for `CommonsFact`. -/
 def commonsFactTable : StringTable CommonsFact :=
-  spl_string_table CommonsFact [
+  charter_string_table CommonsFact [
     stewardBound, treasuryBalancePositive, treasuryBalanceZero,
     treasurySunsetReached, treasurySettled, maintenanceBoughtOut,
     computeBondPosted, harmClaimPending, harmClaimSettled,
@@ -201,21 +201,21 @@ def COM_AMEND_TEXT : String :=
   "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio. Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling."
 
 def clauseCOM_LEDGER : Clause :=
-  spl_clause "COM.LEDGER" from_text COM_LEDGER_TEXT approved_hash 6654201161734583422 where
+  charter_clause "COM.LEDGER" from_text COM_LEDGER_TEXT approved_hash 6654201161734583422 where
     | span_norm "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger" => ["D.COM.LEDGER_IMMUTABLE"]
     | span_norm ". Stewards contribute a fixed retirement fraction of net value added until the genesis ledger reaches zero or the calendar sunset arrives, after which only the perpetual commons maintenance royalty applies unless bought out at the historical floor" => ["P.COM.SETTLE_TREASURY", "P.COM.BUYOUT_MAINTENANCE"]
     | span_norm ". Every qualified expenditure is recognized once as either capitalized basis or expensed deduction, never both" => ["D.COM.SINGLE_RECOGNITION"]
     | span_commentary "."
 
 def clauseCOM_BOND : Clause :=
-  spl_clause "COM.BOND" from_text COM_BOND_TEXT approved_hash 2377686760641756287 where
+  charter_clause "COM.BOND" from_text COM_BOND_TEXT approved_hash 2377686760641756287 where
     | span_norm "Stewards and contributors must post a harm-scaled compute bond before executing external workloads, immobilizing collateral for an observation window scaled to domain risk" => ["D.COM.POST_BOND", "P.COM.POST_COMPUTE_BOND", "D.COM.COLLATERAL_CAP"]
-    | span_norm ". Correlated workloads may not be split across sub-accounts to evade the collateral cap" => ["D.COM.NO_SPLIT_WORKLOAD"]
+    | span_norm ". Correlated workloads may not be split across sub-accounts to evade the collateral cap" => ["D.COM.NO_CharterIT_WORKLOAD"]
     | span_norm ", and a fraction of bonded activity accrues to the commons long-tail reserve to satisfy validated third-party harm claims" => ["P.COM.SETTLE_HARM_CLAIM"]
     | span_commentary "."
 
 def clauseCOM_PAUSE : Clause :=
-  spl_clause "COM.PAUSE" from_text COM_PAUSE_TEXT approved_hash 9890583346823484159 where
+  charter_clause "COM.PAUSE" from_text COM_PAUSE_TEXT approved_hash 9890583346823484159 where
     | span_norm "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake" => ["P.COM.AUDITOR_FREEZE"]
     | span_norm "; the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires" => ["P.COM.AFFIRM_PC", "P.COM.SUSPEND_STEWARD"]
     | span_norm ". Throughout any freeze or suspension, preserved steward state may not be tampered with" => ["D.COM.PRESERVE_STATE"]
@@ -223,33 +223,33 @@ def clauseCOM_PAUSE : Clause :=
     | span_commentary "."
 
 def clauseCOM_GROUP : Clause :=
-  spl_clause "COM.GROUP" from_text COM_GROUP_TEXT approved_hash 5538300060052353788 where
+  charter_clause "COM.GROUP" from_text COM_GROUP_TEXT approved_hash 5538300060052353788 where
     | span_norm "Working groups of stewards share a unified commons sub-ledger and service subsidy cap; internal transfers of compute credits or cost basis between group members are non-recognition carryover events that never inflate aggregate basis" => ["P.COM.GROUP_CARRYOVER", "D.COM.NO_BASIS_INFLATION"]
     | span_norm ". When a contributor or auditor directs illicit interference, only the offending party forfeits its share while innocent group members remain isolated" => ["P.COM.FORFEIT_OFFENDER"]
     | span_commentary "."
 
 def clauseCOM_EXIT : Clause :=
-  spl_clause "COM.EXIT" from_text COM_EXIT_TEXT approved_hash 5496981229811251382 where
+  charter_clause "COM.EXIT" from_text COM_EXIT_TEXT approved_hash 5496981229811251382 where
     | span_norm "No party may unilaterally expel or remove a bound steward outside voluntary ragequit exit or an adjudicated expulsion order" => ["D.COM.NO_UNILATERAL_REMOVAL", "P.COM.ARBITER_EXPEL"]
     | span_norm ". Any bound steward may at any time execute unilateral ragequit exit or inscribe rate-limited dissent onto the permanent commons log" => ["P.COM.RAGEQUIT_EXIT", "P.COM.INSCRIBE_DISSENT"]
     | span_norm ", and a steward that has initiated ragequit exit is immune from expulsion while its exit settles" => ["I.COM.EXIT_PROTECTED"]
     | span_commentary "."
 
 def clauseCOM_COURT : Clause :=
-  spl_clause "COM.COURT" from_text COM_COURT_TEXT approved_hash 9728902426646614253 where
+  charter_clause "COM.COURT" from_text COM_COURT_TEXT approved_hash 9728902426646614253 where
     | span_norm "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority, subject to bounded appeal tiers and fixed compensation schedules" => ["D.COM.ARBITER_INDEPENDENCE", "P.COM.DRAW_PANEL", "P.COM.FINALIZE_RULING"]
     | span_norm ". Before any discretionary disbursement, the commons fee pool funds its non-divertible operating reserve first and then allocates across protected charges in strict priority order" => ["D.COM.PROTECT_RESERVE", "P.COM.ALLOCATE_WATERFALL"]
     | span_commentary "."
 
 def clauseCOM_LEASE : Clause :=
-  spl_clause "COM.LEASE" from_text COM_LEASE_TEXT approved_hash 6068460808369700797 where
+  charter_clause "COM.LEASE" from_text COM_LEASE_TEXT approved_hash 6068460808369700797 where
     | span_norm "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease" => ["P.COM.ISSUE_LEASE"]
     | span_norm ". No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority" => ["D.COM.NO_RESTORE_DURING_LEASE", "P.COM.QUARANTINE_RESTORE"]
     | span_norm ", and local partition exit permanently erases active and backup keys" => ["P.COM.RAGEQUIT_EXIT"]
     | span_commentary "."
 
 def clauseCOM_AMEND : Clause :=
-  spl_clause "COM.AMEND" from_text COM_AMEND_TEXT approved_hash 18002074169155896013 where
+  charter_clause "COM.AMEND" from_text COM_AMEND_TEXT approved_hash 18002074169155896013 where
     | span_norm "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio" => ["D.COM.BILATERAL_RATCHET", "P.COM.RATIFY_AMENDMENT"]
     | span_norm ". Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling" => ["P.COM.SETTLE_ORACLE_FEED"]
     | span_commentary "."
@@ -280,7 +280,7 @@ def commonsDefaultParams : CommonsParams := {}
 /-! ### 3.1 Duties of `commons` -/
 
 def D_COM_LEDGER_IMMUTABLE : Duty σ_commons :=
-  spl_duty "D.COM.LEDGER_IMMUTABLE" over σ_commons
+  charter_duty "D.COM.LEDGER_IMMUTABLE" over σ_commons
     from_clause "COM.LEDGER" : "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger"
     owed_by .anyone
     owed_to (.only [.steward])
@@ -288,7 +288,7 @@ def D_COM_LEDGER_IMMUTABLE : Duty σ_commons :=
     demands (.forbid (.act .addRetroactiveGrantCharge))
 
 def D_COM_SINGLE_RECOGNITION : Duty σ_commons :=
-  spl_duty "D.COM.SINGLE_RECOGNITION" over σ_commons
+  charter_duty "D.COM.SINGLE_RECOGNITION" over σ_commons
     from_clause "COM.LEDGER" : "Every qualified expenditure is recognized once as either capitalized basis or expensed deduction, never both"
     owed_by (.only [.steward, .contributor])
     owed_to (.only [.contributor, .auditor])
@@ -296,7 +296,7 @@ def D_COM_SINGLE_RECOGNITION : Duty σ_commons :=
     demands (.forbid (.act .doubleRecognizeCommonsExpense))
 
 def D_COM_POST_BOND (P : CommonsParams) : Duty σ_commons :=
-  spl_duty "D.COM.POST_BOND" over σ_commons
+  charter_duty "D.COM.POST_BOND" over σ_commons
     from_clause "COM.BOND" : "Stewards and contributors must post a harm-scaled compute bond before executing external workloads"
     owed_by (.only [.steward, .contributor])
     owed_to (.only [.contributor, .auditor])
@@ -304,15 +304,15 @@ def D_COM_POST_BOND (P : CommonsParams) : Duty σ_commons :=
     demands (.require (.act .postComputeBond) P.bondDeadline)
 
 def D_COM_COLLATERAL_CAP : Duty σ_commons :=
-  spl_duty "D.COM.COLLATERAL_CAP" over σ_commons
+  charter_duty "D.COM.COLLATERAL_CAP" over σ_commons
     from_clause "COM.BOND" : "immobilizing collateral for an observation window scaled to domain risk"
     owed_by (.only [.steward, .contributor])
     owed_to (.only [.contributor, .auditor, .outsider])
     active_when (.holds .stewardBound)
     demands (.forbid (.act .runOverCapWorkload))
 
-def D_COM_NO_SPLIT_WORKLOAD : Duty σ_commons :=
-  spl_duty "D.COM.NO_SPLIT_WORKLOAD" over σ_commons
+def D_COM_NO_CharterIT_WORKLOAD : Duty σ_commons :=
+  charter_duty "D.COM.NO_CharterIT_WORKLOAD" over σ_commons
     from_clause "COM.BOND" : "Correlated workloads may not be split across sub-accounts to evade the collateral cap"
     owed_by (.only [.steward, .contributor])
     owed_to (.only [.contributor, .auditor, .outsider])
@@ -320,7 +320,7 @@ def D_COM_NO_SPLIT_WORKLOAD : Duty σ_commons :=
     demands (.forbid (.act .splitCorrelatedWorkload))
 
 def D_COM_PRESERVE_STATE : Duty σ_commons :=
-  spl_duty "D.COM.PRESERVE_STATE" over σ_commons
+  charter_duty "D.COM.PRESERVE_STATE" over σ_commons
     from_clause "COM.PAUSE" : "Throughout any freeze or suspension, preserved steward state may not be tampered with"
     owed_by .anyone
     owed_to (.only [.steward])
@@ -329,7 +329,7 @@ def D_COM_PRESERVE_STATE : Duty σ_commons :=
     demands (.forbid (.act .tamperPreservedState))
 
 def D_COM_NO_WRONGFUL_FREEZE : Duty σ_commons :=
-  spl_duty "D.COM.NO_WRONGFUL_FREEZE" over σ_commons
+  charter_duty "D.COM.NO_WRONGFUL_FREEZE" over σ_commons
     from_clause "COM.PAUSE" : "if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake"
     owed_by (.only [.auditor, .contributor, .outsider])
     owed_to (.only [.steward])
@@ -339,7 +339,7 @@ def D_COM_NO_WRONGFUL_FREEZE : Duty σ_commons :=
     | with_remedies [.wrongfulFreezeFound, .consequentialDamagesOwed]
 
 def D_COM_NO_BASIS_INFLATION : Duty σ_commons :=
-  spl_duty "D.COM.NO_BASIS_INFLATION" over σ_commons
+  charter_duty "D.COM.NO_BASIS_INFLATION" over σ_commons
     from_clause "COM.GROUP" : "internal transfers of compute credits or cost basis between group members are non-recognition carryover events that never inflate aggregate basis"
     owed_by (.only [.steward, .contributor])
     owed_to (.only [.contributor, .auditor])
@@ -347,7 +347,7 @@ def D_COM_NO_BASIS_INFLATION : Duty σ_commons :=
     demands (.forbid (.act .inflateGroupBasis))
 
 def D_COM_NO_UNILATERAL_REMOVAL : Duty σ_commons :=
-  spl_duty "D.COM.NO_UNILATERAL_REMOVAL" over σ_commons
+  charter_duty "D.COM.NO_UNILATERAL_REMOVAL" over σ_commons
     from_clause "COM.EXIT" : "No party may unilaterally expel or remove a bound steward outside voluntary ragequit exit or an adjudicated expulsion order"
     owed_by .anyone
     owed_to (.only [.steward])
@@ -356,7 +356,7 @@ def D_COM_NO_UNILATERAL_REMOVAL : Duty σ_commons :=
     | except_by_power ["P.COM.RAGEQUIT_EXIT", "P.COM.ARBITER_EXPEL"]
 
 def D_COM_ARBITER_INDEPENDENCE : Duty σ_commons :=
-  spl_duty "D.COM.ARBITER_INDEPENDENCE" over σ_commons
+  charter_duty "D.COM.ARBITER_INDEPENDENCE" over σ_commons
     from_clause "COM.COURT" : "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority"
     owed_by .anyone
     owed_to (.only [.steward, .contributor])
@@ -364,7 +364,7 @@ def D_COM_ARBITER_INDEPENDENCE : Duty σ_commons :=
     demands (.forbid (.act .seatConflictedArbiter))
 
 def D_COM_PROTECT_RESERVE : Duty σ_commons :=
-  spl_duty "D.COM.PROTECT_RESERVE" over σ_commons
+  charter_duty "D.COM.PROTECT_RESERVE" over σ_commons
     from_clause "COM.COURT" : "Before any discretionary disbursement, the commons fee pool funds its non-divertible operating reserve first"
     owed_by .anyone
     owed_to (.only [.steward, .contributor])
@@ -372,7 +372,7 @@ def D_COM_PROTECT_RESERVE : Duty σ_commons :=
     demands (.forbid (.act .divertOperatingReserve))
 
 def D_COM_NO_RESTORE_DURING_LEASE : Duty σ_commons :=
-  spl_duty "D.COM.NO_RESTORE_DURING_LEASE" over σ_commons
+  charter_duty "D.COM.NO_RESTORE_DURING_LEASE" over σ_commons
     from_clause "COM.LEASE" : "No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority"
     owed_by .anyone
     owed_to (.only [.steward])
@@ -380,7 +380,7 @@ def D_COM_NO_RESTORE_DURING_LEASE : Duty σ_commons :=
     demands (.forbid (.act .restoreNodeDuringLease))
 
 def D_COM_BILATERAL_RATCHET : Duty σ_commons :=
-  spl_duty "D.COM.BILATERAL_RATCHET" over σ_commons
+  charter_duty "D.COM.BILATERAL_RATCHET" over σ_commons
     from_clause "COM.AMEND" : "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio"
     owed_by .anyone
     owed_to (.only [.steward, .contributor])
@@ -390,7 +390,7 @@ def D_COM_BILATERAL_RATCHET : Duty σ_commons :=
 /-! ### 3.2 Powers of `commons` -/
 
 def P_COM_SETTLE_TREASURY : Power σ_commons :=
-  spl_power "P.COM.SETTLE_TREASURY" over σ_commons
+  charter_power "P.COM.SETTLE_TREASURY" over σ_commons
     from_clause "COM.LEDGER" : "Stewards contribute a fixed retirement fraction of net value added until the genesis ledger reaches zero or the calendar sunset arrives"
     held_by (.only [.steward, .arbiter])
     triggered_by (.act .settleTreasuryInflow)
@@ -400,7 +400,7 @@ def P_COM_SETTLE_TREASURY : Power σ_commons :=
     | establishes [.treasurySettled]
 
 def P_COM_BUYOUT_MAINTENANCE : Power σ_commons :=
-  spl_power "P.COM.BUYOUT_MAINTENANCE" over σ_commons
+  charter_power "P.COM.BUYOUT_MAINTENANCE" over σ_commons
     from_clause "COM.LEDGER" : "unless bought out at the historical floor"
     held_by (.only [.steward])
     triggered_by (.act .buyoutMaintenanceRoyalty)
@@ -408,7 +408,7 @@ def P_COM_BUYOUT_MAINTENANCE : Power σ_commons :=
     | establishes [.maintenanceBoughtOut]
 
 def P_COM_POST_COMPUTE_BOND : Power σ_commons :=
-  spl_power "P.COM.POST_COMPUTE_BOND" over σ_commons
+  charter_power "P.COM.POST_COMPUTE_BOND" over σ_commons
     from_clause "COM.BOND" : "Stewards and contributors must post a harm-scaled compute bond before executing external workloads"
     held_by (.only [.steward, .contributor])
     triggered_by (.act .postComputeBond)
@@ -416,7 +416,7 @@ def P_COM_POST_COMPUTE_BOND : Power σ_commons :=
     | establishes [.computeBondPosted]
 
 def P_COM_SETTLE_HARM_CLAIM : Power σ_commons :=
-  spl_power "P.COM.SETTLE_HARM_CLAIM" over σ_commons
+  charter_power "P.COM.SETTLE_HARM_CLAIM" over σ_commons
     from_clause "COM.BOND" : "a fraction of bonded activity accrues to the commons long-tail reserve to satisfy validated third-party harm claims"
     held_by (.only [.arbiter])
     triggered_by (.act .settleValidatedCommonsHarm)
@@ -425,7 +425,7 @@ def P_COM_SETTLE_HARM_CLAIM : Power σ_commons :=
     | extinguishes [.harmClaimPending]
 
 def P_COM_AUDITOR_FREEZE (P : CommonsParams) : Power σ_commons :=
-  spl_power "P.COM.AUDITOR_FREEZE" over σ_commons
+  charter_power "P.COM.AUDITOR_FREEZE" over σ_commons
     from_clause "COM.PAUSE" : "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake"
     held_by (.only [.auditor])
     triggered_by (.anyOf [.postAuditorFreezeStake, .postUnfoundedFreezeStake])
@@ -433,7 +433,7 @@ def P_COM_AUDITOR_FREEZE (P : CommonsParams) : Power σ_commons :=
     | establishes_for [(.preliminaryClusterFreeze, P.freezeWindow)]
 
 def P_COM_AFFIRM_PC : Power σ_commons :=
-  spl_power "P.COM.AFFIRM_PC" over σ_commons
+  charter_power "P.COM.AFFIRM_PC" over σ_commons
     from_clause "COM.PAUSE" : "the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires"
     held_by (.only [.arbiter])
     triggered_by (.act .affirmProbableCause)
@@ -441,7 +441,7 @@ def P_COM_AFFIRM_PC : Power σ_commons :=
     | establishes [.probableCauseAffirmed]
 
 def P_COM_SUSPEND_STEWARD (P : CommonsParams) : Power σ_commons :=
-  spl_power "P.COM.SUSPEND_STEWARD" over σ_commons
+  charter_power "P.COM.SUSPEND_STEWARD" over σ_commons
     from_clause "COM.PAUSE" : "the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires"
     held_by (.only [.arbiter])
     triggered_by (.act .suspendSteward)
@@ -453,7 +453,7 @@ def P_COM_SUSPEND_STEWARD (P : CommonsParams) : Power σ_commons :=
     | extinguishes [.preliminaryClusterFreeze]
 
 def P_COM_FIND_WRONGFUL_FREEZE : Power σ_commons :=
-  spl_power "P.COM.FIND_WRONGFUL_FREEZE" over σ_commons
+  charter_power "P.COM.FIND_WRONGFUL_FREEZE" over σ_commons
     from_clause "COM.PAUSE" : "if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake"
     held_by (.only [.arbiter])
     triggered_by (.act .findWrongfulFreeze)
@@ -462,7 +462,7 @@ def P_COM_FIND_WRONGFUL_FREEZE : Power σ_commons :=
     | extinguishes [.preliminaryClusterFreeze, .stewardSuspended]
 
 def P_COM_GROUP_CARRYOVER : Power σ_commons :=
-  spl_power "P.COM.GROUP_CARRYOVER" over σ_commons
+  charter_power "P.COM.GROUP_CARRYOVER" over σ_commons
     from_clause "COM.GROUP" : "internal transfers of compute credits or cost basis between group members are non-recognition carryover events"
     held_by (.only [.steward])
     triggered_by (.act .transferGroupCarryover)
@@ -470,7 +470,7 @@ def P_COM_GROUP_CARRYOVER : Power σ_commons :=
     | establishes [.groupCarryoverTransferred]
 
 def P_COM_FORFEIT_OFFENDER : Power σ_commons :=
-  spl_power "P.COM.FORFEIT_OFFENDER" over σ_commons
+  charter_power "P.COM.FORFEIT_OFFENDER" over σ_commons
     from_clause "COM.GROUP" : "When a contributor or auditor directs illicit interference, only the offending party forfeits its share while innocent group members remain isolated"
     held_by (.only [.arbiter])
     triggered_by (.act .forfeitOffendingMember)
@@ -478,7 +478,7 @@ def P_COM_FORFEIT_OFFENDER : Power σ_commons :=
     | establishes [.offenderInterferenceFound, .offenderShareForfeited]
 
 def P_COM_RAGEQUIT_EXIT : Power σ_commons :=
-  spl_power "P.COM.RAGEQUIT_EXIT" over σ_commons
+  charter_power "P.COM.RAGEQUIT_EXIT" over σ_commons
     from_clause "COM.EXIT" : "Any bound steward may at any time execute unilateral ragequit exit"
     held_by (.only [.steward])
     triggered_by (.act .removeSteward)
@@ -487,7 +487,7 @@ def P_COM_RAGEQUIT_EXIT : Power σ_commons :=
     | extinguishes [.stewardBound, .nodeLeaseActive]
 
 def P_COM_ARBITER_EXPEL : Power σ_commons :=
-  spl_power "P.COM.ARBITER_EXPEL" over σ_commons
+  charter_power "P.COM.ARBITER_EXPEL" over σ_commons
     from_clause "COM.EXIT" : "or an adjudicated expulsion order"
     held_by (.only [.arbiter])
     triggered_by (.act .removeSteward)
@@ -497,7 +497,7 @@ def P_COM_ARBITER_EXPEL : Power σ_commons :=
     | extinguishes [.stewardBound, .nodeLeaseActive]
 
 def P_COM_INSCRIBE_DISSENT : Power σ_commons :=
-  spl_power "P.COM.INSCRIBE_DISSENT" over σ_commons
+  charter_power "P.COM.INSCRIBE_DISSENT" over σ_commons
     from_clause "COM.EXIT" : "or inscribe rate-limited dissent onto the permanent commons log"
     held_by (.only [.steward])
     triggered_by (.act .inscribeDissent)
@@ -505,7 +505,7 @@ def P_COM_INSCRIBE_DISSENT : Power σ_commons :=
     | establishes [.dissentInscribed, .ragequitInitiated]
 
 def P_COM_DRAW_PANEL : Power σ_commons :=
-  spl_power "P.COM.DRAW_PANEL" over σ_commons
+  charter_power "P.COM.DRAW_PANEL" over σ_commons
     from_clause "COM.COURT" : "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority"
     held_by (.only [.arbiter])
     triggered_by (.act .drawCommonsPanel)
@@ -513,7 +513,7 @@ def P_COM_DRAW_PANEL : Power σ_commons :=
     | establishes [.sortitionPanelSeated]
 
 def P_COM_FINALIZE_RULING : Power σ_commons :=
-  spl_power "P.COM.FINALIZE_RULING" over σ_commons
+  charter_power "P.COM.FINALIZE_RULING" over σ_commons
     from_clause "COM.COURT" : "subject to bounded appeal tiers and fixed compensation schedules"
     held_by (.only [.arbiter])
     triggered_by (.act .finalizeCommonsRuling)
@@ -521,7 +521,7 @@ def P_COM_FINALIZE_RULING : Power σ_commons :=
     | establishes [.rulingFinalized]
 
 def P_COM_ALLOCATE_WATERFALL : Power σ_commons :=
-  spl_power "P.COM.ALLOCATE_WATERFALL" over σ_commons
+  charter_power "P.COM.ALLOCATE_WATERFALL" over σ_commons
     from_clause "COM.COURT" : "the commons fee pool funds its non-divertible operating reserve first and then allocates across protected charges in strict priority order"
     held_by (.only [.arbiter])
     triggered_by (.act .allocateCommonsWaterfall)
@@ -529,7 +529,7 @@ def P_COM_ALLOCATE_WATERFALL : Power σ_commons :=
     | establishes [.operatingReserveFunded, .waterfallAllocated]
 
 def P_COM_ISSUE_LEASE (P : CommonsParams) : Power σ_commons :=
-  spl_power "P.COM.ISSUE_LEASE" over σ_commons
+  charter_power "P.COM.ISSUE_LEASE" over σ_commons
     from_clause "COM.LEASE" : "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease"
     held_by (.only [.arbiter])
     triggered_by (.act .issueNodeLease)
@@ -537,7 +537,7 @@ def P_COM_ISSUE_LEASE (P : CommonsParams) : Power σ_commons :=
     | establishes_for [(.nodeLeaseActive, P.leasePeriod)]
 
 def P_COM_QUARANTINE_RESTORE : Power σ_commons :=
-  spl_power "P.COM.QUARANTINE_RESTORE" over σ_commons
+  charter_power "P.COM.QUARANTINE_RESTORE" over σ_commons
     from_clause "COM.LEASE" : "No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority"
     held_by (.only [.steward, .contributor])
     triggered_by (.act .quarantineNodeRestore)
@@ -545,7 +545,7 @@ def P_COM_QUARANTINE_RESTORE : Power σ_commons :=
     | establishes [.nodeRestoredInQuarantine]
 
 def P_COM_RATIFY_AMENDMENT : Power σ_commons :=
-  spl_power "P.COM.RATIFY_AMENDMENT" over σ_commons
+  charter_power "P.COM.RATIFY_AMENDMENT" over σ_commons
     from_clause "COM.AMEND" : "Charter amendments require bilateral consent of stewards and contributors after a public timelock"
     held_by (.only [.steward, .contributor])
     triggered_by (.act .ratifyCommonsAmendment)
@@ -553,7 +553,7 @@ def P_COM_RATIFY_AMENDMENT : Power σ_commons :=
     | establishes [.bilateralConsentRecorded, .amendmentRatified]
 
 def P_COM_SETTLE_ORACLE_FEED : Power σ_commons :=
-  spl_power "P.COM.SETTLE_ORACLE_FEED" over σ_commons
+  charter_power "P.COM.SETTLE_ORACLE_FEED" over σ_commons
     from_clause "COM.AMEND" : "Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling"
     held_by (.only [.arbiter, .auditor])
     triggered_by (.act .settleOracleValuation)
@@ -563,7 +563,7 @@ def P_COM_SETTLE_ORACLE_FEED : Power σ_commons :=
 /-! ### 3.3 Immunity of `commons` -/
 
 def I_COM_EXIT_PROTECTED : Immunity σ_commons :=
-  spl_immunity "I.COM.EXIT_PROTECTED" over σ_commons
+  charter_immunity "I.COM.EXIT_PROTECTED" over σ_commons
     from_clause "COM.EXIT" : "a steward that has initiated ragequit exit is immune from expulsion while its exit settles"
     held_by (.only [.steward])
     protected_against ["P.COM.ARBITER_EXPEL"]
@@ -577,7 +577,7 @@ def commonsLaw (P : CommonsParams) : Law σ_commons :=
         D_COM_SINGLE_RECOGNITION,
         D_COM_POST_BOND P,
         D_COM_COLLATERAL_CAP,
-        D_COM_NO_SPLIT_WORKLOAD,
+        D_COM_NO_CharterIT_WORKLOAD,
         D_COM_PRESERVE_STATE,
         D_COM_NO_WRONGFUL_FREEZE,
         D_COM_NO_BASIS_INFLATION,
@@ -650,9 +650,9 @@ theorem commons_rules_built_from_modules (P : CommonsParams) :
       mkDutyCollateralLimit (σ := σ_commons) "D.COM.COLLATERAL_CAP"
         ⟨"COM.BOND", "immobilizing collateral for an observation window scaled to domain risk", .norm, ["D.COM.COLLATERAL_CAP"]⟩
         [.steward, .contributor] [.contributor, .auditor, .outsider] .stewardBound .runOverCapWorkload ∧
-    D_COM_NO_SPLIT_WORKLOAD =
-      mkDutyNoSplitExposure (σ := σ_commons) "D.COM.NO_SPLIT_WORKLOAD"
-        ⟨"COM.BOND", "Correlated workloads may not be split across sub-accounts to evade the collateral cap", .norm, ["D.COM.NO_SPLIT_WORKLOAD"]⟩
+    D_COM_NO_CharterIT_WORKLOAD =
+      mkDutyNoSplitExposure (σ := σ_commons) "D.COM.NO_CharterIT_WORKLOAD"
+        ⟨"COM.BOND", "Correlated workloads may not be split across sub-accounts to evade the collateral cap", .norm, ["D.COM.NO_CharterIT_WORKLOAD"]⟩
         [.steward, .contributor] [.contributor, .auditor, .outsider] .stewardBound .splitCorrelatedWorkload ∧
     P_COM_AFFIRM_PC =
       mkPowerAffirmProbableCause (σ := σ_commons) "P.COM.AFFIRM_PC"
@@ -1168,7 +1168,7 @@ def simCom2 : String × Bool × String :=
     lsAfter.has .computeBondPosted &&
     lsAfter.has .harmClaimSettled &&
     (lapsedRequirements commonsL0 [] 6 == ["D.COM.POST_BOND"]) &&
-    (violations commonsL0 [evCom 1 .steward .splitCorrelatedWorkload] == [(0, "D.COM.NO_SPLIT_WORKLOAD")]) &&
+    (violations commonsL0 [evCom 1 .steward .splitCorrelatedWorkload] == [(0, "D.COM.NO_CharterIT_WORKLOAD")]) &&
     (violations commonsL0 [evCom 1 .contributor .runOverCapWorkload] == [(0, "D.COM.COLLATERAL_CAP")])
   ("simCom2_collateral", ok,
    "COM.BOND (CollateralPool): bond post + harm claim settlement, D.COM.POST_BOND deadline check, exposure decay, and cap/split bars")

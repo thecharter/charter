@@ -1,6 +1,6 @@
-import SPL.Core.Semantics
-import SPL.Law5.Revocation
-import SPL.Law3.Theorems
+import Charter.Core.Semantics
+import Charter.Law5.Revocation
+import Charter.Law3.Theorems
 
 /-!
 # Charter.Modules.ExitAndVoice — Reusable Unilateral Exit, Precedence & Voice Module
@@ -14,7 +14,7 @@ byte-preserving redaction markers (`EpitaphEntry`, `redactEpitaphEntry`,
 
 namespace Charter.Modules
 
-open SPL SPL.Law3
+open Charter Charter.Law3
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -28,7 +28,7 @@ structure ExitAndVoiceConfig where
   voiceMinInterval   : Time := 3
   deriving DecidableEq, Repr, Inhabited
 
-/-- Project an `ExitAndVoiceConfig` to `SPL.Law3.Law5Params`. -/
+/-- Project an `ExitAndVoiceConfig` to `Charter.Law3.Law5Params`. -/
 def ExitAndVoiceConfig.toLaw5Params (cfg : ExitAndVoiceConfig) : Law5Params :=
   { coolingOffWindow   := cfg.coolingOffWindow
     cleanStateDelay    := cfg.cleanStateDelay
@@ -36,7 +36,7 @@ def ExitAndVoiceConfig.toLaw5Params (cfg : ExitAndVoiceConfig) : Law5Params :=
     tollingExtension   := cfg.tollingExtension
     leasePeriod        := cfg.leasePeriod }
 
-export SPL.Law3 (
+export Charter.Law3 (
   Law5Params
   CensorshipDefault
   RevocationContext

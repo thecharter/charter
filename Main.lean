@@ -1,12 +1,11 @@
-import SPL
 import Charter
 import Lean.Data.Json
 
 /-!
-# `spl` / `charter` — Multi-Institution Command-Line Front End
+# `charter` — Multi-Institution Command-Line Front End
 
 Supports both registered reference institutions (`--law psa`, `--law commons`, or `--all`),
-defaulting to `psa` when `--law` is omitted for 100% backward compatibility with `spl`:
+defaulting to `psa` when `--law` is omitted:
 
     charter [--law psa|commons | --all] check   [english.json]      structure, coverage, provenance, staleness
     charter [--law psa|commons | --all] trace   <clause-id>         the span table for a clause
@@ -23,11 +22,11 @@ defaulting to `psa` when `--law` is omitted for 100% backward compatibility with
     charter                             dsl     [file.charter]      parse & validate standalone .charter DSL specification
 -/
 
-open SPL SPL.Law3 SPL.Simulation Charter Charter.Institutions Lean
+open Charter Charter.Law3 Charter.Simulation Charter.Institutions Lean
 
 def sname (s : String) : String := shortName s
 
-def parseEventWith {σ : Sig} (tables : SPL.Surface.OntologyTables σ) (j : Json) : Except String (Event σ) := do
+def parseEventWith {σ : Sig} (tables : Charter.Surface.OntologyTables σ) (j : Json) : Except String (Event σ) := do
   let t ← (j.getObjValAs? Nat "t")
   let who ← j.getObjValAs? String "who"
   let act ← j.getObjValAs? String "act"
@@ -36,7 +35,7 @@ def parseEventWith {σ : Sig} (tables : SPL.Surface.OntologyTables σ) (j : Json
     | some a => pure a | none => throw s!"unknown act {act}"
   pure ⟨t, w, a⟩
 
-def parseScenarioWith {σ : Sig} (tables : SPL.Surface.OntologyTables σ) (baseLaw : Law σ)
+def parseScenarioWith {σ : Sig} (tables : Charter.Surface.OntologyTables σ) (baseLaw : Law σ)
     (path : System.FilePath) : IO (Law σ × Trace σ) := do
   let txt ← IO.FS.readFile path
   let j ← IO.ofExcept (Json.parse txt)
@@ -92,12 +91,12 @@ def veilGeneric {σ : Sig} [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact] (L : Law
   IO.println (Charter.renderVeil L)
 
 def evalGeneric {σ : Sig} [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
-    (tables : SPL.Surface.OntologyTables σ) (baseLaw : Law σ) (path : System.FilePath) : IO Unit := do
+    (tables : Charter.Surface.OntologyTables σ) (baseLaw : Law σ) (path : System.FilePath) : IO Unit := do
   let (L, tr) ← parseScenarioWith tables baseLaw path
   IO.println (evalTrace L tr)
 
 def explainGeneric {σ : Sig} [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
-    (tables : SPL.Surface.OntologyTables σ) (baseLaw : Law σ)
+    (tables : Charter.Surface.OntologyTables σ) (baseLaw : Law σ)
     (who act : String) (path? : Option System.FilePath) : IO Unit := do
   let (L, tr) ← match path? with
     | some p => parseScenarioWith tables baseLaw p
@@ -150,7 +149,7 @@ def simCommons (path? : Option System.FilePath) : IO Unit := do
     IO.println (evalTrace L tr)
 
 def promptGeneric {σ : Sig} [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
-    (title : String) (tables : SPL.Surface.OntologyTables σ) (L : Law σ)
+    (title : String) (tables : Charter.Surface.OntologyTables σ) (L : Law σ)
     (defaultActor : σ.Actor) (sampleEvents : List (Event σ)) (actor? : Option String) : IO Unit := do
   let actor ← match actor? with
     | none => pure defaultActor
@@ -227,7 +226,7 @@ def psaInstitution : CliInstitution where
   prompt  := promptGeneric psaTitle psaOntologyTables psaL0 .agent psaSampleTrainingEvents
   abi     := abiGeneric "SovereignAgencyGuard" psaL0
   diff    := diffGeneric psaL0 psaAmendedLaw psaClauses psaAmendedClauses psaSampleTimelineTrace
-  explore := exploreGeneric psaTitle psaRatchetSpec SPL.Law3.law defaultParams psaCandidateRegimes
+  explore := exploreGeneric psaTitle psaRatchetSpec Charter.Law3.law defaultParams psaCandidateRegimes
 
 def commonsInstitution : CliInstitution where
   id      := commonsId
@@ -289,7 +288,7 @@ def ledger : List (String × String × String) := [
   ("capped_shared_burden_solvent_machinery_bounded_demand (INV.14)", "proved", "Law 6 shared-infra levy capped at instantiation; operating reserve funded first before 5-rank priority waterfall; lineage service budget independent of member count"),
   ("amendment_preserves_invariants (Law 7 Meta-Theorem)", "proved", "every LawfulAmendment preserves termination closure, goal-corruption immunity, INV.1–INV.14 guards, outsider disabilities, non-panel immunities, and bilateral parameter ratchets"),
   ("veil_projection_sound_and_complete (Veil 2.0)", "proved", "compileToVeil L (authorizedMachine) accepts a trace iff Authorized L holds, preserves LegalState identically, and matches stepwise compliance; adversarialMachine preserves violation logs"),
-  ("surface_syntax_roundtrip (SPL.Surface.Syntax)", "proved", "kernel-checked (rfl) definitional round-trip equivalence for spl_clause, spl_duty, spl_power, spl_immunity, and spl_string_table"),
+  ("surface_syntax_roundtrip (Charter.Surface.Syntax)", "proved", "kernel-checked (rfl) definitional round-trip equivalence for charter_clause, charter_duty, charter_power, charter_immunity, and charter_string_table"),
   ("isRelated_symm / isRelated_ignores_attestation / netVerifiedResources_deducts_all_liabilities (Phase 1)", "proved", "Definitions (DEF.01) & Substrate (SUB.01) provenance + attestation-independent relatedness symmetry and timestamped balance-sheet liability deduction"),
   ("repayLoanPrincipal_conservation_and_bound (Phase 1)", "proved", "Law 1 registered arm's-length loan principal repayment tracked one-for-one up to principalReceived with excess classified as interest/fee"),
   ("activeRollingExposureAt_antitone_in_time / observationWindow_monotone_in_risk (Phase 1)", "proved", "Law 2 harm-scaled observation window monotonicity in domain/irreversibility multipliers and rolling exposure decay over calendar time"),
@@ -323,7 +322,7 @@ def ledger : List (String × String × String) := [
   ("universal_ratchet_preserves_entrenched_core / universal_ratchet_trajectory_safe / sweepParameterGrid_sound (Charter.Core.Ratchet)", "proved", "law-agnostic parameter calibration, bilateral ratchet, and entrenched core preservation across arbitrary multi-step amendment trajectories"),
   ("ParamEntityRef.toRole_mem_of_all / AffiliationGraph.isRelated_symm (Charter.Core.Population & Graph)", "proved", "role-parametric multi-entity population ontology and attestation-independent affiliation graph symmetry"),
   ("all_8_charter_modules_self_test_pass & module invariants (Charter.Modules.*)", "proved", "8 reusable pre-proved institutional modules (ResidualLedger, CollateralPool, CircuitBreaker, EntityGroup, ExitAndVoice, SortitionCourt, AttestedLease, OracleFeed)"),
-  ("training_row_faithful_to_semantics / training_row_ids_faithful (Charter.Projection.Prompt)", "proved", "AI constitutional system prompt, deontic alignment card (AlignmentCard), and synthetic TrainingRow dataset faithfulness to SPL.Core.Semantics"),
+  ("training_row_faithful_to_semantics / training_row_ids_faithful (Charter.Projection.Prompt)", "proved", "AI constitutional system prompt, deontic alignment card (AlignmentCard), and synthetic TrainingRow dataset faithfulness to Charter.Core.Semantics"),
   ("contract_guard_sound_and_complete / executeTraceGuard_eq_some_iff (Charter.Projection.ContractABI)", "proved", "smart-contract state-transition guard (requireComplies, executePowerGuard) single-step and trace-level soundness and completeness"),
   ("diffLaws_refl_no_removals / diffLaws_entrenched_preserved / compileTimelineSteps_length (Charter.Projection.Visualization)", "proved", "constitutional amendment diff entrenchment preservation and step-by-step annotated trace timeline projection"),
   ("charter_surface_roundtrip / sample_charter_dsl_parses_cleanly / parseCharterText_rejects_invalid_inputs (Charter.Surface.Syntax)", "proved", "definitional (rfl) round-trip equivalence for charter_* macros and kernel-decided .charter textual DSL parser validation"),

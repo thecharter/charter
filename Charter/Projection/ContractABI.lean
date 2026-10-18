@@ -1,5 +1,5 @@
-import SPL.Core.Semantics
-import SPL.Core.Views
+import Charter.Core.Semantics
+import Charter.Core.Views
 
 /-!
 # Charter.Projection.ContractABI — Smart-Contract State-Transition Guard & JSON ABI
@@ -18,7 +18,7 @@ Proves `contract_guard_sound_and_complete`:
 
 namespace Charter.Projection
 
-open SPL
+open Charter
 
 variable {σ : Sig}
 
@@ -169,7 +169,7 @@ def solidityContractIdent (s : String) : String :=
     else String.mk (c :: cs)
 
 /-- Strip `Charter.<idents>.` namespace prefixes from rendered strings so both
-`SPL.*` and `Charter.*` institutions render clean short constructor names. -/
+`Charter.*` and `Charter.*` institutions render clean short constructor names. -/
 private def abiStripNs (base : String) : String :=
   let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
   match base.splitOn "Charter." with

@@ -1,8 +1,8 @@
-import SPL.Core.Semantics
-import SPL.Law2.Collateral
-import SPL.Law3.Suspension
-import SPL.Law3.Remediation
-import SPL.Law3.Theorems
+import Charter.Core.Semantics
+import Charter.Law2.Collateral
+import Charter.Law3.Suspension
+import Charter.Law3.Remediation
+import Charter.Law3.Theorems
 
 /-!
 # Charter.Modules.CircuitBreaker — Reusable Two-Stage Emergency Pause & Remediation Module
@@ -17,7 +17,7 @@ notwithstanding immunity against termination over objection.
 
 namespace Charter.Modules
 
-open SPL SPL.Law3
+open Charter Charter.Law3
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -33,7 +33,7 @@ structure CircuitBreakerConfig where
   reviewInterval          : Time := 30
   deriving DecidableEq, Repr, Inhabited
 
-/-- Project a `CircuitBreakerConfig` to `SPL.Law3.ASParams`. -/
+/-- Project a `CircuitBreakerConfig` to `Charter.Law3.ASParams`. -/
 def CircuitBreakerConfig.toASParams (cfg : CircuitBreakerConfig) : ASParams :=
   { preliminaryFreezeWindow := cfg.preliminaryFreezeWindow
     ordinarySuspensionLimit := cfg.ordinarySuspensionLimit
@@ -43,7 +43,7 @@ def CircuitBreakerConfig.toASParams (cfg : CircuitBreakerConfig) : ASParams :=
     claimantMultiplier      := cfg.claimantMultiplier
     repeatEscalationStep    := cfg.repeatEscalationStep }
 
-export SPL.Law3 (
+export Charter.Law3 (
   ASParams
   RemediationParams
   requiredEmergencyStake

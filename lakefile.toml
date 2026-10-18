@@ -1,18 +1,10 @@
-name = "spl"
+name = "charter"
 version = "0.2.0"
-defaultTargets = ["SPL", "Charter"]
-
-[[lean_lib]]
-name = "SPL"
+defaultTargets = ["Charter", "charter"]
 
 [[lean_lib]]
 name = "Charter"
 
 [[lean_exe]]
-name = "spl"
-root = "Main"
-
-[[lean_exe]]
 name = "charter"
 root = "Main"
-

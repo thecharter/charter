@@ -6,13 +6,13 @@ import Charter.Modules.ExitAndVoice
 import Charter.Modules.SortitionCourt
 import Charter.Modules.AttestedLease
 import Charter.Modules.OracleFeed
-import SPL.Core.Views
-import SPL.Core.Explain
-import SPL.Law3.Law
-import SPL.Law3.Theorems
-import SPL.Law3.Scenarios
-import SPL.Simulation.WorldState
-import SPL.Simulation.Refinement
+import Charter.Core.Views
+import Charter.Core.Explain
+import Charter.Law3.Law
+import Charter.Law3.Theorems
+import Charter.Law3.Scenarios
+import Charter.Simulation.WorldState
+import Charter.Simulation.Refinement
 
 
 /-!
@@ -25,11 +25,11 @@ institutional modules in `Charter.Modules.*`.
 
 namespace Charter.Institutions
 
-open SPL SPL.Law3 SPL.Simulation Charter.Modules
+open Charter Charter.Law3 Charter.Simulation Charter.Modules
 
 set_option maxRecDepth 200000
 
-export SPL.Law3 (
+export Charter.Law3 (
   Party
   Act
   Fact
@@ -64,7 +64,7 @@ export SPL.Law3 (
   amendment_preserves_invariants
 )
 
-export SPL.Simulation (
+export Charter.Simulation (
   ProtocolWorldState
   initWorld
   worldStep
@@ -90,25 +90,25 @@ def psaTitle : String := "The Protocol of Sovereign Agency"
 /-- Authoritative markdown source path for the 61-clause Protocol of Sovereign Agency. -/
 def psaDocPath : String := "protocol/protocol-of-sovereign-agency.md"
 
-/-- Signature of the Protocol of Sovereign Agency (`SPL.Law3.σ`). -/
-abbrev psaSig : Sig := SPL.Law3.σ
+/-- Signature of the Protocol of Sovereign Agency (`Charter.Law3.σ`). -/
+abbrev psaSig : Sig := Charter.Law3.σ
 
 /-- CLI string tables for the Protocol of Sovereign Agency signature. -/
-def psaOntologyTables : SPL.Surface.OntologyTables SPL.Law3.σ := SPL.Law3.σTables
+def psaOntologyTables : Charter.Surface.OntologyTables Charter.Law3.σ := Charter.Law3.σTables
 
-/-- Default instantiated law (`SPL.Law3.L0`) of the Protocol of Sovereign Agency. -/
-def psaLaw : Law SPL.Law3.σ := SPL.Law3.L0
+/-- Default instantiated law (`Charter.Law3.L0`) of the Protocol of Sovereign Agency. -/
+def psaLaw : Law Charter.Law3.σ := Charter.Law3.L0
 
 /-- Alias for `psaLaw` matching `commonsL0`. -/
-abbrev psaL0 : Law SPL.Law3.σ := psaLaw
+abbrev psaL0 : Law Charter.Law3.σ := psaLaw
 
 /-- All 61 verbatim provenance clauses of the Protocol of Sovereign Agency. -/
-def psaClauses : List Clause := SPL.Law3.clauses
+def psaClauses : List Clause := Charter.Law3.clauses
 
 /-- All 16 end-to-end quantitative, multi-entity, and substrate adversarial
 world simulations for the Protocol of Sovereign Agency. -/
 def psaSimulations : List (String × Bool × String) :=
-  SPL.Simulation.adversarialWorldSimulations
+  Charter.Simulation.adversarialWorldSimulations
 
 /-! ## Kernel-Checked Institution Guarantees for `psa` -/
 
@@ -158,7 +158,7 @@ theorem all_8_charter_modules_self_test_pass :
 end Charter.Institutions
 
 namespace Charter
-export SPL.Law3 (
+export Charter.Law3 (
   Party
   Act
   Fact
@@ -192,7 +192,7 @@ export SPL.Law3 (
   LawfulAmendment
   amendment_preserves_invariants
 )
-export SPL.Simulation (
+export Charter.Simulation (
   ProtocolWorldState
   initWorld
   worldStep

@@ -1,5 +1,5 @@
 import Charter.Core.Semantics
-import SPL.Core.Definitions
+import Charter.Core.Definitions
 
 /-!
 # Charter.Core.Graph — Generic Affiliation Graphs & Verified Balance Sheets
@@ -15,27 +15,6 @@ the universal core (§3.3).
 
 namespace Charter
 
-open SPL
-
-export SPL (
-  RelatedPartyEdge
-  RelatedPartyGraph
-  isRelated
-  isRelated_refl
-  connects_symm
-  any_connects_symm
-  isRelated_symm
-  connects_ignores_attestation
-  isRelated_ignores_attestation
-  VerifiedBalanceSheet
-  netVerifiedResources
-  netVerifiedResources_deducts_all_liabilities
-)
-
-namespace RelatedPartyEdge
-export SPL.RelatedPartyEdge (hasRelation connects)
-end RelatedPartyEdge
-
 /-- Law-agnostic alias for `RelatedPartyEdge` (§3.3). -/
 abbrev AffiliationEdge := RelatedPartyEdge
 
@@ -44,7 +23,7 @@ abbrev AffiliationGraph := RelatedPartyGraph
 
 namespace Core
 
-export SPL (
+export Charter (
   RelatedPartyEdge
   RelatedPartyGraph
   isRelated
@@ -57,16 +36,13 @@ export SPL (
   VerifiedBalanceSheet
   netVerifiedResources
   netVerifiedResources_deducts_all_liabilities
-)
-
-namespace RelatedPartyEdge
-export SPL.RelatedPartyEdge (hasRelation connects)
-end RelatedPartyEdge
-
-export Charter (
   AffiliationEdge
   AffiliationGraph
 )
+
+namespace RelatedPartyEdge
+export Charter.RelatedPartyEdge (hasRelation connects)
+end RelatedPartyEdge
 
 end Core
 

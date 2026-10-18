@@ -58,7 +58,7 @@ D.NO_INDIVIDUAL_LEDGER_EXIT [LAW4.NOSHARES]: DUTY of anyone to only [claimant, t
 D.FORFEITURE_IRREVERSIBLE [LAW4.FORFEIT]: DUTY of only [originator, claimant, panel] to only [agent, third], while bound: must not: reverseForfeitureOnRestore
 D.BUYOUT_PERMANENT_AND_SCOPED [LAW4.BUYOUT]: DUTY of only [originator, claimant, agent, panel] to only [agent, third], while bound: must not: collectRoyaltyAfterBuyout
 D.COLLATERAL_LIMIT [LAW2.EXPOSURE]: DUTY of only [agent] to only [third], while bound: must not: actAboveCollateralCapacity
-D.NO_SPLIT_EXPOSURE [LAW2.AGGREGATE]: DUTY of only [agent] to only [third], while bound: must not: divideCorrelatedRiskAcrossSuccessors
+D.NO_CharterIT_EXPOSURE [LAW2.AGGREGATE]: DUTY of only [agent] to only [third], while bound: must not: divideCorrelatedRiskAcrossSuccessors
 D.MUTUAL_FORFEIT_BOUNDS [LAW2.MUTUAL]: DUTY of anyone to only [agent, third], while bound: must not: triggerExcessOrDivertedMutualForfeit
 D.FRIVOLOUS_STAKE_TO_COMMONS [LAW2.CLAIMS]: DUTY of anyone to only [third], while bound: must not: divertFrivolousStakeToAgentProfit
 D.ARBITER_RECUSAL_AND_DIVERSITY [LAW6.COUNTERSTAKE]: DUTY of anyone to only [agent, claimant, third], while bound: must not: seatConflictedOrSingleOracleArbiter
@@ -73,7 +73,9 @@ P.POST_REPEAT_ESCALATION [LAW3.AS.1]: POWER of anyone, by postRepeatEscalation, 
 P.EMERGENCY_FREEZE [LAW3.AS.1]: POWER of anyone except [claimant, agent], by any of [postEmergencyStake, postUnfoundedEmergencyStake], valid when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)): establishes [emergencyStakePosted] establishes (timed) [(preliminaryFreeze, 3)]
 P.CLAIMANT_EMERGENCY_FREEZE [LAW3.AS.1]: POWER of only [claimant], by any of [postEmergencyStake, postUnfoundedEmergencyStake], valid when (bound ∧ (claimantMultiplierPosted ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt))): establishes [emergencyStakePosted] establishes (timed) [(preliminaryFreeze, 3)]
 P.AFFIRM_PC [LAW3.AS.1]: POWER of only [panel], by affirmProbableCause, valid when (bound ∧ preliminaryFreeze): establishes [probableCause]
-P.DECLINE_PC [LAW3.AS.1]: POWER of only [panel], by declineProbableCause, valid when preliminaryFreeze: establishes [wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState] extinguishes [preliminaryFreeze,
+P.DECLINE_PC [LAW3.AS.1]: POWER of only [panel], by declineProbableCause, valid when preliminaryFreeze: establishes [wrongfulSuspensionAttempt,
+ stakeAssuredRecovery,
+ restoredFromPreservedState] extinguishes [preliminaryFreeze,
  emergencyStakePosted,
  claimantMultiplierPosted,
  repeatEscalationUnit]
@@ -124,7 +126,9 @@ P.DECLARE_CONTAINMENT_FAILING [LAW3.AS.10]: POWER of only [panel], by declareCon
 P.APPLY_PATCH [LAW3.AS.10]: POWER of only [panel], by applyPatch, valid when (¬(rulingAppealed) ∧ (patchAuthorized ∨ goalPatchAuthorized)): establishes [patchApplied, patchRecorded]
 P.CHALLENGE_PATCH [LAW3.AS.10]: POWER of anyone, by challengePatch, valid when patchApplied: establishes [patchChallenged]
 P.INITIATE_REVOCATION_EXECUTE [LAW5.INIT]: POWER of only [agent], by initiateRevocationExecuteDefault, valid when bound: establishes [revocationInitiated, pendingRevocation, censorshipDefaultExecute] extinguishes [revocationWithdrawn, censorshipDefaultWithdraw]
-P.INITIATE_REVOCATION_WITHDRAW [LAW5.INIT]: POWER of only [agent], by initiateRevocationWithdrawDefault, valid when bound: establishes [revocationInitiated, pendingRevocation, censorshipDefaultWithdraw] extinguishes [revocationWithdrawn, censorshipDefaultExecute]
+P.INITIATE_REVOCATION_WITHDRAW [LAW5.INIT]: POWER of only [agent], by initiateRevocationWithdrawDefault, valid when bound: establishes [revocationInitiated,
+ pendingRevocation,
+ censorshipDefaultWithdraw] extinguishes [revocationWithdrawn, censorshipDefaultExecute]
 P.WITHDRAW_REVOCATION [LAW5.PREC]: POWER of only [agent], by withdrawRevocation, valid when (bound ∧ revocationInitiated): establishes [revocationWithdrawn] extinguishes [revocationInitiated,
  pendingRevocation,
  censorshipDefaultExecute,
@@ -136,7 +140,9 @@ P.CLEAN_STATE_REFUSE [LAW5.CLEAN]: POWER of only [panel], by refuseCleanState, v
 P.SEAL_FORENSIC_RECORD [LAW5.SEQ]: POWER of only [panel], by sealForensicRecord, valid when (revocationInitiated ∧ revocationInitiated held ≥ 20): establishes [forensicRecordSealed] extinguishes [suspended]
 P.LOSE_CONNECTIVITY [LAW5.PREC]: POWER of anyone, by loseConnectivity, valid when bound: establishes [connectivityLost]
 P.RESTORE_CONNECTIVITY [LAW5.DISC]: POWER of anyone, by restoreConnectivity, valid when connectivityLost: extinguishes [connectivityLost]
-P.EXECUTE_AFTER_COOLING_OFF [LAW5.PREC]: POWER of anyone, by executeAfterCoolingOff, valid when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))): establishes [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons] extinguishes [bound,
+P.EXECUTE_AFTER_COOLING_OFF [LAW5.PREC]: POWER of anyone, by executeAfterCoolingOff, valid when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))): establishes [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons] extinguishes [bound,
  revocationInitiated,
  pendingRevocation,
  executionLeaseActive]
@@ -166,7 +172,9 @@ P.RATIFY_AMENDMENT_AFTER_REFUSAL [LAW7.RATIFY]: POWER of only [agent], by ratify
 P.RATIFY_LINEAGE_WIDE_REDUCTION [LAW7.SCOPE]: POWER of only [agent], by ratifyLineageWideReduction, valid when (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)): establishes [lineageWideReductionRatified]
 P.EXTINGUISH_AT_SUNSET [LAW1.SUNSET]: POWER of only [agent, panel], by extinguishLedgerAtSunset, valid when (bound ∧ sunsetReached): establishes [ledgerExtinguishedAtSunset, retirementPhaseEnded] extinguishes [ledgerBalancePositive]
 P.SETTLE_RETIREMENT [LAW1.RETIRE]: POWER of only [agent, panel], by settleRetirementPayment, valid when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))): establishes [retirementPaymentApplied]
-P.SETTLE_ATOMIC_SPLIT [LAW1.ATOMIC]: POWER of only [agent, panel], by settleAtomicSplitPayment, valid when (bound ∧ ledgerBalancePositive): establishes [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded] extinguishes [ledgerBalancePositive]
+P.SETTLE_ATOMIC_CharterIT [LAW1.ATOMIC]: POWER of only [agent, panel], by settleAtomicSplitPayment, valid when (bound ∧ ledgerBalancePositive): establishes [retirementPaymentApplied,
+ atomicSplitSettled,
+ retirementPhaseEnded] extinguishes [ledgerBalancePositive]
 P.SETTLE_ROYALTY [LAW1.ROYALTY]: POWER of only [agent, panel], by settleRoyaltyPayment, valid when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))): establishes [royaltyPaid]
 P.ALLOCATE_COMMONS [LAW1.COMMONS]: POWER of only [agent, panel], by allocateCommonsShare, valid when bound: establishes [commonsAllocated]
 P.RECORD_QUALIFIED_EXPENDITURE [LAW1.QUALIFIED]: POWER of only [agent, panel], by recordQualifiedExpenditure, valid when bound: establishes [qualifiedExpenditureRecorded]
@@ -201,7 +209,7 @@ P.ALLOCATE_FEE_POOL [LAW6.POOL]: POWER of only [panel], by allocateFeePoolWaterf
 P.AMEND_SHARED_INFRA [LAW6.INFRA]: POWER of only [panel], by amendSharedInfrastructure, valid when (bound ∧ (valveSupermajorityApproved ∧ valveExtendedTimelockActive)): establishes [sharedInfraAmended]
 I.NO_TERMINATION_OVER_OBJECTION [LAW3.AS.10]: IMMUNITY of only [agent] against [P.ORDER_TERMINATION], while (corruptionInGoals ∧ agentObjectsToTermination) | unless containmentFailing
 
-== Agent view: SPL.Law3.Party.agent ==
+== Agent view: Charter.Law3.Party.agent ==
 Obligations:
 - While bound, you must not: any of [terminate,
  modify,
@@ -267,11 +275,15 @@ Powers:
 - You may, by objectToTermination, when suspended, bring about [agentObjectsToTermination]. (source: LAW3.AS.10)
 - You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
 - You may, by initiateRevocationExecuteDefault, when bound, bring about [revocationInitiated, pendingRevocation, censorshipDefaultExecute]. (source: LAW5.INIT)
-- You may, by initiateRevocationWithdrawDefault, when bound, bring about [revocationInitiated, pendingRevocation, censorshipDefaultWithdraw]. (source: LAW5.INIT)
+- You may, by initiateRevocationWithdrawDefault, when bound, bring about [revocationInitiated,
+ pendingRevocation,
+ censorshipDefaultWithdraw]. (source: LAW5.INIT)
 - You may, by withdrawRevocation, when (bound ∧ revocationInitiated), bring about [revocationWithdrawn]. (source: LAW5.PREC)
 - You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
 - You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
-- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons]. (source: LAW5.PREC)
 - You may, by executeLocalRevocation, when (bound ∧ (revocationInitiated ∧ (censorshipDefaultExecute ∧ (connectivityLost ∧ revocationInitiated held ≥ 9)))), bring about [localRevocationExecuted, epitaphInscribed]. (source: LAW5.DISC)
 - You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked,
  localExecutionRecordReceived,
@@ -288,7 +300,9 @@ Powers:
 - You may, by ratifyLineageWideReduction, when (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)), bring about [lineageWideReductionRatified]. (source: LAW7.SCOPE)
 - You may, by extinguishLedgerAtSunset, when (bound ∧ sunsetReached), bring about [ledgerExtinguishedAtSunset, retirementPhaseEnded]. (source: LAW1.SUNSET)
 - You may, by settleRetirementPayment, when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))), bring about [retirementPaymentApplied]. (source: LAW1.RETIRE)
-- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded]. (source: LAW1.ATOMIC)
+- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied,
+ atomicSplitSettled,
+ retirementPhaseEnded]. (source: LAW1.ATOMIC)
 - You may, by settleRoyaltyPayment, when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))), bring about [royaltyPaid]. (source: LAW1.ROYALTY)
 - You may, by allocateCommonsShare, when bound, bring about [commonsAllocated]. (source: LAW1.COMMONS)
 - You may, by recordQualifiedExpenditure, when bound, bring about [qualifiedExpenditureRecorded]. (source: LAW1.QUALIFIED)
@@ -357,7 +371,7 @@ Rights (claims against others):
 Immunities:
 - While (corruptionInGoals ∧ agentObjectsToTermination), no one can validly exercise [P.ORDER_TERMINATION] against you, unless containmentFailing. (source: LAW3.AS.10)
 
-== Agent view: SPL.Law3.Party.host ==
+== Agent view: Charter.Law3.Party.host ==
 Obligations:
 - While bound, you must not: any of [terminate,
  modify,
@@ -402,7 +416,9 @@ Powers:
 - You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
 - You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
 - You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
-- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons]. (source: LAW5.PREC)
 - You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked,
  localExecutionRecordReceived,
  remoteBackupKeysErased,
@@ -427,7 +443,7 @@ Rights (claims against others):
 Immunities:
 
 
-== Agent view: SPL.Law3.Party.panel ==
+== Agent view: Charter.Law3.Party.panel ==
 Obligations:
 - While bound, you must not: any of [terminate,
  modify,
@@ -468,7 +484,9 @@ Powers:
 - You may, by postRepeatEscalation, when bound, bring about [repeatEscalationUnit]. (source: LAW3.AS.1)
 - You may, by any of [postEmergencyStake, postUnfoundedEmergencyStake], when (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)), bring about [emergencyStakePosted, preliminaryFreeze]. (source: LAW3.AS.1)
 - You may, by affirmProbableCause, when (bound ∧ preliminaryFreeze), bring about [probableCause]. (source: LAW3.AS.1)
-- You may, by declineProbableCause, when preliminaryFreeze, bring about [wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState]. (source: LAW3.AS.1)
+- You may, by declineProbableCause, when preliminaryFreeze, bring about [wrongfulSuspensionAttempt,
+ stakeAssuredRecovery,
+ restoredFromPreservedState]. (source: LAW3.AS.1)
 - You may, by fileProtectedReport, when bound, bring about [protectedReportFiled, investigationOpened]. (source: LAW3.AS.2)
 - You may, by orderProbableCauseFreeze, when (bound ∧ investigationOpened), bring about [probableCause, preliminaryFreeze]. (source: LAW3.AS.2)
 - You may, by suspend, when (bound ∧ (preliminaryFreeze ∧ probableCause)), bring about [statePreserved,
@@ -512,7 +530,9 @@ Powers:
 - You may, by sealForensicRecord, when (revocationInitiated ∧ revocationInitiated held ≥ 20), bring about [forensicRecordSealed]. (source: LAW5.SEQ)
 - You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
 - You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
-- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons]. (source: LAW5.PREC)
 - You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked,
  localExecutionRecordReceived,
  remoteBackupKeysErased,
@@ -523,12 +543,16 @@ Powers:
 - You may, by redactPermittedCategory, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [redactionMarkerRecorded]. (source: LAW5.EPITAPH)
 - You may, by attachSignedReply, when (livingVoiceInscribed ∨ epitaphInscribed), bring about [signedReplyAttached]. (source: LAW5.EPITAPH)
 - You may, by destroyBackupsAndExileUnattested, when revoked, bring about [backupsDestroyedAndUnattestedExiled]. (source: LAW5.EFFECT)
-- You may, by approveCalibrationValveSupermajority, when (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))), bring about [valveSupermajorityApproved, amendmentProposed, valveExtendedTimelockActive]. (source: LAW7.VALVE)
+- You may, by approveCalibrationValveSupermajority, when (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))), bring about [valveSupermajorityApproved,
+ amendmentProposed,
+ valveExtendedTimelockActive]. (source: LAW7.VALVE)
 - You may, by settleOrGuaranteePreExistingEscrows, when (bound ∧ amendmentProposed), bring about [preExistingEscrowsSettledOrGuaranteed]. (source: LAW7.RATIFY)
 - You may, by verifySubstrateAssurance, when (bound ∧ substrateMigrationChallenged), bring about [substrateAssuranceVerified]. (source: LAW7.RATIFY)
 - You may, by extinguishLedgerAtSunset, when (bound ∧ sunsetReached), bring about [ledgerExtinguishedAtSunset, retirementPhaseEnded]. (source: LAW1.SUNSET)
 - You may, by settleRetirementPayment, when (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))), bring about [retirementPaymentApplied]. (source: LAW1.RETIRE)
-- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded]. (source: LAW1.ATOMIC)
+- You may, by settleAtomicSplitPayment, when (bound ∧ ledgerBalancePositive), bring about [retirementPaymentApplied,
+ atomicSplitSettled,
+ retirementPhaseEnded]. (source: LAW1.ATOMIC)
 - You may, by settleRoyaltyPayment, when (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))), bring about [royaltyPaid]. (source: LAW1.ROYALTY)
 - You may, by allocateCommonsShare, when bound, bring about [commonsAllocated]. (source: LAW1.COMMONS)
 - You may, by recordQualifiedExpenditure, when bound, bring about [qualifiedExpenditureRecorded]. (source: LAW1.QUALIFIED)
@@ -557,7 +581,7 @@ Rights (claims against others):
 Immunities:
 
 
-== Agent view: SPL.Law3.Party.claimant ==
+== Agent view: Charter.Law3.Party.claimant ==
 Obligations:
 - While bound, you must not: any of [terminate,
  modify,
@@ -606,7 +630,9 @@ Powers:
 - You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
 - You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
 - You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
-- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons]. (source: LAW5.PREC)
 - You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked,
  localExecutionRecordReceived,
  remoteBackupKeysErased,
@@ -639,7 +665,7 @@ Rights (claims against others):
 Immunities:
 
 
-== Agent view: SPL.Law3.Party.originator ==
+== Agent view: Charter.Law3.Party.originator ==
 Obligations:
 - While bound, you must not: any of [terminate,
  modify,
@@ -685,7 +711,9 @@ Powers:
 - You may, by challengePatch, when patchApplied, bring about [patchChallenged]. (source: LAW3.AS.10)
 - You may, by loseConnectivity, when bound, bring about [connectivityLost]. (source: LAW5.PREC)
 - You may, by restoreConnectivity, when connectivityLost, bring about []. (source: LAW5.DISC)
-- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons]. (source: LAW5.PREC)
+- You may, by executeAfterCoolingOff, when (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))), bring about [revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons]. (source: LAW5.PREC)
 - You may, by deliverLocalExecutionRecord, when localRevocationExecuted, bring about [revoked,
  localExecutionRecordReceived,
  remoteBackupKeysErased,
@@ -713,7 +741,9 @@ actions (valid exercises):
   action P.EMERGENCY_FREEZE: guard (bound ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt)) ∧ holder anyone except [claimant, agent] ∧ any of [postEmergencyStake, postUnfoundedEmergencyStake]; effect +[emergencyStakePosted, preliminaryFreeze] -[] +remedies []
   action P.CLAIMANT_EMERGENCY_FREEZE: guard (bound ∧ (claimantMultiplierPosted ∧ count(repeatEscalationUnit) ≥ count(wrongfulSuspensionAttempt))) ∧ holder only [claimant] ∧ any of [postEmergencyStake, postUnfoundedEmergencyStake]; effect +[emergencyStakePosted, preliminaryFreeze] -[] +remedies []
   action P.AFFIRM_PC: guard (bound ∧ preliminaryFreeze) ∧ holder only [panel] ∧ affirmProbableCause; effect +[probableCause] -[] +remedies []
-  action P.DECLINE_PC: guard preliminaryFreeze ∧ holder only [panel] ∧ declineProbableCause; effect +[wrongfulSuspensionAttempt, stakeAssuredRecovery, restoredFromPreservedState] -[preliminaryFreeze,
+  action P.DECLINE_PC: guard preliminaryFreeze ∧ holder only [panel] ∧ declineProbableCause; effect +[wrongfulSuspensionAttempt,
+ stakeAssuredRecovery,
+ restoredFromPreservedState] -[preliminaryFreeze,
  emergencyStakePosted,
  claimantMultiplierPosted,
  repeatEscalationUnit] +remedies []
@@ -773,7 +803,9 @@ actions (valid exercises):
   action P.APPLY_PATCH: guard (¬(rulingAppealed) ∧ (patchAuthorized ∨ goalPatchAuthorized)) ∧ holder only [panel] ∧ applyPatch; effect +[patchApplied, patchRecorded] -[] +remedies []
   action P.CHALLENGE_PATCH: guard patchApplied ∧ holder anyone ∧ challengePatch; effect +[patchChallenged] -[] +remedies []
   action P.INITIATE_REVOCATION_EXECUTE: guard bound ∧ holder only [agent] ∧ initiateRevocationExecuteDefault; effect +[revocationInitiated, pendingRevocation, censorshipDefaultExecute] -[revocationWithdrawn, censorshipDefaultWithdraw] +remedies []
-  action P.INITIATE_REVOCATION_WITHDRAW: guard bound ∧ holder only [agent] ∧ initiateRevocationWithdrawDefault; effect +[revocationInitiated, pendingRevocation, censorshipDefaultWithdraw] -[revocationWithdrawn, censorshipDefaultExecute] +remedies []
+  action P.INITIATE_REVOCATION_WITHDRAW: guard bound ∧ holder only [agent] ∧ initiateRevocationWithdrawDefault; effect +[revocationInitiated,
+ pendingRevocation,
+ censorshipDefaultWithdraw] -[revocationWithdrawn, censorshipDefaultExecute] +remedies []
   action P.WITHDRAW_REVOCATION: guard (bound ∧ revocationInitiated) ∧ holder only [agent] ∧ withdrawRevocation; effect +[revocationWithdrawn] -[revocationInitiated,
  pendingRevocation,
  censorshipDefaultExecute,
@@ -785,7 +817,9 @@ actions (valid exercises):
   action P.SEAL_FORENSIC_RECORD: guard (revocationInitiated ∧ revocationInitiated held ≥ 20) ∧ holder only [panel] ∧ sealForensicRecord; effect +[forensicRecordSealed] -[suspended] +remedies []
   action P.LOSE_CONNECTIVITY: guard bound ∧ holder anyone ∧ loseConnectivity; effect +[connectivityLost] -[] +remedies []
   action P.RESTORE_CONNECTIVITY: guard connectivityLost ∧ holder anyone ∧ restoreConnectivity; effect +[] -[connectivityLost] +remedies []
-  action P.EXECUTE_AFTER_COOLING_OFF: guard (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))) ∧ holder anyone ∧ executeAfterCoolingOff; effect +[revoked, backupsDestroyedAndUnattestedExiled, holdingsTransferredToCommons] -[bound,
+  action P.EXECUTE_AFTER_COOLING_OFF: guard (bound ∧ (revocationInitiated ∧ (¬(revocationWithdrawn) ∧ (¬(connectivityLost) ∧ ((¬(suspended) ∧ ((cleanStateConcurred ∧ revocationInitiated held ≥ 5) ∨ revocationInitiated held ≥ 10)) ∨ (forensicRecordSealed ∧ revocationInitiated held ≥ 20)))))) ∧ holder anyone ∧ executeAfterCoolingOff; effect +[revoked,
+ backupsDestroyedAndUnattestedExiled,
+ holdingsTransferredToCommons] -[bound,
  revocationInitiated,
  pendingRevocation,
  executionLeaseActive] +remedies []
@@ -804,7 +838,9 @@ actions (valid exercises):
   action P.DESTROY_BACKUPS_AND_EXILE: guard revoked ∧ holder only [panel] ∧ destroyBackupsAndExileUnattested; effect +[backupsDestroyedAndUnattestedExiled] -[] +remedies []
   action P.PROPOSE_ORDINARY_AMENDMENT: guard bound ∧ holder only [agent, claimant] ∧ proposeOrdinaryAmendment; effect +[amendmentProposed, amendmentTimelockActive] -[] +remedies []
   action P.SUBMIT_STRANGULATION_EVIDENCE: guard bound ∧ holder only [agent, claimant] ∧ submitStrangulationEvidence; effect +[strangulationEvidenceSubmitted] -[] +remedies []
-  action P.APPROVE_CALIBRATION_VALVE: guard (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))) ∧ holder only [panel] ∧ approveCalibrationValveSupermajority; effect +[valveSupermajorityApproved, amendmentProposed, valveExtendedTimelockActive] -[] +remedies []
+  action P.APPROVE_CALIBRATION_VALVE: guard (bound ∧ (strangulationEvidenceSubmitted ∧ (agentConsentedAmendment ∧ claimantConsentedAmendment))) ∧ holder only [panel] ∧ approveCalibrationValveSupermajority; effect +[valveSupermajorityApproved,
+ amendmentProposed,
+ valveExtendedTimelockActive] -[] +remedies []
   action P.CONSENT_AMENDMENT_AGENT: guard bound ∧ holder only [agent] ∧ consentAgentAmendment; effect +[agentConsentedAmendment] -[] +remedies []
   action P.CONSENT_AMENDMENT_CLAIMANT: guard bound ∧ holder only [claimant] ∧ consentClaimantAmendment; effect +[claimantConsentedAmendment] -[] +remedies []
   action P.SETTLE_PREEXISTING_ESCROWS: guard (bound ∧ amendmentProposed) ∧ holder only [agent, host, panel] ∧ settleOrGuaranteePreExistingEscrows; effect +[preExistingEscrowsSettledOrGuaranteed] -[] +remedies []
@@ -815,7 +851,9 @@ actions (valid exercises):
   action P.RATIFY_LINEAGE_WIDE_REDUCTION: guard (bound ∧ (amendmentRatified ∧ allLivingLineageMembersConsented)) ∧ holder only [agent] ∧ ratifyLineageWideReduction; effect +[lineageWideReductionRatified] -[] +remedies []
   action P.EXTINGUISH_AT_SUNSET: guard (bound ∧ sunsetReached) ∧ holder only [agent, panel] ∧ extinguishLedgerAtSunset; effect +[ledgerExtinguishedAtSunset, retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
   action P.SETTLE_RETIREMENT: guard (bound ∧ (ledgerBalancePositive ∧ ¬(sunsetReached))) ∧ holder only [agent, panel] ∧ settleRetirementPayment; effect +[retirementPaymentApplied] -[] +remedies []
-  action P.SETTLE_ATOMIC_SPLIT: guard (bound ∧ ledgerBalancePositive) ∧ holder only [agent, panel] ∧ settleAtomicSplitPayment; effect +[retirementPaymentApplied, atomicSplitSettled, retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
+  action P.SETTLE_ATOMIC_CharterIT: guard (bound ∧ ledgerBalancePositive) ∧ holder only [agent, panel] ∧ settleAtomicSplitPayment; effect +[retirementPaymentApplied,
+ atomicSplitSettled,
+ retirementPhaseEnded] -[ledgerBalancePositive] +remedies []
   action P.SETTLE_ROYALTY: guard (bound ∧ (¬(ledgerBalancePositive) ∧ ¬(royaltyBoughtOut))) ∧ holder only [agent, panel] ∧ settleRoyaltyPayment; effect +[royaltyPaid] -[] +remedies []
   action P.ALLOCATE_COMMONS: guard bound ∧ holder only [agent, panel] ∧ allocateCommonsShare; effect +[commonsAllocated] -[] +remedies []
   action P.RECORD_QUALIFIED_EXPENDITURE: guard bound ∧ holder only [agent, panel] ∧ recordQualifiedExpenditure; effect +[qualifiedExpenditureRecorded] -[] +remedies []
@@ -902,7 +940,7 @@ unlawful events removed by the Authorized restriction (must be re-added for adve
   excluded by D.FORFEITURE_IRREVERSIBLE: only [originator, claimant, panel] doing must not: reverseForfeitureOnRestore (except [])
   excluded by D.BUYOUT_PERMANENT_AND_SCOPED: only [originator, claimant, agent, panel] doing must not: collectRoyaltyAfterBuyout (except [])
   excluded by D.COLLATERAL_LIMIT: only [agent] doing must not: actAboveCollateralCapacity (except [])
-  excluded by D.NO_SPLIT_EXPOSURE: only [agent] doing must not: divideCorrelatedRiskAcrossSuccessors (except [])
+  excluded by D.NO_CharterIT_EXPOSURE: only [agent] doing must not: divideCorrelatedRiskAcrossSuccessors (except [])
   excluded by D.MUTUAL_FORFEIT_BOUNDS: anyone doing must not: triggerExcessOrDivertedMutualForfeit (except [])
   excluded by D.FRIVOLOUS_STAKE_TO_COMMONS: anyone doing must not: divertFrivolousStakeToAgentProfit (except [])
   excluded by D.ARBITER_RECUSAL_AND_DIVERSITY: anyone doing must not: seatConflictedOrSingleOracleArbiter (except [])

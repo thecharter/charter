@@ -1,11 +1,11 @@
-import SPL.Core.Semantics
-import SPL.Core.Views
-import SPL.Core.Explain
+import Charter.Core.Semantics
+import Charter.Core.Views
+import Charter.Core.Explain
 
 /-!
 # Charter.Projection.Visualization — Annotated Trace Timelines & Constitutional Amendment Diffs
 
-Provides two human- and auditor-facing analytical projections over `SPL.Core`:
+Provides two human- and auditor-facing analytical projections over `Charter.Core`:
 
 1. **Annotated Trace Timeline (`renderAnnotatedTimeline`)**: Step-by-step trace
    visualization displaying active institutional facts before each event, powers
@@ -21,7 +21,7 @@ Provides two human- and auditor-facing analytical projections over `SPL.Core`:
 
 namespace Charter.Projection
 
-open SPL
+open Charter
 
 variable {σ : Sig}
 
@@ -39,7 +39,7 @@ private def vStripNs (base : String) : String :=
       let parts := run.splitOn "."
       (parts.getLastD run) ++ after)
 
-/-- Strip both `SPL.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
+/-- Strip both `Charter.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
 private def vrs {α : Type} [Repr α] (a : α) : String :=
   vStripNs (rs a)
 

@@ -1,7 +1,7 @@
-import SPL.Core.Semantics
-import SPL.Law6.Adjudication
-import SPL.Substrate.Sortition
-import SPL.Law3.Theorems
+import Charter.Core.Semantics
+import Charter.Law6.Adjudication
+import Charter.Substrate.Sortition
+import Charter.Law3.Theorems
 
 
 /-!
@@ -17,7 +17,7 @@ waterfall (`allocateFeePool`).
 
 namespace Charter.Modules
 
-open SPL SPL.Law3 SPL.Substrate
+open Charter Charter.Law3 Charter.Substrate
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -32,7 +32,7 @@ structure SortitionCourtConfig where
   instantiationLevyCap  : Nat  := 2
   deriving DecidableEq, Repr, Inhabited
 
-export SPL.Substrate (
+export Charter.Substrate (
   ArbiterCandidate
   eligibleCandidate
   filterEligibleCandidates
@@ -48,7 +48,7 @@ export SPL.Substrate (
   sortition_panel_independent_and_unbiased
 )
 
-export SPL.Law3 (
+export Charter.Law3 (
   totalAdjudicationBound
   ProceedingState
   stepProceeding

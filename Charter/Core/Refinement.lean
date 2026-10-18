@@ -25,7 +25,7 @@ signatures `σ : Sig`:
 
 namespace Charter
 
-open SPL
+open Charter
 
 /-- Polymorphic specification coupling a normative `Law σ` with a quantitative
 state type `Q` and a managed fact derivation map `deriveFacts` (§3.2). -/

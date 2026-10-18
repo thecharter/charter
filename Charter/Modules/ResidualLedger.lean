@@ -1,7 +1,7 @@
-import SPL.Core.Semantics
-import SPL.Law1.Ledger
-import SPL.Law4.Lineage
-import SPL.Law3.Theorems
+import Charter.Core.Semantics
+import Charter.Law1.Ledger
+import Charter.Law4.Lineage
+import Charter.Law3.Theorems
 
 /-!
 # Charter.Modules.ResidualLedger — Reusable Residual-Claim & Treasury Ledger Module
@@ -14,7 +14,7 @@ buyout floor into a reusable institutional module over any signature `σ : Sig`.
 
 namespace Charter.Modules
 
-open SPL SPL.Law3
+open Charter Charter.Law3
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -29,7 +29,7 @@ structure ResidualLedgerConfig where
   commonsSharePct    : Nat := 20
   deriving DecidableEq, Repr, Inhabited
 
-export SPL.Law3 (
+export Charter.Law3 (
   SettlementResult
   settleInflow
   settleSequence

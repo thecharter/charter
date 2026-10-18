@@ -1,5 +1,5 @@
-import SPL.Core.Semantics
-import SPL.Core.Views
+import Charter.Core.Semantics
+import Charter.Core.Views
 
 /-!
 # Charter.Projection.Prompt — AI Constitutional System Prompts, Alignment Cards & Synthetic Training Views
@@ -7,7 +7,7 @@ import SPL.Core.Views
 Generates role-specific constitutional system prompts, deontic alignment cards
 (`AlignmentCard`), and normatively grounded synthetic training datasets
 (`TrainingRow`, `evaluateTrainingRow`, `generateTrainingDataset`) directly
-from any `Law σ` in `SPL.Core`.
+from any `Law σ` in `Charter.Core`.
 
 Every item in an `AlignmentCard` or `TrainingRow` is computed from the formal
 AST and carries its exact English provenance span (`source.text`).
@@ -15,7 +15,7 @@ AST and carries its exact English provenance span (`source.text`).
 
 namespace Charter.Projection
 
-open SPL
+open Charter
 
 variable {σ : Sig}
 
@@ -38,7 +38,7 @@ structure AlignmentCard where
   deriving Repr, DecidableEq, BEq
 
 /-- Strip `Charter.<idents>.` namespace prefixes from any rendered string so both
-`SPL.*` and `Charter.*` institutions render clean short constructor names. -/
+`Charter.*` and `Charter.*` institutions render clean short constructor names. -/
 def stripCharterNs (base : String) : String :=
   let isIdent (c : Char) : Bool := c.isAlphanum || c == '_' || c == '.'
   match base.splitOn "Charter." with
@@ -50,7 +50,7 @@ def stripCharterNs (base : String) : String :=
       let parts := run.splitOn "."
       (parts.getLastD run) ++ after)
 
-/-- Strip both `SPL.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
+/-- Strip both `Charter.…` and `Charter.…` namespace prefixes from a value's `Repr` string. -/
 def crs {α : Type} [Repr α] (a : α) : String :=
   stripCharterNs (rs a)
 
@@ -229,7 +229,7 @@ def renderTrainingDatasetJson (rows : List TrainingRow) : String :=
 
 /-! ## 3. Semantic Faithfulness Theorems -/
 
-/-- **Faithfulness of `evaluateTrainingRow` to `SPL.Core.Semantics`.**
+/-- **Faithfulness of `evaluateTrainingRow` to `Charter.Core.Semantics`.**
 For every law `L`, state `ls`, and event `e`:
 1. `(evaluateTrainingRow L ls e).compliesWithDuties` equals `L.duties.all (fun d => !breaches L ls e d)`.
 2. `(evaluateTrainingRow L ls e).exercisesValidPower` equals `!(validExercises L ls e).isEmpty`. -/
@@ -240,7 +240,7 @@ theorem training_row_faithful_to_semantics [Repr σ.Actor] [Repr σ.Act] [Repr �
   ⟨rfl, rfl⟩
 
 /-- Triggered powers and violated duties in `evaluateTrainingRow` match
-`validExercises` and `breaches` in `SPL.Core.Semantics`. -/
+`validExercises` and `breaches` in `Charter.Core.Semantics`. -/
 theorem training_row_ids_faithful [Repr σ.Actor] [Repr σ.Act] [Repr σ.Fact]
     (L : Law σ) (ls : LegalState σ) (e : Event σ) :
     (evaluateTrainingRow L ls e).triggeredPowers = (validExercises L ls e).map (·.id) ∧

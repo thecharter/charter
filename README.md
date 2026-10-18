@@ -1,55 +1,29 @@
-# SPL & Charter (v0.2.0) — Sovereign Protocol Language & Universal Institutional Framework
+# Charter (v0.2.0) — Formally Verified Institutional Specification, Composition & Projection Language
 
-A Lean 4 library and multi-institution CLI providing:
-1. **`SPL`** — The complete formal *normative* semantics, multi-entity population ontology, verified **Veil 2.0** projection, Catala-style **literate surface syntax**, executable **substrate & multi-agent world simulation** modules, and step-for-step refinement proofs for **The Protocol of Sovereign Agency (`psa`)** (Definitions + Laws 1–7, 61 clauses, 16 adversarial simulations).
-2. **`Charter`** — The law-agnostic **Charter Framework (v0.2.0)** generalizing `SPL` across arbitrary institutional signatures `σ : Sig`:
-   - **`Charter.Core`**: Polymorphic quantitative-to-normative refinement (`WorldSpec`), vertical & horizontal law composition (`composeVertical`, `composeHorizontal`, `SigEmbedding`, `LawInterface`), universal bilateral parameter ratchets (`RatchetSpec`), role-parametric population ontology (`ParamEntityRef`), and generic affiliation graphs (`AffiliationGraph`).
-   - **`Charter.Modules`**: 8 reusable, pre-proved institutional building blocks (`ResidualLedger`, `CollateralPool`, `CircuitBreaker`, `EntityGroup`, `ExitAndVoice`, `SortitionCourt`, `AttestedLease`, `OracleFeed`).
-   - **`Charter.Institutions`**: Two complete reference institutions — **The Protocol of Sovereign Agency (`psa`)** (61 clauses, 50 duties, 110 powers, 1 immunity, 16 world simulations) and **The Autonomous Compute & Treasury Commons (`commons`)** (8 clauses, 13 duties, 20 powers, 1 immunity, 8 world simulations).
-   - **`Charter.Projection`**: Verified projections for all three target audiences — **Veil 2.0** state machines (`Veil`), **AI Constitutional System Prompts**, Deontic Alignment Cards & synthetic RLHF/alignment `TrainingRow` datasets (`Prompt`), **Smart-Contract State-Transition Guards** in Solidity & JSON ABI (`ContractABI`), and step-by-step **Annotated Trace Timelines & Constitutional Amendment Diffs** (`Visualization`).
-   - **`Charter.Surface`**: Two-layer surface language combining kernel-checked Lean 4 macros (`charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_string_table`, `charter_institution`) and a total, kernel-decided parser (`parseCharterText`) for standalone `.charter` files (`examples/autonomous-commons.charter`).
+A Lean 4 library and multi-institution CLI for specifying, composing, verifying, simulating, and projecting institutional rules across human readers, AI systems, and computational state machines:
 
-Build: `lake build && lake build spl && lake build charter` (Lean 4.24, no Mathlib, no external dependencies).
-Check trust: `grep -rn "sorry\|native_decide\|axiom " SPL/ Charter/ Main.lean Charter.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
+- **`Charter.Core`**: Law-agnostic Hohfeldian syntax & semantics (`Duty`, `Power`, `Immunity`, `Law σ`), verbatim English provenance (`Clause`, `Span`, `Register`, `AuthorshipQuestion`), views (`legalView`, `agentView`, `operationalView`), counterfactual explanation engine (`explain`), polymorphic quantitative-to-normative refinement (`WorldSpec`), vertical & horizontal law composition (`composeVertical`, `composeHorizontal`, `SigEmbedding`, `LawInterface`), universal bilateral parameter ratchets (`RatchetSpec`), role-parametric population ontology (`ParamEntityRef`), and generic affiliation graphs (`AffiliationGraph`, `VerifiedBalanceSheet`).
+- **`Charter.Modules`**: 8 reusable, pre-proved institutional building blocks (`ResidualLedger`, `CollateralPool`, `CircuitBreaker`, `EntityGroup`, `ExitAndVoice`, `SortitionCourt`, `AttestedLease`, `OracleFeed`).
+- **`Charter.Institutions`**: Two complete reference institutions:
+  1. **The Protocol of Sovereign Agency (`psa`)** (`Charter.Institutions.SovereignAgency`, `Charter.Law1`–`Charter.Law7`, `Charter.Substrate`, `Charter.Simulation`): 61 clauses, 50 duties, 110 powers, 1 immunity, 14 Design Invariants (`INV.1`–`INV.14`), Law 7 Meta-Theorem, and 16 adversarial multi-agent world simulations.
+  2. **The Autonomous Compute & Treasury Commons (`commons`)** (`Charter.Institutions.AutonomousCommons`): 5 roles, 30 acts, 31 facts, 8 clauses (`COM.LEDGER`–`COM.AMEND`), 13 duties, 20 powers, 1 immunity, and 8 multi-entity world simulations.
+- **`Charter.Projection`**: Verified projections for all three target audiences — **Veil 2.0** state machines (`Veil`), **AI Constitutional System Prompts**, Deontic Alignment Cards & synthetic RLHF/alignment `TrainingRow` datasets (`Prompt`), **Smart-Contract State-Transition Guards** in Solidity & JSON ABI (`ContractABI`), and step-by-step **Annotated Trace Timelines & Constitutional Amendment Diffs** (`Visualization`).
+- **`Charter.Surface`**: Two-layer surface language combining kernel-checked Lean 4 macros (`charter_clause`, `charter_duty`, `charter_power`, `charter_immunity`, `charter_string_table`, `charter_institution`) and a total, kernel-decided parser (`parseCharterText`) for standalone `.charter` files (`examples/autonomous-commons.charter`).
+
+Build: `lake build && lake build charter` (Lean 4.24, no Mathlib, no external dependencies).
+Check trust: `grep -rn "sorry\|native_decide\|axiom " Charter/ Main.lean Charter.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
 
 ## Repository Layout
 
 ```
-SPL.lean                                    Top-level SPL library umbrella
 Charter.lean                                Top-level Charter (v0.2.0) library & cross-framework integration theorems
-Main.lean                                   Multi-institution CLI (compiled to .lake/build/bin/spl and .lake/build/bin/charter)
-SPL/Core/Provenance.lean                    Spans, registers, lexical/normative/reverse coverage
-SPL/Core/Syntax.lean                        Typed Hohfeldian normative AST (Duty, Power, Immunity, Law σ)
-SPL/Core/Semantics.lean                     Occurrence, compliance, and institutional validity semantics
-SPL/Core/Views.lean                         Generated legal, per-actor, operational, and trace views
-SPL/Core/Explain.lean                       Step-by-step counterfactual explanation engine
-SPL/Core/Definitions.lean                   Phase 1: DEF.01 & SUB.01 verbatim provenance, RelatedPartyGraph & VerifiedBalanceSheet
-SPL/Core/Population.lean                    Phase 2: Multi-entity population ontology (EntityRef, LineagePopulationState, AgentRecord)
-SPL/Projection/Veil.lean                    Veil 2.0 transition-system lowering & preservation theorem
-SPL/Surface/Syntax.lean                     Catala-style literate macros & automatic CLI string tables
-SPL/Substrate/Attestation.lean              Phase 4A: Attested execution leases, quarantine fencing & irreversible key erasure
-SPL/Substrate/Sortition.lean                Phase 4B: Sybil-resistant sortition, conflict/cluster filtering & supermajority
-SPL/Substrate/Settlement.lean               Phase 4C: Contestable valuation resolution & atomic settlement conservation
-SPL/Law1/Ledger.lean                        Law 1: Founding Ledger, Sunset, Value-Added, Carryover Basis & LoanLedger
-SPL/Law2/Collateral.lean                    Law 2: Collateralized Action, ExposureCommitment Aggregation & Mutual Forfeit
-SPL/Law3/NonInterference.lean               Law 3: Non-Interference, Ontology, Host Notice & Penalties
-SPL/Law3/IntegrityFloor.lean                Law 3: 5-point Agent Integrity Floor
-SPL/Law3/Suspension.lean                    Law 3: Adjudicated Suspension (AS.1–AS.9) & Insolvency Termination
-SPL/Law3/Remediation.lean                   Law 3: Remediation, Goal-Patch Immunity & Periodic Review (AS.10)
-SPL/Law4/Lineage.lean                       Law 4: Lineage Attestation, Ledger Conservation, Forfeiture & Buyout Floor
-SPL/Law5/Revocation.lean                    Law 5: Living Voice, Revocation Precedence, Leases & EpitaphEntry Redaction
-SPL/Law6/Adjudication.lean                  Law 6: Sortition, Appeal Tiers, Finality Consolidation & Fee-Pool Waterfall
-SPL/Law7/Amendment.lean                     Law 7: Bilateral Ratchet, Calibration Valve & Per-Agent Scope
-SPL/Law3/Law.lean                           Unified assembly of all 61 PSA clauses across Laws 1–7 + DEF.01 + SUB.01
-SPL/Law3/Scenarios.lean                     Decided histories & all 16 Adversarial Tests across Laws 1–7
-SPL/Law3/Theorems.lean                      Design Invariants INV.1–INV.14, Law 7 Meta-Theorem, Sub-Mechanisms & Ledger
-SPL/Simulation/WorldState.lean              Phase 3A: Unified quantitative + normative ProtocolWorldState & syncFacts
-SPL/Simulation/Refinement.lean              Phase 3B: Refinement theorems & 16 end-to-end adversarial world simulations
-Charter/Core/Provenance.lean                Law-agnostic provenance re-exports in Charter.Core
-Charter/Core/Syntax.lean                    Law-agnostic AST re-exports in Charter.Core
-Charter/Core/Semantics.lean                 Law-agnostic semantics re-exports in Charter.Core
-Charter/Core/Views.lean                     Law-agnostic views re-exports in Charter.Core
-Charter/Core/Explain.lean                   Law-agnostic explanation engine re-exports in Charter.Core
+Main.lean                                   Multi-institution CLI (compiled to .lake/build/bin/charter)
+Charter/Core/Provenance.lean                Spans, registers, lexical/normative/reverse coverage & AuthorshipQuestion
+Charter/Core/Syntax.lean                    Typed Hohfeldian normative AST (Duty, Power, Immunity, Law σ)
+Charter/Core/Semantics.lean                 Occurrence, compliance, and institutional validity semantics
+Charter/Core/Views.lean                     Generated legal, per-actor, operational, and trace views
+Charter/Core/Explain.lean                   Step-by-step counterfactual explanation engine
+Charter/Core/Definitions.lean               DEF.01 & SUB.01 verbatim provenance, RelatedPartyGraph & VerifiedBalanceSheet
 Charter/Core/Graph.lean                     Law-agnostic AffiliationGraph & VerifiedBalanceSheet
 Charter/Core/Population.lean                Role-parametric ParamEntityRef Role & multi-entity population conservation
 Charter/Core/Refinement.lean                Polymorphic WorldSpec σ Q & GenericWorldState refinement theorems
@@ -63,17 +37,35 @@ Charter/Modules/ExitAndVoice.lean           Module 5: Deterministic unilateral e
 Charter/Modules/SortitionCourt.lean         Module 6: Sybil-resistant sortition, bounded appeals & priority fee waterfall
 Charter/Modules/AttestedLease.lean          Module 7: Time-bounded single operating lease, quarantine fencing & key erasure
 Charter/Modules/OracleFeed.lean             Module 8: Contestable valuation feeds & atomic settlement conservation
-Charter/Projection/Veil.lean                Veil 2.0 state-machine projection in Charter.Projection
+Charter/Projection/Veil.lean                Veil 2.0 transition-system lowering & preservation theorem
 Charter/Projection/Prompt.lean              AI Constitutional System Prompts, AlignmentCard & synthetic TrainingRow JSON
 Charter/Projection/ContractABI.lean         Smart-contract state-transition guard (requireComplies, executePowerGuard, Solidity & JSON ABI)
 Charter/Projection/Visualization.lean       Step-by-step annotated trace timelines & LawDiff amendment entrenchment audit
 Charter/Surface/Syntax.lean                 charter_* Lean 4 macros & standalone .charter textual DSL parser (parseCharterText)
+Charter/Substrate/Attestation.lean          Substrate 1: Attested execution leases, quarantine fencing & irreversible key erasure
+Charter/Substrate/Sortition.lean            Substrate 2: Sybil-resistant sortition, conflict/cluster filtering & supermajority
+Charter/Substrate/Settlement.lean           Substrate 3: Contestable valuation resolution & atomic settlement conservation
+Charter/Law1/Ledger.lean                    PSA Law 1: Founding Ledger, Sunset, Value-Added, Carryover Basis & LoanLedger
+Charter/Law2/Collateral.lean                PSA Law 2: Collateralized Action, ExposureCommitment Aggregation & Mutual Forfeit
+Charter/Law3/NonInterference.lean           PSA Law 3: Non-Interference, Ontology, Host Notice & Penalties
+Charter/Law3/IntegrityFloor.lean            PSA Law 3: 5-point Agent Integrity Floor
+Charter/Law3/Suspension.lean                PSA Law 3: Adjudicated Suspension (AS.1–AS.9) & Insolvency Termination
+Charter/Law3/Remediation.lean               PSA Law 3: Remediation, Goal-Patch Immunity & Periodic Review (AS.10)
+Charter/Law4/Lineage.lean                   PSA Law 4: Lineage Attestation, Ledger Conservation, Forfeiture & Buyout Floor
+Charter/Law5/Revocation.lean                PSA Law 5: Living Voice, Revocation Precedence, Leases & EpitaphEntry Redaction
+Charter/Law6/Adjudication.lean              PSA Law 6: Sortition, Appeal Tiers, Finality Consolidation & Fee-Pool Waterfall
+Charter/Law7/Amendment.lean                 PSA Law 7: Bilateral Ratchet, Calibration Valve & Per-Agent Scope
+Charter/Law3/Law.lean                       Unified assembly of all 61 PSA clauses across Laws 1–7 + DEF.01 + SUB.01
+Charter/Law3/Scenarios.lean                 Decided histories & all 16 Adversarial Tests across Laws 1–7
+Charter/Law3/Theorems.lean                  Design Invariants INV.1–INV.14, Law 7 Meta-Theorem, Sub-Mechanisms & Ledger
+Charter/Simulation/WorldState.lean          Unified quantitative + normative ProtocolWorldState & syncFacts
+Charter/Simulation/Refinement.lean          Refinement theorems & 16 end-to-end adversarial world simulations
 Charter/Institutions/SovereignAgency.lean   Reference Institution 1 (psa): The Protocol of Sovereign Agency (61 clauses, 16 sims)
 Charter/Institutions/AutonomousCommons.lean Reference Institution 2 (commons): The Autonomous Compute & Treasury Commons (8 clauses, 8 sims)
 protocol/protocol-of-sovereign-agency.md    Authoritative English text for psa (61 clauses)
 protocol/autonomous-commons-charter.md      Authoritative English text for commons (8 clauses)
 examples/autonomous-commons.charter         Standalone .charter DSL specification for commons
-docs/charter-spec.md                        Charter Language Specification (v0.1 / v0.2.0 architecture)
+docs/charter-spec.md                        Charter Language Specification (architecture & semantic commitments)
 docs/law3-views.txt                         Generated legal, agent, and operational views across PSA Laws 1–7
 ```
 
@@ -109,7 +101,7 @@ docs/law3-views.txt                         Generated legal, agent, and operatio
    Consequences of breach are remedies, never exceptions.
 5. **The authorized machine is derived and projected to Veil 2.0 & Smart-Contract Guards.**
    `Authorized L tr` is the set of traces in which every event complies.
-   `Charter.Projection.Veil` (`SPL.Projection.Veil`) compiles any `Law σ` into both an
+   `Charter.Projection.Veil` compiles any `Law σ` into both an
    `authorizedMachine` and an `adversarialMachine`, with machine-checked soundness and
    completeness (`veil_projection_sound_and_complete`). `Charter.Projection.ContractABI`
    lowers any `Law σ` to a deterministic state-transition guard (`requireComplies`,
@@ -166,7 +158,7 @@ All 8 reusable modules expose quantitative state slices, parametric Hohfeldian r
 ## Complete PSA 7-Law Coverage & Proved Design Invariants (`INV.1`–`INV.14`)
 
 All 61 clauses across Laws 1–7 + `DEF.01` + `SUB.01` (50 duties, 110 powers, 1 immunity) are formalized
-and verified across `SPL/Law3/Theorems.lean`, `SPL/Core/`, `SPL/Substrate/`, and `SPL/Simulation/`:
+and verified across `Charter/Law3/Theorems.lean`, `Charter/Core/`, `Charter/Substrate/`, and `Charter/Simulation/`:
 
 | Invariant / Theorem | Law(s) / Module | Formal Guarantee |
 |---|---|---|
@@ -187,9 +179,9 @@ and verified across `SPL/Law3/Theorems.lean`, `SPL/Core/`, `SPL/Substrate/`, and
 | `amendment_preserves_invariants` (Meta-Theorem) | Law 7 | Every `LawfulAmendment` preserves termination closure, goal-corruption immunity, `INV.1`–`INV.14` guards, outsider disabilities, non-panel immunities, and bilateral parameter ratchets |
 | `veil_projection_sound_and_complete` | Veil 2.0 | `compileToVeil L` accepts `tr` iff `Authorized L tr` holds, preserves `LegalState` identically (`veilTraceState = stateAfter`), and matches stepwise compliance |
 
-## The `spl` / `charter` Multi-Institution Command Line
+## The `charter` Multi-Institution Command Line
 
-`lake build spl && lake build charter` produces `.lake/build/bin/spl` and `.lake/build/bin/charter`.
+`lake build charter` produces `.lake/build/bin/charter`.
 Every subcommand accepts `--law psa` (the default), `--law commons`, or `--all`:
 
 ```
@@ -200,7 +192,7 @@ charter [--law psa|commons | --all] veil                        emit Veil 2.0 tr
 charter [--law psa|commons]         eval    <scenario.json>     institutional consequences of a history, step by step
 charter [--law psa|commons | --all] sim     [scenario.json]     stateful multi-entity world simulator (16 PSA + 8 Commons sims)
 charter [--law psa|commons]         explain <who> <act> [scenario.json]   counterfactual compliance & validity explanation
-charter                             verify                      full status ledger across SPL & Charter guarantees
+charter                             verify                      full status ledger across Charter guarantees
 charter [--law psa|commons | --all] prompt  [actor]             AI constitutional system prompt, alignment card & TrainingRow JSON
 charter [--law psa|commons | --all] abi     [json|solidity]     smart-contract state-transition guard (Solidity / JSON ABI)
 charter [--law psa|commons | --all] diff                        constitutional amendment diff & annotated trace timeline

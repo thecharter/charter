@@ -1,5 +1,5 @@
-import SPL.Core.Semantics
-import SPL.Substrate.Settlement
+import Charter.Core.Semantics
+import Charter.Substrate.Settlement
 
 /-!
 # Charter.Modules.OracleFeed — Reusable Contestable Valuation Feed & Atomic Waterfall Module
@@ -13,7 +13,7 @@ contestation safety and gross-inflow conservation theorems.
 
 namespace Charter.Modules
 
-open SPL SPL.Substrate
+open Charter Charter.Substrate
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -25,7 +25,7 @@ structure OracleFeedConfig where
   royaltyBps    : Nat  := 500
   deriving DecidableEq, Repr, Inhabited
 
-export SPL.Substrate (
+export Charter.Substrate (
   ContestableValuation
   ContestableValuationFeed
   contestValuation

@@ -1,10 +1,10 @@
-import SPL.Core.Semantics
-import SPL.Core.Population
+import Charter.Core.Semantics
+import Charter.Core.Population
 
 /-!
 # Charter.Modules.EntityGroup — Reusable Multi-Member Group & Stakeholder Accounting Module
 
-Extracts and generalizes `SPL.Core.Population` multi-member group state
+Extracts and generalizes `Charter.Core.Population` multi-member group state
 (`LineagePopulationState`, `AgentRecord`, `ClaimantShare`, `PopulationLedger`),
 intra-group carryover transfers (`transferMemberCarryover`), cross-group inflow
 attribution (`attributeCrossLineageInflow`), targeted stakeholder forfeiture
@@ -14,7 +14,7 @@ and shared service-budget caps (`claimMemberServiceSubsidy`).
 
 namespace Charter.Modules
 
-open SPL
+open Charter
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -24,7 +24,7 @@ structure EntityGroupConfig where
   lifecycleReserveMin  : Nat := 50
   deriving DecidableEq, Repr, Inhabited
 
-export SPL (
+export Charter (
   LineageId
   AgentId
   ClaimantId

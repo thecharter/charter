@@ -51,7 +51,7 @@ Top-level umbrella module for **Charter (v0.2.0)** importing:
 
 namespace Charter
 
-open SPL SPL.Law3 Charter.Institutions Charter.Modules
+open Charter Charter.Law3 Charter.Institutions Charter.Modules
 
 set_option maxRecDepth 200000
 
@@ -200,14 +200,14 @@ def psaRatchetSpec : RatchetSpec Law3Params psaSig where
 /-- Multi-step ratchet trajectory safety for the Protocol of Sovereign Agency (`psa`). -/
 theorem psa_ratchet_trajectory_safe :
     ∀ (p₀ : Law3Params) (rest : List Law3Params),
-      ValidAmendmentTrajectory psaRatchetSpec SPL.Law3.law (p₀ :: rest) →
+      ValidAmendmentTrajectory psaRatchetSpec Charter.Law3.law (p₀ :: rest) →
       let pₙ := (p₀ :: rest).getLast (List.cons_ne_nil p₀ rest)
       psaRatchetSpec.wellCalibrated pₙ = true ∧
       psaRatchetSpec.bilateralRatchet p₀ pₙ = true ∧
-      psaRatchetSpec.entrenchedCore (SPL.Law3.law p₀) (SPL.Law3.law pₙ) = true :=
+      psaRatchetSpec.entrenchedCore (Charter.Law3.law p₀) (Charter.Law3.law pₙ) = true :=
   universal_ratchet_trajectory_safe
     psaRatchetSpec
-    SPL.Law3.law
+    Charter.Law3.law
     psa_bilateralRatchet_trans
     defaultEntrenchedCore_trans
 
@@ -304,7 +304,7 @@ def commonsCandidateRegimes : List (String × CommonsParams) :=
       { commonsDefaultParams with freezeWindow := 20 }) ]
 
 theorem psa_sweep_verdicts_expected :
-    (sweepParameterGrid psaRatchetSpec SPL.Law3.law defaultParams psaCandidateRegimes).map
+    (sweepParameterGrid psaRatchetSpec Charter.Law3.law defaultParams psaCandidateRegimes).map
       (fun (_, cal, rat, core) => cal && rat && core) =
       [true, true, true, false, false, false] := by decide
 

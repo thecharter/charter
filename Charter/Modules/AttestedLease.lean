@@ -1,6 +1,6 @@
-import SPL.Core.Semantics
-import SPL.Substrate.Attestation
-import SPL.Law5.Revocation
+import Charter.Core.Semantics
+import Charter.Substrate.Attestation
+import Charter.Law5.Revocation
 
 /-!
 # Charter.Modules.AttestedLease — Reusable Single-Authority Execution Lease & Quarantine Module
@@ -14,7 +14,7 @@ and their kernel-checked single-authority and cryptographic-erasure theorems.
 
 namespace Charter.Modules
 
-open SPL SPL.Substrate
+open Charter Charter.Substrate
 
 /-! ## 1. Module Configuration & Quantitative State Slice -/
 
@@ -24,7 +24,7 @@ structure AttestedLeaseConfig where
   coolingOffWindow : Time := 5
   deriving DecidableEq, Repr, Inhabited
 
-export SPL.Substrate (
+export Charter.Substrate (
   ExecutionLease
   AttestedInstanceState
   AttestedStateMachine
