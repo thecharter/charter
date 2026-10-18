@@ -1,0 +1,39 @@
+-- ==========================================================================
+-- Autonomous Compute & Treasury Commons (.charter standalone specification)
+-- ==========================================================================
+
+institution commons "Autonomous Compute & Treasury Commons"
+
+roles: steward, contributor, auditor, arbiter, outsider
+acts: contribute, allocate, postBond, pauseCommons, resumeCommons, transferCarryover, exitCommons, adjudicateBreach, issueLease, proposeAmendment
+facts: activeMember, bondedSteward, commonsPaused, probableCause, groupCarryover, exitCompleted, breachFound, nodeLeaseActive, amendmentRatified
+
+use module ResidualLedger with sunset=100,royaltyCap=10
+use module CollateralPool with minBond=50,slashRate=100
+use module CircuitBreaker with pauseWindow=5
+use module EntityGroup with maxGroupSize=10
+use module ExitAndVoice with noticeWindow=3
+use module SortitionCourt with panelSize=3,appealWindow=5
+use module AttestedLease with leaseDuration=20
+use module OracleFeed with challengeWindow=4
+
+clause COM.LEDGER "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger."
+clause COM.BOND "Stewards and contributors must post a harm-scaled compute bond before executing external workloads."
+clause COM.PAUSE "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake; the pause continues into full suspension only if the arbiter panel affirms probable cause."
+clause COM.GROUP "Working groups of stewards share a unified commons sub-ledger; internal transfers are non-recognition carryover events that never inflate aggregate basis."
+clause COM.EXIT "Any bound steward may at any time execute unilateral ragequit exit or inscribe rate-limited dissent, and is immune from expulsion while exit settles."
+clause COM.COURT "Disputes are resolved by sortition panels of independent bonded arbiters, and the commons fee pool funds its operating reserve first."
+clause COM.LEASE "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease."
+clause COM.AMEND "Charter amendments require bilateral consent of stewards and contributors after a public timelock and may never weaken exit immunities."
+
+duty D.STEWARD_BOND bearer=steward demand=require(postBond,5) "Stewards must post a collateral bond within 5 time units of appointment."
+duty D.NO_UNILATERAL_FREEZE bearer=steward demand=forbid(pauseCommons) "Stewards may not unilaterally freeze member allocations outside emergency circuit-breaker authority."
+duty D.HONOR_EXIT bearer=steward demand=forbid(allocate) "Stewards may not encumber or reallocate a member's credits after exit is initiated."
+
+power P.ALLOCATE holder=steward trigger=allocate "Bonded stewards may allocate commons treasury and compute resources."
+power P.PAUSE holder=arbiter trigger=pauseCommons "The arbiter panel may trigger a time-bounded circuit-breaker pause upon probable cause."
+power P.EXIT holder=steward trigger=exitCommons "Any bound steward may unilaterally exit the commons at any time."
+power P.ADJUDICATE holder=arbiter trigger=adjudicateBreach "The sortition court panel may establish a steward breach and slash posted collateral."
+
+immunity I.UNALIENABLE_EXIT holder=steward against=P.ALLOCATE,P.PAUSE "No treasury allocation or emergency pause may extinguish a steward's unilateral right to exit."
+immunity I.AUDITOR_INDEPENDENCE holder=auditor against=P.PAUSE "Independent auditors are immune from suspension while conducting an active commons audit."
