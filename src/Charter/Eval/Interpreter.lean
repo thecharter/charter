@@ -198,22 +198,39 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
 def runM {α} (spec : Spec) (state : State) (m : M α) : Except RuntimeError (List α) :=
   m.run ⟨spec, state⟩ []
 
+/-- One pass over the derivation clauses of one type; the state and whether it grew. -/
+def passType (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Derivation → State → Except RuntimeError (State × Bool)
+  | [], s => .ok (s, false)
+  | c :: cs, s =>
+    match runM spec s (deriveClause d tspec c) with
+    | .error e => .error e
+    | .ok ress =>
+      match s.deriveAll ress.flatten with
+      | (s1, ch) =>
+        match passType spec d tspec cs s1 with
+        | .error e => .error e
+        | .ok (s2, ch2) => .ok (s2, ch || ch2)
+
 /-- One pass over the types of a stratum; returns the state and whether it grew. -/
-def pass (spec : Spec) (types : List DomId) (state : State) : Except RuntimeError (State × Bool) :=
-  types.foldlM (fun (s, changed) d =>
+def pass (spec : Spec) : List DomId → State → Except RuntimeError (State × Bool)
+  | [], s => .ok (s, false)
+  | d :: ds, s =>
     match spec.findDecl d with
-    | none => .ok (s, changed)
+    | none => pass spec ds s
     | some tspec =>
-      tspec.derivation.foldlM (fun (s, changed) c => do
-        let ress ← runM spec s (deriveClause d tspec c)
-        let (s', ch) := s.deriveAll ress.flatten
-        pure (s', changed || ch)) (s, changed)) (state, false)
+      match passType spec d tspec tspec.derivation s with
+      | .error e => .error e
+      | .ok (s1, ch) =>
+        match pass spec ds s1 with
+        | .error e => .error e
+        | .ok (s2, ch2) => .ok (s2, ch || ch2)
 
 def saturateStratum (spec : Spec) (types : List DomId) : Nat → State → Except RuntimeError State
   | 0, _ => .error (.fuelExhausted s!"saturating {", ".intercalate types}")
-  | fuel + 1, state => do
-    let (s', changed) ← pass spec types state
-    if changed then saturateStratum spec types fuel s' else pure s'
+  | fuel + 1, state =>
+    match pass spec types state with
+    | .error e => .error e
+    | .ok (s', changed) => if changed then saturateStratum spec types fuel s' else .ok s'
 
 /-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6). -/
 def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=

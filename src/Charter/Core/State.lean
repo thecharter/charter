@@ -64,8 +64,13 @@ def derive (s : State) (te : Tagged) : State × Bool :=
   | some _ => (s, false)
   | none => ({ s with contents := (te, ⟨true, true⟩) :: s.contents }, true)
 
-def deriveAll (s : State) (tes : List Tagged) : State × Bool :=
-  tes.foldl (fun (s, ch) te => let (s', ch') := s.derive te; (s', ch || ch')) (s, false)
+def deriveAll : State → List Tagged → State × Bool
+  | s, [] => (s, false)
+  | s, te :: tes =>
+    match s.derive te with
+    | (s', ch) =>
+      match deriveAll s' tes with
+      | (s'', ch') => (s'', ch || ch')
 
 end State
 
