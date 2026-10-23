@@ -474,6 +474,8 @@ def run (registered : List Program) (args : List String) : IO UInt32 := do
   | "run" :: rest => return (← runCommand rest)
   | "test" :: rest => return (← testCommand rest)
   | "repl" :: rest => return (← replCommand rest)
+  | "trace" :: cid :: rest =>
+    if rest.any (·.endsWith ".eflint") then return (← traceCommand cid rest) else pure ()
   | "check" :: rest => if rest.any (·.endsWith ".eflint") then return (← checkCommand rest) else pure ()
   | _ => pure ()
   let charterFiles := args.filter (·.endsWith ".charter")

@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (late) — Phase 2's third slice, clauses and provenance (D4): chapter 012; `charter check` and `charter test` run the Law 8 checks as claims; `charter trace`. 99 conformance tests.
 - 2026-10-23 (night) — Phase 2's second slice, time (D7): the clock (`@ t.`, `tick.`), `Time`/`Duration` types and domains, stamps on every assignment, `Held(e) For d`, `Creates e For d`, `Due within d`; CHR106. 92 conformance tests.
 - 2026-10-23 (evening) — Phase 2's first slice: `Valid when` (005.9), `Except under` (007.2), `Immunity … Against … Unless` (007.4), `Scenario` and the claim phrases (011.11), `--eflint` mode (002.9, 011.10); CHR022. 82 conformance tests.
 - 2026-10-23 (later) — Chapters 002–011 drafted from the implementation and eFLINT's semantics, each statement with a conformance test (72 tests, `test/spec/`, all passing; `tools/battery` runs them). 007 and 009 state Phase 2 designs as pending. `Charter.Eval.Properties` proves 004.3 and 005.3.
@@ -29,7 +30,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 009 time | `009_time.md` | draft; 10 tests green (D7: the clock, `Time`/`Duration`, stamps, `Held … For`, expiry) |
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
 | 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
-| 012 clauses and provenance | `012_clauses_and_provenance.md` | unwritten (D4) |
+| 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | unwritten (D11) |
 | 015 modules and require | `015_modules_and_require.md` | unwritten (D8) |

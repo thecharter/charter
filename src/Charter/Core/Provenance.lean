@@ -30,7 +30,7 @@ inductive Register
   | acceptance    -- a stated, tolerated limit; never a rule
   | commentary    -- rationale, motivation, examples
   | definition    -- a term introduced for the norms to use
-  deriving Repr, DecidableEq, BEq
+  deriving Repr, DecidableEq, BEq, Inhabited
 
 /-- An exact span of the authoritative English, with the formal objects
 that give it meaning. `meaning` lists the ids of the duties, powers, or
@@ -41,7 +41,7 @@ structure Span where
   text     : String
   register : Register
   meaning  : List String := []
-  deriving Repr, DecidableEq, BEq
+  deriving Repr, DecidableEq, BEq, Inhabited
 
 /-- A clause is a contiguous passage of the source together with the
 spans that partition it. -/
@@ -54,7 +54,7 @@ structure Clause where
   and every formal id the clause names loses its reviewed status until
   the mapping is re-approved. `0` = never approved. -/
   approvedHash : UInt64 := 0
-  deriving Repr, DecidableEq
+  deriving Repr, DecidableEq, Inhabited
 
 /-- Has the English drifted from what was approved? -/
 def Clause.stale (c : Clause) : Bool := c.source.hash != c.approvedHash

@@ -1,0 +1,21 @@
+// A program declares its authoritative `Document` and `Clause`s with register spans; every rule may cite its English with `From CLAUSE 'span'`; a program whose spans cover its clauses, name declared rules, and occur verbatim in the document passes every provenance check.
+Document "include/tenancy.md"
+Fact tenant Identified by T
+Fact landlord Identified by L
+Fact notice Identified by N
+Duty pay-rent Holder tenant Claimant landlord
+  From T.1 "The tenant pays the rent on the first of each month."
+Act enter Actor landlord Recipient tenant Holds when notice(N)
+  From T.2 "The landlord may enter the premises with twenty-four hours' notice."
+Immunity quiet Holder tenant Against enter Unless notice(N)
+  From T.3 "The tenant is entitled to quiet enjoyment of the premises."
+Clause T.1 Approved 7561569358177147353
+  Norm "The tenant pays the rent on the first of each month." => pay-rent
+  Commentary " Late payment accrues a fee."
+Clause T.2 Approved 2649790785113447530
+  Norm "The landlord may enter the premises with twenty-four hours' notice." => enter
+  Norm " The landlord may not enter without notice except in an emergency." => quiet
+Clause T.3 Approved 14694571418409166043
+  Norm "The tenant is entitled to quiet enjoyment of the premises." => quiet
+.
+?tenant(T) == False.

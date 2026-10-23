@@ -1,0 +1,9 @@
+// `Approved HASH` records the reviewed text; a clause whose text hashes to it is current, one without approval or with drifted text is STALE, and the report prints the hash to declare.
+Document "include/tenancy.md"
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Clause T.3 Approved 1
+  Norm "The tenant is entitled to quiet enjoyment of the premises." => pay-rent
+.
+//! expect-failed-claims: 1

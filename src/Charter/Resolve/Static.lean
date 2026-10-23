@@ -570,6 +570,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .exceptUnder as => checkActs "Except under" as; return [(ty, [.exceptUnder as])]
       | .against as => checkActs "Against" as; return [(ty, [.against as])]
       | .unlessCond ts => return [(ty, [.unlessCond (← ts.mapM (convertPrecon ty tspec))])]
+      | .fromSpan c text => return [(ty, [.fromSpan c text])]
       | .dueWithin d =>
         -- a requirement duty: violated once it has been held for `d` (006.7)
         match tspec.kind with
@@ -601,6 +602,8 @@ def executeDecls (ds : List Decl) : Stc Unit := do
         warn "CHR019" s!"{ty} is declared again; the new declaration replaces the earlier one (B9 pending)"
       setSpec (spec.insertDecl ty tspec)
     | .placeholder f t => modifySpec (·.insertAlias f t)
+    | .clause c => modifySpec (·.insertClause c)
+    | .document p => modifySpec (fun s => { s with document := some p })
     | .typeExt .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in

@@ -15,7 +15,9 @@ anywhere in the file:
   (several directives, several codes; other outcomes are not checked);
 - `//! expect-warning: CHR019` — likewise for a warning;
 - `//! known-issue: <why>` — the file is expected to fail; it fails the run if it
-  unexpectedly passes (so a fixed issue is noticed and the directive deleted).
+  unexpectedly passes (so a fixed issue is noticed and the directive deleted);
+- `//! expect-failed-claims: N` — the file passes only if exactly `N` claims fail
+  (queries, expectations, or provenance checks) and no error is reported.
 
 With `--expect <file>`, each file's outcome is compared with the outcome recorded
 there (lines `ok   <path>` / `FAIL <path>`, the format this command prints, which
@@ -83,6 +85,7 @@ structure Directives where
   expectErrors   : List String := []
   expectWarnings : List String := []
   knownIssue     : Option String := none
+  expectFailedClaims : Option Nat := none
 
 def readDirectives (src : String) : Directives :=
   src.splitOn "\n" |>.foldl (fun d line =>
@@ -92,6 +95,7 @@ def readDirectives (src : String) : Directives :=
       if body.startsWith "expect-error:" then { d with expectErrors := d.expectErrors ++ [(body.drop 13).trim] }
       else if body.startsWith "expect-warning:" then { d with expectWarnings := d.expectWarnings ++ [(body.drop 15).trim] }
       else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
+      else if body.startsWith "expect-failed-claims:" then { d with expectFailedClaims := (body.drop 21).trim.toNat? }
       else d
     else d) {}
 
@@ -101,9 +105,12 @@ def verdict (d : Directives) (stats : RunStats) : Bool × String :=
     let missing := (d.expectErrors ++ d.expectWarnings).filter (fun c => !stats.codes.contains c)
     if missing.isEmpty then (true, s!"expected diagnostics reported: {", ".intercalate (d.expectErrors ++ d.expectWarnings)}")
     else (false, s!"expected diagnostics missing: {", ".intercalate missing}; reported: {", ".intercalate stats.codes}")
-  else match d.knownIssue with
-    | some why => if stats.ok then (false, s!"known issue unexpectedly passes ({why}); delete the directive") else (true, s!"known issue, still failing ({why})")
-    | none => (stats.ok, s!"{stats.errors} error(s), {stats.failedQueries} failed quer{if stats.failedQueries == 1 then "y" else "ies"}")
+  else match d.expectFailedClaims, d.knownIssue with
+    | some n, _ =>
+      if stats.errors == 0 && stats.failedQueries == n then (true, s!"exactly {n} failed claim(s), as expected")
+      else (false, s!"expected exactly {n} failed claim(s) and no error; got {stats.failedQueries} and {stats.errors} error(s)")
+    | none, some why => if stats.ok then (false, s!"known issue unexpectedly passes ({why}); delete the directive") else (true, s!"known issue, still failing ({why})")
+    | none, none => (stats.ok, s!"{stats.errors} error(s), {stats.failedQueries} failed claim(s)")
 
 /-- `charter test <paths…> [--expect file] [--tolerate file] [--out json]` -/
 def testCommand (args : List String) : IO UInt32 := do

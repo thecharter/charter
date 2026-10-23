@@ -1,0 +1,10 @@
+// An `Invariant` span must name a declared `Invariant`.
+//! expect-failed-claims: 3
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Invariant solvent When True
+Clause X.1 Approved 0
+  Invariant "Rent is always paid." => pay-rent
+  Norm "The tenant pays the rent." => pay-rent
+.

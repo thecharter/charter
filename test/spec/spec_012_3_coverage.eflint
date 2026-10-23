@@ -1,0 +1,9 @@
+// A clause's spans must reproduce its `Text` exactly; a gap or a change is a failed check.
+//! expect-failed-claims: 2
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Clause X.1 Approved 0
+  Text "The tenant pays the rent on the first of each month. Late payment accrues a fee."
+  Norm "The tenant pays the rent on the first of each month." => pay-rent
+.

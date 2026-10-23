@@ -1,4 +1,5 @@
 import Charter.Cli.Load
+import Charter.Cli.Provenance
 import Charter.Eval.Interpreter
 import Lean.Data.Json
 
@@ -174,7 +175,21 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
     let stats ← report o l.file it.pos.line it.text cfg.state cfg'.state outs stats
     return (cfg', stats)
 
-/-- Run a whole program. -/
+/-- Print the provenance report of a resolved spec (Law 8); returns the number of
+failed checks. -/
+def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO Nat := do
+  if spec.clauses.isEmpty && spec.document.isNone then return 0
+  let doc? ← readDocument spec programDir
+  let claims := provenanceReport spec doc?
+  let mut failed := 0
+  for c in claims do
+    if !c.ok then failed := failed + 1
+    if o.json then IO.println c.json.compress
+    else if !c.ok || c.warn || !o.testMode then IO.println c.render
+  return failed
+
+/-- Run a whole program. In test mode the provenance checks run at the end and a
+failed check is a failed claim. -/
 def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
   let (items, loadDiags) ← loadProgram path o.eflint
   let mut stats : RunStats := {}
@@ -187,7 +202,8 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     let (cfg', stats') ← stepItem o cfg stats l
     cfg := cfg'
     stats := stats'
-  return stats
+  let failedProv ← reportProvenance o cfg.spec (path.parent.getD ".")
+  return { stats with failedQueries := stats.failedQueries + failedProv }
 
 /-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`. -/
 structure RunFlags where
@@ -255,12 +271,35 @@ def checkCommand (args : List String) : IO UInt32 := do
             let w := (w.withFile l.file).withPos l.item.pos
             emit o (diagJson w) w.render (toErr := true)
             warnings := warnings + 1
-    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {warnings} warning(s))"
-    let failLine := s!"FAIL {f}: {errors} error(s), {warnings} warning(s)"
+    let failedProv ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
+    errors := errors + failedProv
+    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses, {warnings} warning(s))"
+    let failLine := s!"FAIL {f}: {errors} error(s) or failed checks, {warnings} warning(s)"
     emit o (Json.mkObj [("kind", "summary"), ("file", Json.str f), ("phrases", Json.num items.length),
       ("errors", Json.num errors), ("warnings", Json.num warnings), ("ok", Json.bool (errors == 0))])
       (if errors == 0 then okLine else failLine)
     if errors != 0 then status := 1
   return status
+
+/-- `charter trace <clause> <file.eflint>`: the span table of one clause. -/
+def traceCommand (cid : String) (args : List String) : IO UInt32 := do
+  let fl ← match takeFlags args with
+    | .error e => IO.eprintln s!"charter trace: {e}"; return 2
+    | .ok r => pure r
+  match fl.rest with
+  | [f] =>
+    let (items, loadDiags) ← loadProgram f fl.eflint
+    for d in loadDiags do IO.eprintln d.render
+    let mut spec := emptySpec
+    for l in items do
+      match l.item.val with
+      | .inr p => match resolvePhrase spec p with
+        | .ok (spec', _, _) => spec := spec'
+        | .error _ => pure ()
+      | .inl _ => pure ()
+    match spec.clauses.find? (·.id == cid) with
+    | some c => IO.println (traceTable c); return 0
+    | none => IO.println s!"no clause {cid}; known: {", ".intercalate (spec.clauses.map (·.id))}"; return 1
+  | _ => IO.eprintln "usage: charter trace <clause-id> <file.eflint>"; return 2
 
 end Charter.Cli

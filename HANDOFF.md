@@ -184,7 +184,20 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   properties file's theorems were re-proved over the new signatures (still `propext`
   only). A regression caught by the corpus: my first comparison typing forgot that an
   integer fact instance is used as its value; fixed with `asNumber`.
-- Next slice: clauses and provenance (D4), then `Param` (D11) and `Module`/`Use` (D8).
+## Late: Phase 2's third slice, clauses and provenance (D4, Law 8)
+
+- Surface: `Document "path"`, `Clause ID [Approved HASH]` with `Text "…"` and register
+  spans `Norm "…" => rules`, `Definition`, `Invariant`, `Acceptance`, `Commentary`;
+  `From CLAUSE "span"` on acts, duties, immunities, and invariants (`TypeSpec.spans`).
+  Records reused from v0.3's `Core/Provenance.lean` unchanged (`Clause`, `Span`,
+  `Register`, `covered`, `normsInterpreted`, `reverseProvenanceWith`, `stale`).
+- `Cli/Provenance.lean`: the six Law 8 checks as claims (covered, interpreted,
+  declared, named, verbatim, approved), run by `charter check` and at the end of
+  `charter test` (a failed check fails the file); `charter trace <clause> <file>`.
+  `//! expect-failed-claims: N` directive for fixtures that pin a failing check.
+- Spec chapter 012 drafted; 7 tests (99 total). The hash is `String.hash` as in v0.3.
+- Next slices: `Param` (D11, parameters as `Var` facts), `Module`/`Use` (D8), `?why`
+  (plan §2.2.11), `Invariant` exploration, the `lib/` modules, `prove`.
 
 ## Known gaps against Phase 1's exit criteria
 

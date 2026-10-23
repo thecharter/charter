@@ -1,4 +1,5 @@
 import Charter.Core.Term
+import Charter.Core.Provenance
 
 /-!
 # Charter.Core.Spec — Type declarations as records
@@ -106,6 +107,8 @@ structure TypeSpec where
   derivation       : List Derivation := []
   closed           : Option Bool := none
   conditions       : List Term := []
+  /-- Charter (D4, Law 8): the clause spans this rule is the meaning of (`From CLAUSE "span"`). -/
+  spans            : List (ClauseId × String) := []
   deriving Repr, Inhabited
 
 def TypeSpec.isClosed (t : TypeSpec) : Bool := t.closed.getD true
@@ -115,6 +118,10 @@ an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
 structure Spec where
   decls   : List (DomId × TypeSpec) := []
   aliases : List (DomId × DomId) := []
+  /-- Charter (D4): the authoritative English document, as `Document "path"` names it. -/
+  document : Option String := none
+  /-- Charter (D4): the clauses with their register spans. -/
+  clauses  : List Clause := []
   deriving Inhabited
 
 namespace Spec
@@ -130,6 +137,17 @@ def adjustDecl (s : Spec) (d : DomId) (f : TypeSpec → TypeSpec) : Spec :=
 
 def insertAlias (s : Spec) (f t : DomId) : Spec :=
   { s with aliases := (f, t) :: s.aliases.filter (·.1 != f) }
+
+/-- Insert a clause, replacing one with the same id; clauses keep declaration order. -/
+def insertClause (s : Spec) (c : Clause) : Spec :=
+  { s with clauses := s.clauses.filter (·.id != c.id) ++ [c] }
+
+/-- The rules a provenance check must account for: acts, duties, immunities, and invariants. -/
+def ruleIds (s : Spec) : List DomId :=
+  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .act _ | .duty _ | .immunity _ => some p.1
+    | .fact f => if f.invariant then some p.1 else none
+    | _ => none
 
 /-- Follow placeholder aliases (eFLINT `chase_alias`); fuel bounds a cycle. -/
 def chaseAlias (s : Spec) (d : DomId) : DomId :=
@@ -256,6 +274,8 @@ inductive ModClause where
   | unlessCond (ts : List Term)
   /-- Charter (D7): `Due within d` on a duty: violated once held for `d`. -/
   | dueWithin (d : Term)
+  /-- Charter (D4): `From CLAUSE "span"`: the English this rule is the meaning of. -/
+  | fromSpan (clause : ClauseId) (text : String)
   deriving Repr, Inhabited
 
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
@@ -263,17 +283,25 @@ inductive Decl where
   | typeDecl (d : DomId) (t : TypeSpec)
   | typeExt (d : DomId) (clauses : List ModClause)
   | placeholder (f t : DomId)
+  /-- Charter (D4): a clause of the authoritative document with its register spans. -/
+  | clause (c : Clause)
+  /-- Charter (D4): `Document "path"`. -/
+  | document (path : String)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
   | .typeDecl .. => true
   | .placeholder .. => true
   | .typeExt .. => false
+  | .clause .. => true
+  | .document .. => true
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
   | .typeExt d _ => d
   | .placeholder f _ => f
+  | .clause c => c.id
+  | .document p => p
 
 /-- Apply compiled extension clauses to a type (eFLINT `apply_type_ext`). -/
 def TypeSpec.applyExt (clauses : List ModClause) (t : TypeSpec) : TypeSpec :=
@@ -328,5 +356,6 @@ where
     -- `Due within d` is desugared by the resolver into a `Violated when Held(d()) For d`
     -- clause (006.7); it never reaches a record unresolved
     | .dueWithin _ => t
+    | .fromSpan c text => { t with spans := t.spans ++ [(c, text)] }
 
 end Charter

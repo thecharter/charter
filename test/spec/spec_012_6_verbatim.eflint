@@ -1,0 +1,9 @@
+// Each clause's text must occur verbatim in the document; drifted wording is a failed check, and a document that cannot be read is a warning, not a failure.
+//! expect-failed-claims: 2
+Document "include/tenancy.md"
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Clause T.1 Approved 0
+  Norm "The tenant pays the rent on the second of each month." => pay-rent
+.

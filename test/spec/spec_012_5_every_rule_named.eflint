@@ -1,0 +1,9 @@
+// Every act, duty, immunity, and invariant is named by some span or carries its own `From`; a rule with no English is a failed check (Law 8: a rule with no span is the question).
+//! expect-failed-claims: 2
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Act evict Actor landlord Recipient tenant
+Clause X.1 Approved 0
+  Norm "The tenant pays the rent." => pay-rent
+.

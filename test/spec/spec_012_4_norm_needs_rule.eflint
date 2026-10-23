@@ -1,0 +1,8 @@
+// Every `Norm` span names at least one declared rule; a norm with no rule, or naming an undeclared one, is a failed check.
+//! expect-failed-claims: 3
+Fact tenant Identified by T
+Fact landlord Identified by L
+Clause X.1 Approved 0
+  Norm "The tenant pays."
+  Norm "The landlord enters." => enter
+.

@@ -471,6 +471,57 @@ def createsClause : P (List Effect) := do
 
 def idList : P (List DomId) := sepBy1 ident "," 1000
 
+/-- A clause identifier: `DEF.01`, `COM.LEDGER`, `ART.3.2`: atoms and identifiers joined by dots. -/
+def clauseId : P String := do
+  let first ← (do match ← peek with
+    | .atom s => advance; return s
+    | .ident s => advance; return s
+    | .int n => advance; return toString n
+    | k => fail "CHR003" s!"expected a clause identifier but found {k.describe}")
+  let rec more (acc : String) : Nat → P String
+    | 0 => return acc
+    | fuel + 1 => do
+      match ← peek with
+      | .projDot | .kw "." =>
+        match ← peekAt 1 with
+        | .atom s => advance; advance; more (acc ++ "." ++ s) fuel
+        | .ident s => advance; advance; more (acc ++ "." ++ s) fuel
+        | .int n => advance; advance; more (acc ++ "." ++ toString n) fuel
+        | _ => return acc
+      | _ => return acc
+  more first 32
+
+def registerOf : TokKind → Option Register
+  | .kw "Norm" => some .norm
+  | .kw "Definition" => some .definition
+  | .kw "Invariant" => some .invariant
+  | .kw "Acceptance" => some .acceptance
+  | .kw "Commentary" => some .commentary
+  | _ => none
+
+/-- The items of a `Clause` frame: `Text "…"` and register spans `Norm "…" => ids`. -/
+def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span)
+  | 0 => return (none, [])
+  | fuel + 1 => do
+    match ← peek with
+    | .kw "Text" =>
+      advance
+      match ← peek with
+      | .str t => advance; let (_, spans) ← clauseItems cid fuel; return (some t, spans)
+      | k => fail "CHR003" s!"expected the clause text in double quotes after `Text` but found {k.describe}"
+    | k =>
+      match registerOf k with
+      | some reg =>
+        -- `Invariant "…"` is a span; `Invariant id When …` starts a new frame
+        match ← peekAt 1 with
+        | .str text =>
+          advance; advance
+          let ids ← (do if ← isKw "=>" then advance; sepBy1 ident "," 1000 else return [])
+          let (txt, spans) ← clauseItems cid fuel
+          return (txt, ⟨cid, text, reg, ids⟩ :: spans)
+        | _ => return (none, [])
+      | none => return (none, [])
+
 /-- One clause of a frame of the given kind, or `none` when the next token is not one. -/
 def clause (k : FrameKind) : P (Option ModClause) := do
   match ← peek with
@@ -513,6 +564,14 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Due within" =>
     if k != .duty then return none
     advance; return some (.dueWithin (← expression))
+  | .kw "From" =>
+    -- `From CLAUSE "span"` on an act, duty, immunity, or fact (an Invariant)
+    if k == .event then return none
+    advance
+    let cid ← clauseId
+    match ← peek with
+    | .str text => advance; return some (.fromSpan cid text)
+    | kk => fail "CHR003" s!"expected the span text in double quotes after `From {cid}` but found {kk.describe}"
   | .kw "Valid when" =>
     if k != .act then return none
     advance; return some (.validWhen (← exprList))
@@ -662,6 +721,20 @@ def frame : P (List Decl) := do
     expectKw "For"
     let t ← ident
     return [.placeholder f t]
+  | .kw "Document" =>
+    advance
+    match ← peek with
+    | .str p => advance; return [.document p]
+    | k => fail "CHR003" s!"expected the document path in double quotes after `Document` but found {k.describe}"
+  | .kw "Clause" =>
+    advance
+    let cid ← clauseId
+    let approved ← (do if ← isKw "Approved" then advance; let n ← intLit; return n.toNat.toUInt64 else return (0 : UInt64))
+    let (txt, spans) ← clauseItems cid 1000
+    let source := match txt with
+      | some t => t
+      | none => String.join (spans.map (·.text))
+    return [.clause { id := cid, source, spans, approvedHash := approved }]
   | k => fail "CHR003" s!"expected a declaration but found {k.describe}"
 
 /-- Whether the upcoming tokens begin a frame. -/
@@ -669,7 +742,7 @@ def startsFrame : P Bool := do
   let k ← peek
   let isFrameKw : TokKind → Bool
     | .kw s => ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                "Event", "Duty", "Extend", "Placeholder", "Immunity"].contains s
+                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document"].contains s
     | _ => false
   match k with
   | .kw "Open" | .kw "Closed" => return isFrameKw (← peekAt 1)
