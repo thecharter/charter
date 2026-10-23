@@ -1,0 +1,6 @@
+// `&&`, `||`, `!`/`Not` are the boolean connectives; `&&` and `||` do not evaluate their right operand when the left decides.
+?(True && True). ?!(True && False). ?(False || True). ?!(False || False).
+?!(!True). ?(Not(False)).
+Open Fact o Identified by O.
+?(False && o(O)) == False.
+?(True || o(O)).

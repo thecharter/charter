@@ -1,0 +1,5 @@
+// Declaring a type twice replaces the earlier declaration and warns CHR019 (B9 pending).
+//! expect-warning: CHR019
+Fact x Identified by A Holds when True.
+Fact x Identified by B.
+?!x(B).

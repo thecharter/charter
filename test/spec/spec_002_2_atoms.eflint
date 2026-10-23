@@ -1,0 +1,5 @@
+// A word starting with an uppercase letter is an atom: a string literal without quotes.
+Fact done.
++done(Bob).
+?done("Bob").
+?(Bob == "Bob").

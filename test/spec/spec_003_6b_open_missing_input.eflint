@@ -1,0 +1,4 @@
+// An instance of an open type with no assignment and no known instances is missing input (CHR100).
+//! expect-error: CHR100
+Open Fact x Identified by A.
+?x(A).

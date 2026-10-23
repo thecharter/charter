@@ -1,0 +1,9 @@
+// The phrases of `{ … }` are evaluated against the same state and their effects merged, creation first.
+Fact performed Identified by A, B, C
+Event a Creates performed(A) When Not(performed(A))
+Event b Creates performed(B) When performed(A)
+Event c Creates performed(C) When performed(B).
+{ a. b. c. }
+?performed(A). ?!performed(B).
+{ a. b. c. -performed }
+?performed(B). ?!performed(A).

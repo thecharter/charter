@@ -1,0 +1,13 @@
+// `Conditioned by` filters: an instance that fails its conditions is not derived and is not enabled.
+Fact player
+Fact input Identified by Int
+Fact jc Identified by player
+  Holds when (input < 10)
+  Conditioned by (input > 5)
+Fact jackpot Identified by player Holds when jc().
++player(P).
++input(3).
+?!jackpot(P).
+-input.
++input(6).
+?jackpot(P).

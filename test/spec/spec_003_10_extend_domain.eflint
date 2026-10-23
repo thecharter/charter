@@ -1,0 +1,5 @@
+// `Extend Fact x Identified by …` adds instances to a primitive domain; on a product type it is CHR014.
+Fact s Identified by A, B.
+Extend Fact s Identified by C.
++s.
+?s(C).

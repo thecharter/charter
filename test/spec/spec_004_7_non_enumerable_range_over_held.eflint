@@ -1,0 +1,6 @@
+// Over a non-enumerable type, a rule's free variables range over the instances that hold.
+Fact duedate Identified by Int
+Fact valid Identified by duedate Holds when duedate > 0.
+?!valid(5).
++duedate(5).
+?valid(5).

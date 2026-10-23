@@ -1,0 +1,7 @@
+// `[text]` is an identifier, and so is a sequence of lowercase words separated by spaces.
+Fact [data subject] Identified by String
+Fact other subject Identified by String.
++[data subject](Alice).
++other subject(Bob).
+?[data subject](Alice).
+?other subject(Bob).

@@ -1,0 +1,6 @@
+// A duty instance has a holder, a claimant, and its `Related to` objects, and is created and terminated like a fact.
+Fact actor Identified by Alice, Bob
+Duty pay Holder actor Claimant actor'.
++pay(Alice, Bob).
+?pay(Alice, Bob).
+?!pay(Bob, Alice).

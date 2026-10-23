@@ -1,0 +1,3 @@
+// A value used where another type is needed, with no conversion, is CHR012.
+//! expect-error: CHR012
+?(A + 1 == 2).

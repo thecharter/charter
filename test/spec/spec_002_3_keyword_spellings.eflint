@@ -1,0 +1,6 @@
+// `Holds when`, `Holds When`, `Present when`, and `Present When` are the same keyword.
+Fact a Identified by A Holds when True.
+Fact b Identified by B Holds When True.
+Fact c Identified by C Present when True.
+Fact d Identified by D Present When True.
+?a(A). ?b(B). ?c(C). ?d(D).

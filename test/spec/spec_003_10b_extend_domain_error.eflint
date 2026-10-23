@@ -1,0 +1,5 @@
+// `Extend … Identified by` on a product type is CHR014.
+//! expect-error: CHR014
+Fact a Identified by A
+Fact p Identified by a * a'.
+Extend Fact p Identified by B.

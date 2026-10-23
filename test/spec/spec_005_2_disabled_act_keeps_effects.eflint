@@ -1,0 +1,8 @@
+// A disabled act still has its effects (D5: `Valid when` defaults to true); the violation is reported, not enforced (Law 1).
+Fact actor Identified by Alice
+Fact counter Identified by Int.
++counter(0).
+Act count Creates counter(counter + 1) Terminates counter.
+count(Alice).
+?counter(1).
+?!Enabled(count(Alice)).

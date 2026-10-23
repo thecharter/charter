@@ -1,0 +1,8 @@
+// `Identified by A, B`, `1, 2, 3`, and `1..5` enumerate a finite domain; `+x.` creates every instance of an enumerable type.
+Fact x Identified by 1..3
+Fact y Identified by A, B
+Fact z Identified by 4, 5.
++x. +y. +z.
+?x(1). ?x(3). ?y(A). ?y(B). ?z(4). ?z(5).
+?!(Exists x: x == 4).
+?(Count(Foreach x: x) == 3).

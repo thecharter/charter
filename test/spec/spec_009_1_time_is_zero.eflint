@@ -1,0 +1,6 @@
+// In Phase 1 `Current Time` is 0 and never advances (D7's time lands in Phase 2).
+?(Current Time == 0).
+Fact p Identified by P
+Event e Creates p(P).
+e().
+?(Current Time == 0).

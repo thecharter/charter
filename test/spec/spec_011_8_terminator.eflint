@@ -1,0 +1,4 @@
+// Every phrase ends with `.`; the last phrase of a file may omit it.
+Fact p Identified by P.
++p(P).
+?p(P)

@@ -1,0 +1,12 @@
+// An event may sync with an act, whose effects then apply.
+Fact object Identified by Flower
+Fact owner-of Identified by actor * object
+Fact nearby Identified by actor * object
+Event break Related to object Syncs with destroy(actor, object) When nearby()
+Act destroy Actor actor Related to object Creates promise() When owner-of(actor', object)
+Duty promise Holder actor Claimant actor' Related to object.
++actor(Alice). +actor(Bob).
++owner-of(Alice, Flower).
++nearby(Bob, Flower).
+break(Flower).
+?promise(Bob, Alice, Flower).

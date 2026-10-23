@@ -1,0 +1,7 @@
+// Derived facts are recomputed from the assignments after every phrase; a derived fact whose ground is gone is gone.
+Fact x Identified by Int
+Fact even Identified by Int Derived from x When x % 2 == 0.
++x(2).
+?even(2).
+-x(2).
+?!even(2).

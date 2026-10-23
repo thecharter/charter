@@ -1,0 +1,5 @@
+// An event has no actor, is never disabled as an act is, and has effects.
+Fact p Identified by P
+Event happen Creates p(P).
+happen().
+?p(P).

@@ -1,0 +1,5 @@
+// An instance of a closed type with no assignment does not hold.
+Fact x Identified by A.
+?!x(A).
+Closed Fact y Identified by Int.
+?!y(5).

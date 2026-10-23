@@ -1,0 +1,9 @@
+// A product domain names its components; arguments are positional in component order or named `x = e`.
+Fact a Identified by A1, A2
+Fact b Identified by B1, B2
+Fact comp Identified by a * b.
++comp(A1, B2).
++comp(b = B1, a = A2).
+?comp(A1, B2).
+?comp(A2, B1).
+?!comp(A1, B1).

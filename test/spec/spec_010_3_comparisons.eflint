@@ -1,0 +1,5 @@
+// `== != < <= > >=` compare integers; `==` and `!=` also compare strings and instances structurally.
+?(1 < 2). ?(2 <= 2). ?(3 > 2). ?(2 >= 2). ?(1 != 2). ?!(1 == 2).
+?(A == A). ?(A != B).
+Fact p Identified by A, B.
+?(p(A) == p(A)). ?(p(A) != p(B)).

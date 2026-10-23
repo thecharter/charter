@@ -1,0 +1,4 @@
+// Triggering an instance that is not an act or event is CHR103.
+//! expect-error: CHR103
+Fact p Identified by P.
+p(P).

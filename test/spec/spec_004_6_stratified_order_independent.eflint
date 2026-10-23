@@ -1,0 +1,9 @@
+// A rule that reads another derived type through `Not`, `Forall`, or an aggregate is evaluated after that type is complete, whatever the types are named (D6).
+Fact x Identified by Int
+Fact y Identified by Int Derived from (Foreach x: y(x))
+Bool aa Holds when (Sum(Foreach y: y) < 4)
+Bool zz Holds when (Sum(Foreach y: y) < 4).
++x(0). +x(1). +x(2).
+?aa(). ?zz().
++x(3).
+?!aa(). ?!zz().

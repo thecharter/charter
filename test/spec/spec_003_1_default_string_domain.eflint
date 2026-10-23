@@ -1,0 +1,5 @@
+// A `Fact` without `Identified by` has the string domain.
+Fact p.
++p(A).
+?p(A).
+?p("A").

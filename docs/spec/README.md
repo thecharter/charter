@@ -1,12 +1,13 @@
 # The Charter Language Specification
 
 **Version:** 0.4.0-draft
-**Implementation status:** NON-COMPLIANT. The compiler on `main` implements the v0.3 flat grammar (`docs/completed/2026-10-18-charter-spec-v0.3.md`) and, as of Phase 1, the eFLINT core of chapters 002–011 for `.eflint` files. Each chapter below says which of its normative statements have a conformance test under `test/spec/` and whether the test passes. A chapter with no file yet is unwritten, not implied.
+**Implementation status:** NON-COMPLIANT with the plan's full §2 grammar; **compliant with chapters 002–011 as drafted** (the eFLINT core, Phase 1) for `.eflint` files, every normative statement of those chapters having a passing conformance test under `test/spec/`. The `.charter` extension still means the v0.3 flat grammar (`docs/completed/2026-10-18-charter-spec-v0.3.md`) until Phase 2 moves it to this grammar; the conformance tests therefore use `.eflint` for now. Every chapter is a **draft**: D2 fixes the meaning (eFLINT 4.1 unchanged) and the decisions fix the differences, but the wording is Eric's to bless (`AGENTS.md`, "Spec changes are solemn"). A chapter with no file yet is unwritten, not implied.
 
 This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the implementation: a change here is a ruling that the product is non-compliant until the code catches up, and only Eric authors or blesses normative wording (`AGENTS.md`, "The specification leads").
 
 ## Changelog
 
+- 2026-10-23 (later) — Chapters 002–011 drafted from the implementation and eFLINT's semantics, each statement with a conformance test (72 tests, `test/spec/`, all passing; `tools/battery` runs them). 007 and 009 state Phase 2 designs as pending. `Charter.Eval.Properties` proves 004.3 and 005.3.
 - 2026-10-23 — Skeleton: chapter list, `diagnostics.md` with the first CHR codes. No chapter has normative text yet. The implementation is NON-COMPLIANT with the plan's §2 grammar; the eFLINT core (chapters 002–011) is being implemented in Phase 1 against the vendored corpus `test/eflint-corpus/`.
 
 ## Chapters
@@ -16,16 +17,16 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | Chapter | File | Status |
 |---|---|---|
 | 001 design goals | `001_design_goals.md` | unwritten (source: `docs/mission.md`) |
-| 002 lexical structure | `002_lexical_structure.md` | unwritten (source: eFLINT `Parse.hs` `lexer_settings`; D2) |
-| 003 types and domains | `003_types_and_domains.md` | unwritten (D7 for `Time`/`Duration`) |
-| 004 facts and derivation | `004_facts_and_derivation.md` | unwritten (D6: stratified fixpoint) |
-| 005 acts, validity, effects | `005_acts_validity_effects.md` | unwritten (D5: `Valid when` defaults to true) |
-| 006 duties and deadlines | `006_duties_and_deadlines.md` | unwritten (D12: violation reported on transition) |
-| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | unwritten |
-| 008 events, physical, syncs | `008_events_physical_syncs.md` | unwritten |
-| 009 time | `009_time.md` | unwritten (D7) |
-| 010 expressions | `010_expressions.md` | unwritten |
-| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | unwritten |
+| 002 lexical structure | `002_lexical_structure.md` | draft; 7 tests green |
+| 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green; `Time`/`Duration` (D7) pending |
+| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 11 tests green (D6) |
+| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 8 tests green; `Valid when` (D5) pending |
+| 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 5 tests green; deadlines (D7) pending |
+| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft of the Phase 2 design; no tests yet |
+| 008 events, physical, syncs | `008_events_physical_syncs.md` | draft; 4 tests green |
+| 009 time | `009_time.md` | draft; 1 test green (clock fixed at 0); D7 pending |
+| 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
+| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 10 tests green; `Scenario` pending |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | unwritten (D4) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | unwritten (D11) |

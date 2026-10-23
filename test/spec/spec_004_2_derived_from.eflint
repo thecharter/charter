@@ -1,0 +1,7 @@
+// `Derived from e` derives the instances `e` produces, under `Foreach` binders or free variables bound to every instance.
+Fact x Identified by Int
+Fact y Identified by Int Derived from (Foreach x: y(x + 1))
+Fact z Identified by Int Derived from x.
++x(1). +x(2).
+?y(2). ?y(3). ?!y(1).
+?z(1). ?z(2).

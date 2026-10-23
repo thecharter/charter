@@ -1,0 +1,6 @@
+// A `Foreach` effect applies to every binding of its variables.
+Fact x Identified by 1..3
+Fact marked Identified by Int
+Event mark Creates (Foreach x: marked(x)).
+mark().
+?marked(1). ?marked(2). ?marked(3).

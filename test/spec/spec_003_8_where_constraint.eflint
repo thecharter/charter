@@ -1,0 +1,6 @@
+// `Where` restricts a type's instances; an instance outside the constraint is not an instance.
+Fact y Identified by 1..6 Where y % 2 == 0.
++y.
+?y(2). ?y(6).
+?!(Exists y: y == 3).
+?(Count(Foreach y: y) == 3).

@@ -1,0 +1,4 @@
+// A primitive type applied to other than exactly one positional argument is CHR018.
+//! expect-error: CHR018
+Fact x Identified by Int.
++x(1, 2).

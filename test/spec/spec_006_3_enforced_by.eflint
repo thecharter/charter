@@ -1,0 +1,7 @@
+// `Enforced by a` means the duty is violated whenever `a` is enabled.
+Fact actor Identified by Someone
+Duty d Holder actor Claimant actor Enforced by fine Holds when True
+Act fine.
+?!Violated(d()).
++fine.
+?Violated(d()).

@@ -1,0 +1,8 @@
+// A `.` glued to its left and followed by an identifier or `(` is a projection; any other `.` ends the phrase.
+Fact comp Identified by string
+Fact a Derived from comp.string
+Fact p Identified by P.
++comp(A).
+?a(A).
+{ +p(P). +p(P). }
+?p(P).

@@ -1,0 +1,10 @@
+// `+e` makes the instances of `e` hold, `-e` makes them not hold, `~e` forgets their assignment.
+Fact x Identified by 1..3.
++x(1).
+?x(1).
+-x(1).
+?!x(1).
+~x(1).
+?!x(1).
++x.
+?(Forall x: x).

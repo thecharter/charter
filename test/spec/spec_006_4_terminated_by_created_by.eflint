@@ -1,0 +1,10 @@
+// `Created by a` makes `a` create the duty; `Terminated by a` makes `a` terminate it and holds `a` while the duty holds.
+Fact actor Identified by S
+Act create-d Holds when True
+Act end-d
+Duty d Holder actor Claimant actor Terminated by end-d Created by create-d.
+create-d().
+?d().
+?Enabled(end-d()).
+end-d().
+?!d().

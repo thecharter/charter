@@ -1,0 +1,4 @@
+// A declaration block ends with `.` like every phrase; a `+` after an unterminated declaration is read as a list or expression continuation, never as a phrase.
+//! expect-error: CHR004
+Fact done
++done(A).

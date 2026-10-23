@@ -1,0 +1,9 @@
+// Performing an act instance applies its `Creates`, `Terminates`, and `Obfuscates` effects.
+Fact actor Identified by Alice
+Fact done
+Fact gone Identified by G
+Act do Creates done(actor) Terminates gone(G) Holds when True.
++gone(G).
+do(Alice).
+?done(Alice).
+?!gone(G).

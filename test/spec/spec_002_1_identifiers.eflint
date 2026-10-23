@@ -1,0 +1,6 @@
+// An identifier is a lowercase word continued by lowercase letters, `_`, or `-` before a lowercase letter; a following integer and primes are a variable's decoration.
+Fact person Identified by Alice, Bob
+Fact neighbour-of Identified by person1 * person2.
++neighbour-of(Alice, Bob).
+?neighbour-of(Alice, Bob).
+?(Exists person', person'': neighbour-of(person', person'')).

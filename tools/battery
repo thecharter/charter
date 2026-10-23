@@ -68,5 +68,9 @@ else
 fi
 step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 
+# 7. the spec's conformance tests (plan §5.3)
+"$B" test test/spec > "$OUT/spec.log" 2>&1; st=$?
+step spec-conformance $st "$(tail -1 "$OUT/spec.log")"
+
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
 exit $fail

@@ -1,0 +1,6 @@
+// A sync cycle triggers each transition once.
+Fact values Identified by 1..5
+Event even Related to values Creates values When (values % 2 == 0) Syncs with uneven(values)
+Event uneven Related to values Creates values When (values % 2 == 1) Syncs with even(values).
+even(values).
+?(Forall values: Holds(values)).

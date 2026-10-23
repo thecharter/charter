@@ -1,0 +1,3 @@
+// `Holds` applied to a literal is CHR015.
+//! expect-error: CHR015
+?Holds(1).

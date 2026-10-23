@@ -1,0 +1,8 @@
+// An act's components are its actor, then its recipient, then its `Related to` objects.
+Fact a Identified by A
+Fact r Identified by R
+Fact o Identified by O
+Fact seen Identified by a * r * o
+Act send Actor a Recipient r Related to o Creates seen(a, r, o) Holds when True.
+send(A, R, O).
+?seen(A, R, O).

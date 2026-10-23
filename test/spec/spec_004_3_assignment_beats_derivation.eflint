@@ -1,0 +1,7 @@
+// An explicit assignment of an instance takes precedence over its derivation.
+Fact a Identified by A Holds when True.
+?a(A).
+-a(A).
+?!a(A).
+~a(A).
+?a(A).

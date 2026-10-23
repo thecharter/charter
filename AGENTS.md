@@ -301,6 +301,7 @@ Today (v0.3; the target layout is plan §4 and this section is updated as it lan
 | `docs/mission.md`, `docs/meetings/`, `docs/plans/`, `docs/spec/`, `docs/completed/` | mission and laws, decisions, plans, the spec (skeleton) and its diagnostic-code registry, superseded documents |
 | `test/eflint-corpus/` | the vendored eFLINT tests and examples (D2), protected; `tolerances.md` lists the only accepted differences |
 | `test/gates/` | the Law 14 gates; one script per law so far |
+| `test/spec/` | one conformance test per normative statement of `docs/spec/` chapters 002–011 (`.eflint` until the `.charter` extension moves to the new grammar); `//!` directives expect diagnostics |
 | `tools/battery` | the PR-tier runner (build, gates, checks, sims, corpus) |
 | `HANDOFF.md` | reverse-chronological session log (newest section first; verify every hash it names with `git log` before acting) |
 | `.reference/` | eFLINT, Catala, Quint, Symboleo checkouts; untracked, ignored, read-only |

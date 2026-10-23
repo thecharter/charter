@@ -1,0 +1,7 @@
+// `?e` holds when every value of `e` is true; `?!e` and `!?e` negate; `?-e` lists instances and `?--e` the ones that hold.
+Fact p Identified by A, B.
++p(A).
+?p(A).
+?!p(B).
+!?p(B).
+?(Forall p: p) == False.

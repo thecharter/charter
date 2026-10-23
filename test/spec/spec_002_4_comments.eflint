@@ -1,0 +1,7 @@
+// `//` starts a comment to the end of the line and `/* */` encloses one.
+Fact x Identified by Int. // a comment
+/* a block
+   comment with ?x(1). inside */
++x(1).
+?x(1).
+?!x(2).

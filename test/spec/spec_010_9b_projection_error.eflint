@@ -1,0 +1,5 @@
+// Projecting a component the type lacks is CHR016.
+//! expect-error: CHR016
+Fact a Identified by A
+Fact comp Identified by a.
+?(Exists comp: comp.b == A).

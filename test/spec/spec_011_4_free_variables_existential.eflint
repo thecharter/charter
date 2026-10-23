@@ -1,0 +1,7 @@
+// Free variables of a query are bound existentially, inside the negation for `?!`.
+Fact p Identified by A, B.
++p(A).
+?p.
+?!(p == p(B) && p).
+Fact q Identified by A, B.
+?!q.

@@ -1,0 +1,6 @@
+// A trigger with free components performs every instance they can be bound to.
+Fact x Identified by 1..3
+Fact marked Identified by Int
+Event mark Related to x Creates marked(x).
+mark().
+?marked(1). ?marked(2). ?marked(3).

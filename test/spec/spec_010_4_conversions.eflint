@@ -1,0 +1,8 @@
+// An integer instance converts to its integer and a string instance to its string where a value is needed; an instance used as a condition means that it holds; an integer used as a condition means it is at least 1.
+Fact x Identified by Int
+Fact s Identified by String.
++x(5). +s(Hi).
+?(x + 1 == 6).
+?(s == Hi).
+?x(5).
+?1. ?!0. ?!(0-1). ?2.

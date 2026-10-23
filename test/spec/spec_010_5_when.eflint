@@ -1,0 +1,11 @@
+// `e When c` is `e` where `c` holds and nothing otherwise; `When` has the lowest precedence (D14).
+Fact x Identified by Int
+Fact y Identified by 1..10 Holds when x(y).
++x(5).
+?y(5).
+Fact p Identified by P
+Event e Terminates p When 1 + 1 == 2.
++p(P).
+e().
+?!p(P).
+?(Count(Foreach y: y When y > 100) == 0).

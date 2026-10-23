@@ -1,0 +1,14 @@
+// An open type with assignments answers from them; a type that was open and is then closed cannot be reopened; a type closed by default can be opened.
+Open Fact x Identified by A, B.
+-x(A).
++x(B).
+?!x(A).
+?x(B).
+Open Fact y Identified by A.
+Extend Fact y Closed.
+Extend Fact y Open.
+?!y(A).
+Fact z Identified by A.
+Extend Fact z Open.
++z(A).
+?z(A).

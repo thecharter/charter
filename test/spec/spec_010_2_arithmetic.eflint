@@ -1,0 +1,8 @@
+// `+ - * / %` on integers; `/` and `%` round toward negative infinity (the sign of `%` follows the divisor).
+?(2 + 3 * 4 == 14).
+?((2 + 3) * 4 == 20).
+?(7 / 2 == 3).
+?((0-7) / 2 == 0-4).
+?((0-7) % 2 == 1).
+?(7 % (0-2) == 0-1).
+?(10 - 4 - 3 == 3).

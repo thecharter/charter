@@ -1,0 +1,6 @@
+// A phrase that fails with a diagnostic leaves the configuration unchanged.
+//! expect-error: CHR010
+Fact p Identified by P.
++p(P).
++undeclared(P).
+?p(P).

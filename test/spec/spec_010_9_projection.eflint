@@ -1,0 +1,7 @@
+// `e.x` is the component `x` of the product instance `e`; naming a component the type lacks is CHR016.
+Fact a Identified by A1, A2
+Fact b Identified by B1
+Fact comp Identified by a * b.
++comp(A2, B1).
+?(Exists comp: comp.a == A2).
+?(Exists comp: comp.b == B1).

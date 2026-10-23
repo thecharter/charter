@@ -1,0 +1,10 @@
+// A duty is violated when it holds and one of its `Violated when` conditions holds.
+Fact x Identified by Int
+Duty keep-odd Holder actor Claimant actor'
+  Violated when (Exists x: x % 2 == 0).
++actor(Alice). +actor(Bob).
++keep-odd(Alice, Bob).
++x(1).
+?!Violated(keep-odd(Alice, Bob)).
++x(2).
+?Violated(keep-odd(Alice, Bob)).

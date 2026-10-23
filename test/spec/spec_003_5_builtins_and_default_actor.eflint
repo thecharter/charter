@@ -1,0 +1,10 @@
+// `int`, `string`, and `actor` are declared in every program (their instances can be named; none holds until assigned); an `Act` without `Actor` has the component `actor`.
+Act do
+  Creates done(actor)
+Fact done.
++actor(Alice).
+do(Alice).
+?done(Alice).
+?(int(3) == int(3)).
+?!int(3).
+?(string(X) == string("X")).

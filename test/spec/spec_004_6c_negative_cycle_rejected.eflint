@@ -1,0 +1,3 @@
+// A type that depends on its own absence is rejected with CHR020 before anything runs (D6).
+//! expect-error: CHR020
+Fact p Identified by P Holds when Not(p).

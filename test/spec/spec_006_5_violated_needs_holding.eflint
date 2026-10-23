@@ -1,0 +1,6 @@
+// `Violated(d)` is false for a duty instance that does not hold, whatever its conditions.
+Fact actor Identified by A
+Duty d Holder actor Claimant actor Violated when True.
+?!Violated(d()).
++d(A, A).
+?Violated(d()).

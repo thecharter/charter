@@ -1,0 +1,5 @@
+// An application with the wrong number of positional arguments is CHR011.
+//! expect-error: CHR011
+Fact a Identified by A
+Fact comp Identified by a * a'.
++comp(A).

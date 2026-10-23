@@ -1,0 +1,8 @@
+// An act instance is enabled only if it holds (acts are facts), its conditions hold, and no synced transition is forced.
+Fact actor Identified by Alice
+Act do.
+?!Enabled(do(Alice)).
++do(Alice).
+?Enabled(do(Alice)).
+Extend Act do Conditioned by False.
+?!Enabled(do(Alice)).

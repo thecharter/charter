@@ -1,0 +1,9 @@
+// `Holds(e)`/`Present(e)`, `Enabled(e)`, and `Violated(e)` ask the three state questions of an instance; on a literal they are CHR015.
+Fact actor Identified by A
+Fact p Identified by P
+Act a Conditioned by p(P)
+Duty d Holder actor Claimant actor Violated when p(P).
++a(A). +d(A, A).
+?!Holds(p(P)). ?!Enabled(a(A)). ?!Violated(d(A, A)).
++p(P).
+?Present(p(P)). ?Enabled(a(A)). ?Violated(d(A, A)).

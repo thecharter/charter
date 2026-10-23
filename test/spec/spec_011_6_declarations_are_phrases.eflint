@@ -1,0 +1,8 @@
+// A declaration block is a phrase; types it declares may refer to each other in any order.
+Fact done
+Act do Creates done(actor.name)
+Fact actor Identified by name * address
+Fact name
+Fact address.
+do(actor(Alice, Home)).
+?done(Alice).

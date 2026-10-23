@@ -1,0 +1,5 @@
+// Within one step, creating an instance beats terminating it.
+Fact p Identified by P
+Event both Creates p(P) Terminates p(P).
+both().
+?p(P).

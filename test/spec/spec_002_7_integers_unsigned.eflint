@@ -1,0 +1,3 @@
+// Integer literals are unsigned; `0-1` is a subtraction.
+?((0-1) < 0).
+?(0-1 == 0 - 1).

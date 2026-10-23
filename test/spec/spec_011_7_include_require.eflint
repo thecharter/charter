@@ -1,0 +1,6 @@
+// `#include "f"` splices the items of `f`; `#require "f"` does so once per file; names resolve against the including file's directory first.
+#require "include/base.eflint".
+#require "include/base.eflint".
+#include "include/base".
+?p(P).
+?(Count(Foreach p: p) == 1).

@@ -1,0 +1,6 @@
+// Negation over a type of a lower stratum is allowed.
+Fact f Identified by F
+Fact e Identified by E Holds when Not(f).
+?e(E).
++f(F).
+?!e(E).

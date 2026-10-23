@@ -1,0 +1,10 @@
+// `Count`, `Sum`, `Max`, `Min` over a `Foreach`; `Max` and `Min` of nothing are 0.
+Fact x Identified by 1..5.
+?(Sum(Foreach x: x) == 15).
+?(Count(Foreach x: x) == 5).
+?(Max(Foreach x: x) == 5).
+?(Min(Foreach x: x) == 1).
+Fact y Identified by Int.
+?(Max(Foreach y: y) == 0).
+?(Min(Foreach y: y) == 0).
+?(Count(Foreach y: y) == 0).

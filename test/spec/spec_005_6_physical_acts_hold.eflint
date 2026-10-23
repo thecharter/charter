@@ -1,0 +1,5 @@
+// A `Physical` act holds for every actor without being created.
++actor(Self).
+Physical breathe.
+?Holds(breathe(Self)).
+?Enabled(breathe(Self)).
