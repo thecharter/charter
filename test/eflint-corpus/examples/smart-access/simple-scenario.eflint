@@ -1,0 +1,10 @@
++resource(A1).
++resource(A2).
++resource(B1).
++actor(Alice).
++actor(Bob).
+
+create(Alice, A1).
+create(Alice, A2).
+create(Bob, B1).
+

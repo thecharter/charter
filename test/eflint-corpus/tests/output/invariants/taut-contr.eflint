@@ -1,0 +1,6 @@
+// see issue: https://gitlab.com/eflint/haskell-implementation/-/issues/14
+
+Invariant tautology When True.
+Invariant contradiction When False. // should raise violation
+
+

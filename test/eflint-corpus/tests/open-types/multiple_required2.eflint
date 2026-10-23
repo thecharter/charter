@@ -1,0 +1,26 @@
+{
+// this variant assumes open types can be enumerated when the domain (is made) finite
+
+Fact query Identified by Query
+  Holds when True
+  Conditioned by a 
+              && b 
+              && c 
+              && d 
+              && e
+
+Open Fact a Identified by A
+Fact b Identified by B Holds when a
+Open Fact c Identified by C
+Open Fact d Identified by D
+Fact e Identified by E Holds when Not(f) 
+Open Fact f Identified by F
+.
+
+// enumeration happens here, gives no exceptions under simpler treatment of open types
++a.
++c.
++d.
+-f.
+}
+?query(Query).

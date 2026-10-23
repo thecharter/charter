@@ -1,0 +1,23 @@
+
+
+Fact asset Identified by A1, A2, A3
+
+Fact permission Identified by actor * asset
+  Derived from permission(actor, asset) When Not(prohibited(actor, asset))
+
+Fact prohibited Identified by actor * asset.
+
+Extend Fact actor Identified by Eve, John.
+
+?permission(actor=Eve).
+?permission(actor=John).
+
++prohibited(Eve, A1).
+
+?!permission(Eve, A1).
+?permission(actor=John).
+
++prohibited.
+
+?!permission(actor=Eve).
+?!permission(actor=John).

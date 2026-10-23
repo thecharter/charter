@@ -1,0 +1,24 @@
+#require "ontology.eflint".
+
+Fact legal-basis Identified by
+  subject * controller * purpose * data
+  Holds when consent() && subject-of()
+
+Fact consent Identified by 
+  subject * controller * purpose
+
+Act give-consent
+  Actor subject
+  Recipient controller
+  Related to purpose
+  Creates consent()
+  Holds when !consent()
+
+Act collect-personal-data
+  Actor controller
+  Recipient subject
+  Related to data, processor, purpose 
+  Creates processes()
+  Conditioned by legal-basis() 
+  Conditioned by accurate-for-purpose()
+  Holds when subject-of()

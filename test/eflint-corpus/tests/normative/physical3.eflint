@@ -1,0 +1,15 @@
++actor(John).
+
+Physical do.
+
+Act dont. 
+
+Extend Act do
+  Syncs with dont().
+
+?Holds(do(John)).
+?!Holds(dont(John)).
+?!Enabled(dont(John)).
+?!Enabled(do(John)).
+
+do(John). // should trigger do and dont, both shown as disabled and together as violating 

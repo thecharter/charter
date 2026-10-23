@@ -1,0 +1,23 @@
+
+{
+Open Fact inkomen   Identified by Int
+Open Fact grens     Identified by Hoog, Laag
+Fact inkomensgrens  Identified by Int
+  Derived from inkomensgrens(1000) When grens(Hoog)
+              ,inkomensgrens(10)   When grens(Laag)
+
+Bool below
+  Holds when inkomen <= inkomensgrens.
+
+-grens(Hoog).
++grens(Laag).
++inkomen(20).
+}
+?inkomensgrens(10).
+?!below().
+{
+-grens(Laag).
++grens(Hoog).
+}
+?below().
+

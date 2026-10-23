@@ -1,0 +1,12 @@
+Fact resource Derived from owner-of.resource
+Fact owner    Derived from owner-of.owner
+Fact actor    Derived from owner
+// Fact in-group Identified by resource * actor
+
+Function owner-of Identified by resource * owner // at most one owner per resource
+
+Placeholder new-owner For owner
+Act change-owner Related to resource, new-owner
+  Creates owner-of(resource, new-owner) When Enabled(change-owner())
+  Terminates owner-of(resource, actor)
+  Holds when owner-of(resource, actor)

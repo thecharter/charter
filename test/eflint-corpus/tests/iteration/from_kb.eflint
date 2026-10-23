@@ -1,0 +1,8 @@
+
+Fact x Identified by Int.
+
++x(4).
++x(3).
+
+? Sum(Foreach x: x) == 7.
+? Sum(Foreach x: x) != 0.

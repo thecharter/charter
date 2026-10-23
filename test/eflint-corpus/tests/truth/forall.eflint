@@ -1,0 +1,13 @@
+
+Fact t Identified by 1..3.
+
++t.
+
+?(Forall t: t).
+
+Fact f Identified by 1..3.
+
++f(1).
++f(3).
+
+?!(Forall f: f).

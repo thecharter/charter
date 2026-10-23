@@ -1,0 +1,10 @@
+#include "template.eflint".
+
++caretaker(Mom).
++child(Johnny).
++start-date(2).
++initial-allowance(10).
+
+start-the-clock(start-date).
++allowance(initial-allowance).
++allowance-obligation(payment-date=start-date,amount=initial-allowance).

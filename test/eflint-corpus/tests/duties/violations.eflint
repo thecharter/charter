@@ -1,0 +1,27 @@
+
+Fact x Identified by Int
+
+Duty maintain-odd
+  Holder actor
+  Claimant actor'
+  Holds when actor==Alice && actor'==Bob
+  Violated when (Exists x : x % 2 == 0)
+
+Act increment
+  Creates x(x + 1)
+  Terminates x
+  Holds when actor==Alice
+.
+
++actor(Alice).
++actor(Bob).
++x(1).
+
+?!Violated(maintain-odd(Alice,Bob)).
+increment(Alice).
+?Violated(maintain-odd(Alice,Bob)).
+increment(Alice).
+?!Violated(maintain-odd(Alice,Bob)).
+increment(Alice).
+?Violated(maintain-odd(Alice,Bob)).
+

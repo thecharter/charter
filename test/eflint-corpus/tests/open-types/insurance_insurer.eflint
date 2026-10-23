@@ -1,0 +1,21 @@
+#require "insurance.eflint".
+
+{
+// an insurer only reasons about itself as insurer
+Fact insurer Identified by Self Holds when True.
+
+// close domain of discourse
+Extend Fact pharmacy Identified by HollandAndBarrett.
+Extend Fact patient Identified by John.
+Extend Fact medicine Identified by Sleep.
+
+// set value for open-type receipt
++receipt(HollandAndBarrett, John, Sleep).  
+}
+
+// interesting situation: both actions require validity of receipt as input
+// when the info is provided, how long does the authentication of the receipt last?
+?Enabled(request-reimbursement(patient=John,receipt=receipt(patient=John,medicine=Sleep,pharmacy=HollandAndBarrett))).
+request-reimbursement(patient=John,receipt=receipt(patient=John,medicine=Sleep,pharmacy=HollandAndBarrett)).
+?Enabled(reimburse(patient=John,receipt=receipt(patient=John,medicine=Sleep,pharmacy=HollandAndBarrett))).
+reimburse(patient=John,receipt=receipt(patient=John,medicine=Sleep,pharmacy=HollandAndBarrett)).

@@ -1,0 +1,20 @@
+#include "ontology.eflint".
+
+Fact recognizes   Identified by parent * child
+Fact birth-parent Identified by parent * child 
+
+Act permits-recognition 
+  Actor person1
+  Recipient person2
+  Related to child When person1 != person2
+  Creates permission-to-recognize(parent = person2)
+  Holds when birth-parent(person1, child)
+
+Act recognize 
+  Actor parent
+  Recipient child
+  Creates recognizes()
+  Holds when Not(Exists parent: recognizes())
+          && permission-to-recognize()
+
+Fact permission-to-recognize Identified by parent * child

@@ -1,0 +1,4 @@
++actor(Self).
+Physical do.
+
+?Holds(do(Self)).

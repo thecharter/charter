@@ -1,0 +1,6 @@
+
+Fact x Identified by Int Derived from int. 
++int(1).
++int(2).
+?x(1). 
+?x(2).

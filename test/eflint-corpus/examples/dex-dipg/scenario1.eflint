@@ -1,0 +1,20 @@
+#require "access_union.eflint".
+
+// 1) information about HospitalA
++member(HospitalA).
++affiliated-with(John, HospitalA).
+    
+// 2) information about the patients/donors
++donor(Alice).
+give-consent(Alice,HospitalA,DIPGResearch). // Alice and Bob are patients and have both given consent for DIPGResearch to A 
++donor(Bob). 
+give-consent(Bob,HospitalA,DIPGResearch). // remove consent to see query fail
+
+// 3) information about the dataset X1. provided by hospital, or computed from the dataset?
++dataset(X1).
++accurate-for-purpose(X1, DIPGResearch).
++coded(X1). 
++subject-of(Alice,X1).
++subject-of(Bob,X1). // or remove Bob as subject as well, to see query succeed even without consent
+
+?Enabled(write(John,X1)).

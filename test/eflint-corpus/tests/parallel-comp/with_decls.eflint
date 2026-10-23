@@ -1,0 +1,15 @@
+Fact letter.
+
+{
+Extend Fact letter Identified by A.
++letter(B).
+
+Extend Fact letter Identified by B.
++letter(C).
+
+Extend Fact letter Identified by C.
++letter(A).
+}
+
+?letter.
+?(Forall letter: letter).

@@ -1,0 +1,6 @@
+
+Fact comp Identified by string
+Fact a Derived from comp.string
+Fact b. 
++comp(A).
+?a(A).

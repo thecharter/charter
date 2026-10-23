@@ -1,0 +1,18 @@
+#require "../archetypes.eflint".
+
+// Sharing Data via TTP (Thrusted Third Party)
+
+Extend Fact application
+  Derived from application(Apply)
+
+Extend Fact infrastructure-provider-for
+  Derived from infrastructure-provider-for(Party_C, application)
+
+Extend Fact consumer-for
+  Derived from consumer-for(Party_B, application)
+
+Extend Fact algorithm-provider-for
+  Derived from algorithm-provider-for(Party_B, application)
+
+Extend Fact data-provider-for
+  Derived from data-provider-for(Party_A, application).

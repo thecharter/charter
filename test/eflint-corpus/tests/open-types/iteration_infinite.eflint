@@ -1,0 +1,9 @@
+
+Open Fact unbounded Identified by Int.
+
++unbounded(2).
+?(Exists unbounded: unbounded).
+-unbounded(2).
+
+?!(Exists unbounded: unbounded).
+

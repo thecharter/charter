@@ -1,0 +1,34 @@
+#require "storage.eflint".
+
+// no need to specify a context-expression, 
+// a rich context is implicitly present as the knowledge base active when an expression is evaluated
+Act read    Related to resource
+Act write   Related to resource
+Act create  Related to resource  
+  Holds when True // all know resources can be created, unless further constraint 
+  Creates owner-of(resource, actor) When Enabled(create()) // only 'new' resources can be created
+  Conditioned by !(Exists owner-of: owner-of.resource == resource)
+Act delete  Related to resource
+Act compute Related to input, output
+Placeholder input For resource
+Placeholder output For resource
+
+// make permissions explicit
+// (a) permissions can be queried with `?--permission`
+// or alternatively: `?--read`, `?--write`, `?--compute`
+// can be used by the policy contract to pro-actively update the ledger when attributes change
+Fact action Identified by READ, WRITE, CREATE, DELETE
+Fact permission Identified by actor * action * resource
+  Derived from permission(action = READ) When Enabled(read())
+              ,permission(action = WRITE) When Enabled(write())
+// (b) permissions can be queried with `?Enabled(read(actor, resource))`
+// can be used by the PDP to ask the policy contract whether a request is permitted 
+
+// (1) owners can read, write (and compute), and delete their resources
+Extend Act read Holds when owner-of(owner=actor)
+Extend Act write Holds when owner-of(owner=actor)
+Extend Act compute Holds when owner-of(owner=actor, resource = input) 
+                           && owner-of(owner=actor, resource = output)
+Extend Act delete Holds when owner-of(owner=actor)
+Extend Act create Holds when True // no constraints on creation (yet)
+

@@ -1,0 +1,7 @@
+Fact even Identified by int Derived from even(int) When (int % 2 == 0).
+?!even(4).
+?!even(5).
+
+Fact even Identified by 1..10 Derived from even When (even % 2 == 0).
+?even(4).
+?!even(5).

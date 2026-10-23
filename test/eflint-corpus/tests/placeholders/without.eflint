@@ -1,0 +1,5 @@
+Fact a Identified by int1 * int2
+ Derived from (Foreach a: a(a.int2, a.int1)).
+
++a(1,2).
+?a(2,1).

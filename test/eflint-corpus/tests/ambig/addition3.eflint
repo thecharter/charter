@@ -1,0 +1,7 @@
+
+Fact x Identified by Int Derived from int
++int(1) // part of derivation expression
+.
++int(2).
+?x(3). 
+

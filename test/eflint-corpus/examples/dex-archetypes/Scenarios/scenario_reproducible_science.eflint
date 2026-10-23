@@ -1,0 +1,8 @@
+#require "../Templates/reproducible_science.eflint".
+#require "domain.eflint".
+
+?Enabled(send-data(Party_A, Apply, Party_B, Inp)).
+?Enabled(send-algorithm(Party_A, Apply, Party_B, Alg)).
+?Enabled(apply(Party_B, Apply, Alg, Inp, Out)).
+
+?!Enabled(apply(Party_A, Apply, Alg, Inp, Out)).

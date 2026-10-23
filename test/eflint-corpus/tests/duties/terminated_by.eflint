@@ -1,0 +1,30 @@
+Fact actor Identified by SomeOne
+
+Act creates-duty Holds when True
+Act terminates-duty
+Act enforcer
+
+Duty duty
+  Holder actor
+  Claimant actor
+  Terminated by terminates-duty
+  Created by creates-duty
+  Enforced by enforcer
+.
+
+creates-duty().
+?Holds(duty()).
+?!Violated(duty()).
+?Enabled(terminates-duty()).
+
++enforcer().
+?Violated(duty()).
+
+terminates-duty().
+?!Violated(duty()).
+
+creates-duty().
+?Violated(duty()).
+
+-enforcer().
+?!Violated(duty()).

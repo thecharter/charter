@@ -1,0 +1,17 @@
+
+// #1
+Fact bar Identified by String
+    Holds when True.
+Fact bar Identified by Amy, Bob, Cho.
+
+// #3
+Invariant no-odd-bar
+    When ((Count(Foreach bar: bar When Holds(bar)) % 2) == 0).
+{
+    +bar(Amy).  // Violation? -> no triggers processed, so no violation
+    +bar(Bob).  // Violation? -> no triggers processed, so no violation
+}
+// Triggers processed here; no violation occurs
+
+?no-odd-bar().
+?Count(Foreach bar: bar When Holds(bar)) == 2 When Holds(bar).

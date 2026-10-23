@@ -1,0 +1,14 @@
++string(Amy).
+
+Duty tautology
+    Holder string
+    Claimant string
+    Holds when True
+    Violated when False. // violation should be displayed
+
+Duty contradiction
+    Holder string
+    Claimant string
+    Holds when True
+    Violated when True.
+

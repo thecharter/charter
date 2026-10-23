@@ -1,0 +1,17 @@
+#require "../archetypes.eflint".
+
+//set domain of discourse
+// using eFLINT-4.0 feature
+// Extend Fact actor Identified by Party_A, Party_B, Party_C 
+// Extend Fact application Identified by Apply
+// Extend Fact algorithm Identified by Alg
+// Extend Fact input Identified by Inp
+// Extend Fact output Identified by Out .
+
++actor(Party_A).
++actor(Party_B).
++actor(Party_C).
++application(Apply).
++algorithm(Alg).
++input(Inp).
++output(Out).

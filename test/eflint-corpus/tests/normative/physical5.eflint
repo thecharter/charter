@@ -1,0 +1,15 @@
++actor(John).
+
+Physical do Conditioned by False.
+
+Act dont. 
+
+Extend Act do.
+
+?!Enabled(dont(John)).
+?!Enabled(do(John)).
+
+{
+do(John).
+dont(John).
+} // should trigger both actions, showing both as disabled, but only dont as violating

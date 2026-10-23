@@ -1,0 +1,52 @@
+Fact citizen  Identified by Alice, Bob, Chloe
+Fact minister Identified by "Minister van Volkshuisvesting"
+
+Fact permit      Identified by citizen
+Fact permit-type Identified by "solar panels", "new construction"
+Fact application Identified by citizen * permit-type
+
+Act apply
+  Actor citizen
+  Recipient minister
+  Related to permit-type
+  Creates 
+    application(citizen, permit-type)
+
+Act deny
+  Actor minister
+  Recipient citizen
+  Related to application
+  Conditioned by 
+    application && 
+    application.citizen == citizen &&
+    application.permit-type == "new construction"
+  Terminates
+    application
+
+Act approve
+  Actor minister
+  Recipient citizen
+  Related to application
+  Conditioned by 
+    application &&
+    application.citizen == citizen &&
+    application.permit-type == "solar panels"
+  Terminates
+    application
+  Creates
+    permit(citizen).
+
+// init
+
++apply.
++deny.
++approve.
+
+// scenario
+
+apply(Chloe, minister, "solar panels").
+approve(minister, Chloe, application(Chloe, "solar panels")).
+apply(Bob, minister, "new construction").
+deny(minister, Bob, application(Bob, "new construction")).
+apply(Alice, minister, "solar panels").
+deny(minister, Alice, application(Alice, "solar panels")). //non-compliant

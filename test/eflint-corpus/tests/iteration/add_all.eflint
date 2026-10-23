@@ -1,0 +1,67 @@
+
+Fact x Identified by 1,2,3
+Fact y Identified by One, Two, Three
+
+Fact comp Identified by x * y.
+
++comp.
+?Holds(comp(1,One)).
+?Holds(comp(1,Two)).
+?Holds(comp(1,Three)).
+?Holds(comp(2,One)).
+?Holds(comp(2,Two)).
+?Holds(comp(2,Three)).
+?Holds(comp(3,One)).
+?Holds(comp(3,Two)).
+?Holds(comp(3,Three)).
+
+-comp.
+
+?!Holds(comp(1,One)).
+?!Holds(comp(1,Two)).
+?!Holds(comp(1,Three)).
+?!Holds(comp(2,One)).
+?!Holds(comp(2,Two)).
+?!Holds(comp(2,Three)).
+?!Holds(comp(3,One)).
+?!Holds(comp(3,Two)).
+?!Holds(comp(3,Three)).
+
+Fact actor Identified by A,B
+Placeholder recipient For actor
+
+Act act Actor actor
+        Recipient recipient
+        Where actor != recipient.
+
++act.
+?Holds(act(A,B)).
+?Holds(act(B,A)).
+?!Holds(act(A,A)).
+?!Holds(act(B,B)).
+
+~act.
+
+?!Holds(act(A,B)).
+?!Holds(act(B,A)).
+?!Holds(act(A,A)).
+?!Holds(act(B,B)).
+
+Fact citizen   
+Fact candidate
+
+Act cast_vote
+  Actor citizen
+  Recipient candidate.
+
++citizen(A).
++citizen(B).
++candidate(C).
+
++cast_vote.
+
+?!Holds(cast_vote(A,C)). // perhaps unexpectedly
+?!Holds(cast_vote(B,C)). // by definition, a statement +<fact-type>. will have no effect if the domain of <fact-type> is unbounded, this because only instances that are already in the K.B. will be added (again)
+
+?!Holds(cast_vote(C,C)).
+?!Holds(cast_vote(A,B)).

@@ -1,0 +1,120 @@
+
+// application occurrences (of an algorithm to input)
+// run at an infrastructure provider for applying algorithms to data
+Fact application 
+
+// three types of assets (arrows) are involved in an application 
+Fact asset
+  Derived from algorithm, input, output
+Fact algorithm
+Fact input
+Fact output
+
+// four roles (nodes) are involved in an application:  
+// providers: algorithm provider, data provider, infrastructure provider
+// consumer: data consumer
+Fact role
+  Derived from algorithm-provider, data-provider, infrastructure-provider, consumer
+Fact algorithm-provider Derived from actor
+Fact data-provider Derived from actor
+Fact infrastructure-provider Derived from actor
+Fact consumer Derived from actor
+
+// The following relations are populated to determine the source
+// and target of the arrows (assets) involved in application occurrences
+Fact algorithm-provider-for       Identified by algorithm-provider * application
+Fact data-provider-for            Identified by data-provider * application
+Fact consumer-for                 Identified by consumer * application
+// The following relation determines the role (node) of an application
+Fact infrastructure-provider-for  Identified by infrastructure-provider * application
+
+// If agent is infrastructure-provider-fot, it is also infrastructure-provider
+Extend Fact infrastructure-provider
+  Derived from (Foreach infrastructure-provider-for:
+    infrastructure-provider(infrastructure-provider-for.infrastructure-provider)
+  )
+Extend Fact algorithm-provider
+  Derived from (Foreach algorithm-provider-for:
+    algorithm-provider(algorithm-provider-for.algorithm-provider)
+  )
+Extend Fact data-provider
+  Derived from (Foreach data-provider-for:
+    data-provider(data-provider-for.data-provider)
+  )
+Extend Fact consumer
+  Derived from (Foreach consumer-for:
+    consumer(consumer-for.consumer)
+  )
+
+// The apply action
+Act apply Actor infrastructure-provider
+  Related to application, algorithm, input // what about multiple input
+                                   , output
+  Conditioned by infrastructure-provider-for()
+  Holds when True // will be conditioned in subsequent code/specifications 
+
+// Various actions related to sending assets
+// A send action is always associated with a single application occurrence
+Act send-data Actor data-provider
+  Related to application, infrastructure-provider, input
+  Conditioned by data-provider-for() 
+                ,infrastructure-provider-for()
+  Holds when True // will be conditioned in subsequent code/specifications 
+
+Act send-output Actor infrastructure-provider
+  Related to application, consumer, output
+  Conditioned by consumer-for()
+                ,infrastructure-provider-for()
+  Holds when True // will be conditioned in subsequent code/specifications
+
+Act send-algorithm Actor algorithm-provider
+  Related to application, infrastructure-provider, algorithm
+  Conditioned by infrastructure-provider-for()
+                ,algorithm-provider-for()
+  Holds when True // will be conditioned in subsequent code/specifications
+
+// 1. if no algorithm-provider is given for an application, 
+// then the infrastructure-provider is considered to provide algorithm
+Extend Fact algorithm-provider-for 
+  Derived from algorithm-provider-for(infrastructure-provider, application)
+    When  infrastructure-provider-for() 
+       && !(Exists algorithm-provider: algorithm-provider-for())
+
+// 2. similar for data-provider
+Extend Fact data-provider-for 
+  Derived from data-provider-for(infrastructure-provider, application)
+    When infrastructure-provider-for() 
+      && !(Exists data-provider: data-provider-for())
+
+// 3. and consumer
+Extend Fact consumer-for 
+  Derived from consumer-for(infrastructure-provider, application)
+    When infrastructure-provider-for() 
+      && !(Exists consumer: consumer-for())
+
+// Super-action-type of previous send-* actions
+Placeholder sender   For role
+Placeholder receiver For role
+Act send Actor sender
+  Related to application, receiver, asset
+  Holds when True // can be conditioned by `Extend Act send Conditioned by ...`
+
+Extend Act send-data
+  Syncs with send(data-provider, application, infrastructure-provider, input)
+Extend Act send-output
+  Syncs with send(infrastructure-provider, application, consumer, output)
+Extend Act send-algorithm
+  Syncs with send(algorithm-provider, application, infrastructure-provider, algorithm)
+
+// graph
+Fact edge-type Identified by Input, Algorithm, Output
+Fact archetype-edge Identified by sender * receiver * edge-type * application
+  Derived from archetype-edge(sender, receiver, Input, application)
+    When data-provider-for(sender, application)
+      && infrastructure-provider-for(receiver, application)
+  Derived from archetype-edge(sender, receiver, Algorithm, application)
+    When algorithm-provider-for(sender, application)
+      && infrastructure-provider-for(receiver, application)
+  Derived from archetype-edge(sender, receiver, Output, application)
+    When consumer-for(receiver, application)
+      && infrastructure-provider-for(sender, application)

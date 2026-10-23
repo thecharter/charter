@@ -1,0 +1,22 @@
+
+{
+Open Fact grens     Identified by Hoog, Laag
+Fact inkomensgrens  Identified by Int
+  Derived from inkomensgrens(1000) When grens(Hoog)
+              ,inkomensgrens(10)   When grens(Laag)
+
+Bool below
+  Holds when 100 <= inkomensgrens.
+
+// should return true with input `grens(Hoog) = true`
++grens(Hoog).
+-grens(Laag).
+?!below. // evaluated in previous context
+}
+{
+-grens(Hoog).
++grens(Laag).
+?below. // evaluated in previous context
+}
+?!below. // evaluated in previous context
+

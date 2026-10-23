@@ -1,0 +1,41 @@
+
+Open Fact unbounded Identified by Int
+
+Fact created Identified by Int
+
+Event add_single Related to int
+  Creates created(int) When unbounded(int)
+
+Event add_multiple
+  Creates created(unbounded) When unbounded.
+
+Extend Fact unbounded Identified by 1,3,5,7.
+
+-unbounded(1).
+-unbounded(3).
++unbounded(5).
+-unbounded(7).
+
+add_single(5).
+?!created(1).
+?!created(3).
+?created(5).
+?!created(7).
+
+add_multiple().
+
+?!created(1).
+?!created(3).
+?created(5).
+?!created(7).
+
++unbounded(1).
++unbounded(3).
++unbounded(7).
+
+add_multiple().
+
+?created(1).
+?created(3).
+?created(5).
+?created(7).

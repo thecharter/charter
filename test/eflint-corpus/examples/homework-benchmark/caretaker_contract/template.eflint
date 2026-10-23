@@ -1,0 +1,138 @@
+// the parameters of the contract
+Fact caretaker
+Fact child
+Fact start-date       Identified by Int
+Fact initial-allowance  Identified by Int
+
+// time management
+Fact date Identified by Int // keeps track of current date, counting the days 
+
+Event tick // ticking of the clock, with 1 day intervals
+  Terminates date // terminates the current date
+  Creates date(date + 1) // but only after a new date has been created based on it
+
+Fact days Identified by Int
+
+Event start-the-clock
+  Related to days 
+  Creates date(days)
+
+// the following invariants formalize the assumption that a caretaker contract is always between exactly one child and one caretaker, although multiple such contracts can co-exists, e.g. one child with multiple caretakers and one caretaker with multiple children.
+Invariant at-most-one-child Where (Forall child, child' : child == child')
+Invariant at-most-one-caretaker Where (Forall caretaker, caretaker': caretaker == caretaker')
+
+// Article 1
+// The following formalization shows a coarse degree of granularity, relying on separate policy formalizations of the specific rules set by the caretaker
+
+Fact rule 
+
+// The power to set rules
+Act set-rule
+  Actor caretaker
+  Recipient child
+  Related to rule
+  Creates rule // the given rule is made to hold (be in place)
+  Holds when child && caretaker // the two parties have entered the contract
+
+// The duty to obey rules
+Duty my-roof-my-rules
+  Holder child
+  Claimant caretaker
+  Holds when child && caretaker
+  Violated when disobeys()
+  // implicitly: 
+  // Violated when (Exists rule: disobeys(child, rule))
+
+Fact disobeys Identified by child * rule
+// The `disobeys` fact signals violation of the my-roof-my-rules duty for a specific rule
+// An external monitoring system should be in place to detect these violations
+// and creates instances of this fact
+
+// Article 2
+
+// The power to enforce rules, by grounding
+Act ground
+  Actor caretaker
+  Recipient child
+  Related to days 
+  Creates grounded(date = date + days) // grounded until `date + days` 
+  Terminates disobeys // after punishment, no longer in violation
+  Holds when Violated(my-roof-my-rules) // there exists a violation of the mentioned duty
+          && days <= 28
+
+Fact grounded Identified by child * date.
+
+// extend the effects of the clock to ensure termination
+// this is done as a modular extension using the `Extend` keyword  
+Extend Event tick
+  Terminates grounded When date + 1 == grounded.date.
+
+// Article 3 
+Fact allowance Identified by Int
+Fact amount    Identified by Int
+  Derived from allowance-obligation.amount // allows system to iterate these
+Placeholder payment-date For date
+
+Duty allowance-obligation
+  Holder caretaker
+  Claimant child
+  Related to payment-date, amount
+  Violated when payment-date < date 
+
+// The ticking of the clock also creates payment obligations for the new week
+.
+Extend Event tick // create allowance-obligation for the next week
+  Creates allowance-obligation(payment-date=date+7,amount=allowance)
+    When (date - start-date) % 7 == 0.
+
+Act pay
+  Actor caretaker
+  Recipient child
+  Related to payment-date, amount'
+  Terminates allowance-obligation() When amount' >= amount // duty is terminated when enough is paid
+  Holds when date >= start-date
+          && (payment-date - start-date) % 7 == 0
+
+// Article 4
+Act ask-for-help
+  Actor child
+  Recipient caretaker
+  Related to homework
+  Creates obligation-to-help(demand-date=date)
+  Holds when date >= start-date
+
+Fact demand-date Identified by Int
+  Derived from obligation-to-help.demand-date
+
+Placeholder duedate For date
+Fact homework Identified by duedate
+
+Duty obligation-to-help
+  Holder caretaker
+  Claimant child
+  Related to demand-date, homework
+  Violated when date > homework.duedate 
+
+Act help-with-homework
+  Actor caretaker
+  Recipient child
+  Related to homework
+  Terminates obligation-to-help()
+  Holds when obligation-to-help()
+
+// Article 5
+Act refuse-to-help
+  Actor caretaker
+  Recipient child
+  Related to homework
+  Terminates obligation-to-help() When demand-date >= homework.duedate - 1
+  Holds when obligation-to-help() &&   demand-date >= homework.duedate - 1 
+
+// Article 6
+Act demand-allowance-increase
+  Actor child
+  Recipient caretaker
+  Terminates allowance
+            ,obligation-to-help
+  Creates allowance(allowance + (allowance * 2) / 10)
+  Holds when (Exists obligation-to-help: Violated(obligation-to-help))

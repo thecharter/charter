@@ -1,0 +1,22 @@
+
+{
+Open Fact inkomen   Identified by Int
+Fact inkomensgrens  Identified by Int.
++inkomensgrens(1000).
+
+Bool below
+  Holds when inkomen <= inkomensgrens.
+
+// should return true with input `inkomen(100) = true`
+// ?below
++inkomen(100).
+}
+?below.
+
+{
+-inkomen.
++inkomen(2000).
+}
+?!below.
+
+

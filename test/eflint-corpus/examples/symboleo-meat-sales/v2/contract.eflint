@@ -1,0 +1,77 @@
+Fact seller 
+Fact address
+Fact return-address Identified by seller * address
+
+Fact buyer
+Fact delivery-address Identified by buyer * address
+
+Invariant buyer-seller Where buyer != seller
+
+Fact currency Identified by CAD, USD, EUR
+Fact quality  Identified by PRIME, AAA, AA, A
+Fact quantity Identified by Int
+
+Fact meat-id
+Fact meat    Identified by meat-id * quantity * quality
+Fact goods   Identified by meat
+
+Fact delivered    Identified by meat * address 
+Fact delivery-due Identified by meat * address
+
+Fact amount       Identified by Int
+Fact sum          Identified by amount * currency
+Fact normal-sum   Identified by sum
+Fact late-sum     Identified by sum
+Fact from
+Fact to
+Fact paid         Identified by sum * from * to
+Fact payment-due  Identified by sum * from * to
+
+Duty [O1] 
+  Holder seller
+  Claimant buyer
+  Violated when delivery-due(meat=goods.meat) 
+
+Duty [O2]
+  Holder buyer
+  Claimant seller
+  Related to sum
+  Violated when payment-due(from=buyer, to=seller)
+
+Act demand-interest
+  Actor seller
+  Recipient buyer
+  Terminates [O2](sum = normal-sum.sum)
+  Creates    [O2](sum = late-sum.sum)
+  Holds when Violated([O2](sum = normal-sum.sum)) 
+
+Act deliver-meat
+  Actor seller
+  Recipient buyer
+  Related to address
+  Creates delivered(meat = goods.meat)
+  Terminates [O1]() When delivery-address()
+
+Act pay-for-meat
+  Actor buyer
+  Recipient seller
+  Related to sum
+  Terminates [O2]()
+  Creates    [O1]() When sum == late-sum.sum  // replaces [P2]     
+
+Act [P1]
+  Actor seller
+  Recipient buyer
+  Terminates [O1]()
+  Holds when Violated([O2])
+
+Act [P3]
+  Actor buyer
+  Recipient seller
+  Creates terminated
+  Holds when Not(delivered(meat=goods.meat)) 
+          && delivery-overdue(meat=goods.meat) 
+          && delivery-address()
+
+Fact terminated Identified by Terminated
+Fact delivery-overdue Identified by meat * address 

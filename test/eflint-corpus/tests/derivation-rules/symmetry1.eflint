@@ -1,0 +1,15 @@
+
+Fact person Identified by Alice, Bob, Chloe.
+Fact neighbour-of Identified by person1 * person2
+Fact neighbour-of-closure Identified by person1 * person2
+  Holds when neighbour-of(person1, person2)
+            ,neighbour-of-closure(person2, person1)
+.
+
++neighbour-of(Alice,Bob).
++neighbour-of(Bob, Chloe).
+
+?neighbour-of-closure(Alice, Bob).
+?neighbour-of-closure(Bob, Alice).
+?neighbour-of-closure(Bob, Chloe).
+?neighbour-of-closure(Chloe, Bob).

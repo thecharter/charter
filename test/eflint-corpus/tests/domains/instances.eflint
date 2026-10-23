@@ -1,0 +1,21 @@
+
+Fact prim Identified by A, B
+
+Fact bin Identified by prim * prim'
+
+Fact level Identified by bin * prim.
+
++level.
+
+?level(bin(A, A), A).
+?level(bin(A, A), B).
+?level(bin(A, B), A).
+?level(bin(B, A), A).
+
+?(Forall prim1, prim2, prim3 : level(bin(prim1, prim2), prim3)).
+
+Fact single Identified by bin
+  Holds when (bin.prim == bin.prim').
+
+?!(Forall prim1, prim2: single(bin(prim1, prim2))).
+?(Forall prim: single(bin(prim, prim))).

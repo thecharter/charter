@@ -1,0 +1,11 @@
++actor(John).
+
+Physical do.
+
+Act just-do Holds when True. 
+
+Extend Act do
+  Syncs with just-do().
+
+?Enabled(just-do(John)).
+?Enabled(do(John)).

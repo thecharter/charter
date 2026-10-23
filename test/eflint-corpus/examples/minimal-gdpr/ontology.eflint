@@ -1,0 +1,15 @@
+Fact subject 
+Fact data    
+
+Fact subject-of Identified by subject * data
+
+Fact controller
+Fact processor
+Fact purpose
+
+Fact processes Identified by 
+  processor * data * controller * purpose
+
+Fact accurate-for-purpose Identified by
+  data * purpose
+

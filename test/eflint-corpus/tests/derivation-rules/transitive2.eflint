@@ -1,0 +1,16 @@
+
+Fact person Identified by Alice, Bob, Chloe
+Fact family-of Identified by person1 * person2 Where person1 != person2
+  Holds when family-of(person2, person1)
+           , family-of(person2, person3) && family-of(person3,person1)
+.
+
++family-of(Alice,Bob).
++family-of(Bob, Chloe).
+
+?family-of(Alice, Bob).
+?family-of(Alice, Chloe).
+?family-of(Chloe, Alice).
+?family-of(Chloe, Bob).
+?family-of(Bob, Alice).
+?family-of(Bob, Chloe).

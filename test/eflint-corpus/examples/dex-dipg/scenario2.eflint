@@ -1,0 +1,19 @@
+#require "access_union.eflint".
+
+// 1) information about hospitals 
++member(HospitalB).
++affiliated-with(Eve, HospitalB).
+
+// 2) project P1 by Y is proposed and then approved
++project(P1).
+propose-project(HospitalB,EC,P1). //EC is executive committee, P1 is 'project 1'
+approve-project(EC,HospitalB,P1).
+send-letter-of-approval(DIPG,HospitalB,P1).
+sign-letter-of-approval(HospitalB,EC,P1).
+
+// X1 is selected for the project
++dataset(X1).
+select-data(EC,HospitalB,P1,X1). // remove to see query below fail
+
+// 3) selection of X1 and X2 creates collection `asset(P1)` and access for Y is inferred from projects' approval 
+?Enabled(read(Eve,X1)).

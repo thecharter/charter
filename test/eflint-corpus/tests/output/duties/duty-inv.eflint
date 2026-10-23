@@ -1,0 +1,10 @@
+Invariant tautology When True.
+Invariant contradiction When False. // should display violation
+
++string(Amy).
+Duty still-works
+    Holder string
+    Claimant string
+    Holds when True
+    Violated when True. // should display violation
+

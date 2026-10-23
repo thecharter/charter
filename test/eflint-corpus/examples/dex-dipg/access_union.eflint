@@ -1,0 +1,27 @@
+#require "gdpr_union.eflint".
+#require "access_control.eflint".
+
+// generate access_control specific primivites from other concepts 
+//   researchers 'act' on behalf of hospitals 
+Extend Fact actor Derived from affiliated-with.person
+//   assets  
+Extend Fact asset Derived from dataset
+
+Extend Act read Holds when (Exists project, member: 
+  selected(asset,project) && approved(project,member) && affiliated-with(actor,member))
+  
+Extend Act write Holds when (Exists member: 
+  Enabled(make-data-available(member, DCOG, asset)) && affiliated-with(actor,member))
+  
+// alternatively
+//Extend Act write Holds when (Exists member:
+//  make-data-available(member, DCOG, asset) && affiliated-with(actor, member))
+  
+Fact owner-of Identified by member * dataset
+Extend Act make-data-available Creates owner-of(member, dataset)
+
+Extend Act write Holds when affiliated-with(actor, member) && owner-of(member, asset) 
+Extend Act read  Holds when affiliated-with(actor, member) && owner-of(member, asset) 
+
+// For simplicity: An approved project is recognised as a project
+Extend Fact project Derived from approved.project

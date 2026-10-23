@@ -1,0 +1,10 @@
+#require "contract.eflint".
+#require "contract_instantiation.eflint".
+
++payment-due(normal-sum.sum, "Buyer", "Seller").
+[P1]().
++delivery-due(goods.meat, "Home").
++paid(late-sum.sum, "Buyer", "Seller").
+[P2]().
++delivered(goods.meat, "Harbour").
++delivered(goods.meat, "Home").

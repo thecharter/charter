@@ -1,0 +1,9 @@
+#require "../Templates/code_TTP.eflint".
+#require "domain.eflint".
+
+?Enabled(send-data(Party_B, Apply, Party_C, Inp)).
+?Enabled(send-algorithm(Party_A, Apply, Party_C, Alg)).
+?Enabled(apply(Party_C, Apply, Alg, Inp, Out)).
+?Enabled(send-output(Party_C, Apply, Party_B, Out)).
+
+?!Enabled(apply(Party_A, Apply, Alg, Inp, Out)).

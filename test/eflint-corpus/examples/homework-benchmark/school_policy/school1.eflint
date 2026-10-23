@@ -1,0 +1,23 @@
+#include "policy.eflint".
+
+Fact day-one    Identified by 28800  // Int Derived from 60*60*8.
+Fact day-two    Identified by 115200 // Int Derived from 60*60*32.
+Fact day-three  Identified by 201600 // Int Derived from 60*60*56.
+Fact day-four   Identified by 288000 // Derived from 60*60*80.
+
+Extend Fact duedate Identified by 28800, 115200, 201600, 288000
+Extend Fact setdate Identified by 28800, 115200, 201600, 288000
+Extend Fact course  Identified by Algebra, Trigonometry.
+
++school(MOT).
++owns-course(Alice, Algebra).
++owns-course(Trish, Trigonometry).
++enrolled-in(George, Algebra).
++enrolled-in(Alex, Algebra).
++enrolled-in(Pete, Trigonometry).
+
+?valid-assignment(assignment(Algebra,day-three,day-one)).
+?Enabled(set-assignment(Alice,George,assignment(Algebra,day-three,day-one))).
+?!Enabled(set-assignment(Alice,George,assignment(Algebra,day-two,day-one))).
+?!Enabled(set-assignment(Alice,Trish,assignment(Algebra,day-three,day-one))).
+?!Enabled(set-assignment(Alice,Pete,assignment(Algebra,day-three,day-one))).

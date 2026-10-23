@@ -1,0 +1,12 @@
+Fact letter.
+
+{
+Extend Fact letter Identified by A.
+Extend Fact letter Identified by B.
+Extend Fact letter Identified by C.
++letter.
+}
+
+?letter(A).
+?letter(B).
+?letter(C).

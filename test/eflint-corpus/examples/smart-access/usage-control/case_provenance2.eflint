@@ -1,0 +1,12 @@
+#require "provenance.eflint".
+#require "simple-scenario.eflint".
+
++current-time(0).
+
+allow-processing(Alice, Bob, A2, A3).
+compute(Bob, A2, A3).
++current-time(700100). //violation due to inaction
+?Violated(write-obligation(Bob, Alice, A3, 0)).
+write(Bob, A3).
+?Violated(write-obligation(Bob, Alice, A3, 0)).
+

@@ -1,0 +1,45 @@
+#require "ontology.eflint".
+
+Act demand-rectification
+ Actor subject
+ Recipient controller
+ Related to purpose
+ Creates rectification-duty()
+ Holds when (Exists data, processor: 
+  subject-of() && processes() && !accurate-for-purpose())
+
+Duty rectification-duty
+  Holder controller
+  Claimant subject
+  Related to purpose
+  Violated when undue-rectification-delay()
+Fact undue-rectification-delay Identified by
+  controller * purpose * subject 
+
+Act rectified-personal-data
+ Actor controller
+ Recipient subject
+ Related to purpose 
+ Terminates rectification-duty()
+           ,undue-rectification-delay()
+ Holds when processors-accurate()
+
+Fact processors-accurate
+ Identified by controller * subject * purpose
+ Holds when (Forall processor, data : 
+               accurate-for-purpose() 
+               When processes() && subject-of())
+
+Placeholder new-data For data
+Event data-change 
+ Related to data, new-data, purpose
+  When data != new-data
+    && subject-of() && subject-of(data = new-data)
+ Terminates accurate-for-purpose(data,purpose)
+ Creates    accurate-for-purpose(new-data,purpose)
+ Holds when accurate-for-purpose(data,purpose)
+
+Event rectification-delay
+ Related to controller, purpose, subject 
+ Creates undue-rectification-delay() 
+          When rectification-duty()

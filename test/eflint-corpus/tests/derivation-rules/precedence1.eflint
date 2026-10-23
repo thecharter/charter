@@ -1,0 +1,11 @@
+
+
+// assignment trumps derivation.
+
+Fact a Identified by A Holds when True.
+
+?a(A).
+
+-a(A).
+
+?!a(A).

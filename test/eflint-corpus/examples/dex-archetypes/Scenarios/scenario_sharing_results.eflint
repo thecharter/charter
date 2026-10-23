@@ -1,0 +1,7 @@
+#require "../Templates/sharing_results.eflint".
+#require "domain.eflint".
+
+?Enabled(apply(Party_A, Apply, Alg, Inp, Out)).
+?Enabled(send-output(Party_A, Apply, Party_B, Out)).
+
+?!Enabled(apply(Party_B, Apply, Alg, Inp, Out)).

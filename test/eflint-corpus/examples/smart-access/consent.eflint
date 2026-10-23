@@ -1,0 +1,20 @@
+#require "storage.eflint".
+#require "access.eflint".
+#require "gdpr.eflint".
+
+Extend Fact processor Derived from consent.processor
+Extend Fact subject Derived from consent.subject
+
+Fact consent Identified by subject * processor * resource
+
+Act give-consent Recipient processor Related to resource
+  Creates consent(subject = actor)
+  Holds when owner-of(owner = actor) // only owners of resources can give consent
+
+Act revoke-consent Recipient processor Related to resource
+  Terminates consent(subject = actor)
+  Holds when owner-of(owner = actor) // only owners of resources can revoke consent
+
+// consent implies read access
+Extend Act read Holds when consent(processor = actor, resource = resource )
+                        && owner-of(owner = subject)

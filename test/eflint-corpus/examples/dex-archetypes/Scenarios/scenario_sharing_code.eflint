@@ -1,0 +1,8 @@
+#require "../Templates/sharing_code.eflint".
+#require "domain.eflint".
+
+?Enabled(send-algorithm(Party_A, Apply, Party_B, Alg)).
+?Enabled(apply(Party_B, Apply, Alg, Inp, Out)).
+
+?!Enabled(apply(Party_A, Apply, Alg, Inp, Out)).
+

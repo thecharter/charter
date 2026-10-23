@@ -1,0 +1,19 @@
+Fact x Identified by 1..20 Where (x % 2 == 0) Holds when True.
+
+?!x(1).
+?x(2).
+?!x(3).
+?x(4).
+?!x(19).
+?x(20).
+
+Fact y Identified by 1..20 Where (y % 2 == 0).
+
++y.
+?!y(1).
+?y(2).
+?!y(3).
+?y(4).
+?!y(19).
+?y(20).
+

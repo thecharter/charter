@@ -1,0 +1,9 @@
+#require "consent.eflint".
+#require "simple-scenario.eflint".
+
+give-consent(Alice, Bob, A2).
+?Enabled(read(Bob, A2)).
+?!Enabled(read(Bob, A1)).
+revoke-consent(Alice, Bob, A2).
+?!Enabled(read(Bob, A2)).
+

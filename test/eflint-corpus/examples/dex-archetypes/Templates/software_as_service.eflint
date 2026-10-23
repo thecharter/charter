@@ -1,0 +1,15 @@
+#require "../archetypes.eflint".
+
+//Software as a Service
+
+Extend Fact application
+  Derived from application(Apply)
+
+Extend Fact infrastructure-provider-for
+  Derived from infrastructure-provider-for(Party_B, application)
+
+Extend Fact data-provider-for
+  Derived from data-provider-for(Party_A, application)
+
+Extend Fact consumer-for
+  Derived from consumer-for(Party_A, application).

@@ -1,0 +1,25 @@
+#require "contract.eflint".
+
+// instantiate contract part 1
+Fact seller  Identified by "Seller"
+Fact buyer   Identified by "Buyer"
+
+// bind domain
+Fact address Identified by "Home", "Warehouse", "Harbour".
+
+// instantiate contract part 2
++return-address("Seller", "Warehouse").
++delivery-address("Buyer", "Home").
+ 
++normal-sum(sum(50,CAD)).
++late-sum(sum(60, CAD)).
++goods(meat("Beef", 10, AAA)).
+
++[O1]().
++[O2](sum = normal-sum.sum).
+
+// enable actions
++pay-for-meat(sum = late-sum.sum).
++pay-for-meat(sum = normal-sum.sum).
++deliver-meat().
+

@@ -1,0 +1,27 @@
+
+Fact even Identified by 0..10
+  Holds when even == 2
+             , even == even' + 2 && even'
+             , even == even' - 2 && even'
+//  rules below work under "alternative semantics" (see branch)
+// but cause division/rounding issues here?
+//           , even(even/2) When even > 0
+//           , even(0-(even/2)) When even < 0
+.
+
+
+// ?even(-4).
+// ?!even(-3).
+// ?even(-2).
+// ?!even(-1).
+?even(0).
+?!even(1).
+?even(2).
+?!even(3).
+?even(4).
+?!even(5).
+?even(6).
+?!even(7).
+?even(8).
+?!even(9).
+?even(10).

@@ -1,0 +1,19 @@
+
+Fact x Identified by 10..110
+
+Fact max Identified by Int
+Fact min Identified by Int
+
+Event do
+  Creates max(Max(Foreach x: x))
+         ,min(Min(Foreach x: x)).
+
+?Max(Foreach x: x)==110.
+?Min(Foreach x: x)==10.
+
+do().
+
+?max(110).
+?min(10).
+?!max(10).
+?!min(110).

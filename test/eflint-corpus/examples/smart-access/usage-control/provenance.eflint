@@ -1,0 +1,48 @@
+#require "../access.eflint".
+
+Open Var current-time Identified by Int // e.g. unix time, provided by execution environment
+Fact timestamp Identified by Int Derived from write-obligation.timestamp, written.timestamp
+Fact owner Derived from write-obligation.owner
+
+// in this scenario, the owner of a resource can give permission to another actor
+// for using its resource in a process action that results in some output data
+// this kind of permission comes with the obligation to report the analysis result
+// the owner provides a resource identified that needs to be (over)written
+// with the analyis results within a certain time window (say 24 hours) starting from the read action
+// this way, a provenance trail can be established even when processing happens remotely
+
+Act allow-processing Recipient actor' Related to resource, resource'
+  Holds when owner-of(resource, actor) && Enabled(create(actor, resource'))
+  Syncs with create(actor, resource') // create the new resource for storing the processing result
+  Creates compute(actor = actor', input = resource, output = resource')
+
+Extend Act compute // a version of read that demands the provenance trail build-up
+  Creates write-obligation(actor, owner-of.owner, output, current-time)
+            When owner-of.resource == input
+
+Fact deadline Identified by 86400 // 24 x 3600
+Duty write-obligation Holder actor Claimant owner Related to resource, timestamp
+  Violated when current-time > timestamp + deadline
+             && Not(Exists written: written.actor == actor && written.resource == resource
+                                    && written.timestamp <= timestamp + deadline)
+
+// proof that the resource has been written by the actor
+Fact written Identified by actor * resource * timestamp
+
+// having the write-obligation permits writing
+// executing the action removes the obligation
+// (the ledger is used to record the fact that the obligation ever existed)
+Extend Act write Holds when write-obligation()
+  Creates written(timestamp = current-time)
+
+// the duty is also considered violation if the resource has been written with bogus content
+// as `proven` by an external observation that the written content does not match some expectation
+// e.g. purpose, anonymisation, aggregation, quality, etc.
+Extend Duty write-obligation 
+  Violated when bogus(written)
+
+Fact bogus Identified by written
+
+Act declare-bogus Recipient actor' Related to resource, timestamp
+  Holds when owner-of() && written(actor=actor')
+  Creates bogus(written(actor=actor'))

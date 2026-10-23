@@ -1,0 +1,90 @@
+
+// knowledge representation, function type
+Fact     bidder         Identified by String  // actor placing bids
+Fact     object         Identified by String  // objects for sale
+Fact     price          Identified by Int     // price to pay
+Var      display        Identified by object  // the item on display
+Fact     bid            Identified by bidder * object * price * int
+Function min-price-of   Identified by object * price
+.
+
++min-price-of(Watch, 100).
++min-price-of(Clock, 200).
++min-price-of(Painting, 400).
+
+// // type replacement
+// Fact bids               Identified by Int
+// Fact bid                Identified by bidder * object * price * bids 
+
+
+// Forall, Exists, var-type
+Var highest-bid Identified by bidder * price Holds when (Exists bid: 
+ bid.bidder == bidder && bid.price == price && bid.object == display.object
+   && (Forall bid': bid'.price <= price When bid'.object == display.object))
+
+
+// act-type, holds when, creates
+Var auctioneer // responsible for displaying objects
+Act start-bidding Related to object Holds when auctioneer(actor)
+  Creates display(object) 
+
+// Actor clause
+// does not imply bidder(actor) as Condition/Holds when
+Act place-bid Actor bidder Related to object, price Holds when bidder
+  Conditioned by display(object), 
+    price > Max(Foreach bid: bid.price When bid.object == object)
+  Creates bid(int = Count(Foreach bid: bid When bid.object == object))
+
+// Physical action, with implicit Foreach
+Physical raise-hand Syncs with place-bid(
+  bidder = actor, object = object, price = 
+   min-price-of.price + increment*Count(Foreach bid: bid When bid.object == object)
+ ) When bidder(actor) && display(object) && (min-price-of.object == object)
+Var increment Identified by Int
+.
+
+// Duty creation
+Act end-bidding Holds when auctioneer(actor)
+  Creates payment-duty(bidder=highest-bid.bidder, price=highest-bid.price)
+         ,delivery-duty(bidder=highest-bid.bidder, object=display.object)
+  Terminates display, bid When bid.object == display.object
+
+
+
+Bool undue-payment-delay
+Duty payment-duty Holder bidder Claimant auctioneer Related to price
+  Violated when undue-payment-delay()
+
+
+Duty delivery-duty
+  Holder auctioneer
+  Claimant bidder
+  Related to object
+
+// Grounding the domain of discourse
+// necessary to ensure all required actions can be enumerated
+Extend Fact object Derived from min-price-of.object
+Extend Fact price  Derived from min-price-of.price, (bid.price)
+Extend Fact actor  Derived from auctioneer
+Extend Fact price  Derived from min-price-of.price + increment
+                               ,(bid.price + increment)
+.
+              
++bidder(Alice). +bidder(Bob). +bidder(Chloe). 
++auctioneer(David).
++increment(20).
+
+?start-bidding(David, Clock).
+?!start-bidding(Alice, Watch).
+
+start-bidding(David, Watch). // statement executing an action
+raise-hand(Alice). raise-hand(Bob). raise-hand(Alice). raise-hand(Chloe). 
+raise-hand(Bob). 
+
+end-bidding(David).
+
+?payment-duty(Bob, David, 100+4*increment).
+?!payment-duty(Alice, David, 100+4*increment).
+
+?delivery-duty(David, Bob, Watch).
+?!delivery-duty(David, Bob, Clock).

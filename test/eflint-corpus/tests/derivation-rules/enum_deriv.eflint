@@ -1,0 +1,18 @@
+
+Fact x Identified by Int Derived from int
+
+Fact y Identified by Int Derived from (Foreach x: y(x)).
+
++int(1).
++int(2).
++int(3).
+
+?y(1).
+?y(2).
+?y(3).
+
+Fact z Identified by x * y Holds when x == y.
+
+?z(1,1).
+?z(2,2).
+?z(3,3).

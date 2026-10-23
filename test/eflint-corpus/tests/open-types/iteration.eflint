@@ -1,0 +1,16 @@
+
+Open Fact bounded Identified by 1..5.
+
+-bounded(1).
++bounded(2).
+-bounded(3).
+-bounded(4).
+-bounded(5).
+?(Exists bounded: bounded).
+
+-bounded(1).
+-bounded(2).
+-bounded(3).
++bounded(4).
+-bounded(5).
+?!(Forall bounded: bounded).

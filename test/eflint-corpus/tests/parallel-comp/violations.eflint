@@ -1,0 +1,31 @@
+
+Fact x Identified by 0..10.
++x(0).
+
+Event increment Terminates x When x
+                Creates x(x+1) When x
+
+Bool in-violation Holds when (x % 2 == 1) When x
+Invariant not-in-violation When Not(in-violation())
+Duty keep-not-in-violation Holder actor1 Claimant actor 2
+  Violated when in-violation().
++keep-not-in-violation(Alice, Bob).
+
+{
+increment.
+increment.
+}
+
+?Violated(keep-not-in-violation(Alice,Bob)).
+
+{
+increment.
+increment.
+}
+?!Violated(keep-not-in-violation(Alice,Bob)).
+
+{
+increment.
+}
+?Violated(keep-not-in-violation(Alice,Bob)).
+

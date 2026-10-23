@@ -1,0 +1,21 @@
+{
+Fact values Identified by String.
+
+Open Fact open-type Identified by values.
+
+Fact derived-type Identified by values
+  Holds when open-type(values)
+
+Fact enumerated-type Identified by String
+  Holds when derived-type(enumerated-type).
+
++values(A).
++open-type(A).
+}
+?open-type(A).
+Extend Fact enumerated-type Identified by A,B,C.
+?enumerated-type(A).
+?!enumerated-type(B).
+?!enumerated-type(C).
+// ?--enumerated-type. // should give `enumerated-type(A)`
+

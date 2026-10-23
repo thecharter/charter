@@ -1,0 +1,23 @@
+#include "contract1.eflint".
+
+set-rule(rule=HomeBy6).
+pay(Mom,Johnny,start-date,11).
++disobeys(rule=HomeBy6).
+ground(days=2).
+tick().
+tick().
+tick().
+tick().
+tick().
+tick().
+pay(Mom,Johnny,start-date+7,5).
+pay(Mom,Johnny,start-date+7,10).
+tick().
+tick().
+tick().
+tick().
+tick().
+tick().
+tick().
+tick().
+tick().

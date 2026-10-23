@@ -1,0 +1,87 @@
+#require "terms.eflint".
+
+Fact send-letter-of-approval Identified by ecommittee * member * proposal
+
+Act propose-project
+  Actor researcher
+  Recipient ecommittee
+  Related to project
+  Creates proposal(researcher,project, project) When member(researcher)
+         ,proposal(member, project, project)    When affiliated-with(researcher,member)
+  Holds when researcher && ecommittee
+
+Act approve-project
+  Actor ecommittee
+  Recipient member
+  Related to project
+  Creates approved(project, member)
+  Holds when ecommittee && member && proposal(member, project, project) // TODO do we want to involve consent here?
+
+Fact approved Identified by project * member
+
+Act send-letter-of-approval // letter of approval is sent to confirm project proposal approval
+  Actor dipg
+  Recipient member
+  Related to project
+  Creates letter-of-approval-sent(project, member)
+  Holds when dipg && member && approved(project, member)
+
+Fact letter-of-approval-sent Identified by project * member
+Fact letter-of-approval-signed Identified by project * member
+
+Act sign-letter-of-approval
+  Actor researcher
+  Recipient ecommittee
+  Related to project
+  Creates letter-of-approval-signed(project, researcher) When member(researcher)
+         ,letter-of-approval-signed(project, member) When affiliated-with(researcher,member)
+         ,duty-to-select-data(ecommittee, researcher, project) When member(researcher)
+         ,duty-to-select-data(ecommittee, member, project) When affiliated-with(researcher,member)
+         ,duty-to-send-data(ecommittee, researcher, project) When member(researcher)
+         ,duty-to-send-data(ecommittee, member, project) When affiliated-with(researcher,member)
+  Holds when
+    researcher && ecommittee && letter-of-approval-sent(project, researcher) && member(researcher)
+   ,researcher && ecommittee && letter-of-approval-sent(project, member) && affiliated-with(researcher, member)
+
+Duty duty-to-select-data
+  Holder ecommittee
+  Claimant member
+  Related to project
+
+Duty duty-to-send-data
+  Holder ecommittee
+  Claimant member
+  Related to project
+
+Duty duty-to-use-data-for-project
+  Holder researcher
+  Claimant ecommittee
+  Related to dataset, project
+
+Act select-data // Article 5(9)
+  Actor ecommittee // Article 5(9) does not state the actor explicitly (infered from definition of ecommittee)
+  Recipient member
+  Related to project, dataset
+  Creates selected(dataset, project)
+  Terminates duty-to-select-data(ecommittee, member, project)
+  Conditioned by ecommittee && member
+  Holds when letter-of-approval-signed(project, member)
+//  Holds when duty-to-select-data(ecommittee, member, project)
+
+Fact selected Identified by dataset * project
+Act send-data
+  Actor ecommittee
+  Recipient member
+  Related to dataset
+  Terminates duty-to-send-data(ecommittee,member,project) When selected(dataset,project)
+  Holds when duty-to-send-data(ecommittee,member,project) && selected(dataset, project)
+
+Act make-data-available
+  Actor member
+  Recipient dcog
+  Related to dataset
+  Conditioned by coded(dataset)
+  Holds when member && ecommittee
+
+
+

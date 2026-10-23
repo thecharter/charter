@@ -1,0 +1,34 @@
+#require "access.eflint".
+#require "gdpr.eflint".
+
+Fact is-call-center   Identified by actor
+Fact is-ambulance     Identified by actor
+Fact is-hospital      Identified by actor
+Fact emergency-member Identified by subject * actor
+Fact actor            Derived from emergency-member.actor
+                                  ,is-call-center.actor
+                                  ,is-ambulance.actor
+                                  ,is-hospital.actor
+                                  ,Hospital
+
+Act start-emergency Recipient subject
+  Creates emergency-member()
+  Holds when is-call-center(actor) // a call-center professional can start the emergency
+            ,is-hospital(actor)    // a hospital professional can start the emergency
+
+Act add-emergency-member Recipient actor' Related to subject
+  Creates emergency-member(subject, actor')
+  Holds when emergency-member() // only members of the emergency can add members
+
+Act revoke-emergency-member Recipient actor' Related to subject
+  Terminates emergency-member(subject, actor')
+  Holds when emergency-member() // only members of the emergency can remove members
+
+Act end-emergency Recipient subject
+  Holds when controller(actor) // the controller can end emergencies
+  Terminates emergency-member When emergency-member.subject == subject
+
+// emergency members can read owner-ofs owned by the emergency subject
+Extend Act read // fields: actor, resource
+  Holds when emergency-member()
+          && owner-of(owner = subject)

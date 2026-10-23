@@ -1,0 +1,31 @@
+
+Fact ints Identified by Int
+Fact strings Identified by String
+Fact some-strings Identified by A,B,C // can be parsed both as domain-related clause and accumulating clause (grammar is ambiguous but both interpretations are equivalent)
+.
+// Extend Fact ints Identified by "Boo" // should do nothing or raise static error/warning
+// .
+// Extend Fact strings Identified by 1,2,3 // should do nothing or raise static error/warning
+// .
+Extend Fact ints Identified by 1,2,3.
++ints.
+?ints(1).
+?ints(2).
+?ints(3).
+
+Extend Fact strings Identified by A,B.
++strings.
+?strings(A).
+?strings(B).
+?!strings(C).
+
+Extend Fact some-strings Identified by D
+                         Identified by E.
+
++some-strings.
+?some-strings(A).
+?some-strings(B).
+?some-strings(C).
+?some-strings(D).
+?some-strings(E).
+?!some-strings(F).

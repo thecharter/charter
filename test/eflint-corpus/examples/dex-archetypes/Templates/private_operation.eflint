@@ -1,0 +1,19 @@
+#require "../archetypes.eflint".
+
+Extend Fact algorithm-provider
+  Derived from Party
+
+Extend Fact infrastructure-provider
+  Derived from Party
+
+Extend Fact data-provider
+  Derived from Party
+
+Extend Fact consumer
+  Derived from Party
+
+Extend Fact application
+  Derived from application(Apply)
+
+Extend Fact infrastructure-provider-for
+  Derived from infrastructure-provider-for(Party, application)

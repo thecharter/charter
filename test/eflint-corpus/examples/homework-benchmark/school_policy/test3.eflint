@@ -1,0 +1,7 @@
+#include "school1.eflint".
+
+set-assignment(Alice,George,assignment(Algebra,day-three,day-one)).
+hand-in(George,Alice,assignment(Algebra,day-three,day-one)).
++authored(Friend,submission(George,assignment(Algebra,day-three,day-one))).
+consider-invalid(Alice,George,assignment(Algebra,day-three,day-one)).
+?Enabled(suspend(learner=George)).

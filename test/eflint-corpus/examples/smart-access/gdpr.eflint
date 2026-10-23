@@ -1,0 +1,7 @@
+#require "storage.eflint". 
+
+Fact controller
+Fact subject Derived from owner-of.owner
+Fact processor.
+
++controller(Hospital). // in all our scenarios the hospital is considered the controller

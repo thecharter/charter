@@ -1,0 +1,11 @@
+Fact duedate Identified by 1..5 // assumed unix timestamp in seconds
+
+Fact assignment Identified by duedate 
+
+Fact valid-assignment Identified by assignment
+  Holds when (assignment.duedate > 0).
+
+Fact int Identified by 1..3.
++duedate(int).
+
+?valid-assignment(assignment(2)).

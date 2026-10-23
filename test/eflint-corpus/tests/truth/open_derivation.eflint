@@ -1,0 +1,16 @@
+
+{
+Fact values Identified by String
+
+Open Fact open-type Identified by values
+
+Fact derived-type Identified by values 
+  Holds when open-type(values).
+
++values(A).
++open-type(A)
+}
+
+?open-type(A).
+// +values(B). // saturation should report open-type(A)
+?open-type(A).

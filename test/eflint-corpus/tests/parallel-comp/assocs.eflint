@@ -1,0 +1,38 @@
+
+Fact performed Identified by A, B, C
+
+Event a Creates performed(A) When Not(performed(A)).
+Event b Creates performed(B) When performed(A)
+Event c Creates performed(C) When performed(B).
+
+{
+  a.
+  b.
+  c.
+}
+
+?performed(A).
+?!performed(C).
+?!performed(B).
+
+{
+  a.
+  b.
+  c.
+  -performed
+}
+
+?performed(B).
+?!performed(A).
+?!performed(C).
+
+{
+  a.
+  b.
+  c.
+  -performed
+}
+
+?performed(A).
+?!performed(B).
+?performed(C).

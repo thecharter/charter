@@ -1,0 +1,29 @@
+
+Fact x Identified by Int
+
+Fact y Identified by Int Derived from (Foreach x: y(x)).
+
++x(0).
++x(1).
++x(2).
+
+?y(0).
+?y(1).
+?y(2).
+
+Fact check Identified by Int Derived from Sum(Foreach y: y).
+Bool zz Holds when (4 > Sum(Foreach y: y)).
+Bool aa Holds when (4 > Sum(Foreach y: y)).
+Bool abc Holds when 4 > check.
+
+?zz().
+?aa().
+?abc().
+
++x(3).
+
+?!aa().
+?!zz().
+?!abc().
+?!(4 > Sum(Foreach y:y)).
+

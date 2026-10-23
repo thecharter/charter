@@ -1,0 +1,6 @@
+
+Fact x Identified by 1..5.
+
+? Sum(Foreach x: x) != 7.
+? Sum(Foreach x: x) != 0.
+? Sum(Foreach x: x) == 15.

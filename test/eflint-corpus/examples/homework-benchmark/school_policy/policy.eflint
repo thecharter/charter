@@ -1,0 +1,110 @@
+#include "../parentship_laws/parentship.eflint".
+
+Fact course
+  Derived from owns-course.course
+              ,enrolled-in.course
+
+// Article 1
+Fact owns-course Identified by teacher * course
+Fact teacher 
+  Derived from owns-course.teacher 
+
+// Article 2
+Fact enrolled-in Identified by learner * course
+Fact learner
+  Derived from enrolled-in.learner
+
+Fact duedate Identified by Int // assumed unix timestamp in seconds
+Fact setdate Identified by Int // assumed unix timestamp in seconds
+Fact assignment Identified by course * duedate * setdate 
+
+// Article 3
+Act set-assignment
+  Actor teacher
+  Recipient learner
+  Related to assignment
+  Creates obligation-to-complete()
+  Holds when owns-course(course=assignment.course) 
+          && enrolled-in(course=assignment.course) 
+          && valid-assignment(assignment)
+
+Fact valid-assignment Identified by assignment
+  Holds when assignment.duedate > assignment.setdate + 60*60*24
+          && valid-duedate(assignment.duedate)
+
+// Article 4
+Fact valid-duedate Identified by duedate
+  Holds when 60*60*8 // first ever 8 am
+                  == (duedate %
+                      (60*60*24) // one day
+                     )
+
+// Article 5
+Duty obligation-to-complete
+  Holder learner
+  Claimant teacher
+  Related to assignment
+  Violated when [violated: obligation-to-complete]
+
+Fact [violated: obligation-to-complete] Identified by obligation-to-complete
+
+Act hand-in
+  Actor learner
+  Recipient teacher
+  Related to assignment
+  Creates authored(learner, submission())
+         ,submission()
+  Holds when obligation-to-complete()
+
+Fact submission Identified by learner * assignment
+
+Fact school
+Act suspend // effects of the suspend action are not specified..
+  Actor school
+  Recipient learner // also not how many violations should have occurred (at least one?)
+  Holds when (Exists obligation-to-complete: Violated(obligation-to-complete)
+                                          && obligation-to-complete.learner == learner)
+
+// Article 6
+Act consider-complete
+  Actor teacher
+  Recipient learner
+  Related to assignment
+  Terminates obligation-to-complete()
+  Holds when owns-course(course=assignment.course)
+          && enrolled-in(course=assignment.course)
+          && valid-assignment(assignment)
+          && authored(learner,submission(learner,assignment))
+
+Fact author
+  Derived from authored.author, person
+Fact authored Identified by author * submission 
+
+Act consider-incomplete
+  Actor teacher
+  Recipient learner
+  Related to assignment
+  Creates [violated: obligation-to-complete](obligation-to-complete())
+  Holds when owns-course(course=assignment.course) 
+          && enrolled-in(course=assignment.course) 
+          && valid-assignment(assignment)
+
+Act consider-invalid
+  Actor teacher
+  Recipient learner
+  Related to assignment
+  Creates [violated: obligation-to-complete](obligation-to-complete())
+  Holds when owns-course(course=assignment.course) 
+          && enrolled-in(course=assignment.course) 
+          && valid-assignment()
+          && invalid-submission(submission())
+
+// Article 7
+// how do we recognize the authors of a submission? some external actor should (AI component?)
+
+Fact invalid-submission Identified by submission 
+  Holds when (Exists author: 
+                authored(author, submission) 
+             && Not(legal-parent(author,submission.learner)) 
+             && author != submission.learner)
+              

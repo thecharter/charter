@@ -1,0 +1,43 @@
+
+Fact domain Identified by A,B,C,D,E
+Fact codomain Identified by 1..5
+
+Function f Identified by domain * codomain.
+
+?(Forall codomain: Not(f(A,codomain))).
+?(Forall codomain: Not(f(B,codomain))).
+?(Forall codomain: Not(f(C,codomain))).
+?(Forall codomain: Not(f(D,codomain))).
+?(Forall codomain: Not(f(E,codomain))).
+
++f(A,1).
++f(B,2).
++f(C,3).
++f(D,4).
++f(E,5).
+
+?(Forall codomain: Not(f(A,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(B,codomain)) When codomain != 2).
+?(Forall codomain: Not(f(C,codomain)) When codomain != 3).
+?(Forall codomain: Not(f(D,codomain)) When codomain != 4).
+?(Forall codomain: Not(f(E,codomain)) When codomain != 5).
+
++f(C,1).
+
+?(Forall codomain: Not(f(A,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(B,codomain)) When codomain != 2).
+?(Forall codomain: Not(f(C,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(D,codomain)) When codomain != 4).
+?(Forall codomain: Not(f(E,codomain)) When codomain != 5).
+
++f(B,1).
++f(D,1).
++f(E,1).
+
+?(Forall codomain: Not(f(A,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(B,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(C,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(D,codomain)) When codomain != 1).
+?(Forall codomain: Not(f(E,codomain)) When codomain != 1).
+
+

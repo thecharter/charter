@@ -1,0 +1,18 @@
+#require "../minimal-gdpr/consent.eflint".
+#require "dipg_regulatory.eflint".
+
+
+Fact subject Derived from donor
+Fact controller Derived from member
+Fact processor Derived from DCOG, member
+Fact purpose Derived from DIPGResearch, project
+Fact data Derived from dataset.
+
+// 1. Making data-available is akin to collecting personal data with DCOG as processor
+Extend Act make-data-available // member, dcog, dataset
+  Syncs with (Foreach donor: collect-personal-data(controller = member
+                                                  ,subject = donor
+                                                  ,data = dataset
+                                                  ,processor = dcog  
+                                                  ,purpose = DIPGResearch)
+                              When subject-of(donor, dataset))

@@ -1,0 +1,2 @@
+Invariant one When False. // should raise violation
+Invariant two When False. // should raise violation

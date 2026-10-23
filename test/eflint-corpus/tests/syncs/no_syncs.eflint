@@ -1,0 +1,8 @@
+
+Fact performed Identified by A, B, C
+Event do Related to performed
+  Creates performed.
+
+do.
+
+?(Forall performed: performed).

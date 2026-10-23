@@ -1,0 +1,20 @@
+#require "insurance.eflint". 
+
+{
+// a patient only reasons about itself as a patient
+Extend Fact patient Identified by Self
+
+// and has only one health insurer
+Extend Fact insurer Identified by ORA 
+
+// close domain of discourse
+Extend Fact pharmacy Identified by HollandAndBarrett.
+Extend Fact medicine Identified by Sleep.
+
+// the patient implicitly claims the validity of a receipt when requesting reimbursement
+// Extend Fact receipt
+//   Holds when patient == Self
++receipt(patient=Self).
+}
+
+?Enabled(request-reimbursement(receipt=receipt(medicine=Sleep,pharmacy=HollandAndBarrett))).

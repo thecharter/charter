@@ -1,0 +1,9 @@
+#include "school1.eflint".
+
++birth-parent(Mom,George).
+
+set-assignment(Alice,George,assignment(Algebra,day-three,day-one)).
+hand-in(George,Alice,assignment(Algebra,day-three,day-one)).
++authored(Mom,submission(George,assignment(Algebra,day-three,day-one))).
+?Enabled(consider-invalid(Alice,George,assignment(Algebra,day-three,day-one))).
+

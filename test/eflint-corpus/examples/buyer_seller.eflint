@@ -1,0 +1,79 @@
+Fact person
+
+Placeholder buyer  For person
+Placeholder seller For person
+
+Fact item
+
+Fact amount Identified by 1..10
+Fact price-of Identified by item * amount
+
+Duty need-to-pay 
+  Holder buyer
+  Claimant seller
+  Related to amount
+  Enforced by demand-interest
+
+Duty need-to-deliver
+  Holder seller
+  Claimant buyer
+  Related to item
+
+Act purchase
+  Actor buyer
+  Recipient seller
+  Related to item
+  Conditioned by buyer != seller
+  Creates 
+    need-to-pay(amount = amount) When price-of(item, amount)
+   ,need-to-deliver()
+
+Act pay
+  Actor buyer
+  Recipient seller
+  Related to amount
+  Terminates need-to-pay()
+  Holds when need-to-pay()
+
+Act deliver
+  Actor seller
+  Recipient buyer
+  Related to item
+  Terminates need-to-deliver()
+  Holds when need-to-deliver()
+
+Fact payment-expired Identified by buyer * seller * amount
+
+Act demand-interest
+  Actor seller
+  Recipient buyer
+  Related to amount
+  Conditioned by  
+    payment-expired()
+  Terminates
+    need-to-pay(), 
+    payment-expired()
+  Creates
+    need-to-pay(amount = amount + 1)
+  Holds when need-to-pay().
+
+// domain
+Fact person Identified by Alice, Bob, Chloe, David, Ellis
+
+Fact item Identified by Phone, Lipstick.
+
+// init
++purchase.
++price-of(Phone, 9).
++price-of(Lipstick, 5).
+
+// scenario
+purchase(Alice, David, Phone).
+deliver(David, Alice, Phone).
++payment-expired(Alice, David, 9).
+demand-interest(David, Alice, 9).
+pay(Alice, David, 10).
+
+purchase(Bob, Ellis, Lipstick).
+pay(Bob, Ellis, 4). // fails because the duty says to pay 5
+deliver(Ellis, Bob, Lipstick).

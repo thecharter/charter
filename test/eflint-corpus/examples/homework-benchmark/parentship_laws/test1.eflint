@@ -1,0 +1,5 @@
+#include "parentship.eflint".
++person(Alice). +person(Bob). +person(John). +birth-parent(Alice, Bob).
+permits-recognition(Alice, John, Bob).
+recognize(John, Bob).
+

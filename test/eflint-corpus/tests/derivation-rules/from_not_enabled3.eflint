@@ -1,0 +1,18 @@
+Fact actor Identified by Alice.
+Fact asset Identified by AliceAccount.
+
+Act oread 
+  Actor actor 
+  Related to asset.
+
+Extend Act oread   Derived from oread(Alice,AliceAccount).
+// +oread(Alice,AliceAccount).
+
+Fact prohibition  Identified by actor * asset.
+
+Extend Fact prohibition
+  Derived from prohibition(actor,   asset)   When !Enabled(oread()).
+
+?Enabled(oread(Alice,AliceAccount)).
+?!Not(Enabled(oread(Alice,AliceAccount))).
+?!prohibition(Alice, AliceAccount).

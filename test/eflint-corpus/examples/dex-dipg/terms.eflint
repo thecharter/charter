@@ -1,0 +1,32 @@
+#require "../minimal-gdpr/ontology.eflint".
+
+Fact coded Identified by actual_dataset
+Fact data
+Fact code Identified by Int
+Fact dataset
+Fact actual_dataset
+Fact researcher
+Fact person
+Fact donor Identified by String
+Fact dcog Identified by DCOG Derived from DCOG
+Fact dipg Identified by DIPG Derived from DIPG
+Fact ecommittee Identified by EC Derived from EC
+Fact findings Identified by data * project
+Fact member // institutes are members
+Fact country
+Fact country_of Identified by member * country
+Fact coordinator Identified by member // coordinator of the country in which they resides
+Fact project
+Fact proposal Identified by member * purpose * project // proposal is always for a project
+Fact access Identified by researcher * project * dataset
+Fact researcher Derived from person When affiliated-with(person, member)
+                                                 ,member
+Fact affiliated-with Identified by person * member
+Fact eligible-access Identified by dataset * purpose
+Fact thirdparty
+//Fact ecommittee-consent
+//Fact eligile-donor Identified by donor * purpose // they have not specified on who is the eligible patient
+//Fact termsconditions // its something the EC has to formulate
+//Fact transfer-datset-uncoded  Identified by dataset Holds when
+//Fact personal-data Identified by data Holds when
+  //(Exists !code())

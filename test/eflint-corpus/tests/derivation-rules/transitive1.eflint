@@ -1,0 +1,18 @@
+
+Fact person Identified by Alice, Bob, Chloe
+Fact family-of Identified by person1 * person2 Where person1 != person2
+Fact family-of-closure Identified by person1 * person2 Where person1 != person2
+  Holds when family-of(person1, person2)
+           , family-of-closure(person2, person1)
+           , family-of-closure(person2, person3) && family-of-closure(person3,person1)
+.
+
++family-of(Alice, Bob).
++family-of(Bob, Chloe).
+
+?family-of-closure(Alice, Bob).
+?family-of-closure(Alice, Chloe).
+?family-of-closure(Chloe, Alice).
+?family-of-closure(Chloe, Bob).
+?family-of-closure(Bob, Alice).
+?family-of-closure(Bob, Chloe).

@@ -1,0 +1,6 @@
+Placeholder a For b
+Fact b Identified by int1 * int2
+ Derived from (Foreach a: a(a.int2, a.int1)).
+
++a(1,2).
+?b(2,1).

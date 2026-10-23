@@ -1,0 +1,12 @@
+Fact a Identified by 1..20 
+Fact b Identified by 1..20 
+Fact c Identified by 1..20
+
+Fact pythagorean Identified by a * b * c 
+ Derived from pythagorean(a,b,c) When a * a + b * b == c * c.
+
+?pythagorean(3,4,5).
+?pythagorean(5,12,13).
+?pythagorean(8,15,17).
+?!pythagorean(1,2,3).
+?!pythagorean(6,6,6).

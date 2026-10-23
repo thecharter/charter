@@ -1,0 +1,17 @@
+
+Fact x Identified by 1..3
+
+Event observed_xs Related to x
+  Creates x
+
+Fact y Identified by 1..5
+
+Act observe_ys Related to y
+  Creates y
+  Holds when actor
+.
+
++actor(Alice).
+
+observed_xs().
+observe_ys().

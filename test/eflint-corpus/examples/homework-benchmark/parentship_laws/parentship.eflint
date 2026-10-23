@@ -1,0 +1,18 @@
+#include "natural_parentship.eflint".
+
+// (Article 1)
+Fact legal-parent     Identified by parent * child
+  Holds when adoptive-parent(parent,child) 
+          || natural-parent(parent,child)
+
+// (Article 2)
+Fact natural-parent   Identified by parent * child
+  Holds when birth-parent()
+            ,recognizes()
+
+// TODO turn into derived fact according to the definition of the article
+// perhaps requiring one or more actions to produce the right forms
+
+// (Article 3), introduced as a postulated fact
+Fact adoptive-parent  Identified by parent * child
+

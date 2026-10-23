@@ -1,0 +1,13 @@
+
+Fact person Identified by Alice, Bob, Chloe, David
+Fact neighbour-of Identified by person1 * person2
+  Holds when neighbour-of(person2, person1)
+.
+
++neighbour-of(Alice,Bob).
++neighbour-of(Bob, Chloe).
+
+?neighbour-of(Alice, Bob).
+?neighbour-of(Bob, Alice).
+?neighbour-of(Bob, Chloe).
+?neighbour-of(Chloe, Bob).

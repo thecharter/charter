@@ -1,0 +1,33 @@
+Fact actor Identified by Someone 
+
+Duty is-enforced
+  Holder actor
+  Claimant actor
+  Enforced by maybe-enabled
+  Holds when True
+
+Act maybe-enabled
+.
+
+?!Violated(is-enforced()).
+
++maybe-enabled.
+
+?Violated(is-enforced()).
+
+Extend Act maybe-enabled
+  Conditioned by False.
+
+?!Violated(is-enforced()).
+
+Act yes-enabled Holds when True
+
+Extend Duty is-enforced
+  Enforced by yes-enabled.
+
+?Violated(is-enforced()).
+
+Extend Act yes-enabled 
+  Conditioned by False.
+
+?!Violated(is-enforced()).

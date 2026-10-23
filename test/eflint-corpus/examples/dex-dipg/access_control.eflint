@@ -1,0 +1,7 @@
+Fact actor
+Fact asset
+Act  access Actor actor  Related to asset
+    Holds when read(actor ,asset), write(actor,asset)
+    
+Act read Actor actor Related to asset Syncs with access(actor,asset) 
+Act write Actor actor Related to asset Syncs with access(actor,asset)

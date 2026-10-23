@@ -1,0 +1,21 @@
+#include "contract1.eflint".
+
+pay(Mom,Johnny,start-date,10).
+ask-for-help(homework=homework(3)).
+refuse-to-help(homework=homework(3)).
+tick().
+ask-for-help(homework=homework(5)).
+tick().
+help-with-homework(homework=homework(5)).
+tick().
+ask-for-help(homework=homework(7)).
+tick().
+tick().
+pay(Mom,Johnny,start-date+7,10).
+refuse-to-help(homework=homework(7)).
+tick().
+demand-allowance-increase().
+tick().
+tick().
+pay(Mom,Johnny,start-date+14,10).
+?allowance-obligation(Mom,Johnny,start-date+14,12)

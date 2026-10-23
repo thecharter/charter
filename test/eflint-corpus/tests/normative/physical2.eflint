@@ -1,0 +1,8 @@
++actor(John).
+Physical do
+  Conditioned by False.
+
+?!Holds(do(John)).
+?!Enabled(do(John)). 
+
+do(John). // should show as Disabled but not as violating

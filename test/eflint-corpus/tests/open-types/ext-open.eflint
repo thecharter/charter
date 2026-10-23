@@ -1,0 +1,10 @@
+
+Fact open Identified by A.
+
+Extend Fact open Open.
+
+-open(A). 
+?!open(A). // throws missing truth-value error without previous line
+
++open(A).
+?open(A).

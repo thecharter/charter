@@ -1,0 +1,39 @@
+#require "emergency.eflint".
+#require "simple-scenario.eflint".
+
++is-call-center(P1).
++is-ambulance(P2).
++is-hospital(P3).
+
+?!Enabled(add-emergency-member(P2, P2, Bob)).
+
+start-emergency(P1, Bob).
+?Enabled(read(P1, B1)).
+?!Enabled(read(P1, A1)).
+?!Enabled(read(P2, B1)).
+
+add-emergency-member(P1, P2, Bob).
+?Enabled(read(P1, B1)).
+?!Enabled(read(P1, A1)).
+?Enabled(read(P2, B1)).
+
+revoke-emergency-member(P2, P1, Bob).
+?!Enabled(read(P1, B1)).
+?!Enabled(read(P1, A1)).
+?Enabled(read(P2, B1)).
+
+add-emergency-member(P2, P3, Bob).
+?Enabled(read(P3, B1)).
+?!Enabled(read(P1, A1)).
+?Enabled(read(P2, B1)).
+
+revoke-emergency-member(P3, P2, Bob).
+?Enabled(read(P3, B1)).
+?!Enabled(read(P1, A1)).
+?!Enabled(read(P2, B1)).
+
+end-emergency(Hospital, Bob).
+?!Enabled(read(P3, B1)).
+?!Enabled(read(P1, A1)).
+?!Enabled(read(P2, B1)).
+

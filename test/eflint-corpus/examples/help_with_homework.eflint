@@ -1,0 +1,43 @@
+Fact person Identified by String
+Placeholder parent    For person
+Placeholder child     For person
+
+Fact natural-parent   Identified by parent * child
+Fact adoptive-parent  Identified by parent * child
+Fact legal-parent     Identified by parent * child
+  Holds when adoptive-parent(parent,child) 
+          || natural-parent(parent,child)
+
+Act ask-for-help
+  Actor      child
+  Recipient  parent
+  Creates    help-with-homework(parent,child)
+  Holds when legal-parent(parent,child)
+
+Fact homework-due Identified by child
+
+Duty help-with-homework
+  Holder        parent
+  Claimant      child
+  Violated when homework-due(child)
+
+Act help 
+  Actor      parent 
+  Recipient  child
+  Terminates help-with-homework(parent,child)
+  Holds when help-with-homework(parent,child).
+
+Fact person Identified by Alice, Bob, Chloe, David.
+
++natural-parent(Alice, Bob).
++adoptive-parent(Chloe, David).
+
+?legal-parent(Alice, Bob).
+?legal-parent(Chloe, David).
+?!legal-parent(Alice, Chloe).
+?!legal-parent(Alice, David).
+
+ask-for-help(Bob, Alice).
++homework-due(Bob).  // homework deadline passed
+?Violated(help-with-homework(Alice,Bob)).
+help(Alice,Bob).

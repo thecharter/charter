@@ -1,0 +1,12 @@
+#require "../archetypes.eflint".
+
+//Sharing Results
+
+Extend Fact application
+  Derived from application(Apply)
+
+Extend Fact infrastructure-provider-for
+  Derived from infrastructure-provider-for(Party_A, application)
+
+Extend Fact consumer-for
+  Derived from consumer-for(Party_B, application).

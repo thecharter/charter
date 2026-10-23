@@ -1,0 +1,6 @@
+#require "../Templates/private_operation.eflint".
+#require "domain.eflint".
+
+?Enabled(apply(Party, Apply, Alg, Inp, Out)).
+
+?!Enabled(apply(OtherParty, Apply, Alg, Inp, Out)).

@@ -1,0 +1,40 @@
+// this variant assumes open types can be enumerated when the domain (is made) finite
+
+Open Fact unbounded Identified by Int
+
+Fact created Identified by Int
+
+Event add_single Related to int
+  Creates created(int) When unbounded(int)
+
+Event add_multiple
+  Creates created(unbounded) When unbounded.
+
+Extend Fact unbounded Identified by 1..7.
+
+// enumeration happens here, gives no exceptions under simpler treatment of open types
+-unbounded.
++unbounded(5).
+
+add_single(5).
+?!created(1).
+?!created(3).
+?created(5).
+?!created(7).
+
+add_multiple().
+
+?!created(1).
+?!created(3).
+?created(5).
+?!created(7).
+
+// enumeration happens here, gives no exceptions under simpler treatment of open types
++unbounded When unbounded % 2 == 1.
+
+add_multiple().
+
+?created(1).
+?created(3).
+?created(5).
+?created(7).

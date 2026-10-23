@@ -1,0 +1,64 @@
+Fact citizen          Identified by Alice, Bob, Chloe
+Fact candidate        Identified by David, Eve
+Fact administrator    Identified by Admin
+Fact voter            Identified by citizen
+Fact winner           Identified by candidate
+Fact vote             Identified by citizen * candidate
+
+Placeholder other candidate For candidate
+
+Duty cast-vote-duty Holder citizen Claimant administrator 
+
+Fact has-voted Identified by citizen
+  Holds when (Exists candidate : vote(citizen,candidate))
+
+Predicate vote-concluded When (Exists candidate : winner(candidate))
+
+
+Fact number-of-votes  Identified by 1..5
+  Derived from Count(Foreach vote : vote When Holds(vote))
+
+Act cast-vote
+  Actor citizen 
+  Recipient administrator
+  Related to candidate
+  Conditioned by voter(citizen) && !has-voted(citizen)
+  Creates vote(citizen,candidate)
+  Terminates cast-vote-duty(citizen,administrator)
+
+Act enable-vote
+  Actor administrator
+  Recipient citizen
+  Conditioned by !voter(citizen) && !vote-concluded()
+  Creates voter(citizen),
+          cast-vote-duty(citizen,administrator),
+          (Foreach candidate : cast-vote(citizen,administrator,candidate))
+
+Act declare-winner
+  Actor administrator
+  Recipient candidate
+  Conditioned by
+      !vote-concluded()
+                            
+   && (Forall other candidate : 
+         Count(Foreach vote : vote.citizen
+                 When vote && vote.candidate == other candidate) < 
+         Count(Foreach vote : vote.citizen
+                 When vote && vote.candidate == candidate)
+        When other candidate != candidate)
+  Creates winner(candidate).
+
++enable-vote.
++cast-vote.
++declare-winner.
+
+enable-vote(Admin,Alice).
+enable-vote(Admin,Bob).
+enable-vote(Admin,Chloe).
+cast-vote(Alice, Admin, Eve).
+cast-vote(Bob, Admin, David).
+?!Enabled(declare-winner()).
+cast-vote(Chloe, Admin, Eve).
+?!Enabled(declare-winner(candidate=David)).
+?Enabled(declare-winner(candidate=Eve)).
+declare-winner(candidate=Eve).

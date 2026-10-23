@@ -1,0 +1,23 @@
+{
+Fact citizen 
+Fact address 
+Fact value Identified by Int
+Fact property Identified by address * value
+
+Open Fact first_property Identified by citizen * property
+
+Fact article_one
+  Identified by citizen * property
+  Holds when first_property(citizen, property).
+
++citizen(Alice).
++property(Q,1).
++first_property(Alice,property(Q,1)).
+}
+?article_one(Alice,property(Q,1)).
+{
++property(PP,10).
+-first_property(Alice,property(PP,10)).
+}
+?article_one(Alice,property(Q,1)). // succeeds but removed from output
+
