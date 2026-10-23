@@ -1,0 +1,6 @@
+// Re-creating an instance that already holds keeps its original stamp.
+Fact p Identified by P.
++p(P).
+@ 5.
++p(P).
+?Held(p(P)) For 5.

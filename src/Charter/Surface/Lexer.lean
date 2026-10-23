@@ -75,7 +75,8 @@ def wordKeywords : List String :=
 /-- Charter's additions to the keyword set (plan §2.2); not keywords in `--eflint` mode,
 where they are atoms, as eFLINT reads them. -/
 def charterWordKeywords : List String :=
-  [ "Except under", "Valid when", "Immunity", "Scenario", "Against", "Unless" ]
+  [ "Except under", "Valid when", "Due within", "Immunity", "Duration", "Scenario", "Against",
+    "Unless", "Held", "tick" ]
 
 /-- The claim phrases. Each is a keyword only when followed by whitespace, so that
 `?valid(5)` still queries a fact named `valid` and `?valid do(x)` is the claim. -/
@@ -88,7 +89,7 @@ def symbolKeywords : List String :=
     "==", "!=", "#" ]
 
 def keyChars : List Char :=
-  ['[', ']', '(', ')', '!', ',', '\'', '+', '-', '*', '/', '.', '=', '>', '<', ':', '?', '{', '}', '%', '~']
+  ['[', ']', '(', ')', '!', ',', '\'', '+', '-', '*', '/', '.', '=', '>', '<', ':', '?', '{', '}', '%', '~', '@']
 
 def isLowerWordChar (c : Char) : Bool := c.isLower || c == '_'
 

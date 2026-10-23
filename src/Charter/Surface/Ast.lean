@@ -47,6 +47,10 @@ inductive Phrase where
   /-- Charter: `?lawful e`, `?valid e`, `?violated e`, and their `?!` negations: a claim
   about an act or duty instance. -/
   | expect (what : Expect) (negated : Bool) (t : Term)
+  /-- Charter (D7, Law 6): `@ t.` sets the clock; environment input, not an event. -/
+  | setTime (t : Term)
+  /-- Charter (D7): `tick.` advances the clock by one. -/
+  | tick
   deriving Repr, Inhabited
 
 /-- `#include "file"` and `#require "file"`. -/

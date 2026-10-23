@@ -1,0 +1,9 @@
+// `Time` and `Duration` are distinct types over `Int`: a time plus a duration is a time, a time minus a time is a duration, a literal coerces to either by demand.
+Fact deadline Identified by Time
+Fact window Identified by Duration.
++deadline(10).
++window(3).
+?(Current Time + window < deadline).
+?(deadline - Current Time == 10).
+?(Current Time + 2 == 2).
+?(window + window == 6).

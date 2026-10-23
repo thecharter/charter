@@ -232,6 +232,14 @@ def unary : Nat → P Term
     | .kw "Holds" => advance; return .present (← unary fuel)
     | .kw "Violated" => advance; return .violated (← unary fuel)
     | .kw "Enabled" => advance; return .enabled (← unary fuel)
+    | .kw "Held" =>
+      advance
+      expectKw "("
+      let t ← expr fuel
+      expectKw ")"
+      expectKw "For"
+      let d ← addExpr fuel
+      return .heldFor t d
     | _ => postfixExpr fuel
 
 def postfixExpr : Nat → P Term
@@ -346,6 +354,7 @@ def typeExpr : P Domain := do
   | .kw "String" | .kw "Atom" => advance; return .anyString
   | .kw "Int" => advance; return .anyInt
   | .kw "Time" => advance; return .time
+  | .kw "Duration" => advance; return .duration
   | .int lo =>
     advance
     if ← isKw ".." then advance; let hi ← intLit; return .ints (intsFromRange lo hi)
@@ -452,6 +461,14 @@ def effectClause (mk : List Var → Term → Effect) : P (List Effect) := do
   let es ← sepBy1 optForeach "," 1000
   return es.map (fun (xs, t) => mk xs t)
 
+/-- `Creates e [For d], …`: a creation may carry an expiry duration (D7). -/
+def createsClause : P (List Effect) := do
+  let one : P Effect := do
+    let (xs, t) ← optForeach
+    if ← isKw "For" then advance; let d ← expression; return .cAll xs t (some d)
+    else return .cAll xs t none
+  sepBy1 one "," 1000
+
 def idList : P (List DomId) := sepBy1 ident "," 1000
 
 /-- One clause of a frame of the given kind, or `none` when the next token is not one. -/
@@ -469,7 +486,7 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     if k == .fact then advance; return some (← extendDomainClause) else return none
   | .kw "Creates" =>
     if k == .fact || k == .immunity then return none
-    advance; return some (.postCond (← effectClause .cAll))
+    advance; return some (.postCond (← createsClause))
   | .kw "Terminates" =>
     if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← effectClause .tAll))
@@ -493,6 +510,9 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Created by" =>
     if k != .duty then return none
     advance; return some (.createdBy (← idList))
+  | .kw "Due within" =>
+    if k != .duty then return none
+    advance; return some (.dueWithin (← expression))
   | .kw "Valid when" =>
     if k != .act then return none
     advance; return some (.validWhen (← exprList))
@@ -679,6 +699,8 @@ def phrase : P Phrase := do
   | .kw "?!lawful" => advance; return .expect .lawful true (← expression)
   | .kw "?!valid" => advance; return .expect .valid true (← expression)
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
+  | .kw "@" => advance; return .setTime (← expression)
+  | .kw "tick" => advance; return .tick
   | .kw "!" => advance; let (xs, t) ← optForeach; return .trigger xs t
   | _ => let (xs, t) ← optForeach; return .trigger xs t
 

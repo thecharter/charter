@@ -48,6 +48,7 @@ more errors); `warning` does not.
 | CHR103 | error | a phrase triggers a type that is not an act or event | `Charter.Eval` |
 | CHR104 | error | evaluation fuel exhausted (a derivation or sync chain did not converge within the bound) | `Charter.Eval` |
 | CHR105 | error | an undeclared type reached the evaluator (internal; a resolution gap) | `Charter.Eval` |
+| CHR106 | error | `@ t` would move the clock backwards (D7) | `Charter.Eval.Interpreter` |
 
 ## Claims are not diagnostics
 

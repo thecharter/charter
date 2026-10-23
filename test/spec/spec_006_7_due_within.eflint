@@ -1,0 +1,11 @@
+// `Due within d` on a duty: the duty is violated once it has been held for `d` without being terminated.
+Fact actor Identified by A
+Duty pay Holder actor Claimant actor Due within 5.
++pay(A, A).
+?!Violated(pay(A, A)).
+@ 4.
+?!Violated(pay(A, A)).
+@ 5.
+?Violated(pay(A, A)).
+-pay(A, A).
+?!Violated(pay(A, A)).

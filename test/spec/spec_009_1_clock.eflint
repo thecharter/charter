@@ -1,0 +1,6 @@
+// `Current Time` is an instant that starts at 0; `@ t.` sets the clock to `t` and `tick.` advances it by one; both are environment input, not events.
+?(Current Time == 0).
+@ 5.
+?(Current Time == 5).
+tick.
+?(Current Time == 6).

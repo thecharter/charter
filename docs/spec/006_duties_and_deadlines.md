@@ -1,6 +1,6 @@
 # 006 — Duties and deadlines
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 and D12; wording awaits Eric. Implementation: compliant for the eFLINT core; deadlines (`Due within`, D7) are Phase 2, stated as pending.
+**Status:** draft (2026-10-23). Meaning fixed by D2, D7, and D12; wording awaits Eric. Implementation: compliant, including 6.7 (`Due within`).
 
 **6.1 Duty instances.** `Duty d Holder h Claimant c [Related to …]` declares a type whose instances have a holder, a claimant, and the related objects, created and terminated like any fact (by `+`/`-` or by effects). `test/spec/spec_006_1_duty_instance.eflint`
 
@@ -14,4 +14,4 @@
 
 **6.6 Findings.** A finding is an institutional act whose effect is the breached duty's declared remedies; the link from violation to finding is an assumption a program states, never a theorem the language supplies (Law 3). Nothing in the eFLINT core names remedies; Phase 2's `Immunity` and Phase 3's protocol rewrite do.
 
-**6.7 Deadlines (Phase 2, pending).** `Due within d`: a requirement duty breached when the duration `d` passes after creation without the terminating act; a condition over time stamps, never a lapse event (Law 7, D7).
+**6.7 Deadlines (D7).** `Due within d` on a duty is the violation condition `Held(d()) For d`: the duty is violated once it has been held for the duration `d` without being terminated; a condition over the stamp, never a lapse event (Law 7, 009.3). `test/spec/spec_006_7_due_within.eflint`

@@ -1,0 +1,12 @@
+// Every fact carries the time it was established; `Held(e) For d` holds when `e` holds and has held for at least `d` (Law 7: a condition over the stamp, never an event).
+Fact p Identified by P.
++p(P).
+?Held(p(P)) For 0.
+?!Held(p(P)) For 1.
+@ 3.
+?Held(p(P)) For 3.
+?!Held(p(P)) For 4.
+tick.
+?Held(p(P)) For 4.
+-p(P).
+?!Held(p(P)) For 0.

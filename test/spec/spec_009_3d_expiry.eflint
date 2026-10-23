@@ -1,0 +1,9 @@
+// `Creates e For d` stamps the created instances with the expiry `now + d`; from that time they no longer hold.
+Fact p Identified by P
+Event grant Creates p(P) For 2.
+grant().
+?p(P).
+@ 1.
+?p(P).
+@ 2.
+?!p(P).

@@ -4,7 +4,7 @@
 
 **3.1 Kinds.** A type is a `Fact`, an `Act`, a `Duty`, or an `Event`; `Bool`, `Predicate`, `Invariant`, `Var`, `Function`, and `Physical` declare facts and acts with the restrictions below. A `Fact` with no `Identified by` has the string domain. `test/spec/spec_003_1_default_string_domain.eflint`
 
-**3.2 Domains.** A domain is `String`, `Int`, an enumeration of atoms (`A, B`), of integers (`1, 2, 3` or `1..5`), of single-character strings (`'a'..'z'`), or a product of components (`a * b`). An enumeration is *enumerable*: `+x.` with `x` free creates every instance of the type; `String` and `Int` are not, and a free variable over them ranges over the instances that hold (004.7). `test/spec/spec_003_2_enumerations.eflint`
+**3.2 Domains.** A domain is `String`, `Int`, `Time`, `Duration` (009.2), an enumeration of atoms (`A, B`), of integers (`1, 2, 3` or `1..5`), of single-character strings (`'a'..'z'`), or a product of components (`a * b`). An enumeration is *enumerable*: `+x.` with `x` free creates every instance of the type; `String` and `Int` are not, and a free variable over them ranges over the instances that hold (004.7). `test/spec/spec_003_2_enumerations.eflint`
 
 **3.3 Products and variables.** A product's components are variables: a type name with a decoration (`person1 * person2`). An application gives arguments positionally in component order or by name (`f(a = e, b = e')`); a component not given stays free and is bound by the surrounding construct. The wrong number of positional arguments is CHR011. `test/spec/spec_003_3_products.eflint`, `spec_003_3b_arity_error.eflint`
 
@@ -26,4 +26,4 @@
 
 **3.12 Static types.** Resolution gives every term one of: string, integer, boolean, or instance of a named type, and inserts the conversions of 010.4. A value where another type is needed, with no conversion, is CHR012.
 
-*Phase 2:* `Time` and `Duration` as distinct types over `Int` (D7); `Param` as a `Var` fact (D11).
+*Phase 2 still to come:* `Param` as a `Var` fact (D11).

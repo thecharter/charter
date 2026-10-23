@@ -34,7 +34,8 @@ inductive Derivation where
 /-- An effect of an act or event: create, terminate, or obfuscate every instance
 the term produces under the `Foreach` binders. -/
 inductive Effect where
-  | cAll (xs : List Var) (t : Term)
+  /-- Create; Charter (D7): `For d` stamps the instances with an expiry `now + d`. -/
+  | cAll (xs : List Var) (t : Term) (forDur : Option Term := none)
   | tAll (xs : List Var) (t : Term)
   | oAll (xs : List Var) (t : Term)
   deriving Repr, Inhabited
@@ -161,6 +162,7 @@ def enumerableFuel (s : Spec) : Nat → Domain → Bool
   | _, .anyString => false
   | _, .anyInt => false
   | _, .time => false
+  | _, .duration => false
 
 def enumerable (s : Spec) (dom : Domain) : Bool := s.enumerableFuel (s.decls.length + 1) dom
 
@@ -252,6 +254,8 @@ inductive ModClause where
   | against (as : List DomId)
   /-- Charter: `Unless` on an immunity. -/
   | unlessCond (ts : List Term)
+  /-- Charter (D7): `Due within d` on a duty: violated once held for `d`. -/
+  | dueWithin (d : Term)
   deriving Repr, Inhabited
 
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
@@ -321,5 +325,8 @@ where
     | .unlessCond ts => { t with kind := match t.kind with
         | .immunity i => .immunity { i with unlessConds := ts ++ i.unlessConds }
         | k => k }
+    -- `Due within d` is desugared by the resolver into a `Violated when Held(d()) For d`
+    -- clause (006.7); it never reaches a record unresolved
+    | .dueWithin _ => t
 
 end Charter

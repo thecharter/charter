@@ -113,6 +113,8 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
         ("negated", Json.bool neg), ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
       if !ok then emit o j s!"{where_}: claim failed: {text}"
       else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
+    | .timeSet t =>
+      emit o (Json.mkObj [("kind", "clock"), ("time", Json.num t)]) (if o.testMode then "" else s!"  clock: {t}")
     | .instQueryRes tes =>
       if o.json then
         IO.println (Json.mkObj [("kind", "instances"), ("claim", Json.str text),

@@ -1,0 +1,5 @@
+// The clock never moves backwards: `@ t` with `t` before now is CHR106 and leaves the configuration unchanged.
+//! expect-error: CHR106
+@ 5.
+@ 3.
+?(Current Time == 5).

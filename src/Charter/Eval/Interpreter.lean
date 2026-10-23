@@ -81,6 +81,7 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
     | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b =>
       deps spec fuel bound p a ++ deps spec fuel bound p b
+    | .heldFor t d => deps spec fuel bound p t ++ deps spec fuel bound p d
     | .exists_ xs t => binderDeps spec xs p ++ deps spec fuel (bound ++ xs) p t
     | .forall_ xs t | .count xs t | .sum xs t | .max xs t | .min xs t =>
       binderDeps spec xs .neg ++ deps spec fuel (bound ++ xs) .neg t
@@ -202,43 +203,47 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
 def runM {α} (spec : Spec) (state : State) (m : M α) : Except RuntimeError (List α) :=
   m.run ⟨spec, state⟩ []
 
-/-- One pass over the derivation clauses of one type; the state and whether it grew. -/
-def passType (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Derivation → State → Except RuntimeError (State × Bool)
+/-- One pass over the derivation clauses of one type; the state and whether it grew.
+`prev` are the derived facts before rebasing, whose stamps re-derived facts keep (D7). -/
+def passType (spec : Spec) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
+    List Derivation → State → Except RuntimeError (State × Bool)
   | [], s => .ok (s, false)
   | c :: cs, s =>
     match runM spec s (deriveClause d tspec c) with
     | .error e => .error e
     | .ok ress =>
-      match s.deriveAll ress.flatten with
+      match State.deriveAll prev s ress.flatten with
       | (s1, ch) =>
-        match passType spec d tspec cs s1 with
+        match passType spec prev d tspec cs s1 with
         | .error e => .error e
         | .ok (s2, ch2) => .ok (s2, ch || ch2)
 
 /-- One pass over the types of a stratum; returns the state and whether it grew. -/
-def pass (spec : Spec) : List DomId → State → Except RuntimeError (State × Bool)
+def pass (spec : Spec) (prev : List (Tagged × Info)) : List DomId → State → Except RuntimeError (State × Bool)
   | [], s => .ok (s, false)
   | d :: ds, s =>
     match spec.findDecl d with
-    | none => pass spec ds s
+    | none => pass spec prev ds s
     | some tspec =>
-      match passType spec d tspec tspec.derivation s with
+      match passType spec prev d tspec tspec.derivation s with
       | .error e => .error e
       | .ok (s1, ch) =>
-        match pass spec ds s1 with
+        match pass spec prev ds s1 with
         | .error e => .error e
         | .ok (s2, ch2) => .ok (s2, ch || ch2)
 
-def saturateStratum (spec : Spec) (types : List DomId) : Nat → State → Except RuntimeError State
+def saturateStratum (spec : Spec) (prev : List (Tagged × Info)) (types : List DomId) : Nat → State → Except RuntimeError State
   | 0, _ => .error (.fuelExhausted s!"saturating {", ".intercalate types}")
   | fuel + 1, state =>
-    match pass spec types state with
+    match pass spec prev types state with
     | .error e => .error e
-    | .ok (s', changed) => if changed then saturateStratum spec types fuel s' else .ok s'
+    | .ok (s', changed) => if changed then saturateStratum spec prev types fuel s' else .ok s'
 
-/-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6). -/
+/-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`,
+D6); a fact derived before and again keeps its stamp (D7). -/
 def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
-  strata.foldlM (fun s layer => saturateStratum spec layer 100000 s) state.rebase
+  let prev := state.derivedFacts
+  strata.foldlM (fun s layer => saturateStratum spec prev layer 100000 s) state.rebase
 
 end Saturate
 
@@ -261,6 +266,8 @@ inductive Output where
   | instQueryRes (tes : List Tagged)
   /-- Charter: the result of `?lawful`/`?valid`/`?violated`. -/
   | expectRes (what : Expect) (negated : Bool) (ok : Bool)
+  /-- Charter (D7): the clock was set (environment input, not an event). -/
+  | timeSet (t : Int)
 
 def Output.isFailure : Output → Bool
   | .diag d => d.isError
@@ -291,6 +298,8 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
     match p with
     | .onlyDecls => (some [], [])
     | .scenario _ _ => (some [], [])
+    | .setTime _ => (some [], [])
+    | .tick => (some [], [])
     | .expect w neg xs t =>
       let ask (te : Tagged) : M Bool := match w with
         | .lawful => isEnabled M.fuel te
@@ -337,10 +346,10 @@ where
     | .error err => (none, [diagOf err])
     | .ok stores => (some (Store.unions stores), [])
 
-/-- Apply a store, saturate, and find the violations (eFLINT `new_context`). -/
-def newContext (cfg : Config) (spec : Spec) (strata : List (List DomId)) (store : Store) :
+/-- Apply a store, saturate, and find the violations (eFLINT `new_context`). `state1`
+is the state after the phrase's assignments (and any clock change). -/
+def newContext (cfg : Config) (spec : Spec) (strata : List (List DomId)) (state1 : State) :
     Option Config × List Output :=
-  let state1 := State.makeAssignments spec store cfg.state
   match Saturate.rebaseAndSat spec strata state1 with
   | .error e => (none, [diagOf e])
   | .ok state' =>
@@ -381,11 +390,30 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       (cfg, warnOuts ++ [.diag (Diagnostic.error "CHR020"
         s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
     | .ok strata =>
-      let (store?, outs) := Interp.semPhrase spec' cfg.state 1000 cp
+      -- the clock (D7): environment input applied before saturation, never a transition
+      let clock : Except RuntimeError (Option Int) := match cp with
+        | .tick => .ok (some (cfg.state.time + 1))
+        | .setTime t =>
+          match (M.eval M.fuel t).run ⟨spec', cfg.state⟩ [] with
+          | .error e => .error e
+          | .ok [.int t] => if t < cfg.state.time then .error (.timeBackwards cfg.state.time t) else .ok (some t)
+          | .ok _ => .error (.fuelExhausted "reading the clock")
+        | _ => .ok none
+      match clock with
+      | .error e => (cfg, warnOuts ++ [Interp.diagOf e])
+      | .ok newTime =>
+      let state0 := match newTime with
+        | some t => { cfg.state with time := t }
+        | none => cfg.state
+      let (store?, outs) := Interp.semPhrase spec' state0 1000 cp
+      let outs := match newTime with
+        | some t => Output.timeSet t :: outs
+        | none => outs
       match store? with
       | none => (cfg, warnOuts ++ outs)
       | some store =>
-        let (cfg'?, outs2) := Interp.newContext cfg spec' strata store
+        let state1 := State.makeAssignments spec' store state0
+        let (cfg'?, outs2) := Interp.newContext cfg spec' strata state1
         match cfg'? with
         | none => (cfg, warnOuts ++ outs ++ outs2)
         | some cfg' => (cfg', warnOuts ++ outs ++ outs2)

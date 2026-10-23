@@ -113,6 +113,8 @@ inductive Domain where
   | ints (is : List Int)
   | products (xs : List Var)
   | time
+  /-- Charter (D7): differences of instants, over `Int`. -/
+  | duration
   deriving Repr, Inhabited, BEq
 
 mutual
@@ -151,6 +153,8 @@ inductive Term where
   | ref (x : Var)
   | app (d : DomId) (args : Args)
   | currentTime
+  /-- Charter (D7): `Held(e) For d`: `e` holds and has held for at least the duration `d`. -/
+  | heldFor (t : Term) (d : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -165,10 +169,15 @@ inductive Ty where
   | ints
   | bool
   | tagged (d : DomId)
+  /-- Charter (D7): an instant. -/
+  | time
+  /-- Charter (D7): a difference of instants. -/
+  | duration
   deriving Repr, DecidableEq, Inhabited
 
 instance : ToString Ty := ⟨fun
-  | .strings => "a string" | .ints => "an integer" | .bool => "a boolean" | .tagged d => s!"an instance of {d}"⟩
+  | .strings => "a string" | .ints => "an integer" | .bool => "a boolean" | .tagged d => s!"an instance of {d}"
+  | .time => "a time" | .duration => "a duration"⟩
 
 /-- Run-time values (eFLINT `Value`). -/
 inductive Value where
@@ -231,6 +240,7 @@ def Term.pp : Term → String
   | .ref x => toString x
   | .app d args => d ++ "(" ++ args.pp ++ ")"
   | .currentTime => "Current Time"
+  | .heldFor t d => "Held(" ++ t.pp ++ ") For " ++ d.pp
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms

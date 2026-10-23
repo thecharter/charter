@@ -40,6 +40,9 @@ inductive CPhrase where
   | scenario (name : String) (ps : List Phrase)
   /-- Charter: `?lawful`/`?valid`/`?violated` over the instances of `t`, `xs` bound to every instance. -/
   | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
+  /-- Charter (D7): `@ t.` and `tick.`, the clock as environment input. -/
+  | setTime (t : Term)
+  | tick
   deriving Inhabited
 
 namespace Resolve
@@ -119,6 +122,7 @@ def freeVars (spec : Spec) : Term → List Var
       | _ => freeVarsArgs spec args
     | none => freeVarsArgs spec args
   | .not t | .present t | .violated t | .enabled t | .project t _ | .tag t _ | .untag t => freeVars spec t
+  | .heldFor t d => union (freeVars spec t) (freeVars spec d)
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
   | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b => union (freeVars spec a) (freeVars spec b)
   | .exists_ xs t | .forall_ xs t | .count xs t | .max xs t | .min xs t | .sum xs t => diff (freeVars spec t) xs
@@ -162,17 +166,36 @@ def matchDomain : Domain → Domain → Bool
   | .anyInt, _ => false
   | .ints _, _ => false
   | .time, .time => true
-  | .time, .anyInt => true
   | .time, _ => false
+  | .duration, .duration => true
+  | .duration, _ => false
   | .products r, .products r' => r == r'
   | .products _, _ => false
 
 def matchType (ty : Ty) (dom : Domain) : Stc Bool := do
   match ty with
   | .tagged d => return matchDomain (← getDom d) dom
-  | .ints => return match dom with | .anyInt | .ints _ | .time => true | _ => false
+  | .ints => return match dom with | .anyInt | .ints _ => true | _ => false
   | .strings => return match dom with | .anyString | .strings _ => true | _ => false
+  | .time => return match dom with | .time => true | _ => false
+  | .duration => return match dom with | .duration => true | _ => false
   | .bool => return false
+
+/-- A term built only from literals and arithmetic: the only integer that converts to a
+`Time` or a `Duration` by demand (D7). -/
+def literalArith : Term → Bool
+  | .intLit _ => true
+  | .add a b | .sub a b | .mult a b | .div a b | .mod a b => literalArith a && literalArith b
+  | _ => false
+
+/-- The result type of `+`/`-` over integers, times, and durations (D7), or `none`. -/
+def arithTy (isSub : Bool) : Ty → Ty → Option Ty
+  | .ints, .ints => some .ints
+  | .time, .duration => some .time
+  | .duration, .time => if isSub then none else some .time
+  | .duration, .duration => some .duration
+  | .time, .time => if isSub then some .duration else none
+  | _, _ => none
 
 /-! ## Terms -/
 
@@ -187,7 +210,7 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
   | fuel + 1, t0 => do
     let spec ← getSpec
     match t0 with
-    | .currentTime => return (t0, .ints)
+    | .currentTime => return (t0, .time)
     | .stringLit _ => return (t0, .strings)
     | .intLit _ => return (t0, .ints)
     | .boolLit _ => return (t0, .bool)
@@ -211,20 +234,29 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         | some decl => match decl.domain with
           | .strings _ | .anyString => return (.untag t', .strings)
           | .ints _ | .anyInt => return (.untag t', .ints)
+          | .time => return (.untag t', .time)
+          | .duration => return (.untag t', .duration)
           | _ => err "CHR003" "untagging is an internal operation"
       | _ => err "CHR003" "untagging is an internal operation"
     | .not t => do let t' ← convertTerm fuel t .bool; return (.not t', .bool)
     | .and a b => do let a' ← convertTerm fuel a .bool; let b' ← convertTerm fuel b .bool; return (.and a' b', .bool)
     | .or a b => do let a' ← convertTerm fuel a .bool; let b' ← convertTerm fuel b .bool; return (.or a' b', .bool)
-    | .geq a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.geq a' b', .bool)
-    | .leq a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.leq a' b', .bool)
-    | .le a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.le a' b', .bool)
-    | .ge a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.ge a' b', .bool)
+    | .geq a b => do let (a', b') ← compileCompare fuel a b; return (.geq a' b', .bool)
+    | .leq a b => do let (a', b') ← compileCompare fuel a b; return (.leq a' b', .bool)
+    | .le a b => do let (a', b') ← compileCompare fuel a b; return (.le a' b', .bool)
+    | .ge a b => do let (a', b') ← compileCompare fuel a b; return (.ge a' b', .bool)
     | .mult a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.mult a' b', .ints)
     | .mod a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.mod a' b', .ints)
     | .div a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.div a' b', .ints)
-    | .sub a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.sub a' b', .ints)
-    | .add a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.add a' b', .ints)
+    | .sub a b => do let (a', b', ty) ← compileArith fuel true a b; return (.sub a' b', ty)
+    | .add a b => do let (a', b', ty) ← compileArith fuel false a b; return (.add a' b', ty)
+    | .heldFor t d => do
+      let (t', ty) ← compileTerm fuel t
+      match ty with
+      | .tagged _ =>
+        let d' ← convertTerm fuel d .duration
+        return (.heldFor t' d', .bool)
+      | _ => err "CHR015" s!"Held({t}) needs an instance, not {ty}"
     | .sum xs t => do let t' ← convertTerm fuel t .ints; return (.sum xs t', .ints)
     | .eq a b =>
       orElse
@@ -288,8 +320,63 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | _ => convErr ty' ty
     | .tagged d =>
       if ← matchType ty' (← getDom d) then return .tag t' d else convErr ty' ty
+    | .time =>
+      match ty' with
+      | .ints => if literalArith t' then return t' else convErr ty' ty
+      | .tagged d => if matchDomain (← getDom d) .time then return .untag t' else convErr ty' ty
+      | _ => convErr ty' ty
+    | .duration =>
+      match ty' with
+      | .ints => if literalArith t' then return t' else convErr ty' ty
+      | .tagged d => if matchDomain (← getDom d) .duration then return .untag t' else convErr ty' ty
+      | _ => convErr ty' ty
 
-/-- `d(e)` for a primitive type `d` (eFLINT `compile_primitive_application`). -/
+/-- An instance of an integer, time, or duration type used as its value. -/
+def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
+  match ty with
+  | .tagged d => match ← getDom d with
+    | .anyInt | .ints _ => pure (Term.untag t, Ty.ints)
+    | .time => pure (Term.untag t, Ty.time)
+    | .duration => pure (Term.untag t, Ty.duration)
+    | _ => convErr ty .ints
+  | _ => pure (t, ty)
+
+/-- Two operands of a comparison, resolved to one type among integer, time, duration
+(D7: a time is never compared with a duration or an integer other than a literal). -/
+def compileCompare : Nat → Term → Term → Stc (Term × Term)
+  | 0, _, _ => err "CHR003" "expression too deeply nested to resolve"
+  | fuel + 1, a, b => do
+    let (a', ta) ← compileTerm fuel a
+    let (b', tb) ← compileTerm fuel b
+    let (a', ta) ← asNumber a' ta
+    let (b', tb) ← asNumber b' tb
+    let numeric (t : Ty) : Bool := t == .ints || t == .time || t == .duration
+    if !(numeric ta) then convErr ta .ints
+    else if !(numeric tb) then convErr tb .ints
+    else if ta == tb then return (a', b')
+    else if ta == .ints && literalArith a' then return (a', b')
+    else if tb == .ints && literalArith b' then return (a', b')
+    else convErr tb ta
+
+/-- `+`/`-` over integers, times, and durations (D7). -/
+def compileArith : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
+  | 0, _, _, _ => err "CHR003" "expression too deeply nested to resolve"
+  | fuel + 1, isSub, a, b => do
+    let (a', ta) ← compileTerm fuel a
+    let (b', tb) ← compileTerm fuel b
+    -- an instance of an integer/time/duration type is used as its value
+    let (a', ta) ← asNumber a' ta
+    let (b', tb) ← asNumber b' tb
+    match arithTy isSub ta tb with
+    | some ty => return (a', b', ty)
+    | none =>
+      -- a literal side takes the other's type (`Current Time + 10`)
+      if ta == .ints && literalArith a' && (tb == .time || tb == .duration) then
+        match arithTy isSub (if tb == .time && isSub then .time else tb) tb with
+        | _ => return (a', b', if isSub && tb == .time then .time else tb)
+      else if tb == .ints && literalArith b' && (ta == .time || ta == .duration) then
+        return (a', b', ta)
+      else err "CHR012" s!"cannot {if isSub then "subtract" else "add"} {tb} {if isSub then "from" else "to"} {ta} (D7: a time and a duration combine, two times only subtract)"
 def compilePrimitiveApplication : Nat → DomId → Args → Stc (Term × Ty)
   | 0, _, _ => err "CHR003" "expression too deeply nested to resolve"
   | fuel + 1, d, args => do
@@ -308,7 +395,8 @@ def compilePrimitiveApplication : Nat → DomId → Args → Stc (Term × Ty)
     | .ints [i], .named [] => prim (.intLit i) .ints
     | .ints [i], .pos [] => prim (.intLit i) .ints
     | .ints _, .pos [a] => prim a .ints
-    | .time, .pos [a] => prim a .ints
+    | .time, .pos [a] => prim a .time
+    | .duration, .pos [a] => prim a .duration
     | _, _ => e
 
 /-- Positional arguments become named modifiers; every modifier is checked
@@ -367,7 +455,10 @@ def compileEffect' (mk : List Var → Term → Effect) (bound xs : List Var) (t 
   return mk (xs ++ diff fs (bound ++ xs)) t'
 
 def compileEffect (bound : List Var) : Effect → Stc Effect
-  | .cAll xs t => compileEffect' .cAll bound xs t
+  | .cAll xs t none => compileEffect' (fun xs t => .cAll xs t none) bound xs t
+  | .cAll xs t (some d) => do
+    let d' ← convertTerm termFuel d .duration
+    compileEffect' (fun xs t => .cAll xs t (some d')) bound xs t
   | .tAll xs t => compileEffect' .tAll bound xs t
   | .oAll xs t => compileEffect' .oAll bound xs t
 
@@ -460,7 +551,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         return (ty, [.terminatedBy as]) :: (posts ++ holds)
       | .createdBy as =>
         let posts ← as.mapM fun a => do
-          let e ← compileEffect' .cAll xs [] (.app ty (.named []))
+          let e ← compileEffect' (fun xs t => .cAll xs t none) xs [] (.app ty (.named []))
           return (a, [ModClause.postCond [e]])
         return (ty, [.createdBy as]) :: posts
       | .strings ss =>
@@ -479,6 +570,14 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .exceptUnder as => checkActs "Except under" as; return [(ty, [.exceptUnder as])]
       | .against as => checkActs "Against" as; return [(ty, [.against as])]
       | .unlessCond ts => return [(ty, [.unlessCond (← ts.mapM (convertPrecon ty tspec))])]
+      | .dueWithin d =>
+        -- a requirement duty: violated once it has been held for `d` (006.7)
+        match tspec.kind with
+        | .duty _ =>
+          let d' ← convertTerm termFuel d .duration
+          let v ← compileViolationCondition ty (.heldFor (.app ty (.named [])) d')
+          return [(ty, [.violation [v]])]
+        | k => err "CHR003" s!"`Due within` applies to a Duty, not {k.name.toLower.decapitalize}"
     let parts ← clauses.mapM one
     return parts.flatten
 
@@ -560,6 +659,8 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       return .instQuery b (xs ++ diff fs xs) t'
     | .decls ds => executeDecls ds; return .onlyDecls
     | .scenario name ps => return .scenario name ps
+    | .setTime t => return .setTime (← convertTerm termFuel t .time)
+    | .tick => return .tick
     | .expect w neg t =>
       let (t', ty) ← compileTerm termFuel t
       match ty with

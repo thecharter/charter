@@ -1,0 +1,7 @@
+// Advancing the clock recomputes derived facts and violations, like any phrase.
+Fact p Identified by P
+Fact late Identified by L Holds when Held(p(P)) For 3.
++p(P).
+?!late(L).
+@ 3.
+?late(L).

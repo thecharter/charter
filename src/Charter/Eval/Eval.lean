@@ -137,6 +137,7 @@ def instantiateDomain : Nat → DomId → Domain → M Elem
     | .time => let t ← getTime; nd ((List.range (t.toNat + 1)).map (fun (k : Nat) => Elem.int (k : Int)))
     | .anyString => err (.enumerateInfiniteDomain d)
     | .anyInt => err (.enumerateInfiniteDomain d)
+    | .duration => err (.enumerateInfiniteDomain d)
     | .strings ss => nd (ss.map .str)
     | .ints is => nd (is.map .int)
     | .products xs => do
@@ -173,6 +174,8 @@ def isValidInstance : Nat → Tagged → M Bool
     match te.1, dom with
     | .int i, .ints is => if is.contains i then check else pure false
     | .int _, .anyInt => check
+    | .int _, .time => check
+    | .int _, .duration => check
     | .str s, .strings ss => if ss.contains s then check else pure false
     | .str _, .anyString => check
     | .prod args, .products params =>
@@ -203,7 +206,7 @@ def isHolds : Nat → Tagged → M Bool
       let state ← getState
       let spec ← getSpec
       match state.lookup te with
-      | some i => pure i.value
+      | some i => pure (i.live state.time)
       | none =>
         match spec.closedType te.2 with
         | some false => err (.missingInput (.assignments [te]))
@@ -348,7 +351,12 @@ def evalEffect : Nat → Effect → M Store
   | 0, _ => err (.fuelExhausted "evaluating an effect")
   | fuel + 1, e => do
     match e with
-    | .cAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue))
+    | .cAll xs t none => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none))
+    | .cAll xs t (some d) =>
+      -- D7: `Creates e For d` stamps the instances with the expiry now + d
+      let now ← getTime
+      let pairs ← foreach fuel xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
+      pure (pairs.map fun (te, u) => (te, .holdsTrue (some u)))
     | .tAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse))
     | .oAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
 
@@ -407,6 +415,14 @@ def eval : Nat → Term → M Value
       let v ← eval fuel t
       whenBool (eval fuel c) (fun | true => pure v | false => empty)
     | .present t => whenTagged (eval fuel t) (fun te => .bool <$> isHolds fuel te)
+    | .heldFor t d => whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => do
+        -- D7, Law 7: a condition over the stamp, never an event
+        if !(← isHolds fuel te) then pure (.bool false)
+        else
+          let state ← getState
+          match state.lookup te with
+          | some i => pure (.bool (state.time - i.since ≥ dur))
+          | none => pure (.bool false)))
     | .violated t => whenTagged (eval fuel t) (fun te => .bool <$> isViolated fuel te)
     | .enabled t => whenTagged (eval fuel t) (fun te => .bool <$> isEnabled fuel te)
     | .exists_ xs t => do

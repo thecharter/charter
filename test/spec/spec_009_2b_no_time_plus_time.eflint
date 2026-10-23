@@ -1,0 +1,3 @@
+// Two times do not add (CHR012).
+//! expect-error: CHR012
+?(Current Time + Current Time == 0).

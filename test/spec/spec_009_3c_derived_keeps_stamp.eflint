@@ -1,0 +1,11 @@
+// A derived fact keeps its stamp while it stays derived across phrases.
+Fact x Identified by X
+Fact y Identified by Y
+Fact d Identified by D Holds when x(X).
++x(X).
+@ 2.
++y(Y).
+?Held(d(D)) For 2.
+-x(X).
++x(X).
+?!Held(d(D)) For 1.

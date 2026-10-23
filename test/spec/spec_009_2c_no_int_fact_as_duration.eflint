@@ -1,0 +1,5 @@
+// An integer fact is not a duration: only a literal coerces (D7).
+//! expect-error: CHR012
+Fact n Identified by Int.
++n(3).
+?(Current Time + n == 3).

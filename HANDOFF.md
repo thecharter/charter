@@ -160,7 +160,31 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   battery runs the corpus with it (196/196 unchanged). CHR022 registered.
 - Spec 002.9, 005.9, 007.2, 007.4, 011.10–11 updated; 9 new conformance tests (82 total).
 - Not in this slice: time (D7), clauses and provenance (D4), `Param`, `Module`/`Use`,
-  `?why`, `Invariant` exploration, the `lib/` modules, `prove`. Next slice: time.
+  `?why`, `Invariant` exploration, the `lib/` modules, `prove`.
+
+## Night: Phase 2's second slice, time (D7)
+
+- **The clock.** `@ t.` sets it, `tick.` advances it; both are phrases that are
+  environment input (Law 6): no transition, no event, `Output.timeSet` only; derived
+  facts and violations are recomputed like after any phrase. `@ t` backwards is CHR106.
+- **`Time` and `Duration`** as `Ty.time`/`Ty.duration` and domains `Identified by Time`
+  / `Duration`: `Time ± Duration : Time`, `Time - Time : Duration`, `Duration ±
+  Duration`; `Time + Time` and an integer fact as a duration are CHR012; a literal or
+  literal arithmetic coerces by demand (`Resolve.literalArith`, `arithTy`,
+  `compileCompare`, `compileArith`). `Current Time : Time`.
+- **Stamps** (Law 7): `Info.since` on every assignment, kept when an instance that
+  holds is re-created and when a derived fact is re-derived (`State.stampFrom` over the
+  derived facts before rebasing; `deriveAll`/`pass`/`saturateStratum` take `prev`).
+  `Info.expiry` from `Creates e For d`; `Info.live now` replaces `value` wherever
+  holding is asked. `Held(e) For d` is the stamp condition; `Due within d` on a duty
+  desugars to `Violated when Held(d()) For d`.
+- Spelling choices for Eric (spec 009): `Held(e) For d`; `tick` is a reserved word in
+  Charter mode.
+- Spec 009 rewritten; 003, 006, 010, 011 updated; 11 time tests (92 total). The
+  properties file's theorems were re-proved over the new signatures (still `propext`
+  only). A regression caught by the corpus: my first comparison typing forgot that an
+  integer fact instance is used as its value; fixed with `asNumber`.
+- Next slice: clauses and provenance (D4), then `Param` (D11) and `Module`/`Use` (D8).
 
 ## Known gaps against Phase 1's exit criteria
 
