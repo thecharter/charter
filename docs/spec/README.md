@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (late, 4) — Phase 2's sixth slice: invariant exploration, `charter test --explore N` and `//! explore: N` (chapter 013). 110 conformance tests.
 - 2026-10-23 (late, 3) — Phase 2's fifth slice: `Module name(params) { … }` and `Use name(args) As prefix` (D8, chapter 015); CHR023. 106 conformance tests.
 - 2026-10-23 (late, 2) — Phase 2's fourth slice: `Param` (D11, chapter 014) and fact origins with `?why` (Law 6, 004.10). 102 conformance tests.
 - 2026-10-23 (late) — Phase 2's third slice, clauses and provenance (D4): chapter 012; `charter check` and `charter test` run the Law 8 checks as claims; `charter trace`. 99 conformance tests.
@@ -33,7 +34,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
 | 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
-| 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
+| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 4 tests green (invariants checked, `--explore`); `prove` pending |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
 | 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); `lib/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |

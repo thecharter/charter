@@ -30,6 +30,8 @@ structure RunOpts where
   eflint    : Bool := false
   /-- Run `Scenario` blocks (test mode) instead of only noting them. -/
   scenarios : Bool := false
+  /-- Explore enabled acts from the end state up to this depth (0 = off); plan §2.2.7. -/
+  explore   : Nat := 0
 
 structure RunStats where
   phrases       : Nat := 0
@@ -138,6 +140,27 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       emit o (Json.mkObj [("kind", "fact"), ("change", Json.str ch), ("instance", Json.str te.pp)]) s!"  {ch}{te}"
   return stats
 
+/-- Explore from a configuration (plan §2.2.7): a violated invariant within the depth
+is a failed claim whose text is the shortest trace. -/
+def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats) : IO RunStats := do
+  if o.explore == 0 || cfg.spec.invariants.isEmpty then return stats
+  match Explore.bfs cfg o.explore 5000 with
+  | .error e =>
+    let d := Diagnostic.error e.code e.message
+    emit o (diagJson d) d.render (toErr := true)
+    return { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
+  | .safe n =>
+    let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool true),
+      ("depth", Json.num o.explore), ("states", Json.num n)]
+    if !o.testMode || o.json then emit o j s!"{where_}: explore: no invariant violated within {o.explore} step(s) ({n} states)"
+    return stats
+  | .violated d trace n =>
+    let traceS := ", ".intercalate (trace.map Tagged.pp)
+    let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool false),
+      ("invariant", Json.str d), ("trace", Json.arr (trace.map (fun te => Json.str te.pp)).toArray), ("states", Json.num n)]
+    emit o j s!"{where_}: explore: invariant {d} violated after {trace.length} step(s): {if trace.isEmpty then "(already in the end state)" else traceS}"
+    return { stats with failedQueries := stats.failedQueries + 1 }
+
 /-- Run a scenario's phrases from `cfg`, reporting under the scenario's name; the
 configuration is not changed. -/
 def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config) (ps : List Phrase)
@@ -151,7 +174,7 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
     stats := { stats with phrases := stats.phrases + 1 }
     stats ← report o s!"{file} [scenario {name}, phrase {k}]" line s!"scenario {name}, phrase {k}" cfg.state cfg'.state outs stats
     cfg := cfg'
-  return stats
+  exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats
 
 /-- Run one located item. -/
 def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO (Config × RunStats) := do
@@ -205,14 +228,16 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     let (cfg', stats') ← stepItem o cfg stats l
     cfg := cfg'
     stats := stats'
+  stats ← exploreFrom o s!"{path}" cfg stats
   let failedProv ← reportProvenance o cfg.spec (path.parent.getD ".")
   return { stats with failedQueries := stats.failedQueries + failedProv }
 
 /-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`. -/
 structure RunFlags where
-  json   : Bool := false
-  eflint : Bool := false
-  rest   : List String := []
+  json    : Bool := false
+  eflint  : Bool := false
+  explore : Nat := 0
+  rest    : List String := []
 
 def takeFlags (args : List String) : Except String RunFlags :=
   let rec go : List String → RunFlags → Except String RunFlags
@@ -222,6 +247,10 @@ def takeFlags (args : List String) : Except String RunFlags :=
     | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
     | ["--out"], _ => .error "--out needs json or text"
     | "--eflint" :: rest, f => go rest { f with eflint := true }
+    | "--explore" :: n :: rest, f => match n.toNat? with
+      | some k => go rest { f with explore := k }
+      | none => .error s!"--explore needs a depth, not {n}"
+    | ["--explore"], _ => .error "--explore needs a depth"
     | a :: rest, f => go rest { f with rest := a :: f.rest }
   go args {}
 
@@ -233,13 +262,13 @@ def summaryJson (stats : RunStats) : Json :=
 def runCommand (args : List String) : IO UInt32 := do
   match takeFlags args with
   | .error e => IO.eprintln s!"charter run: {e}"; return 2
-  | .ok { json, eflint, rest := [f] } =>
-    let stats ← runProgram { json, eflint } f
+  | .ok { json, eflint, explore, rest := [f] } =>
+    let stats ← runProgram { json, eflint, explore } f
     if json then IO.println (summaryJson stats).compress
     else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
     return (if stats.ok then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint]"
+    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--explore <depth>]"
     return 2
 
 /-- `charter check <file.eflint> ... [--out json] [--eflint]`: resolve every phrase in

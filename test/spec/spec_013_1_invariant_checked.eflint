@@ -1,0 +1,9 @@
+// An `Invariant` is checked after every phrase; while it does not hold a violation is reported, and `?inv()` asks whether it holds.
+Fact x Identified by Int
+Invariant small When Not(Exists x: x > 10).
++x(3).
+?small().
++x(11).
+?!small().
+-x(11).
+?small().

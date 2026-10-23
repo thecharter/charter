@@ -1,0 +1,9 @@
+// `//! explore: N` (or `--explore N`) searches the enabled acts from the end state up to N steps and reports the shortest trace that violates an invariant as a failed claim.
+//! explore: 3
+//! expect-failed-claims: 1
+Fact actor Identified by Alice
+Fact count Identified by Int
+Act bump Actor actor Creates count(count + 1) Terminates count Holds when True
+Invariant below-two When Not(Exists count: count >= 2).
++count(0).
+?below-two().

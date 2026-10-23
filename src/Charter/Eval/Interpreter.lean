@@ -446,4 +446,102 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
         | none => (cfg, warnOuts ++ outs ++ outs2)
         | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
 
+/-! ## Exploration (plan §2.2.7): bounded search over acts from a state -/
+
+namespace Explore
+
+open M
+
+/-- Every instance of every act type that is enabled in the configuration: the
+candidates for a next step under lawful behaviour. -/
+def enabledActs (cfg : Config) : Except RuntimeError (List Tagged) := do
+  let spec := cfg.spec
+  let acts := spec.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .act _ => some p.1
+    | _ => none
+  acts.foldlM (fun acc d => do
+    let xs := spec.components d
+    let m : M (List Tagged) := results (scope M.fuel xs (whenTagged (eval M.fuel (.app d (.named []))) pure))
+    let insts ← (ignoreMissingInput m).run ⟨spec, cfg.state⟩ []
+    let insts := insts.flatten
+    let enabled ← insts.filterMapM fun te => do
+      let r ← (ignoreMissingInput (isEnabled M.fuel te)).run ⟨spec, cfg.state⟩ []
+      pure (if r.any id then some te else none)
+    pure (acc ++ enabled)) []
+
+/-- Perform one act instance from a configuration (the `trigger` step without a phrase). -/
+def perform (cfg : Config) (te : Tagged) : Except RuntimeError Config := do
+  let infos ← (instantiateTrans M.fuel [] te).run ⟨cfg.spec, cfg.state⟩ []
+  let store := Store.unions (infos.map (·.assignments))
+  let state1 := State.makeAssignments cfg.spec store { cfg.state with step := cfg.state.step + 1 }
+  let state' ← Saturate.rebaseAndSat cfg.spec cfg.strata state1
+  pure { cfg with state := state' }
+
+/-- The invariants that do not hold in a configuration. -/
+def violatedInvariants (cfg : Config) : List DomId :=
+  cfg.spec.invariants.filter fun d =>
+    let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
+    match (ignoreMissingInput (checkFalse (eval M.fuel term))).run ⟨cfg.spec, cfg.state⟩ [] with
+    | .ok rs => !rs.isEmpty
+    | .error _ => false
+
+/-- A canonical key of a state: the instances that hold, as sorted text. -/
+def stateKey (s : State) : String :=
+  let names := s.holdsList.map Tagged.pp
+  String.intercalate "|" (names.toArray.qsort (· < ·)).toList
+
+/-- The outcome of an exploration. -/
+inductive Result where
+  /-- No invariant violated within the bound; how many distinct states were visited. -/
+  | safe (visited : Nat)
+  | violated (invariant : DomId) (trace : List Tagged) (visited : Nat)
+  | error (e : RuntimeError)
+
+/-- Breadth-first search over enabled acts from `cfg`, up to `depth` steps and `cap`
+visited states, returning the shortest violating trace. Deterministic: candidates
+are taken in declaration order, so the same program and depth always give the same
+answer (the "seed" of plan §2.2.7 is the declaration order). -/
+def bfs (cfg : Config) (depth cap : Nat) : Result :=
+  match violatedInvariants cfg with
+  | d :: _ => .violated d [] 1
+  | [] =>
+    let rec go (frontier : List (Config × List Tagged)) (seen : List String) (fuel : Nat) : Result :=
+      match fuel with
+      | 0 => .safe seen.length
+      | fuel + 1 =>
+        if frontier.isEmpty then .safe seen.length else
+        -- expand the whole frontier one level
+        let step := frontier.foldl (fun (acc : Except RuntimeError (List (Config × List Tagged) × List String × Option (DomId × List Tagged))) (c, trace) =>
+          match acc with
+          | .error e => .error e
+          | .ok (next, seen, some v) => .ok (next, seen, some v)
+          | .ok (next, seen, none) =>
+            match enabledActs c with
+            | .error e => .error e
+            | .ok cands =>
+              cands.foldl (fun acc te =>
+                match acc with
+                | .error e => .error e
+                | .ok (next, seen, some v) => .ok (next, seen, some v)
+                | .ok (next, seen, none) =>
+                  if seen.length ≥ cap then .ok (next, seen, none) else
+                  match perform c te with
+                  | .error e => .error e
+                  | .ok c' =>
+                    let key := stateKey c'.state
+                    if seen.contains key then .ok (next, seen, none)
+                    else
+                      let trace' := trace ++ [te]
+                      match violatedInvariants c' with
+                      | d :: _ => .ok (next, key :: seen, some (d, trace'))
+                      | [] => .ok (next ++ [(c', trace')], key :: seen, none)) (.ok (next, seen, none)))
+          (.ok ([], seen, none))
+        match step with
+        | .error e => .error e
+        | .ok (_, seen, some (d, trace)) => .violated d trace seen.length
+        | .ok (next, seen, none) => go next seen fuel
+    go [(cfg, [])] [stateKey cfg.state] depth
+
+end Explore
+
 end Charter

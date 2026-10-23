@@ -221,9 +221,25 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   `ModClause` moved above `Spec` in `Spec.lean` because `Spec` now holds module bodies.
 - Spec 015 drafted (the `-` join of the prefix is a spelling for Eric); 4 tests (106
   total).
-- Next slices: `Invariant` exploration (`test --explore`, needs eFLINT's
-  `find_transitions` enumeration), the `lib/` modules as `.charter`, a first `prove`
-  generator; then Phase 3's artifact format (B10 first).
+## Late (4): Phase 2's sixth slice, invariant exploration (plan §2.2.7)
+
+- `Explore` in `Eval/Interpreter.lean`: `enabledActs` (every enabled instance of every
+  act type, enumerable components over their domain, others over held instances),
+  `perform` (one act instance as a step), `violatedInvariants`, and `bfs` (breadth-first
+  over enabled acts, deduplicating states by the sorted text of what holds, depth bound
+  plus a cap of 5000 states, deterministic in declaration order). Lawful behaviour
+  only: disabled acts are not explored.
+- `charter test --explore N` and `charter run --explore N`, and the fixture directive
+  `//! explore: N`; the search runs from the program's end state and each scenario's;
+  a violation is a failed claim naming the invariant and the shortest trace.
+- Spec 013 drafted (13.1–13.2 implemented; tags, `prove`, module properties pending);
+  4 tests (110 total). One test-authoring lesson worth a line in the spec: a quantifier
+  over an enumerable type ranges over the domain, over a non-enumerable one over what
+  holds (004.7), so an invariant about "the counter" must be over `Int`.
+- Next slices: the `lib/` modules as `.charter` (needs the standard-library content
+  modelled, a day's work each), a first `prove` generator (`charter_program` plus a
+  theorem per invariant, maintainer-run with the repo's toolchain); then Phase 3's
+  artifact format after B10 is ruled.
 
 ## Known gaps against Phase 1's exit criteria
 

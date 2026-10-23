@@ -17,7 +17,10 @@ anywhere in the file:
 - `//! known-issue: <why>` — the file is expected to fail; it fails the run if it
   unexpectedly passes (so a fixed issue is noticed and the directive deleted);
 - `//! expect-failed-claims: N` — the file passes only if exactly `N` claims fail
-  (queries, expectations, or provenance checks) and no error is reported.
+  (queries, expectations, or provenance checks) and no error is reported;
+- `//! explore: N` — explore enabled acts to depth `N` from the file's end state and
+  each scenario's (plan §2.2.7); a violated invariant is a failed claim. `--explore N`
+  on the command line sets the depth for every file without the directive.
 
 With `--expect <file>`, each file's outcome is compared with the outcome recorded
 there (lines `ok   <path>` / `FAIL <path>`, the format this command prints, which
@@ -86,6 +89,8 @@ structure Directives where
   expectWarnings : List String := []
   knownIssue     : Option String := none
   expectFailedClaims : Option Nat := none
+  /-- `//! explore: N`: explore enabled acts to depth N from the end states. -/
+  explore        : Option Nat := none
 
 def readDirectives (src : String) : Directives :=
   src.splitOn "\n" |>.foldl (fun d line =>
@@ -96,6 +101,7 @@ def readDirectives (src : String) : Directives :=
       else if body.startsWith "expect-warning:" then { d with expectWarnings := d.expectWarnings ++ [(body.drop 15).trim] }
       else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
       else if body.startsWith "expect-failed-claims:" then { d with expectFailedClaims := (body.drop 21).trim.toNat? }
+      else if body.startsWith "explore:" then { d with explore := (body.drop 8).trim.toNat? }
       else d
     else d) {}
 
@@ -142,7 +148,8 @@ def testCommand (args : List String) : IO UInt32 := do
   for f in files do
     let src ← IO.FS.readFile f
     let d := readDirectives src
-    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true } f
+    let depth := d.explore.getD fl.explore
+    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, explore := depth } f
     let (outcome, why) := verdict d stats
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)

@@ -1,0 +1,7 @@
+// Exploration follows lawful behaviour: acts that are not enabled are not explored.
+//! explore: 3
+Fact actor Identified by Alice
+Fact bad Identified by B
+Act break Actor actor Creates bad(B) Holds when False
+Invariant intact When Not(bad(B)).
+?intact().

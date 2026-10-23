@@ -1,0 +1,8 @@
+// An exploration that finds no violation within its depth is a passing claim; a program whose acts cannot reach a violation passes.
+//! explore: 4
+Fact actor Identified by Alice
+Fact flag Identified by F
+Act raise Actor actor Creates flag(F) Holds when True
+Act lower Actor actor Terminates flag(F) Holds when True
+Invariant fine When True.
+?fine().
