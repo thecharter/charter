@@ -107,14 +107,15 @@ def verdict (d : Directives) (stats : RunStats) : Bool × String :=
 
 /-- `charter test <paths…> [--expect file] [--tolerate file] [--out json]` -/
 def testCommand (args : List String) : IO UInt32 := do
-  let (json, args) ← match takeOutFlag args with
+  let fl ← match takeFlags args with
     | .error e => IO.eprintln s!"charter test: {e}"; return 2
     | .ok r => pure r
-  let opts ← match parseTestArgs args {} with
+  let json := fl.json
+  let opts ← match parseTestArgs fl.rest {} with
     | .ok o => pure o
     | .error e => IO.eprintln s!"charter test: {e}"; return 2
   if opts.paths.isEmpty then
-    IO.eprintln "usage: charter test <file.eflint | directory> ... [--expect <outcomes>] [--tolerate <tolerances.md>] [--out json]"
+    IO.eprintln "usage: charter test <file.eflint | directory> ... [--expect <outcomes>] [--tolerate <tolerances.md>] [--out json] [--eflint]"
     return 2
   let expected ← match opts.expect with
     | some f => readExpected f
@@ -134,7 +135,7 @@ def testCommand (args : List String) : IO UInt32 := do
   for f in files do
     let src ← IO.FS.readFile f
     let d := readDirectives src
-    let stats ← runProgram { testMode := true, json } f
+    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true } f
     let (outcome, why) := verdict d stats
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)

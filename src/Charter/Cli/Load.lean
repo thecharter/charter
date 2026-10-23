@@ -30,7 +30,7 @@ def findIncluded (dirs : List System.FilePath) (name : String) : IO (Option Syst
 directory of every file it loads, so a file under `usage-control/` that requires
 `../access.eflint` can then require `simple-scenario.eflint` from the parent); `depth`
 bounds include chains. -/
-def loadFile (path : System.FilePath) (seen : List String) (dirs : List System.FilePath) : Nat →
+def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs : List System.FilePath) : Nat →
     IO (List Located × List Diagnostic × List String × List System.FilePath)
   | 0 => return ([], [Diagnostic.error "CHR005" s!"include chain too deep at {path}"], seen, dirs)
   | depth + 1 => do
@@ -41,7 +41,7 @@ def loadFile (path : System.FilePath) (seen : List String) (dirs : List System.F
     let seen := seen ++ [pathS]
     let dir := path.parent.getD "."
     let dirs := if dirs.contains dir then dirs else dirs ++ [dir]
-    match parseSource src with
+    match parseSource src eflint with
     | .error e => return ([], [e.withFile pathS], seen, dirs)
     | .ok items =>
       let mut acc : List Located := []
@@ -61,16 +61,17 @@ def loadFile (path : System.FilePath) (seen : List String) (dirs : List System.F
             let fS := f.toString
             if once && seen.contains fS then pure ()
             else
-              let (its, ds, seen', dirs') ← loadFile f seen dirs depth
+              let (its, ds, seen', dirs') ← loadFile eflint f seen dirs depth
               acc := acc ++ its
               diags := diags ++ ds
               seen := seen'
               dirs := dirs'
       return (acc, diags, seen, dirs)
 
-/-- Load a program: its items in order, and the diagnostics of loading. -/
-def loadProgram (path : System.FilePath) : IO (List Located × List Diagnostic) := do
-  let (its, ds, _, _) ← loadFile path [] ["."] 64
+/-- Load a program: its items in order, and the diagnostics of loading. `eflint`
+restricts the keywords to eFLINT's (`--eflint`). -/
+def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Located × List Diagnostic) := do
+  let (its, ds, _, _) ← loadFile eflint path [] ["."] 64
   return (its, ds)
 
 end Charter.Cli

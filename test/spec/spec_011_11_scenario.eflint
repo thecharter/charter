@@ -1,0 +1,10 @@
+// `Scenario name { … }` is run by `charter test` from the configuration at its point in the file and leaves that configuration unchanged; a failed claim inside it fails the file.
+Fact p Identified by P.
+Scenario adds-p {
+  +p(P).
+  ?p(P).
+}
+?!p(P).
+Scenario still-absent {
+  ?!p(P).
+}

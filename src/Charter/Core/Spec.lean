@@ -54,6 +54,20 @@ structure ActSpec where
   effects  : List Effect := []
   syncs    : List Sync := []
   physical : Bool := false
+  /-- Charter (D5): the act has institutional effect only when these hold; empty means always. -/
+  validWhen : List Term := []
+  /-- Charter (plan §2.2.4): performing the act is lawful iff it is also a valid, enabled
+  exercise of one of these acts. -/
+  exceptUnder : List DomId := []
+  /-- Whether the act's second component is a `Recipient` (immunities protect recipients). -/
+  hasRecipient : Bool := false
+  deriving Repr, Inhabited
+
+/-- Charter (plan §2.2.2): while an instance holds, the acts in `against` are not valid
+when the instance's holder is their recipient, unless one of `unlessConds` holds. -/
+structure ImmunitySpec where
+  against : List DomId := []
+  unlessConds : List Term := []
   deriving Repr, Inhabited
 
 /-- The act-name lists are record-keeping (eFLINT); their meaning is compiled into
@@ -75,10 +89,11 @@ inductive Kind where
   | act (a : ActSpec)
   | duty (d : DutySpec)
   | event (e : EventSpec)
+  | immunity (i : ImmunitySpec)
   deriving Repr, Inhabited
 
 def Kind.name : Kind → String
-  | .fact _ => "Fact" | .act _ => "Act" | .duty _ => "Duty" | .event _ => "Event"
+  | .fact _ => "Fact" | .act _ => "Act" | .duty _ => "Duty" | .event _ => "Event" | .immunity _ => "Immunity"
 
 /-- One type declaration (eFLINT `TypeSpec`). `closed = none` means closed by
 default and still openable; `some b` is an explicit setting. -/
@@ -175,6 +190,12 @@ def findViolationCond (s : Spec) (d : DomId) : Option (List Term) :=
 def invariants (s : Spec) : List DomId :=
   s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with | .fact f => if f.invariant then some p.1 else none | _ => none
 
+/-- The immunity types naming `a` in `Against`, with their specs. -/
+def immunitiesAgainst (s : Spec) (a : DomId) : List (DomId × TypeSpec × ImmunitySpec) :=
+  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .immunity i => if i.against.contains a then some (p.1, p.2, i) else none
+    | _ => none
+
 def derivedTypes (s : Spec) : List DomId :=
   s.decls.filterMap fun (p : DomId × TypeSpec) => if p.2.derivation.isEmpty then none else some p.1
 
@@ -223,6 +244,14 @@ inductive ModClause where
   | ints (is : List Int)
   | close
   | open
+  /-- Charter: `Valid when` on an act. -/
+  | validWhen (ts : List Term)
+  /-- Charter: `Except under` on an act. -/
+  | exceptUnder (as : List DomId)
+  /-- Charter: `Against` on an immunity. -/
+  | against (as : List DomId)
+  /-- Charter: `Unless` on an immunity. -/
+  | unlessCond (ts : List Term)
   deriving Repr, Inhabited
 
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
@@ -280,5 +309,17 @@ where
         | .anyInt => .ints is
         | .ints is' => .ints (is' ++ is)
         | d => d }
+    | .validWhen ts => { t with kind := match t.kind with
+        | .act a => .act { a with validWhen := ts ++ a.validWhen }
+        | k => k }
+    | .exceptUnder as => { t with kind := match t.kind with
+        | .act a => .act { a with exceptUnder := as ++ a.exceptUnder }
+        | k => k }
+    | .against as => { t with kind := match t.kind with
+        | .immunity i => .immunity { i with against := as ++ i.against }
+        | k => k }
+    | .unlessCond ts => { t with kind := match t.kind with
+        | .immunity i => .immunity { i with unlessConds := ts ++ i.unlessConds }
+        | k => k }
 
 end Charter

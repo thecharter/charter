@@ -20,4 +20,6 @@ A Charter source file is a sequence of tokens separated by whitespace and commen
 
 **2.8 Symbols.** `?--`, `?-`, `!?`, `||`, `&&`, `<=`, `>=`, `..`, `==`, `!=`, `#include`, `#require`, and the single characters `[ ] ( ) ! , ' + - * / . = > < : ? { } % ~`.
 
+**2.9 Charter's keywords and `--eflint` mode.** Charter adds the word keywords `Valid when`, `Except under`, `Immunity`, `Against`, `Unless`, `Scenario` and the claim keywords `?lawful`, `?valid`, `?violated`, `?!lawful`, `?!valid`, `?!violated` (the latter only when followed by whitespace, 011.11). In `--eflint` mode none of these is a keyword, so an eFLINT program that uses `Valid` or `Against` as an atom reads as eFLINT reads it; the corpus runs in that mode. `test/spec/spec_002_9_eflint_mode.eflint`
+
 *Differences from eFLINT:* none in token classes. eFLINT's generalised parser resolves the dot and the `When` ambiguities by trying every parse; Charter decides each once (2.6, D14).

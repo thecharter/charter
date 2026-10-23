@@ -5,19 +5,18 @@ import Lean.Data.Json
 /-!
 # Charter.Cli.Run — `charter run <file>`, `charter check`, and the shared program driver
 
-`run` executes a program's phrases in order and prints, for each, what it did:
-every executed transition with its three answers (Law 2: *occurred*, *lawful*,
-*valid*; in Phase 1 every act that occurs is valid, D5), the violations it
-caused, the result of each query, and the facts that changed. `test` mode
-(`Charter.Cli.Test`) prints only diagnostics, failed queries, and instance-query
-results, which is eFLINT's `--test-mode` criterion.
+`run` executes a program's top-level phrases in order and prints, for each, what
+it did: every executed transition with its three answers (Law 2: *occurred*,
+*lawful*, *valid*), the violations it caused, the result of each query or
+expectation, and the facts that changed. Scenarios (`Scenario name { … }`) are
+run by `charter test` from the configuration at their point in the file and leave
+it unchanged; `run` only notes them. `test` mode prints only diagnostics, failed
+claims, and instance-query results, which is eFLINT's `--test-mode` criterion.
 
-With `--out json` every report is one JSON object per line (plan §3: diagnostics
-and claims are data): `{"kind":"diagnostic", code, severity, message, file,
-line, col}`, `{"kind":"claim", claim, tag:"checked", about:"holds", result, …}`,
-`{"kind":"transition", act, occurred, lawful, valid, syncs}`,
-`{"kind":"violation", …}`, `{"kind":"fact", change, instance}`, and a final
-`{"kind":"summary", …}`.
+Flags shared by `run`, `test`, `check`: `--out json` makes every report one JSON
+object per line (plan §3); `--eflint` restricts the keywords to eFLINT's, so a
+corpus file that uses `Valid`, `Against`, or `Scenario` as an atom still reads as
+eFLINT reads it.
 -/
 
 namespace Charter.Cli
@@ -25,8 +24,11 @@ namespace Charter.Cli
 open Lean (Json)
 
 structure RunOpts where
-  testMode : Bool := false
-  json     : Bool := false
+  testMode  : Bool := false
+  json      : Bool := false
+  eflint    : Bool := false
+  /-- Run `Scenario` blocks (test mode) instead of only noting them. -/
+  scenarios : Bool := false
 
 structure RunStats where
   phrases       : Nat := 0
@@ -39,14 +41,16 @@ structure RunStats where
 
 def RunStats.ok (s : RunStats) : Bool := s.errors == 0 && s.failedQueries == 0
 
+def yesNo (b : Bool) : String := if b then "yes" else "no"
+
 /-- Render a transition tree as eFLINT's `showTriggerTree` does, with the three answers. -/
 def renderTrans (info : TransInfo) (indent : String) (fuel : Nat) : List String :=
   match fuel with
   | 0 => []
   | fuel + 1 =>
     let kind := if info.isAction then "act" else "event"
-    let lawful := if info.isAction then (if info.disabled then "   lawful: no" else "   lawful: yes") else ""
-    let head := s!"{indent}occurred {kind} {info.tagged}{lawful}   valid: yes"
+    let lawful := if info.isAction then s!"   lawful: {yesNo (!info.disabled)}" else ""
+    let head := s!"{indent}occurred {kind} {info.tagged}{lawful}   valid: {yesNo info.valid}"
     head :: info.syncs.flatMap (renderTrans · (indent ++ "  ") fuel)
 
 def transJson (info : TransInfo) (fuel : Nat) : Json :=
@@ -54,7 +58,7 @@ def transJson (info : TransInfo) (fuel : Nat) : Json :=
   | 0 => Json.null
   | fuel + 1 =>
     Json.mkObj ([("act", Json.str info.tagged.pp), ("kind", Json.str (if info.isAction then "act" else "event")),
-      ("occurred", Json.bool true), ("valid", Json.bool true)] ++
+      ("occurred", Json.bool true), ("valid", Json.bool info.valid)] ++
       (if info.isAction then [("lawful", Json.bool (!info.disabled))] else []) ++
       [("syncs", Json.arr (info.syncs.map (transJson · fuel)).toArray)])
 
@@ -84,55 +88,93 @@ def emit (o : RunOpts) (j : Json) (text : String) (toErr : Bool := false) : IO U
   if o.json then IO.println j.compress
   else if toErr then IO.eprintln text else IO.println text
 
-/-- Run one located phrase, printing according to the options. -/
+/-- Print what one phrase reported and update the statistics. -/
+def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before after : State)
+    (outs : List Output) (stats : RunStats) : IO RunStats := do
+  let where_ := s!"{file}:{line}"
+  let mut stats := stats
+  for out in outs do
+    match out with
+    | .diag d =>
+      let d := (d.withFile file).withPos ⟨line, 0⟩
+      stats := { stats with codes := stats.codes ++ [d.code] }
+      if d.isError then stats := { stats with errors := stats.errors + 1 }
+      else stats := { stats with warnings := stats.warnings + 1 }
+      if d.isError || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
+    | .queryRes ok =>
+      if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
+      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("about", "holds"),
+        ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
+      if !ok then emit o j s!"{where_}: query failed: {text}"
+      else if !o.testMode then emit o j "  query holds"
+    | .expectRes w neg ok =>
+      if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
+      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("about", Json.str w.name),
+        ("negated", Json.bool neg), ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
+      if !ok then emit o j s!"{where_}: claim failed: {text}"
+      else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
+    | .instQueryRes tes =>
+      if o.json then
+        IO.println (Json.mkObj [("kind", "instances"), ("claim", Json.str text),
+          ("instances", Json.arr (tes.map (fun te => Json.str te.pp)).toArray)]).compress
+      else
+        for te in tes do IO.println s!"{te}"
+        IO.println ""
+    | .executed info =>
+      if o.json then IO.println (Json.mkObj [("kind", "transition"), ("transition", transJson info 1000)]).compress
+      else if !o.testMode then
+        for l in renderTrans info "  " 1000 do IO.println l
+    | .violation v =>
+      if o.json then IO.println (violationJson v).compress
+      else if !o.testMode then IO.println s!"  {renderViolation v}"
+  if !o.testMode then
+    for (ch, te) in factChanges before after do
+      emit o (Json.mkObj [("kind", "fact"), ("change", Json.str ch), ("instance", Json.str te.pp)]) s!"  {ch}{te}"
+  return stats
+
+/-- Run a scenario's phrases from `cfg`, reporting under the scenario's name; the
+configuration is not changed. -/
+def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config) (ps : List Phrase)
+    (stats : RunStats) : IO RunStats := do
+  let mut cfg := cfg
+  let mut stats := stats
+  let mut k := 0
+  for p in ps do
+    k := k + 1
+    let (cfg', outs) := runPhrase cfg p
+    stats := { stats with phrases := stats.phrases + 1 }
+    stats ← report o s!"{file} [scenario {name}, phrase {k}]" line s!"scenario {name}, phrase {k}" cfg.state cfg'.state outs stats
+    cfg := cfg'
+  return stats
+
+/-- Run one located item. -/
 def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO (Config × RunStats) := do
   let it := l.item
   match it.val with
   | .inl _ => return (cfg, stats)
+  | .inr (.scenario name ps) =>
+    if o.json then
+      IO.println (Json.mkObj [("kind", "scenario"), ("name", Json.str name), ("file", Json.str l.file),
+        ("line", Json.num it.pos.line), ("phrases", Json.num ps.length), ("run", Json.bool o.scenarios)]).compress
+    else if !o.testMode then
+      IO.println s!"{l.file}:{it.pos.line}: Scenario {name} ({ps.length} phrases{if o.scenarios then "" else "; charter test runs it"})"
+    if o.scenarios then
+      let stats ← runScenario o l.file it.pos.line name cfg ps stats
+      return (cfg, stats)
+    else return (cfg, stats)
   | .inr p =>
-    let where_ := s!"{l.file}:{it.pos.line}"
-    let (cfg', outs) := runPhrase cfg p
-    let mut stats := { stats with phrases := stats.phrases + 1 }
     if !o.testMode && !o.json then
-      IO.println s!"{where_}: {it.text}"
+      IO.println s!"{l.file}:{it.pos.line}: {it.text}"
     if o.json then
       IO.println (Json.mkObj [("kind", "phrase"), ("file", Json.str l.file), ("line", Json.num it.pos.line), ("text", Json.str it.text)]).compress
-    for out in outs do
-      match out with
-      | .diag d =>
-        let d := (d.withFile l.file).withPos it.pos
-        stats := { stats with codes := stats.codes ++ [d.code] }
-        if d.isError then stats := { stats with errors := stats.errors + 1 }
-        else stats := { stats with warnings := stats.warnings + 1 }
-        if d.isError || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
-      | .queryRes ok =>
-        if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
-        let j := Json.mkObj [("kind", "claim"), ("claim", Json.str it.text), ("tag", "checked"), ("about", "holds"),
-          ("result", Json.bool ok), ("file", Json.str l.file), ("line", Json.num it.pos.line)]
-        if !ok then emit o j s!"{where_}: query failed: {it.text}"
-        else if !o.testMode then emit o j "  query holds"
-      | .instQueryRes tes =>
-        if o.json then
-          IO.println (Json.mkObj [("kind", "instances"), ("claim", Json.str it.text),
-            ("instances", Json.arr (tes.map (fun te => Json.str te.pp)).toArray)]).compress
-        else
-          for te in tes do IO.println s!"{te}"
-          IO.println ""
-      | .executed info =>
-        if o.json then IO.println (Json.mkObj [("kind", "transition"), ("transition", transJson info 1000)]).compress
-        else if !o.testMode then
-          for line in renderTrans info "  " 1000 do IO.println line
-      | .violation v =>
-        if o.json then IO.println (violationJson v).compress
-        else if !o.testMode then IO.println s!"  {renderViolation v}"
-    if !o.testMode then
-      for (ch, te) in factChanges cfg.state cfg'.state do
-        emit o (Json.mkObj [("kind", "fact"), ("change", Json.str ch), ("instance", Json.str te.pp)]) s!"  {ch}{te}"
+    let (cfg', outs) := runPhrase cfg p
+    let stats := { stats with phrases := stats.phrases + 1 }
+    let stats ← report o l.file it.pos.line it.text cfg.state cfg'.state outs stats
     return (cfg', stats)
 
 /-- Run a whole program. -/
 def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
-  let (items, loadDiags) ← loadProgram path
+  let (items, loadDiags) ← loadProgram path o.eflint
   let mut stats : RunStats := {}
   for d in loadDiags do
     emit o (diagJson d) d.render (toErr := true)
@@ -145,44 +187,50 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     stats := stats'
   return stats
 
-/-- Split `--out json` off an argument list. -/
-def takeOutFlag (args : List String) : Except String (Bool × List String) :=
-  let rec go : List String → List String → Except String (Bool × List String)
-    | [], acc => .ok (false, acc.reverse)
-    | "--out" :: "json" :: rest, acc => (go rest acc).map fun (_, r) => (true, r)
-    | "--out" :: "text" :: rest, acc => go rest acc
+/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`. -/
+structure RunFlags where
+  json   : Bool := false
+  eflint : Bool := false
+  rest   : List String := []
+
+def takeFlags (args : List String) : Except String RunFlags :=
+  let rec go : List String → RunFlags → Except String RunFlags
+    | [], f => .ok { f with rest := f.rest.reverse }
+    | "--out" :: "json" :: rest, f => go rest { f with json := true }
+    | "--out" :: "text" :: rest, f => go rest f
     | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
     | ["--out"], _ => .error "--out needs json or text"
-    | a :: rest, acc => go rest (a :: acc)
-  go args []
+    | "--eflint" :: rest, f => go rest { f with eflint := true }
+    | a :: rest, f => go rest { f with rest := a :: f.rest }
+  go args {}
 
 def summaryJson (stats : RunStats) : Json :=
   Json.mkObj [("kind", "summary"), ("phrases", Json.num stats.phrases), ("errors", Json.num stats.errors),
     ("warnings", Json.num stats.warnings), ("failedQueries", Json.num stats.failedQueries), ("ok", Json.bool stats.ok)]
 
-/-- `charter run <file.eflint> [--out json]` -/
+/-- `charter run <file.eflint> [--out json] [--eflint]` -/
 def runCommand (args : List String) : IO UInt32 := do
-  match takeOutFlag args with
+  match takeFlags args with
   | .error e => IO.eprintln s!"charter run: {e}"; return 2
-  | .ok (json, [f]) =>
-    let stats ← runProgram { json } f
+  | .ok { json, eflint, rest := [f] } =>
+    let stats ← runProgram { json, eflint } f
     if json then IO.println (summaryJson stats).compress
-    else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed quer{if stats.failedQueries == 1 then "y" else "ies"}"
+    else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
     return (if stats.ok then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.eflint> [--out json]"
+    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint]"
     return 2
 
-/-- `charter check <file.eflint> ... [--out json]`: resolve every phrase in order
-without evaluating anything; report the diagnostics. -/
+/-- `charter check <file.eflint> ... [--out json] [--eflint]`: resolve every phrase in
+order without evaluating anything; report the diagnostics. -/
 def checkCommand (args : List String) : IO UInt32 := do
-  let (json, files) ← match takeOutFlag args with
+  let fl ← match takeFlags args with
     | .error e => IO.eprintln s!"charter check: {e}"; return 2
     | .ok r => pure r
-  let o : RunOpts := { json }
+  let o : RunOpts := { json := fl.json, eflint := fl.eflint }
   let mut status : UInt32 := 0
-  for f in files do
-    let (items, loadDiags) ← loadProgram f
+  for f in fl.rest do
+    let (items, loadDiags) ← loadProgram f fl.eflint
     let mut errors := 0
     let mut warnings := 0
     for d in loadDiags do

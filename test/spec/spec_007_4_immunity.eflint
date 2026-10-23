@@ -1,0 +1,14 @@
+// While an immunity instance holds, the acts named in `Against` are not valid when its holder is their recipient; they still occur and are judged lawful or not on their own.
+Fact actor Identified by Alice, Bob
+Fact fined Identified by actor
+Act fine Actor actor Recipient actor' Creates fined(actor') Holds when True
+Immunity protected Holder actor Against fine.
+?valid fine(Alice, Bob).
++protected(Bob).
+?!valid fine(Alice, Bob).
+?lawful fine(Alice, Bob).
+?valid fine(Bob, Alice).
+fine(Alice, Bob).
+?!fined(Bob).
+fine(Bob, Alice).
+?fined(Alice).

@@ -1,0 +1,5 @@
+// `Against` and `Except under` must name acts; anything else is CHR022.
+//! expect-error: CHR022
+Fact actor Identified by Alice
+Fact p Identified by P
+Immunity i Holder actor Against p.

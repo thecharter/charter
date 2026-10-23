@@ -48,7 +48,7 @@ def replLoop (o : RunOpts) (h : IO.FS.Stream) : Nat → Config → RunStats → 
 
 /-- `charter repl [file.eflint]` -/
 def replCommand (args : List String) : IO UInt32 := do
-  let o : RunOpts := {}
+  let o : RunOpts := { scenarios := true }
   let mut cfg : Config := {}
   let mut stats : RunStats := {}
   match args with

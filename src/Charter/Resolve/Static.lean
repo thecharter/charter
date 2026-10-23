@@ -36,6 +36,10 @@ inductive CPhrase where
   | instQuery (mustHold : Bool) (xs : List Var) (t : Term)
   | onlyDecls
   | par (ps : List CPhrase)
+  /-- Charter: a scenario's phrases are resolved when `charter test` runs them. -/
+  | scenario (name : String) (ps : List Phrase)
+  /-- Charter: `?lawful`/`?valid`/`?violated` over the instances of `t`, `xs` bound to every instance. -/
+  | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
   deriving Inhabited
 
 namespace Resolve
@@ -378,12 +382,28 @@ def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Deriva
     let fs ← freeVarsChecked t'
     return .dv (xs ++ diff fs xs) t'
 
+/-- Every name in `as` must be a declared act (Charter's `Except under` and `Against`). -/
+def checkActs (what : String) (as : List DomId) : Stc Unit := do
+  let spec ← getSpec
+  as.forM fun a =>
+    match spec.findDecl a with
+    | some t => match t.kind with
+      | .act _ => pure ()
+      | k => err "CHR022" s!"`{what}` names {a}, which is {k.name.toLower.decapitalize}, not an act"
+    | none => err "CHR010" s!"undeclared type {a} in `{what}`"
+
 def compileKind (d : DomId) (tspec : TypeSpec) : Kind → Stc Kind
   | .act a => do
     let xs := match tspec.domain with | .products xs => xs | _ => []
     let effects ← a.effects.mapM (compileEffect xs)
     let syncs ← a.syncs.mapM (compileSync xs)
-    return .act { a with effects, syncs }
+    let validWhen ← a.validWhen.mapM (convertPrecon d tspec)
+    checkActs "Except under" a.exceptUnder
+    return .act { a with effects, syncs, validWhen }
+  | .immunity i => do
+    let unlessConds ← i.unlessConds.mapM (convertPrecon d tspec)
+    checkActs "Against" i.against
+    return .immunity { i with unlessConds }
   | .event e => do
     let xs := match tspec.domain with | .products xs => xs | _ => []
     let effects ← e.effects.mapM (compileEffect xs)
@@ -455,6 +475,10 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         | _, _ => err "CHR014" s!"cannot extend {ty}: only a Fact with a primitive domain can be given new instances by `Identified by`"
       | .close => return [(ty, [.close])]
       | .open => return [(ty, [.open])]
+      | .validWhen ts => return [(ty, [.validWhen (← ts.mapM (convertPrecon ty tspec))])]
+      | .exceptUnder as => checkActs "Except under" as; return [(ty, [.exceptUnder as])]
+      | .against as => checkActs "Against" as; return [(ty, [.against as])]
+      | .unlessCond ts => return [(ty, [.unlessCond (← ts.mapM (convertPrecon ty tspec))])]
     let parts ← clauses.mapM one
     return parts.flatten
 
@@ -535,6 +559,14 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       let (t', _) ← compileTerm termFuel t
       return .instQuery b (xs ++ diff fs xs) t'
     | .decls ds => executeDecls ds; return .onlyDecls
+    | .scenario name ps => return .scenario name ps
+    | .expect w neg t =>
+      let (t', ty) ← compileTerm termFuel t
+      match ty with
+      | .tagged _ =>
+        let fs ← freeVarsChecked t'
+        return .expect w neg fs t'
+      | _ => err "CHR015" s!"?{w.name} needs an act or duty instance, not {ty}"
     | .par ps =>
       -- declarations in a block are executed first, then the other phrases compiled
       let decls := ps.flatMap fun | .decls ds => ds | _ => []

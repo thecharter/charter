@@ -12,7 +12,18 @@ Declarations are `Charter.Decl` records (`Charter.Core.Spec`); expressions are
 
 namespace Charter
 
-/-- One phrase (eFLINT `Phrase`). Binders of `Foreach` forms are the `xs` lists. -/
+/-- Which of the three answers an expectation phrase asks about (Charter, plan §2.2.6). -/
+inductive Expect
+  | lawful
+  | valid
+  | violated
+  deriving Repr, DecidableEq, Inhabited
+
+def Expect.name : Expect → String
+  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
+
+/-- One phrase (eFLINT `Phrase`, plus Charter's scenarios and expectations). Binders of
+`Foreach` forms are the `xs` lists. -/
 inductive Phrase where
   /-- `a(args)`, `(Foreach x: a(x))`: trigger an act or event. -/
   | trigger (xs : List Var) (t : Term)
@@ -30,6 +41,12 @@ inductive Phrase where
   | decls (ds : List Decl)
   /-- `{ p₁. p₂. … }`: phrases evaluated against the same state, effects merged. -/
   | par (ps : List Phrase)
+  /-- Charter: `Scenario name { phrases }`, a named test run by `charter test` from the
+  configuration at this point, leaving it unchanged. -/
+  | scenario (name : String) (ps : List Phrase)
+  /-- Charter: `?lawful e`, `?valid e`, `?violated e`, and their `?!` negations: a claim
+  about an act or duty instance. -/
+  | expect (what : Expect) (negated : Bool) (t : Term)
   deriving Repr, Inhabited
 
 /-- `#include "file"` and `#require "file"`. -/

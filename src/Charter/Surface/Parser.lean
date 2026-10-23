@@ -426,7 +426,7 @@ def extendDomainClause : P ModClause := do
 
 /-! ## Declarations -/
 
-inductive FrameKind | fact | act | event | duty
+inductive FrameKind | fact | act | event | duty | immunity
   deriving DecidableEq
 
 /-- `Derived from` / `Holds when` / `Present when` / `Holds When` / `Present When`. -/
@@ -468,16 +468,16 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Identified by" | .kw "Domain" =>
     if k == .fact then advance; return some (← extendDomainClause) else return none
   | .kw "Creates" =>
-    if k == .fact then return none
+    if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← effectClause .cAll))
   | .kw "Terminates" =>
-    if k == .fact then return none
+    if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← effectClause .tAll))
   | .kw "Obfuscates" =>
-    if k == .fact then return none
+    if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← effectClause .oAll))
   | .kw "Syncs with" =>
-    if k == .fact || k == .duty then return none
+    if k == .fact || k == .duty || k == .immunity then return none
     advance
     let ss ← sepBy1 optForeach "," 1000
     return some (.sync (ss.map fun (xs, t) => ⟨xs, t⟩))
@@ -493,6 +493,18 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Created by" =>
     if k != .duty then return none
     advance; return some (.createdBy (← idList))
+  | .kw "Valid when" =>
+    if k != .act then return none
+    advance; return some (.validWhen (← exprList))
+  | .kw "Except under" =>
+    if k != .act then return none
+    advance; return some (.exceptUnder (← idList))
+  | .kw "Against" =>
+    if k != .immunity then return none
+    advance; return some (.against (← idList))
+  | .kw "Unless" =>
+    if k != .immunity then return none
+    advance; return some (.unlessCond (← exprList))
   | _ =>
     match ← derivationClause with
     | some ds => return some (.derivation ds)
@@ -564,7 +576,7 @@ def frame : P (List Decl) := do
     let filter ← domainConstraint
     let cls ← clauses .act 1000
     let actorV := actor.getD ⟨"actor", ""⟩
-    return [ .typeDecl d { kind := .act {}, domain := .products (actorV :: (recip.toList ++ objs)),
+    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome }, domain := .products (actorV :: (recip.toList ++ objs)),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
   | .kw "Physical" =>
@@ -603,14 +615,27 @@ def frame : P (List Decl) := do
     return [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
+  | .kw "Immunity" =>
+    advance
+    let d ← ident
+    let _ ← optKw "With"
+    expectKw "Holder"
+    let holder ← var
+    let objs ← relatedTo
+    let filter ← domainConstraint
+    let cls ← clauses .immunity 1000
+    return [ .typeDecl d { kind := .immunity {}, domain := .products (holder :: objs),
+                           domainConstraint := filter, closed := if isClosed then none else some false },
+             .typeExt d cls ]
   | .kw "Extend" =>
     advance
     match ← peek with
+    | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000)]
     | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000)]
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000)]
     | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000)]
     | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000)]
-    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Event`, or `Duty` after `Extend` but found {k.describe}"
+    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
   | .kw "Placeholder" =>
     advance
     let f ← ident
@@ -624,7 +649,7 @@ def startsFrame : P Bool := do
   let k ← peek
   let isFrameKw : TokKind → Bool
     | .kw s => ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                "Event", "Duty", "Extend", "Placeholder"].contains s
+                "Event", "Duty", "Extend", "Placeholder", "Immunity"].contains s
     | _ => false
   match k with
   | .kw "Open" | .kw "Closed" => return isFrameKw (← peekAt 1)
@@ -648,8 +673,40 @@ def phrase : P Phrase := do
   | .kw "!?" => advance; return .query (.not (← expression))
   | .kw "?-" => advance; let (xs, t) ← optForeach; return .instQuery false xs t
   | .kw "?--" => advance; let (xs, t) ← optForeach; return .instQuery true xs t
+  | .kw "?lawful" => advance; return .expect .lawful false (← expression)
+  | .kw "?valid" => advance; return .expect .valid false (← expression)
+  | .kw "?violated" => advance; return .expect .violated false (← expression)
+  | .kw "?!lawful" => advance; return .expect .lawful true (← expression)
+  | .kw "?!valid" => advance; return .expect .valid true (← expression)
+  | .kw "?!violated" => advance; return .expect .violated true (← expression)
   | .kw "!" => advance; let (xs, t) ← optForeach; return .trigger xs t
   | _ => let (xs, t) ← optForeach; return .trigger xs t
+
+/-- The body of `Scenario name { … }`: phrases and parallel blocks, as at top level. -/
+def scenarioBody : Nat → P (List Phrase)
+  | 0 => return []
+  | fuel + 1 => do
+    if ← isKw "}" then advance; return []
+    if ← isKw "{" then
+      advance
+      let ps ← parBlockFuel fuel
+      return .par ps :: (← scenarioBody fuel)
+    let p ← phrase
+    match ← peek with
+    | .kw "." => advance; return p :: (← scenarioBody fuel)
+    | .kw "}" => advance; return [p]
+    | k => fail "CHR004" s!"expected `.` to end the phrase but found {k.describe}"
+where
+  parBlockFuel : Nat → P (List Phrase)
+    | 0 => return []
+    | fuel + 1 => do
+      if ← isKw "}" then advance; return []
+      let p ← phrase
+      if ← isKw "." then
+        advance
+        return p :: (← parBlockFuel fuel)
+      else if ← isKw "}" then advance; return [p]
+      else unexpected "`.` or `}` after a phrase in a parallel block"
 
 /-- `{ p₁. p₂. … }` with an optional final `.`. -/
 def parBlock : Nat → P (List Phrase)
@@ -690,6 +747,16 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
       advance
       let ps ← parBlock 10000
       return ⟨p, lineOf p, .inr (.par ps)⟩ :: (← items lineOf fuel)
+    else if ← isKw "Scenario" then
+      advance
+      let name ← (do match ← peek with
+        | .ident s => advance; return s
+        | .atom s => advance; return s
+        | .str s => advance; return s
+        | k => fail "CHR003" s!"expected a scenario name but found {k.describe}")
+      expectKw "{"
+      let ps ← scenarioBody 10000
+      return ⟨p, lineOf p, .inr (.scenario name ps)⟩ :: (← items lineOf fuel)
     else
       let ph ← phrase
       match ← peek with
@@ -699,9 +766,9 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
 
 end Parser
 
-/-- Parse a source text into items. -/
-def parseSource (src : String) : Except Diagnostic (List Item) := do
-  let toks ← tokenize src
+/-- Parse a source text into items; `eflint` restricts the keywords to eFLINT's. -/
+def parseSource (src : String) (eflint : Bool := false) : Except Diagnostic (List Item) := do
+  let toks ← tokenize src eflint
   let lines := src.splitOn "\n" |>.toArray
   let lineOf (p : Pos) : String :=
     if h : p.line - 1 < lines.size then lines[p.line - 1].trim else ""

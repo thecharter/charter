@@ -134,17 +134,19 @@ def State.makeAssignments (spec : Spec) (st : Store) (s : State) : State :=
 
 /-- What one trigger did (eFLINT `TransInfo`). -/
 inductive TransInfo where
-  | mk (tagged : Tagged) (assignments : Store) (forced : Bool) (disabled : Bool)
+  | mk (tagged : Tagged) (assignments : Store) (forced : Bool) (disabled : Bool) (valid : Bool)
        (actor : Option Tagged) (syncs : List TransInfo)
   deriving Inhabited
 
 namespace TransInfo
-def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ => t
-def assignments : TransInfo → Store | .mk _ a _ _ _ _ => a
-def forced : TransInfo → Bool | .mk _ _ f _ _ _ => f
-def disabled : TransInfo → Bool | .mk _ _ _ d _ _ => d
-def actor : TransInfo → Option Tagged | .mk _ _ _ _ a _ => a
-def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ s => s
+def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ _ => t
+def assignments : TransInfo → Store | .mk _ a _ _ _ _ _ => a
+def forced : TransInfo → Bool | .mk _ _ f _ _ _ _ => f
+def disabled : TransInfo → Bool | .mk _ _ _ d _ _ _ => d
+/-- Charter (D5): whether the transition had institutional effect. -/
+def valid : TransInfo → Bool | .mk _ _ _ _ v _ _ => v
+def actor : TransInfo → Option Tagged | .mk _ _ _ _ _ a _ => a
+def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ _ s => s
 def isAction (t : TransInfo) : Bool := t.actor.isSome
 end TransInfo
 

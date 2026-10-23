@@ -62,9 +62,9 @@ step sim $(( st != 0 || s16 != 1 || s8 != 1 )) "psa 16/16: $s16, commons 8/8: $s
 BASE=test/eflint-corpus/eflint-outcomes.txt
 TOL=test/eflint-corpus/tolerances.md
 if [ -f "$BASE" ]; then
-  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --expect "$BASE" --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --eflint --expect "$BASE" --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 else
-  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --eflint --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 fi
 step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 

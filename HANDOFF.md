@@ -139,6 +139,29 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   (same order, same meaning; the corpus and spec runs are unchanged). The trust grep
   caught the words "sorry" and "axiom" in the module's own comment; reworded.
 
+## Evening: Phase 2's first slice (pushed to `main` directly)
+
+- **`Valid when` (D5)** on acts: effects apply iff every condition holds at performance;
+  `charter run` prints *valid: yes/no* on every transition; `TransInfo.valid`.
+- **`Except under a₁, a₂`** (plan §2.2.4): lawful iff some instance of a named act sharing
+  the bound components is enabled and valid; the act's own `Holds when`/`Conditioned by`
+  are not consulted.
+- **`Immunity name Holder v [Related to …] Against a₁, a₂ [Holds when] [Unless e]`**: a new
+  kind (`Kind.immunity`, `ImmunitySpec`); an act in `Against` whose **recipient** is the
+  holder of a held instance is not valid unless an `Unless` condition holds. The
+  holder-is-recipient rule is this draft's reading of "not valid against the holder"
+  (spec 007.4) and is for Eric to confirm; acts without `Recipient` are unaffected.
+- **`Scenario name { … }`** items, run by `charter test` from the configuration at that
+  point and leaving it unchanged (`run` only notes them); **claim phrases** `?lawful`,
+  `?valid`, `?violated` and their `?!` negations, labelled with the question they answer
+  (Law 2). A claim keyword is one only when followed by whitespace, so `?valid(5)` still
+  queries a fact named `valid`; found by a conformance test, fixed in the lexer.
+- **`--eflint` mode** on `run`/`test`/`check`: Charter's keywords are not keywords; the
+  battery runs the corpus with it (196/196 unchanged). CHR022 registered.
+- Spec 002.9, 005.9, 007.2, 007.4, 011.10–11 updated; 9 new conformance tests (82 total).
+- Not in this slice: time (D7), clauses and provenance (D4), `Param`, `Module`/`Use`,
+  `?why`, `Invariant` exploration, the `lib/` modules, `prove`. Next slice: time.
+
 ## Known gaps against Phase 1's exit criteria
 
 - The declarative semantics of `eval` and the evaluator's full agreement proof (Law 9):

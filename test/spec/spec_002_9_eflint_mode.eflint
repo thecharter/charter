@@ -1,0 +1,4 @@
+// In `--eflint` mode Charter's keywords are not keywords, so an eFLINT program may use them as atoms; this file is run in Charter mode and so avoids them, while `Valid` as an atom is tested by the corpus baseline run.
+Fact mode Identified by Charter, EFLINT.
++mode(Charter).
+?mode(Charter).

@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (evening) — Phase 2's first slice: `Valid when` (005.9), `Except under` (007.2), `Immunity … Against … Unless` (007.4), `Scenario` and the claim phrases (011.11), `--eflint` mode (002.9, 011.10); CHR022. 82 conformance tests.
 - 2026-10-23 (later) — Chapters 002–011 drafted from the implementation and eFLINT's semantics, each statement with a conformance test (72 tests, `test/spec/`, all passing; `tools/battery` runs them). 007 and 009 state Phase 2 designs as pending. `Charter.Eval.Properties` proves 004.3 and 005.3.
 - 2026-10-23 — Skeleton: chapter list, `diagnostics.md` with the first CHR codes. No chapter has normative text yet. The implementation is NON-COMPLIANT with the plan's §2 grammar; the eFLINT core (chapters 002–011) is being implemented in Phase 1 against the vendored corpus `test/eflint-corpus/`.
 
@@ -17,16 +18,16 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | Chapter | File | Status |
 |---|---|---|
 | 001 design goals | `001_design_goals.md` | unwritten (source: `docs/mission.md`) |
-| 002 lexical structure | `002_lexical_structure.md` | draft; 7 tests green |
+| 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green |
 | 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green; `Time`/`Duration` (D7) pending |
 | 004 facts and derivation | `004_facts_and_derivation.md` | draft; 11 tests green (D6) |
-| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 8 tests green; `Valid when` (D5) pending |
+| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 10 tests green, `Valid when` (D5) included |
 | 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 5 tests green; deadlines (D7) pending |
-| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft of the Phase 2 design; no tests yet |
+| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 4 tests green (`Except under`, `Immunity`); duty precedence pending |
 | 008 events, physical, syncs | `008_events_physical_syncs.md` | draft; 4 tests green |
 | 009 time | `009_time.md` | draft; 1 test green (clock fixed at 0); D7 pending |
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
-| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 10 tests green; `Scenario` pending |
+| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | unwritten (D4) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | unwritten (D11) |

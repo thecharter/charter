@@ -1,6 +1,6 @@
 # 005 — Acts, validity, effects
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 and D5; wording awaits Eric. Implementation: compliant for the eFLINT core; `Valid when` (D5) is Phase 2 and is stated here as the design, marked *pending*.
+**Status:** draft (2026-10-23). Meaning fixed by D2 and D5; wording awaits Eric. Implementation: compliant, including 5.9 (`Valid when`, Phase 2's first construct, landed the same day).
 
 An act is a type whose instances are performed. Performing one is an event in the history and is judged by three independent answers (Law 2): it *occurred* (always, once performed: Law 1), it was *lawful* (eFLINT's *enabled*: the instance holds, its conditions hold, and nothing it syncs with is forced), and it was *valid* (it had institutional effect). In the eFLINT core every performed act is valid, so a disabled act still has its effects and the violation is reported, not enforced (D5).
 
@@ -20,4 +20,4 @@ An act is a type whose instances are performed. Performing one is an event in th
 
 **5.8 Triggering.** A trigger phrase names an act or event; a fact or duty is CHR103. `test/spec/spec_005_8_trigger_non_act.eflint`
 
-**5.9 `Valid when` (Phase 2, pending).** `Act x … Valid when e`: effects apply iff `e` holds at performance; absent, `Valid when True`. A disabled act is reported *occurred, unlawful, valid* unless `Valid when` fails, then *occurred, unlawful, void*. Authority exceptions `Except under a₁, a₂` (plan §2.2.4) land with it.
+**5.9 `Valid when` (D5).** `Act x … Valid when e₁, e₂`: performing an instance has institutional effect (its own `Creates`/`Terminates`/`Obfuscates` apply) iff every `eᵢ` holds at performance with the act's components bound, and no immunity protects its recipient (007.4). Absent, `Valid when True`. A disabled act is reported *occurred, unlawful, valid* unless validity fails, then *occurred, unlawful, void*; transitions it syncs with are judged on their own. `charter run` prints all three answers for every transition. `test/spec/spec_005_9_valid_when.eflint`, `spec_005_9b_valid_when_default.eflint`

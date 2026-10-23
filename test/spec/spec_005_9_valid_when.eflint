@@ -1,0 +1,13 @@
+// An act with `Valid when e` has its effects only when `e` holds at performance; it still occurs, and its lawfulness is judged separately (D5).
+Fact actor Identified by Alice
+Fact consent Identified by C
+Fact done Identified by D
+Act do Creates done(D) Valid when consent(C) Holds when True.
+?lawful do(Alice).
+?!valid do(Alice).
+do(Alice).
+?!done(D).
++consent(C).
+?valid do(Alice).
+do(Alice).
+?done(D).

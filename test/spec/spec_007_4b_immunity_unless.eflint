@@ -1,0 +1,9 @@
+// An immunity's `Unless e` conditions, over its components, lift the protection while one holds.
+Fact actor Identified by Alice, Bob
+Fact waived Identified by actor
+Act fine Actor actor Recipient actor' Holds when True
+Immunity protected Holder actor Against fine Unless waived(actor).
++protected(Bob).
+?!valid fine(Alice, Bob).
++waived(Bob).
+?valid fine(Alice, Bob).

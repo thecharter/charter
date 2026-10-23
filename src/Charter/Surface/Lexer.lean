@@ -72,6 +72,16 @@ def wordKeywords : List String :=
     "Duty", "Fact", "Open", "Time", "True", "When", "With", "Act", "For", "Int", "Max", "Min",
     "Not", "Sum", "Var", "Do" ]
 
+/-- Charter's additions to the keyword set (plan §2.2); not keywords in `--eflint` mode,
+where they are atoms, as eFLINT reads them. -/
+def charterWordKeywords : List String :=
+  [ "Except under", "Valid when", "Immunity", "Scenario", "Against", "Unless" ]
+
+/-- The claim phrases. Each is a keyword only when followed by whitespace, so that
+`?valid(5)` still queries a fact named `valid` and `?valid do(x)` is the claim. -/
+def charterSymbolKeywords : List String :=
+  [ "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid" ]
+
 /-- Symbol keywords, longest first. -/
 def symbolKeywords : List String :=
   [ "#include", "#require", "####", "###", "##", "?--", "?-", "!?", "||", "&&", "<=", ">=", "..",
@@ -102,6 +112,8 @@ structure St where
   line : Nat := 1
   col  : Nat := 1
   toks : Array Tok := #[]
+  /-- `false` in `--eflint` mode: only eFLINT's keywords. -/
+  charter : Bool := true
 
 def St.pos (s : St) : Pos := ⟨s.line, s.col⟩
 
@@ -206,12 +218,20 @@ def step (s : St) : Except Diagnostic St := do
   match s.peek with
   | none => return s.push .eof p
   | some c =>
+    let claimKw (k : String) : Bool :=
+      startsWithAt s.cs s.i k && (match s.peek k.length with | some c' => c'.isWhitespace | none => false)
+    let claim := if s.charter then charterSymbolKeywords.find? claimKw else none
+    match claim with
+    | some k => return (s.advance k.length).push (.kw k) p
+    | none =>
+    let symbols := symbolKeywords
+    let words := if s.charter then charterWordKeywords ++ wordKeywords else wordKeywords
     -- symbol keywords
-    match symbolKeywords.find? (startsWithAt s.cs s.i) with
+    match symbols.find? (startsWithAt s.cs s.i) with
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
     -- word keywords at a boundary
-    match wordKeywords.find? (fun k => startsWithAt s.cs s.i k && boundaryAt s.cs (s.i + k.length)) with
+    match words.find? (fun k => startsWithAt s.cs s.i k && boundaryAt s.cs (s.i + k.length)) with
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
     if c == '"' then lexString s p
@@ -258,9 +278,9 @@ def run (fuel : Nat) (s : St) : Except Diagnostic (Array Tok) :=
 
 end Lexer
 
-/-- Tokenize a source text. -/
-def tokenize (src : String) : Except Diagnostic (Array Tok) :=
+/-- Tokenize a source text; `eflint` restricts the keywords to eFLINT's. -/
+def tokenize (src : String) (eflint : Bool := false) : Except Diagnostic (Array Tok) :=
   let cs := src.toList.toArray
-  Lexer.run (cs.size + 2) { cs }
+  Lexer.run (cs.size + 2) { cs, charter := !eflint }
 
 end Charter

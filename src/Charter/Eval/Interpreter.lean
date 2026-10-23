@@ -110,14 +110,18 @@ def enabledDeps (spec : Spec) : Nat → List DomId → Pol → DomId → List De
     | some tspec =>
       let xs := spec.components d
       let conds := depsList spec fuel xs p tspec.conditions
-      let syncs := match tspec.kind with
-        | .act a => a.syncs.flatMap fun s =>
-          binderDeps spec s.xs p ++ deps spec fuel (xs ++ s.xs) p s.t ++
-          (match typeOf spec s.t with
-            | some d' => [(d', p)] ++ enabledDeps spec fuel (d :: seen) p d'
-            | none => [])
+      let more := match tspec.kind with
+        | .act a =>
+          -- syncs, Valid when (consulted through Except under), and the Except under acts themselves
+          a.syncs.flatMap (fun s =>
+            binderDeps spec s.xs p ++ deps spec fuel (xs ++ s.xs) p s.t ++
+            (match typeOf spec s.t with
+              | some d' => [(d', p)] ++ enabledDeps spec fuel (d :: seen) p d'
+              | none => [])) ++
+          depsList spec fuel xs p a.validWhen ++
+          a.exceptUnder.flatMap (fun d' => [(d', p)] ++ enabledDeps spec fuel (d :: seen) p d')
         | _ => []
-      conds ++ syncs
+      conds ++ more
 end
 
 /-- The dependencies of a derived type: its derivation rules, its own conditions
@@ -255,10 +259,13 @@ inductive Output where
   | violation (v : Violation)
   | queryRes (ok : Bool)
   | instQueryRes (tes : List Tagged)
+  /-- Charter: the result of `?lawful`/`?valid`/`?violated`. -/
+  | expectRes (what : Expect) (negated : Bool) (ok : Bool)
 
 def Output.isFailure : Output → Bool
   | .diag d => d.isError
   | .queryRes ok => !ok
+  | .expectRes _ _ ok => !ok
   | _ => false
 
 namespace Interp
@@ -283,6 +290,15 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
     let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state⟩ []
     match p with
     | .onlyDecls => (some [], [])
+    | .scenario _ _ => (some [], [])
+    | .expect w neg xs t =>
+      let ask (te : Tagged) : M Bool := match w with
+        | .lawful => isEnabled M.fuel te
+        | .valid => isValid M.fuel te
+        | .violated => isViolated M.fuel te
+      match run (foreach M.fuel xs (whenTagged (eval M.fuel t) ask)) with
+      | .error e => (none, [diagOf e])
+      | .ok bss => (some [], [.expectRes w neg (bss.flatten.all (fun b => b != neg))])
     | .query t =>
       match run (eval M.fuel t) with
       | .error e => (none, [diagOf e])

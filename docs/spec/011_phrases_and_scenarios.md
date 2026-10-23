@@ -1,6 +1,6 @@
 # 011 — Phrases and scenarios
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 (eFLINT `Interpreter.hs`, `REPL.hs`); wording awaits Eric. Implementation: compliant for the eFLINT core; `Scenario` blocks and the expectation phrases (`?lawful`, `?valid`, `?violated`) are Phase 2, stated as pending.
+**Status:** draft (2026-10-23). Meaning fixed by D2 (eFLINT `Interpreter.hs`, `REPL.hs`); wording awaits Eric. Implementation: compliant, including 11.11 (`Scenario` and the claim phrases, Phase 2's first slice).
 
 A file is a sequence of phrases and directives. Each phrase is a step: it is resolved against the current declarations, evaluated against the current state, its effects are applied, derived facts are recomputed (004.4), and violations are reported (006.5).
 
@@ -22,6 +22,6 @@ A file is a sequence of phrases and directives. Each phrase is a step: it is res
 
 **11.9 Failure.** A phrase that produces an error diagnostic leaves the configuration unchanged; later phrases run against the state before it. `test/spec/spec_011_9_failed_phrase_leaves_state.eflint`
 
-**11.10 Test mode.** `charter test` passes a file that produces no error diagnostic and whose every query holds (eFLINT's `--test-mode` criterion); `//!` directives may instead expect a diagnostic or declare a known issue (`src/Charter/Cli/Test.lean`).
+**11.10 Test mode.** `charter test` passes a file that produces no error diagnostic and whose every claim holds (eFLINT's `--test-mode` criterion); `//!` directives may instead expect a diagnostic or declare a known issue (`src/Charter/Cli/Test.lean`). `--eflint` restricts the keywords to eFLINT's, so a corpus file may use `Valid`, `Against`, or `Scenario` as atoms (002.3). `test/spec/spec_002_9_eflint_mode.eflint`
 
-**11.11 Scenarios (Phase 2, pending).** `Scenario name { phrases }` groups phrases as a named test; `?lawful a(args)`, `?valid a(args)`, `?violated d` are claims about the three answers; `charter test` runs every scenario and `charter run` the top-level phrases (plan §2.2.6).
+**11.11 Scenarios and claims.** `Scenario name { phrases }` is a named test: `charter test` runs its phrases from the configuration at that point in the file and leaves it unchanged; `charter run` only notes it. `?lawful e`, `?valid e`, `?violated e` are claims about the instances of `e` (an act or duty instance; free variables bound to every instance), labelled with the question they answer (Law 2); `?!lawful`, `?!valid`, `?!violated` claim the opposite. A claim keyword is one only when followed by whitespace, so `?valid(5)` queries a fact named `valid`. `test/spec/spec_011_11_scenario.eflint`, `spec_011_11b_expectations.eflint`

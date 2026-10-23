@@ -210,20 +210,78 @@ def isHolds : Nat → Tagged → M Bool
         | _ => pure false
 
 /-- Whether an act or event instance is enabled: it holds, its conditions hold,
-and no transition it syncs with is forced (eFLINT `is_enabled`). -/
+and no transition it syncs with is forced (eFLINT `is_enabled`). Charter's
+`Except under a₁, a₂` (plan §2.2.4) replaces this: the act is lawful iff some
+instance of a named act sharing its bound components is enabled and valid. -/
 def isEnabled : Nat → Tagged → M Bool
   | 0, _ => err (.fuelExhausted "deciding whether an act is enabled")
   | fuel + 1, te => do
-    if !(← isHolds fuel te) then pure false
-    else if !(← satConditions fuel te) then pure false
-    else
-      let tspec ← getTypeSpec te.2
-      match tspec.kind with
-      | .act a =>
+    let tspec ← getTypeSpec te.2
+    match tspec.kind with
+    | .act a =>
+      if !a.exceptUnder.isEmpty then
+        let spec ← getSpec
+        withSubs (Tagged.bindings tspec.domain te) do
+          let subs ← getSubs
+          let rs ← a.exceptUnder.mapM fun d' => do
+            let free := (spec.components d').filter (fun x => !(subs.any (fun p => p.1 == x)))
+            let insts ← results (scope fuel free (whenTagged (eval fuel (.app d' (.named []))) pure))
+            let oks ← insts.mapM fun inst => do
+              if ← isEnabled fuel inst then isValid fuel inst else pure false
+            pure (oks.any id)
+          pure (rs.any id)
+      else if !(← isHolds fuel te) then pure false
+      else if !(← satConditions fuel te) then pure false
+      else
         withSubs (Tagged.bindings tspec.domain te) do
           let infos ← a.syncs.mapM (evalSync fuel [])
           pure (infos.flatten.all (fun i => !i.forced))
-      | _ => pure true
+    | _ =>
+      if !(← isHolds fuel te) then pure false
+      else satConditions fuel te
+
+/-- Charter (D5, plan §2.2.1–2): whether performing an act instance has institutional
+effect: every `Valid when` condition holds and no immunity protects its recipient. An
+event or an act without `Valid when` is valid unless an immunity applies. -/
+def isValid : Nat → Tagged → M Bool
+  | 0, _ => err (.fuelExhausted "deciding whether an act is valid")
+  | fuel + 1, te => do
+    let tspec ← getTypeSpec te.2
+    match tspec.kind with
+    | .act a =>
+      let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
+      if !(conds.all id) then pure false
+      else
+        match te.1, a.hasRecipient with
+        | .prod (_ :: recipient :: _), true => do
+          let blocked ← immunityBlocks fuel te.2 recipient
+          pure (!blocked)
+        | _, _ => pure true
+    | _ => pure true
+
+/-- Whether some immunity instance that holds protects `party` against the act `act`:
+its holder is `party`, `act` is in its `Against`, and none of its `Unless` conditions hold. -/
+def immunityBlocks : Nat → DomId → Tagged → M Bool
+  | 0, _, _ => err (.fuelExhausted "checking immunities")
+  | fuel + 1, act, party => do
+    let spec ← getSpec
+    let state ← getState
+    let same (a b : Tagged) : Bool := spec.chaseAlias a.2 == spec.chaseAlias b.2 && Elem.beq a.1 b.1
+    let rs ← (spec.immunitiesAgainst act).mapM fun entry => do
+      let d := entry.1
+      let tspec := entry.2.1
+      let i := entry.2.2
+      let held := state.holdsList.filter (fun im => im.2 == d)
+      let bs ← held.mapM fun im => do
+        match im.1 with
+        | .prod (holder :: _) =>
+          if same holder party then
+            let us ← withSubs (Tagged.bindings tspec.domain im) (i.unlessConds.mapM (fun c => whenBool (eval fuel c) pure))
+            pure (!(us.any id))
+          else pure false
+        | _ => pure false
+      pure (bs.any id)
+    pure (rs.any id)
 
 def evalViolationCondition : Nat → Tagged → Option (List Term) → M Bool
   | 0, _, _ => err (.fuelExhausted "checking a violation condition")
@@ -262,21 +320,25 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
       let actor : Option Tagged := match te.1 with
         | .prod (a :: _) => some a
         | _ => none
-      let doTransition (mActor : Option Tagged) (effects : List Effect) (ss : List Sync) (physical : Bool) : M TransInfo :=
+      let doTransition (mActor : Option Tagged) (valid : Bool) (effects : List Effect) (ss : List Sync) (physical : Bool) : M TransInfo :=
         withSubs (Tagged.bindings tspec.domain te) do
           let syncInfos ← ss.mapM (evalSync fuel (te :: done))
           let syncInfos := syncInfos.flatten
           let (ssAss, anyF) := syncTransInfos syncInfos
-          let stores ← effects.mapM (evalEffect fuel)
+          -- D5: the act's own effects apply iff it is valid; synced transitions are judged on their own
+          let stores ← if valid then effects.mapM (evalEffect fuel) else pure []
           let ass := Store.union (Store.unions stores) ssAss
           let disabled := anyF || !enabled
           let forced := anyF || (!enabled && !physical)
-          pure (.mk te ass forced disabled mActor syncInfos)
+          pure (.mk te ass forced disabled valid mActor syncInfos)
       match tspec.kind with
       | .fact _ => empty
       | .duty _ => empty
-      | .act a => doTransition actor a.effects a.syncs a.physical
-      | .event e => doTransition none e.effects e.syncs true
+      | .immunity _ => empty
+      | .act a => do
+        let valid ← isValid fuel te
+        doTransition actor valid a.effects a.syncs a.physical
+      | .event e => doTransition none true e.effects e.syncs true
 
 def evalSync : Nat → List Tagged → Sync → M (List TransInfo)
   | 0, _, _ => err (.fuelExhausted "evaluating a sync")

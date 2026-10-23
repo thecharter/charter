@@ -1,0 +1,10 @@
+// `Act x … Except under a₁, a₂`: performing `x` is lawful when and only when it is also a valid, enabled exercise of a named act sharing its components.
+Fact actor Identified by Alice, Bob
+Fact warrant Identified by W
+Act search Actor actor Recipient actor' Except under search-with-warrant
+Act search-with-warrant Actor actor Recipient actor' Holds when warrant(W).
+?!lawful search(Alice, Bob).
++warrant(W).
+?lawful search(Alice, Bob).
+-warrant(W).
+?!lawful search(Alice, Bob).

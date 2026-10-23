@@ -1,0 +1,9 @@
+// `?lawful e`, `?valid e`, `?violated e` are claims about an act or duty instance, with free variables bound to every instance.
+Fact actor Identified by Alice, Bob
+Act greet Actor actor Recipient actor' Holds when True
+Duty d Holder actor Claimant actor' Violated when True.
+?lawful greet(Alice, Bob).
+?lawful greet(actor, actor').
+?valid greet(Alice, Bob).
++d(Alice, Bob).
+?violated d(Alice, Bob).

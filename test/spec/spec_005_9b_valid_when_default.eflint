@@ -1,0 +1,8 @@
+// An act without `Valid when` is valid whenever performed, so an eFLINT program keeps eFLINT's meaning: a disabled act still has its effects.
+Fact actor Identified by Alice
+Fact done Identified by D
+Act do Creates done(D).
+?!lawful do(Alice).
+?valid do(Alice).
+do(Alice).
+?done(D).
