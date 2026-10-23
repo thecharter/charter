@@ -9,7 +9,7 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ## Where
 
-- Branch `phase-0-1-eflint-core` off `main` at `806f23b`, **not pushed**, eight commits
+- Merged to `main` by fast-forward (PR #1, then direct pushes per the landing rule change of 2026-10-23). The branch carried eight commits
   (`496076d` move to `src/`, `ab88de7` D12/B9/spec skeleton, `51ee95b` corpus,
   `1a12f3f` gates and battery, `3dc5c3d` plan §3a server, `1651515` Phase 1 pipeline,
   `f1c5cc4` `test --expect`, plus this handoff). Every change goes to `main` through a
@@ -113,18 +113,45 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   (`c` before `b` in `tests/syncs/hierarchy.eflint`'s tree); the comment in that file
   shows `b` first. Charter prints as eFLINT's code does. Cosmetic; not in test mode.
 
+## Later the same day: the rest of Phase 1's list (pushed to `main` directly, per the new landing rule)
+
+- **`--out json`** on `run`, `test`, `check`: one record per line (`diagnostic`,
+  `claim` tagged *checked* about *holds*, `transition` with the three answers,
+  `violation`, `fact`, `summary`). **`charter repl [file]`** with `:display`, `:help`,
+  `:quit`. **Fixture directives** `//! expect-error: CHRnnn`, `//! expect-warning:`,
+  `//! known-issue:` read by `charter test` (plan §5.4).
+- **Spec chapters 002–011 drafted** (`docs/spec/`), every normative statement with a
+  conformance test: 72 files under `test/spec/` (`.eflint` until the `.charter`
+  extension moves to this grammar), all passing; `tools/battery` step 7 runs them.
+  Three test-authoring mistakes were found and fixed by the run (built-in types hold
+  nothing until assigned; eFLINT's "cannot reopen" applies only to a type that was
+  explicitly open then closed; declaration-order test lacked a declaration). The
+  chapters are **drafts**: D2 fixes the meaning, Eric blesses the wording. 007 and 009
+  state the Phase 2 designs as pending. Integer `/` and `%` now round toward negative
+  infinity (`Int.fdiv`/`fmod`), matching Haskell's `div`/`mod`; the corpus had no
+  negative divisor to catch it, `spec_010_2` does.
+- **`Charter.Eval.Properties`**: the first proved properties, depending on `propext`
+  at most: 005.3 create beats terminate (`Store.create_beats_terminate`), 004.3
+  assignment beats derivation (`State.derive_assigned`, `deriveAll_unchanged`), and
+  004.5's fixpoint half (`Saturate.saturateStratum_fixpoint`: the state the evaluator
+  returns for a stratum is unchanged by one more pass). To make them provable,
+  `State.deriveAll` and the saturation `pass` were restated as structural recursion
+  (same order, same meaning; the corpus and spec runs are unchanged). The trust grep
+  caught the words "sorry" and "axiom" in the module's own comment; reworded.
+
 ## Known gaps against Phase 1's exit criteria
 
-- `test/spec/` conformance tests for chapters 002–011 and the chapters themselves:
-  not written. The spec is a skeleton.
-- The evaluator's agreement proof with a declarative `Core.Semantics` (Law 9): not
-  started. Today the evaluator is the only definition.
-- `charter repl`, `--eflint` mode flag, `--out json`: not built. `--eflint` has nothing
-  to toggle until Phase 2 adds a Charter construct.
+- The declarative semantics of `eval` and the evaluator's full agreement proof (Law 9):
+  not started beyond `Properties.lean`. Today the evaluator is the only definition of
+  `eval`, `isHolds`, `isEnabled`, `isViolated`; leastness of the fixpoint and the
+  correctness of stratification are stated in 004.5–004.6 and tested, not proved.
+- `--eflint` mode flag: nothing to toggle until Phase 2 adds a Charter construct.
 - `find_transitions` (eFLINT's per-phrase enumeration of every possible trigger, used
   only by its REPL `:options`) is not computed; nothing in test mode depends on it.
 - Time is fixed at 0 (`Current Time`, the `Time` domain); D7's time lands in Phase 2.
 - `charter test` judges a file on its own when no baseline line exists for it.
+- Chapter 007 has no tests (its constructs are Phase 2); chapters 001 and 012–020 are
+  unwritten.
 
 ## Pitfalls found (also in AGENTS.md)
 
