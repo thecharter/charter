@@ -283,7 +283,8 @@ trailer, or credit; no `Co-Authored-By` for AI assistance (adopted 2026-10-23).
 - Never wrap commands in an opaque script (`sh -c`, `bash -c`, `eval`, `xargs
   <cmd>`, a heredoc that edits files in place): the permission checker cannot read
   inside them. Put multi-step logic in a script file under `tools/` and run that.
-- Commit locally; do not push unless told. A pushed branch always has a PR.
+- Commit to `main` and push once the battery is green (see "Landing changes"); agents
+  working in a worktree commit there and the coordinator fast-forwards `main`.
 - Re-read any file before editing it after ten or more messages; context compaction
   may have destroyed your knowledge of it and the edit will fail or, worse, succeed
   wrongly.
@@ -340,9 +341,12 @@ continue until it passes.
 
 ## Landing changes
 
-Every change reaches `main` through a pull request. A PR is a draft until the PR
-tier is green on the maintainer's machine with the pinned `lean-toolchain` and the
-result is posted on the PR; GitHub lanes run nightly or on dispatch and are not a
-merge signal. Dependent PRs are a `gh stack`, never hand-chained bases. Merge with a
-squash. The `lean-toolchain` pin is bumped first, in its own change, when a feature
-needs a newer toolchain; the surface is never reverted to appease an old pin.
+For now (Eric, 2026-10-23) changes are pushed straight to `main`; no pull requests.
+The gate is unchanged: nothing is pushed until the PR tier (`tools/battery`) is green
+on the maintainer's machine with the pinned `lean-toolchain`, and the commit message
+or the handoff says so. One logical change per commit, with its own fast-forward
+history (no squashing: the handoff and decision log cite hashes). GitHub lanes run
+nightly or on dispatch and are not a merge signal. When PRs return, they are drafts
+until the battery is green, dependent PRs are a `gh stack`, and merges are squashes.
+The `lean-toolchain` pin is bumped first, in its own change, when a feature needs a
+newer toolchain; the surface is never reverted to appease an old pin.
