@@ -21,3 +21,19 @@ Source: `docs/plans/2026-10-22-redesign.md` §2.1 lists two eFLINT differences s
 **Prediction.** 60% that Eric rules **error** (CHR019 as an error; `tests/truth/infinite_even.eflint` and `tests/parallel-comp/no_violations.eflint` listed in `test/eflint-corpus/tolerances.md`), 40% replacement-with-warning. Below the delegation threshold, so the implementation keeps eFLINT's meaning (replacement) and emits CHR019 as a **warning** naming both declarations until the ruling. Moving to the predicted ruling is: raise CHR019 to an error, delete the replacement path in `Resolve`, add the two tolerance lines.
 
 **Reopens if.** The PSA rewrite needs to restate a type (it should use `Extend` or `Amend`, D11).
+
+---
+
+## B10. Who signs the artifact's certificate, and what does the server check it against (blocks the artifact format, plan §3a; decide before Phase 3)
+
+**Question.** Under the compiler/server split (plan §3a, 2026-10-23), a compiled law takes office in a server only with a verified certificate. Three ways to verify it: (a) the server embeds the kernel and re-checks the proofs (heavy; the server then carries the engine, against the spirit of the operator law); (b) a trusted compiler signs the artifact and the server checks the signature (reintroduces trust in whoever ran the compiler, one level up); (c) the artifact carries a proof certificate that the server verifies with a small checker, itself proved against the kernel once (the honest middle; what independent proof checkers for Lean's export format do).
+
+**References.** eFLINT's server (`.reference/eflint/src/Server.hs`) loads source and compiles it at runtime: no artifact, no certificate, operator sees source. Catala compiles to a target language and ships no certificate; its proof plugin runs at development time. Quint ships ITF traces as artifacts, unsigned. Symboleo has no runtime.
+
+**Mission.** Law 10 (one trusted checker; every claim tagged), Law 11 (the author never sees the engine), and the proposed operator law (the operator never sees source; replay is byte-identical). Goal 3 as restated in the plan: one artifact in three hosts.
+
+**Fit.** (a) satisfies Law 10 directly but makes the server the engine's host; (b) fails Law 10's spirit (a signature is trust, not a check); (c) keeps the trusted base to one proved checker and one proved evaluator, both in the server, and lets anyone replay.
+
+**Prediction.** (c) at 70%: a proof certificate in the artifact, verified by a checker that is proved sound against the kernel and shipped inside the server; the server's answers are then tagged *checked* under the sharpened definition the plan proposes for Law 10. Below the delegation threshold and about trust, so it waits for Eric. Nothing in Phases 1–2 depends on it; the artifact format (Phase 3's first step) does.
+
+**Reopens if.** The certificate size or check time makes amendment impractical on-chain, in which case the guard host verifies off-chain and posts the artifact hash.
