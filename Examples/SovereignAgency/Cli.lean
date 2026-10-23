@@ -38,7 +38,7 @@ def psaSim (path? : Option System.FilePath) : IO Unit := do
 
 /-- Verification ledger of the Protocol of Sovereign Agency (`charter verify --law psa`). -/
 def psaLedger : List LedgerEntry := [
-  ("psa_program_is_lean_law / psa_program_clauses (Examples.SovereignAgency.Program)", "decided", "lowering protocol-of-sovereign-agency.charter yields exactly the Lean law psaL0 and its 61 clauses, so every theorem below is a theorem about the .charter file"),
+  ("psa_program_is_companion_law / psa_program_clauses (Examples.SovereignAgency.Program)", "decided", "lowering protocol-of-sovereign-agency.charter yields exactly the companion law psaL0 and its 61 clauses, so every theorem below is a theorem about the .charter file"),
 
   ("conditional_ledger_conservation (INV.1)", "proved", "Law 1 & Law 4 founding ledger balance equals obligation minus retirement and claimant forfeitures while a member survives before sunset; internal lineage operations preserve balance"),
   ("collection_follows_income_without_exit (INV.2)", "proved", "Law 1 & Law 4 retirement collection follows net value added across all living members without individual ledger shares or exit; invariant to buyout status"),

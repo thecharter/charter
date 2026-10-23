@@ -5,7 +5,7 @@ import Examples.SovereignAgency.Export
 # Examples.SovereignAgency.Program — The `.charter` File Is the Protocol
 
 `psaDoc` embeds `protocol-of-sovereign-agency.charter` as a Lean term, and
-`psa_program_is_lean_law` proves by kernel evaluation that lowering it yields exactly
+`psa_program_is_companion_law` proves by kernel evaluation that lowering it yields exactly
 the Lean law `psaL0` (transported to the dynamic signature). Every theorem about the
 Lean formalization, from `terminate_only_by_power` to the 16 adversarial world
 simulations, is therefore a theorem about the `.charter` file. The provenance
@@ -26,7 +26,7 @@ def psaDoc : Doc := charter_program "protocol-of-sovereign-agency.charter"
 def psaProgram : Lowered := lower psaDoc
 
 /-- The `.charter` file and the Lean formalization are the same law. -/
-theorem psa_program_is_lean_law : psaProgram.law = Law.lift psaEmbedding psaL0 := by
+theorem psa_program_is_companion_law : psaProgram.law = Law.lift psaEmbedding psaL0 := by
   decide +kernel
 
 /-- The `.charter` file carries the same 61 verbatim clauses. -/

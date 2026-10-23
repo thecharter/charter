@@ -45,7 +45,7 @@ def commonsSim (path? : Option System.FilePath) : IO Unit := do
 
 /-- Verification ledger of the Autonomous Commons (`charter verify --law commons`). -/
 def commonsLedger : List LedgerEntry := [
-  ("commons_program_is_lean_law / commons_program_clauses (Examples.AutonomousCommons.Program)", "decided", "lowering autonomous-commons.charter yields exactly the Lean law commonsL0 and its 8 clauses, so every theorem below is a theorem about the .charter file"),
+  ("commons_program_is_companion_law / commons_program_clauses (Examples.AutonomousCommons.Program)", "decided", "lowering autonomous-commons.charter yields exactly the companion law commonsL0 and its 8 clauses, so every theorem below is a theorem about the .charter file"),
 
   ("commons_wellFormed / commons_english_covered / commons_norms_interpreted / commons_reverse_provenance", "decided", "lexical, normative, and reverse provenance coverage of all 8 clauses of the Autonomous Compute & Treasury Commons (13 duties, 20 powers, 1 immunity)"),
   ("commons_rules_built_from_modules", "proved", "every duty, power, and immunity of commonsLaw is definitionally an instantiation of a Charter.Modules rule builder over σ_commons"),

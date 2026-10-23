@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# PR-tier battery (AGENTS.md "Rebuild and verify"; plan §5.4). Run from anywhere:
+#
+#     tools/battery            full PR tier
+#     tools/battery --no-build skip the lake build (the binary must be current)
+#
+# Exit status is non-zero if any step fails. Each step prints one `ok`/`FAIL` line
+# and keeps its full output under out/battery/ for inspection.
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+OUT=out/battery
+mkdir -p "$OUT"
+fail=0
+build=1
+[ "${1:-}" = "--no-build" ] && build=0
+
+step() { # name, status(0/1), detail
+  if [ "$2" -eq 0 ]; then printf 'ok    %-28s %s\n' "$1" "$3"; else printf 'FAIL  %-28s %s\n' "$1" "$3"; fail=1; fi
+}
+
+# 1. lake build, zero warnings
+if [ $build -eq 1 ]; then
+  lake build > "$OUT/build.log" 2>&1; st=$?
+  warns=$(grep -c 'warning:' "$OUT/build.log")
+  if [ $st -ne 0 ]; then step build 1 "lake build failed; see $OUT/build.log"
+  elif [ "$warns" -ne 0 ]; then step build 1 "$warns warning(s); see $OUT/build.log"
+  else step build 0 "$(tail -1 "$OUT/build.log")"; fi
+else
+  step build 0 "skipped (--no-build)"
+fi
+[ -x "$B" ] || { step binary 1 "$B missing"; echo "battery: FAIL"; exit 1; }
+
+# 2. gates
+for g in test/gates/*.sh; do
+  name=$(basename "$g" .sh)
+  bash "$g" > "$OUT/$name.log" 2>&1; st=$?
+  step "$name" $st "$(tail -1 "$OUT/$name.log")"
+done
+
+# 3. charter check on both example programs: zero FAIL, zero STALE
+PSA=Examples/SovereignAgency/protocol-of-sovereign-agency.charter
+COM=Examples/AutonomousCommons/autonomous-commons.charter
+"$B" check "$PSA" "$COM" > "$OUT/check-files.log" 2>&1; st=$?
+bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-files.log")
+ok=$(grep -c '^ok' "$OUT/check-files.log")
+step check-charter-files $(( st != 0 || bad != 0 )) "$ok ok, $bad FAIL/STALE"
+
+# 4. charter check on the linked companions
+"$B" check > "$OUT/check-linked.log" 2>&1; st=$?
+bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-linked.log")
+step check-linked $(( st != 0 || bad != 0 )) "$bad FAIL/STALE"
+
+# 5. charter sim: 16/16 and 8/8
+"$B" sim > "$OUT/sim.log" 2>&1; st=$?
+s16=$(grep -c '(16/16 scenarios passed)' "$OUT/sim.log")
+s8=$(grep -c '(8/8 scenarios passed)' "$OUT/sim.log")
+step sim $(( st != 0 || s16 != 1 || s8 != 1 )) "psa 16/16: $s16, commons 8/8: $s8"
+
+# 6. the eFLINT corpus (D2), once `charter test` exists
+if "$B" help 2>/dev/null | grep -q '^  test '; then
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples > "$OUT/corpus.log" 2>&1; st=$?
+  step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
+else
+  step eflint-corpus 1 "charter test is not implemented yet (Phase 1)"
+fi
+
+if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
+exit $fail

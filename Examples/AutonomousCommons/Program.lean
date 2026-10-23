@@ -5,7 +5,7 @@ import Examples.AutonomousCommons.Export
 # Examples.AutonomousCommons.Program — The `.charter` File Is the Commons
 
 `commonsDoc` embeds `autonomous-commons.charter` as a Lean term and
-`commons_program_is_lean_law` proves by kernel evaluation that lowering it yields the
+`commons_program_is_companion_law` proves by kernel evaluation that lowering it yields the
 Lean law `commonsL0`, so the commons theorems and module simulations are theorems
 about the `.charter` file.
 -/
@@ -22,7 +22,7 @@ def commonsDoc : Doc := charter_program "autonomous-commons.charter"
 
 def commonsProgram : Lowered := lower commonsDoc
 
-theorem commons_program_is_lean_law : commonsProgram.law = Law.lift commonsEmbedding commonsL0 := by
+theorem commons_program_is_companion_law : commonsProgram.law = Law.lift commonsEmbedding commonsL0 := by
   decide +kernel
 
 theorem commons_program_clauses : commonsProgram.clauses = commonsClauses := by
