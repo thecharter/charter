@@ -209,9 +209,21 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   by a declaration keyword starts the next frame; before, `Fact p … Open Fact o` opened
   `p` (eFLINT's grammar has the same ambiguity; its corpus never hits it).
 - Spec 014 drafted; 3 tests (102 total).
-- Next slices: `Module`/`Use` (D8), `Invariant` exploration (`test --explore`), the
-  `lib/` modules as `.charter`, a first `prove` generator; then Phase 3's artifact
-  format (B10 first).
+## Late (3): Phase 2's fifth slice, `Module`/`Use` (D8)
+
+- `Module name(params) { declarations }` stores its body in `Spec.modules`; `Use
+  name(args) [As prefix]` expands in `Resolve.expandUses` before a block is executed:
+  parameters replaced by the argument types, every name the module declares renamed
+  `prefix-name` (`Term.mapDom`, `Decl.mapDom`, `TypeSpec.mapDom` and friends in
+  `Core/Term.lean` and `Core/Spec.lean`), nested `Use`s expanded recursively (fuel 32).
+  CHR023 for an unknown module or wrong arity.
+- Parser: `frame` and `moduleBody` are now mutually recursive on fuel. `Decl` and
+  `ModClause` moved above `Spec` in `Spec.lean` because `Spec` now holds module bodies.
+- Spec 015 drafted (the `-` join of the prefix is a spelling for Eric); 4 tests (106
+  total).
+- Next slices: `Invariant` exploration (`test --explore`, needs eFLINT's
+  `find_transitions` enumeration), the `lib/` modules as `.charter`, a first `prove`
+  generator; then Phase 3's artifact format (B10 first).
 
 ## Known gaps against Phase 1's exit criteria
 

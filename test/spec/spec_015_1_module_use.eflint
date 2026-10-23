@@ -1,0 +1,14 @@
+// `Module name(params) { declarations }` is a parameterised block; `Use name(args) As prefix` instantiates it, replacing each parameter by its argument and prefixing every name the module declares with `prefix-`.
+Fact asset Identified by A, B
+Fact coin Identified by C
+Module pool(item) {
+  Fact balance Identified by item * int
+  Fact funded Identified by item Holds when (Exists balance: balance.item == item && balance.int > 0)
+}
+Use pool(asset) As a
+Use pool(coin) As c.
++a-balance(A, 5).
++c-balance(C, 0).
+?a-funded(A).
+?!a-funded(B).
+?!c-funded(C).

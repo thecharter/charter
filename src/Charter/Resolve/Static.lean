@@ -591,11 +591,41 @@ def executeExt (d : DomId) (cs : List ModClause) : Stc Unit :=
 
 def builtins : List DomId := ["int", "string", "actor"]
 
+/-- Expand every `Use` into the renamed body of its module (D8): parameters are
+replaced by the arguments, the names the module declares are prefixed with
+`prefix-` when `As prefix` is given, and the module's `Use`s expand in turn. -/
+def expandUses : Nat → List Decl → Stc (List Decl)
+  | 0, _ => err "CHR003" "modules nest too deeply"
+  | fuel + 1, ds => do
+    -- register the block's modules first so a Use may precede its Module in the block
+    ds.forM fun d => match d with
+      | .module n ps body => modifySpec fun s => { s with modules := (n, ps, body) :: s.modules.filter (·.1 != n) }
+      | _ => pure ()
+    let spec ← getSpec
+    let expanded ← ds.mapM fun d => match d with
+      | .use n args pre =>
+        match spec.modules.find? (·.1 == n) with
+        | none => err "CHR023" s!"Use {n}: no such module"
+        | some (_, ps, body) =>
+          if ps.length != args.length then
+            err "CHR023" s!"Use {n}: the module takes {ps.length} parameter(s), {args.length} given"
+          else
+            let declared := declaredNames body
+            let f (x : DomId) : DomId :=
+              match (ps.zip args).find? (·.1 == x) with
+              | some (_, a) => a
+              | none => if declared.contains x then (match pre with | some p => p ++ "-" ++ x | none => x) else x
+            expandUses fuel (body.map (Decl.mapDom f))
+      | .module .. => pure []
+      | d => pure [d]
+    return expanded.flatten
+
 /-- Execute a block of declarations (eFLINT `compile_phrase (PDeclBlock ds)`):
-new types and placeholders first, as written; then each new type is compiled with
-every new name in scope; then the extensions. Returns the initial instances of the
-block's `Param`s (D11). -/
+`Use`s expanded (D8); new types and placeholders first, as written; then each new type
+is compiled with every new name in scope; then the extensions. Returns the initial
+instances of the block's `Param`s (D11). -/
 def executeDecls (ds : List Decl) : Stc Store := do
+  let ds ← expandUses 32 ds
   let (inits, exts) := ds.partition Decl.isInitial
   let init : Store := inits.filterMap fun d => match d with
     | .param n _ v => some ((.int v, n), .holdsTrue none none)
@@ -617,6 +647,8 @@ def executeDecls (ds : List Decl) : Stc Store := do
       if (spec.lookupDecl n).isSome then
         warn "CHR019" s!"{n} is declared again; the new declaration replaces the earlier one (B9 pending)"
       setSpec (spec.insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
+    | .module .. => pure ()
+    | .use .. => pure ()
     | .typeExt .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in

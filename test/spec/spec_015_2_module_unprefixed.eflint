@@ -1,0 +1,10 @@
+// Without `As`, a module's names are introduced as written; a module may be used before its declaration in the same block, and a module's own `Use`s expand with it.
+Fact person Identified by P
+Use greeting(person)
+Module greeting(who) {
+  Act greet Actor who Creates greeted(who) Holds when True
+  Fact greeted Identified by who
+}
+.
+greet(P).
+?greeted(P).

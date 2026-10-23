@@ -1,0 +1,5 @@
+// `Use` of an undeclared module, or with the wrong number of arguments, is CHR023.
+//! expect-error: CHR023
+Module m(a, b) { Fact x Identified by a }
+Fact t Identified by T
+Use m(t).

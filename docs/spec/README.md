@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (late, 3) — Phase 2's fifth slice: `Module name(params) { … }` and `Use name(args) As prefix` (D8, chapter 015); CHR023. 106 conformance tests.
 - 2026-10-23 (late, 2) — Phase 2's fourth slice: `Param` (D11, chapter 014) and fact origins with `?why` (Law 6, 004.10). 102 conformance tests.
 - 2026-10-23 (late) — Phase 2's third slice, clauses and provenance (D4): chapter 012; `charter check` and `charter test` run the Law 8 checks as claims; `charter trace`. 99 conformance tests.
 - 2026-10-23 (night) — Phase 2's second slice, time (D7): the clock (`@ t.`, `tick.`), `Time`/`Duration` types and domains, stamps on every assignment, `Held(e) For d`, `Creates e For d`, `Due within d`; CHR106. 92 conformance tests.
@@ -34,7 +35,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
-| 015 modules and require | `015_modules_and_require.md` | unwritten (D8) |
+| 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); `lib/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |
 | 017 projections | `017_projections.md` | unwritten |
 | 018 toolchain and CLI | `018_toolchain_and_cli.md` | unwritten (D1, D9) |

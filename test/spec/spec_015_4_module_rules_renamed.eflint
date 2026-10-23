@@ -1,0 +1,17 @@
+// Renaming applies throughout the module: effects, conditions, derivations, duty clauses, and `Against` lists all refer to the instantiated names.
+Fact actor Identified by Alice, Bob
+Module guard(thing) {
+  Fact locked Identified by thing
+  Act open Actor actor Recipient actor' Related to thing Conditioned by Not(locked(thing)) Holds when True
+  Immunity shielded Holder actor Against open
+  Duty keep Holder actor Claimant actor' Related to thing Violated when locked(thing)
+}
+Fact door Identified by D
+Use guard(door) As d.
+?lawful d-open(Alice, Bob, D).
++d-locked(D).
+?!lawful d-open(Alice, Bob, D).
++d-shielded(Bob).
+?!valid d-open(Alice, Bob, D).
++d-keep(Alice, Bob, D).
+?violated d-keep(Alice, Bob, D).

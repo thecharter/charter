@@ -37,6 +37,7 @@ more errors); `warning` does not.
 | CHR020 | error | derivation not stratifiable: a cycle through negation, naming the types on the cycle (D6) | `Charter.Resolve` |
 | CHR021 | error | a type used in a position that needs a composite (product) type | `Charter.Resolve` |
 | CHR022 | error | `Except under` or `Against` names something that is not an act | `Charter.Resolve` |
+| CHR023 | error | `Use` names no declared module, or gives the wrong number of arguments (D8) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

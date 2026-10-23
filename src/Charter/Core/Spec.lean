@@ -113,6 +113,73 @@ structure TypeSpec where
 
 def TypeSpec.isClosed (t : TypeSpec) : Bool := t.closed.getD true
 
+/-! ## Surface declarations -/
+
+/-- A clause of a declaration or `Extend` (eFLINT `ModClause`). -/
+inductive ModClause where
+  | conditionedBy (ts : List Term)
+  | derivation (ds : List Derivation)
+  | postCond (effs : List Effect)
+  | sync (ss : List Sync)
+  | violation (ts : List Term)
+  | enforcingActs (as : List DomId)
+  | terminatedBy (as : List DomId)
+  | createdBy (as : List DomId)
+  | strings (ss : List String)
+  | ints (is : List Int)
+  | close
+  | open
+  /-- Charter: `Valid when` on an act. -/
+  | validWhen (ts : List Term)
+  /-- Charter: `Except under` on an act. -/
+  | exceptUnder (as : List DomId)
+  /-- Charter: `Against` on an immunity. -/
+  | against (as : List DomId)
+  /-- Charter: `Unless` on an immunity. -/
+  | unlessCond (ts : List Term)
+  /-- Charter (D7): `Due within d` on a duty: violated once held for `d`. -/
+  | dueWithin (d : Term)
+  /-- Charter (D4): `From CLAUSE "span"`: the English this rule is the meaning of. -/
+  | fromSpan (clause : ClauseId) (text : String)
+  deriving Repr, Inhabited
+
+/-- A declaration: a new type, an extension of one, or a placeholder alias. -/
+inductive Decl where
+  | typeDecl (d : DomId) (t : TypeSpec)
+  | typeExt (d : DomId) (clauses : List ModClause)
+  | placeholder (f t : DomId)
+  /-- Charter (D4): a clause of the authoritative document with its register spans. -/
+  | clause (c : Clause)
+  /-- Charter (D4): `Document "path"`. -/
+  | document (path : String)
+  /-- Charter (D11): `Param name [: Int|Time|Duration] = n`, a `Var` fact with an initial instance. -/
+  | param (name : DomId) (dom : Domain) (value : Int)
+  /-- Charter (D8): `Module name(params) { declarations }`. -/
+  | module (name : DomId) (params : List DomId) (body : List Decl)
+  /-- Charter (D8): `Use name(args) [As prefix]`: instantiate a module. -/
+  | use (name : DomId) (args : List DomId) (pre : Option String)
+  deriving Repr, Inhabited
+
+def Decl.isInitial : Decl → Bool
+  | .typeDecl .. => true
+  | .placeholder .. => true
+  | .typeExt .. => false
+  | .clause .. => true
+  | .document .. => true
+  | .param .. => true
+  | .module .. => true
+  | .use .. => true
+
+def Decl.name : Decl → DomId
+  | .typeDecl d _ => d
+  | .typeExt d _ => d
+  | .placeholder f _ => f
+  | .clause c => c.id
+  | .document p => p
+  | .param n _ _ => n
+  | .module n _ _ => n
+  | .use n _ _ => n
+
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
 structure Spec where
@@ -122,6 +189,8 @@ structure Spec where
   document : Option String := none
   /-- Charter (D4): the clauses with their register spans. -/
   clauses  : List Clause := []
+  /-- Charter (D8): declared modules, by name: their parameters and body. -/
+  modules  : List (DomId × List DomId × List Decl) := []
   deriving Inhabited
 
 namespace Spec
@@ -248,65 +317,6 @@ def stringDecl : TypeSpec := { kind := .fact {}, domain := .anyString }
 def emptySpec : Spec :=
   { decls := [("int", intDecl), ("string", stringDecl), ("actor", actorDecl)], aliases := [] }
 
-/-! ## Surface declarations -/
-
-/-- A clause of a declaration or `Extend` (eFLINT `ModClause`). -/
-inductive ModClause where
-  | conditionedBy (ts : List Term)
-  | derivation (ds : List Derivation)
-  | postCond (effs : List Effect)
-  | sync (ss : List Sync)
-  | violation (ts : List Term)
-  | enforcingActs (as : List DomId)
-  | terminatedBy (as : List DomId)
-  | createdBy (as : List DomId)
-  | strings (ss : List String)
-  | ints (is : List Int)
-  | close
-  | open
-  /-- Charter: `Valid when` on an act. -/
-  | validWhen (ts : List Term)
-  /-- Charter: `Except under` on an act. -/
-  | exceptUnder (as : List DomId)
-  /-- Charter: `Against` on an immunity. -/
-  | against (as : List DomId)
-  /-- Charter: `Unless` on an immunity. -/
-  | unlessCond (ts : List Term)
-  /-- Charter (D7): `Due within d` on a duty: violated once held for `d`. -/
-  | dueWithin (d : Term)
-  /-- Charter (D4): `From CLAUSE "span"`: the English this rule is the meaning of. -/
-  | fromSpan (clause : ClauseId) (text : String)
-  deriving Repr, Inhabited
-
-/-- A declaration: a new type, an extension of one, or a placeholder alias. -/
-inductive Decl where
-  | typeDecl (d : DomId) (t : TypeSpec)
-  | typeExt (d : DomId) (clauses : List ModClause)
-  | placeholder (f t : DomId)
-  /-- Charter (D4): a clause of the authoritative document with its register spans. -/
-  | clause (c : Clause)
-  /-- Charter (D4): `Document "path"`. -/
-  | document (path : String)
-  /-- Charter (D11): `Param name [: Int|Time|Duration] = n`, a `Var` fact with an initial instance. -/
-  | param (name : DomId) (dom : Domain) (value : Int)
-  deriving Repr, Inhabited
-
-def Decl.isInitial : Decl → Bool
-  | .typeDecl .. => true
-  | .placeholder .. => true
-  | .typeExt .. => false
-  | .clause .. => true
-  | .document .. => true
-  | .param .. => true
-
-def Decl.name : Decl → DomId
-  | .typeDecl d _ => d
-  | .typeExt d _ => d
-  | .placeholder f _ => f
-  | .clause c => c.id
-  | .document p => p
-  | .param n _ _ => n
-
 /-- Apply compiled extension clauses to a type (eFLINT `apply_type_ext`). -/
 def TypeSpec.applyExt (clauses : List ModClause) (t : TypeSpec) : TypeSpec :=
   clauses.foldr apply t
@@ -361,5 +371,77 @@ where
     -- clause (006.7); it never reaches a record unresolved
     | .dueWithin _ => t
     | .fromSpan c text => { t with spans := t.spans ++ [(c, text)] }
+
+/-! ## Renaming (module instantiation, D8) -/
+
+def Derivation.mapDom (f : DomId → DomId) : Derivation → Derivation
+  | .dv xs t => .dv (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .holdsWhen t => .holdsWhen (t.mapDom f)
+
+def Effect.mapDom (f : DomId → DomId) : Effect → Effect
+  | .cAll xs t d => .cAll (xs.map (Var.mapDom f)) (t.mapDom f) (d.map (·.mapDom f))
+  | .tAll xs t => .tAll (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .oAll xs t => .oAll (xs.map (Var.mapDom f)) (t.mapDom f)
+
+def Sync.mapDom (f : DomId → DomId) (s : Sync) : Sync := ⟨s.xs.map (Var.mapDom f), s.t.mapDom f⟩
+
+def Kind.mapDom (f : DomId → DomId) : Kind → Kind
+  | .fact x => .fact x
+  | .act a =>
+    .act { a with
+      effects := a.effects.map (Effect.mapDom f)
+      syncs := a.syncs.map (Sync.mapDom f)
+      validWhen := a.validWhen.map (Term.mapDom f)
+      exceptUnder := a.exceptUnder.map f }
+  | .duty d =>
+    .duty { d with
+      enforcingActs := d.enforcingActs.map f
+      terminatingActs := d.terminatingActs.map f
+      creatingActs := d.creatingActs.map f
+      violatedWhen := d.violatedWhen.map (Term.mapDom f) }
+  | .event e => .event { e with effects := e.effects.map (Effect.mapDom f), syncs := e.syncs.map (Sync.mapDom f) }
+  | .immunity i => .immunity { i with against := i.against.map f, unlessConds := i.unlessConds.map (Term.mapDom f) }
+
+def TypeSpec.mapDom (f : DomId → DomId) (t : TypeSpec) : TypeSpec :=
+  { t with
+    kind := t.kind.mapDom f
+    domain := t.domain.mapDom f
+    domainConstraint := t.domainConstraint.mapDom f
+    derivation := t.derivation.map (Derivation.mapDom f)
+    conditions := t.conditions.map (Term.mapDom f) }
+
+def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
+  | .conditionedBy ts => .conditionedBy (ts.map (Term.mapDom f))
+  | .derivation ds => .derivation (ds.map (Derivation.mapDom f))
+  | .postCond es => .postCond (es.map (Effect.mapDom f))
+  | .sync ss => .sync (ss.map (Sync.mapDom f))
+  | .violation ts => .violation (ts.map (Term.mapDom f))
+  | .enforcingActs as => .enforcingActs (as.map f)
+  | .terminatedBy as => .terminatedBy (as.map f)
+  | .createdBy as => .createdBy (as.map f)
+  | .validWhen ts => .validWhen (ts.map (Term.mapDom f))
+  | .exceptUnder as => .exceptUnder (as.map f)
+  | .against as => .against (as.map f)
+  | .unlessCond ts => .unlessCond (ts.map (Term.mapDom f))
+  | .dueWithin d => .dueWithin (d.mapDom f)
+  | c => c
+
+/-- Rename the type names a declaration mentions and declares. Modules and uses inside
+a module body are renamed in their arguments only. -/
+def Decl.mapDom (f : DomId → DomId) : Decl → Decl
+  | .typeDecl d t => .typeDecl (f d) (t.mapDom f)
+  | .typeExt d cs => .typeExt (f d) (cs.map (ModClause.mapDom f))
+  | .placeholder a b => .placeholder (f a) (f b)
+  | .param n dom v => .param (f n) dom v
+  | .use n args pre => .use n (args.map f) pre
+  | d => d
+
+/-- The type names a block of declarations introduces (what a `Use` prefixes). -/
+def declaredNames (ds : List Decl) : List DomId :=
+  ds.filterMap fun
+    | .typeDecl d _ => some d
+    | .placeholder a _ => some a
+    | .param n _ _ => some n
+    | _ => none
 
 end Charter

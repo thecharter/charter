@@ -255,4 +255,58 @@ def Term.ppMods : List (Var × Term) → String
 end
 instance : ToString Term := ⟨Term.pp⟩
 
+/-- Rename the type names a term mentions (module instantiation, D8). -/
+def Var.mapDom (f : DomId → DomId) (x : Var) : Var := { x with dom := f x.dom }
+
+mutual
+def Term.mapDom (f : DomId → DomId) : Term → Term
+  | .not t => .not (t.mapDom f)
+  | .and a b => .and (a.mapDom f) (b.mapDom f)
+  | .or a b => .or (a.mapDom f) (b.mapDom f)
+  | .boolLit b => .boolLit b
+  | .leq a b => .leq (a.mapDom f) (b.mapDom f)
+  | .geq a b => .geq (a.mapDom f) (b.mapDom f)
+  | .ge a b => .ge (a.mapDom f) (b.mapDom f)
+  | .le a b => .le (a.mapDom f) (b.mapDom f)
+  | .sub a b => .sub (a.mapDom f) (b.mapDom f)
+  | .add a b => .add (a.mapDom f) (b.mapDom f)
+  | .mult a b => .mult (a.mapDom f) (b.mapDom f)
+  | .mod a b => .mod (a.mapDom f) (b.mapDom f)
+  | .div a b => .div (a.mapDom f) (b.mapDom f)
+  | .intLit i => .intLit i
+  | .stringLit s => .stringLit s
+  | .eq a b => .eq (a.mapDom f) (b.mapDom f)
+  | .neq a b => .neq (a.mapDom f) (b.mapDom f)
+  | .exists_ xs t => .exists_ (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .forall_ xs t => .forall_ (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .count xs t => .count (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .sum xs t => .sum (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .max xs t => .max (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .min xs t => .min (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .when t c => .when (t.mapDom f) (c.mapDom f)
+  | .present t => .present (t.mapDom f)
+  | .violated t => .violated (t.mapDom f)
+  | .enabled t => .enabled (t.mapDom f)
+  | .project t x => .project (t.mapDom f) (x.mapDom f)
+  | .tag t d => .tag (t.mapDom f) (f d)
+  | .untag t => .untag (t.mapDom f)
+  | .ref x => .ref (x.mapDom f)
+  | .app d args => .app (f d) (args.mapDom f)
+  | .currentTime => .currentTime
+  | .heldFor t d => .heldFor (t.mapDom f) (d.mapDom f)
+def Args.mapDom (f : DomId → DomId) : Args → Args
+  | .pos ts => .pos (Term.mapDomList f ts)
+  | .named ms => .named (Term.mapDomMods f ms)
+def Term.mapDomList (f : DomId → DomId) : List Term → List Term
+  | [] => []
+  | t :: ts => t.mapDom f :: Term.mapDomList f ts
+def Term.mapDomMods (f : DomId → DomId) : List (Var × Term) → List (Var × Term)
+  | [] => []
+  | (x, t) :: ms => (x.mapDom f, t.mapDom f) :: Term.mapDomMods f ms
+end
+
+def Domain.mapDom (f : DomId → DomId) : Domain → Domain
+  | .products xs => .products (xs.map (Var.mapDom f))
+  | d => d
+
 end Charter

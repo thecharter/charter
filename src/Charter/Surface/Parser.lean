@@ -535,7 +535,7 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     -- `Open Fact x` after a declaration starts the next frame; a bare `Open`/`Closed` is a clause
     match ← peekAt 1 with
     | .kw s => if ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                   "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param"].contains s
+                   "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param", "Module", "Use"].contains s
                then return none
                else (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
     | _ => (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
@@ -634,8 +634,22 @@ def paramDomain : P Domain := do
     | k => fail "CHR003" s!"expected Int, Time, or Duration after `:` but found {k.describe}"
   else return Domain.anyInt
 
-/-- One frame: a type declaration, an `Extend`, or a `Placeholder`. -/
-def frame : P (List Decl) := do
+mutual
+
+/-- The declarations of a `Module` body, up to `}`, each block ended by `.` or by the
+next declaration keyword. -/
+def moduleBody : Nat → P (List Decl)
+  | 0 => return []
+  | fuel + 1 => do
+    if ← isKw "}" then advance; return []
+    if ← isKw "." then advance; return (← moduleBody fuel)
+    let ds ← frame fuel
+    return ds ++ (← moduleBody fuel)
+
+/-- One frame: a type declaration, an `Extend`, a `Placeholder`, a `Clause`, … -/
+def frame : Nat → P (List Decl)
+  | 0 => fail "CHR003" "declarations nest too deeply"
+  | fuel + 1 => do
   let isClosed ← openness
   match ← peek with
   | .kw "Fact" | .kw "Var" | .kw "Function" =>
@@ -738,6 +752,23 @@ def frame : P (List Decl) := do
     expectKw "For"
     let t ← ident
     return [.placeholder f t]
+  | .kw "Module" =>
+    advance
+    let name ← ident
+    expectKw "("
+    let params ← (do if ← isKw ")" then return [] else sepBy1 ident "," 1000)
+    expectKw ")"
+    expectKw "{"
+    let body ← moduleBody fuel
+    return [.module name params body]
+  | .kw "Use" =>
+    advance
+    let name ← ident
+    expectKw "("
+    let args ← (do if ← isKw ")" then return [] else sepBy1 ident "," 1000)
+    expectKw ")"
+    let pre ← (do if ← isKw "As" then advance; return some (← ident) else return none)
+    return [.use name args pre]
   | .kw "Param" =>
     advance
     let name ← ident
@@ -763,12 +794,14 @@ def frame : P (List Decl) := do
     return [.clause { id := cid, source, spans, approvedHash := approved }]
   | k => fail "CHR003" s!"expected a declaration but found {k.describe}"
 
+end
+
 /-- Whether the upcoming tokens begin a frame. -/
 def startsFrame : P Bool := do
   let k ← peek
   let isFrameKw : TokKind → Bool
     | .kw s => ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param"].contains s
+                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param", "Module", "Use"].contains s
     | _ => false
   match k with
   | .kw "Open" | .kw "Closed" => return isFrameKw (← peekAt 1)
@@ -777,7 +810,7 @@ def startsFrame : P Bool := do
 def declarations : Nat → P (List Decl)
   | 0 => return []
   | fuel + 1 => do
-    let ds ← frame
+    let ds ← frame fuel
     if ← startsFrame then return ds ++ (← declarations fuel) else return ds
 
 /-! ## Phrases -/
