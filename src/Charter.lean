@@ -42,6 +42,7 @@ import Charter.Resolve.Static
 import Charter.Eval.Eval
 import Charter.Eval.Interpreter
 import Charter.Eval.Properties
+import Charter.Prove.Run
 import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Cli.Test
