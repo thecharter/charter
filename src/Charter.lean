@@ -44,6 +44,7 @@ import Charter.Eval.Interpreter
 import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Cli.Test
+import Charter.Cli.Repl
 
 /-!
 # `Charter` — Universal Institutional Specification Language & Standard Library

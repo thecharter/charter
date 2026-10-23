@@ -8,6 +8,15 @@ it produces no error diagnostic and every query holds (`test/eflint-corpus/READM
 Prints one line per file and a summary; exit status is non-zero when any file
 fails.
 
+**Fixture directives** (plan §5.4, With's style) are comment lines `//! …`
+anywhere in the file:
+
+- `//! expect-error: CHR020` — the file passes only if that error is reported
+  (several directives, several codes; other outcomes are not checked);
+- `//! expect-warning: CHR019` — likewise for a warning;
+- `//! known-issue: <why>` — the file is expected to fail; it fails the run if it
+  unexpectedly passes (so a fixed issue is noticed and the directive deleted).
+
 With `--expect <file>`, each file's outcome is compared with the outcome recorded
 there (lines `ok   <path>` / `FAIL <path>`, the format this command prints, which
 `tools/corpus-baseline` produces by running eFLINT itself). With
@@ -15,9 +24,12 @@ there (lines `ok   <path>` / `FAIL <path>`, the format this command prints, whic
 `tolerances.md` of the corpus) are expected to *differ* from the recorded
 outcome, under a ruled decision; a tolerated file that agrees with eFLINT fails
 the run, because its tolerance is no longer needed and must be deleted (D2).
+`--out json` prints one object per file and a summary object.
 -/
 
 namespace Charter.Cli
+
+open Lean (Json)
 
 def walkEflint (p : System.FilePath) : Nat → IO (List System.FilePath)
   | 0 => return []
@@ -58,22 +70,51 @@ def readExpected (file : System.FilePath) : IO (List (String × Bool)) := do
 def readTolerated (file : System.FilePath) : IO (List String) := do
   let txt ← IO.FS.readFile file
   let parts := txt.splitOn "`"
-  -- odd-indexed parts are inside backticks
   let rec pick : List String → Bool → List String
     | [], _ => []
     | s :: rest, inside => (if inside && s.endsWith ".eflint" then [s] else []) ++ pick rest (!inside)
   return pick parts false
 
 def endsWithPath (full : String) (suffix : String) : Bool :=
-  full == suffix || full.endsWith ("/" ++ suffix) || suffix.endsWith ("/" ++ full) || suffix == full
+  full == suffix || full.endsWith ("/" ++ suffix) || suffix.endsWith ("/" ++ full)
 
-/-- `charter test <paths…> [--expect file] [--tolerate file]` -/
+/-- The `//!` directives of a source text. -/
+structure Directives where
+  expectErrors   : List String := []
+  expectWarnings : List String := []
+  knownIssue     : Option String := none
+
+def readDirectives (src : String) : Directives :=
+  src.splitOn "\n" |>.foldl (fun d line =>
+    let l := line.trim
+    if l.startsWith "//!" then
+      let body := (l.drop 3).trim
+      if body.startsWith "expect-error:" then { d with expectErrors := d.expectErrors ++ [(body.drop 13).trim] }
+      else if body.startsWith "expect-warning:" then { d with expectWarnings := d.expectWarnings ++ [(body.drop 15).trim] }
+      else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
+      else d
+    else d) {}
+
+/-- The verdict on a file: passed, and why in one phrase. -/
+def verdict (d : Directives) (stats : RunStats) : Bool × String :=
+  if !d.expectErrors.isEmpty || !d.expectWarnings.isEmpty then
+    let missing := (d.expectErrors ++ d.expectWarnings).filter (fun c => !stats.codes.contains c)
+    if missing.isEmpty then (true, s!"expected diagnostics reported: {", ".intercalate (d.expectErrors ++ d.expectWarnings)}")
+    else (false, s!"expected diagnostics missing: {", ".intercalate missing}; reported: {", ".intercalate stats.codes}")
+  else match d.knownIssue with
+    | some why => if stats.ok then (false, s!"known issue unexpectedly passes ({why}); delete the directive") else (true, s!"known issue, still failing ({why})")
+    | none => (stats.ok, s!"{stats.errors} error(s), {stats.failedQueries} failed quer{if stats.failedQueries == 1 then "y" else "ies"}")
+
+/-- `charter test <paths…> [--expect file] [--tolerate file] [--out json]` -/
 def testCommand (args : List String) : IO UInt32 := do
+  let (json, args) ← match takeOutFlag args with
+    | .error e => IO.eprintln s!"charter test: {e}"; return 2
+    | .ok r => pure r
   let opts ← match parseTestArgs args {} with
     | .ok o => pure o
     | .error e => IO.eprintln s!"charter test: {e}"; return 2
   if opts.paths.isEmpty then
-    IO.eprintln "usage: charter test <file.eflint | directory> ... [--expect <outcomes>] [--tolerate <tolerances.md>]"
+    IO.eprintln "usage: charter test <file.eflint | directory> ... [--expect <outcomes>] [--tolerate <tolerances.md>] [--out json]"
     return 2
   let expected ← match opts.expect with
     | some f => readExpected f
@@ -87,40 +128,46 @@ def testCommand (args : List String) : IO UInt32 := do
   let mut agreed := 0
   let mut toleratedCount := 0
   let mut failed : List String := []
+  let report (f : System.FilePath) (ok : Bool) (why : String) (extra : List (String × Json)) : IO Unit :=
+    if json then IO.println (Json.mkObj (([("kind", Json.str "file"), ("file", Json.str f.toString), ("ok", Json.bool ok), ("why", Json.str why)] : List (String × Json)) ++ extra)).compress
+    else IO.println s!"{if ok then "ok  " else "FAIL"} {f}{if ok then " (" ++ why ++ ")" else ": " ++ why}"
   for f in files do
-    let stats ← runProgram true f
+    let src ← IO.FS.readFile f
+    let d := readDirectives src
+    let stats ← runProgram { testMode := true, json } f
+    let (outcome, why) := verdict d stats
     let fS := f.toString
-    let outcome := stats.ok
     let isTolerated := tolerated.any (endsWithPath fS)
     match expected.find? (fun (p, _) => endsWithPath fS p) with
     | some (_, eflintOk) =>
       let agrees := outcome == eflintOk
-      let verdict := if isTolerated then !agrees else agrees
-      if verdict then
+      let ok := if isTolerated then !agrees else agrees
+      let eflintS := if eflintOk then "passes" else "fails"
+      let charterS := if outcome then "passes" else "fails"
+      let extra := [("eflint", Json.str eflintS), ("charter", Json.str charterS), ("tolerated", Json.bool isTolerated)]
+      if ok then
         passed := passed + 1
         if isTolerated then
           toleratedCount := toleratedCount + 1
-          IO.println s!"ok   {f} (tolerated: eFLINT {if eflintOk then "passes" else "fails"}, Charter {if outcome then "passes" else "fails"})"
+          report f true s!"tolerated: eFLINT {eflintS}, Charter {charterS}" extra
         else
           agreed := agreed + 1
-          IO.println s!"ok   {f} ({if outcome then "passes" else "fails"} as in eFLINT; {stats.phrases} phrases)"
+          report f true s!"{charterS} as in eFLINT; {stats.phrases} phrases" extra
       else
         failed := failed ++ [fS]
-        if isTolerated then
-          IO.println s!"FAIL {f}: listed as tolerated but agrees with eFLINT ({if outcome then "passes" else "fails"}); delete the tolerance"
-        else
-          IO.println s!"FAIL {f}: eFLINT {if eflintOk then "passes" else "fails"}, Charter {if outcome then "passes" else "fails"} ({stats.errors} error(s), {stats.failedQueries} failed quer{if stats.failedQueries == 1 then "y" else "ies"})"
+        if isTolerated then report f false s!"listed as tolerated but agrees with eFLINT ({charterS}); delete the tolerance" extra
+        else report f false s!"eFLINT {eflintS}, Charter {charterS} ({why})" extra
     | none =>
-      if opts.expect.isSome then
+      if opts.expect.isSome && !json then
         IO.println s!"WARN {f}: no eFLINT outcome recorded; judged on its own"
-      if outcome then
-        passed := passed + 1
-        IO.println s!"ok   {f} ({stats.phrases} phrases)"
-      else
-        failed := failed ++ [fS]
-        IO.println s!"FAIL {f}: {stats.errors} error(s), {stats.failedQueries} failed quer{if stats.failedQueries == 1 then "y" else "ies"}"
+      if outcome then passed := passed + 1 else failed := failed ++ [fS]
+      report f outcome why []
   let detail := if opts.expect.isSome then s!" ({agreed} agree with eFLINT, {toleratedCount} tolerated differences)" else ""
-  IO.println s!"{passed} passed, {failed.length} failed, {files.length} total{detail}"
+  if json then
+    IO.println (Json.mkObj [("kind", "summary"), ("passed", Json.num passed), ("failed", Json.num failed.length),
+      ("total", Json.num files.length), ("agree", Json.num agreed), ("tolerated", Json.num toleratedCount)]).compress
+  else
+    IO.println s!"{passed} passed, {failed.length} failed, {files.length} total{detail}"
   return (if failed.isEmpty then 0 else 1)
 
 end Charter.Cli

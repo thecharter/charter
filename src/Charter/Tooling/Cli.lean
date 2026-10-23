@@ -10,6 +10,7 @@ import Charter.Surface.Syntax
 import Charter.Surface.Lower
 import Lean.Data.Json
 import Charter.Cli.Test
+import Charter.Cli.Repl
 
 /-!
 # Charter.Tooling.Cli — Program-Agnostic Command-Line Harness
@@ -447,6 +448,8 @@ def usageText (programs : List Program) : String :=
   "  check   [english.json | file.eflint]    structure, coverage, provenance, staleness; or resolve an .eflint program\n" ++
   "  run     <file.eflint>                   run the phrases: transitions with their three answers, violations, facts\n" ++
   "  test    <file.eflint | dir> ...         run in test mode: a file passes with no errors and every query holding\n" ++
+  "  repl    [file.eflint]                   load the file, then read and run phrases interactively\n" ++
+  "          (run, test, check take --out json: one record per line; test takes --expect, --tolerate)\n" ++
   "  trace   <clause-id>                     the span table for a clause\n" ++
   "  views                                   legal / agent / operational views\n" ++
   "  veil                                    Veil 2.0 transition-system & safety specification\n" ++
@@ -470,6 +473,7 @@ def run (registered : List Program) (args : List String) : IO UInt32 := do
   match args with
   | "run" :: rest => return (← runCommand rest)
   | "test" :: rest => return (← testCommand rest)
+  | "repl" :: rest => return (← replCommand rest)
   | "check" :: rest => if rest.any (·.endsWith ".eflint") then return (← checkCommand rest) else pure ()
   | _ => pure ()
   let charterFiles := args.filter (·.endsWith ".charter")
