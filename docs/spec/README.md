@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (late, 5) — Chapter 018 (toolchain and CLI, today's commands) drafted; `Charter.Prove.Run` gives the evaluator as a pure function for `prove`. The kernel-decision feasibility result is in 013.4.
 - 2026-10-23 (late, 4) — Phase 2's sixth slice: invariant exploration, `charter test --explore N` and `//! explore: N` (chapter 013). 110 conformance tests.
 - 2026-10-23 (late, 3) — Phase 2's fifth slice: `Module name(params) { … }` and `Use name(args) As prefix` (D8, chapter 015); CHR023. 106 conformance tests.
 - 2026-10-23 (late, 2) — Phase 2's fourth slice: `Param` (D11, chapter 014) and fact origins with `?why` (Law 6, 004.10). 102 conformance tests.

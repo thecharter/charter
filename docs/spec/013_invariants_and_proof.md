@@ -10,6 +10,8 @@
 
 **13.4 `charter prove` (pending; D9).** A generator, not a mode: it writes a project containing the program plus one theorem per named invariant and expectation, runs the toolchain the binary fetches by digest, and reports per-theorem results through the diagnostic channel; the author sees theorem names and pass/fail, never the engine.
 
+*Finding (2026-10-23), for the design of `prove`:* `Charter.Prove.Run` gives the evaluator as a pure function, and a *decided* claim would be `theorem t : (runText src).ok = true := by decide`. Measured on a three-phrase program (`Fact x Identified by A. +x(A). ?x(A).`), the kernel ran for ten minutes and was then killed out of memory, with no answer; the compiled evaluator answers the same question in a third of a second. The cause is representation: type names are `String`s (a `List Char` to the kernel), states are association lists compared structurally, and every step runs a fuel-indexed nondeterministic monad. `prove` therefore needs a kernel-oriented Core before it can discharge anything: names interned to `Nat` at resolution, states as sorted arrays keyed by those numbers, and the evaluator proved equal to a kernel-friendly evaluator rather than run in the kernel itself (plan §3: "the evaluator is the proved artifact"). This is Phase 2's open item and is not shipped as a `prove` that cannot discharge.
+
 **13.5 Module properties (pending; D8).** A standard-library module's properties are `Invariant`s in its `.charter` file, proved in `lib/lean/` by name and reported as *proved* when a program `Use`s the module.
 
 *Differences from eFLINT:* eFLINT checks invariants after every phrase (13.1 is unchanged); exploration is Charter's, after Quint's `run` simulations.

@@ -236,10 +236,21 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   4 tests (110 total). One test-authoring lesson worth a line in the spec: a quantifier
   over an enumerable type ranges over the domain, over a non-enumerable one over what
   holds (004.7), so an invariant about "the counter" must be over `Int`.
-- Next slices: the `lib/` modules as `.charter` (needs the standard-library content
-  modelled, a day's work each), a first `prove` generator (`charter_program` plus a
-  theorem per invariant, maintainer-run with the repo's toolchain); then Phase 3's
-  artifact format after B10 is ruled.
+## Late (5): chapter 018, `Prove.Run`, and the kernel-decision finding
+
+- `Charter.Prove.Run`: `runText`/`runItems` run a program as a pure function (no IO).
+- **Finding:** `theorem : (runText src).ok = true := by decide` on a three-phrase
+  program ran ten minutes in the kernel and was killed out of memory (exit 137), no
+  answer; the compiled evaluator takes 0.3 s. Strings as `List Char`, association
+  lists, and the fuel-indexed monad are the cause. Recorded in spec 013.4: `prove`
+  needs a kernel-oriented Core (interned names, sorted arrays) and an equality proof
+  between the two evaluators; no `prove` command is shipped that cannot discharge.
+- Spec 018 (toolchain and CLI, today's commands) drafted.
+- Next for a fresh session: the eight `lib/` modules as Charter programs (each a real
+  modelling task; `src/Charter/Modules/CircuitBreaker.lean` is the smallest), the
+  kernel-oriented Core for `prove`, then Phase 3's artifact format after B10 is ruled.
+  Three spellings await Eric: `Held(e) For d`, the `-` join of a module prefix, and
+  the holder-is-recipient reading of immunities (spec 007.4).
 
 ## Known gaps against Phase 1's exit criteria
 
