@@ -83,7 +83,7 @@ Examples/AutonomousCommons/Cli.lean                 Registers commons with the c
 
 ── CLI & DOCUMENTATION ─────────────────────────────────────────────────────────
 src/Main.lean                                 `charter` executable: Charter.Cli.run over the registered examples
-docs/charter-spec.md                        Charter Language Specification (architecture & semantic commitments)
+docs/spec/                                  The Charter language specification (skeleton; replaces docs/charter-spec.md, archived under docs/completed/)
 HANDOFF.md                                  Orientation for the next maintainer
 ```
 
