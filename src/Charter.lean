@@ -30,6 +30,20 @@ import Charter.Surface.Unlower
 import Charter.Surface.Program
 import Charter.Surface.DslSample
 import Charter.Tooling.Cli
+-- The eFLINT-core pipeline (Phase 1, plan §3)
+import Charter.Surface.Diagnostics
+import Charter.Surface.Lexer
+import Charter.Surface.Ast
+import Charter.Surface.Parser
+import Charter.Core.Term
+import Charter.Core.Spec
+import Charter.Core.State
+import Charter.Resolve.Static
+import Charter.Eval.Eval
+import Charter.Eval.Interpreter
+import Charter.Cli.Load
+import Charter.Cli.Run
+import Charter.Cli.Test
 
 /-!
 # `Charter` — Universal Institutional Specification Language & Standard Library

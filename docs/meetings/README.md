@@ -6,6 +6,8 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D14 — In `e When c` the condition extends as far right as it can: `When`/`Where` has the lowest precedence (fourth eFLINT tolerance; delegated)](2026-10-23-D14-when-has-the-lowest-precedence.md)
+- [D13 — An instance named through a placeholder is an instance of the aliased type (third eFLINT tolerance; delegated)](2026-10-23-D13-placeholder-instances-belong-to-the-aliased-type.md)
 - [D12 — A duty's violation is reported once, when it begins; `Violated()` still answers at any time (second eFLINT tolerance; delegated)](2026-10-23-D12-duty-violations-are-reported-on-transition.md)
 - [D11 — Rule amendment is an act (`Amend`) whose effects target rule records; ratchets are immunities against `Amend`, reflexively entrenched; `Extend` never changes rules at run time](2026-10-23-D11-rule-amendment-is-an-act-ratchets-are-immunities.md)
 - [D10 — No model of the protocol is retained outside Charter: `ProtocolWorldState` and the 16 Lean simulations are deleted when their Charter replacements pass (sharpens D3)](2026-10-23-D10-no-model-of-the-protocol-is-retained-outside-charter.md)

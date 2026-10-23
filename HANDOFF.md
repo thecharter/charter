@@ -5,6 +5,153 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-23 (day): Phase 0 closed, Phase 1 eFLINT core running the corpus, plan amended for the server; branch `phase-0-1-eflint-core`
+
+## Where
+
+- Branch `phase-0-1-eflint-core` off `main` at `806f23b`, **not pushed**, eight commits
+  (`496076d` move to `src/`, `ab88de7` D12/B9/spec skeleton, `51ee95b` corpus,
+  `1a12f3f` gates and battery, `3dc5c3d` plan §3a server, `1651515` Phase 1 pipeline,
+  `f1c5cc4` `test --expect`, plus this handoff). Every change goes to `main` through a
+  PR; open one from this branch when the battery is green (see "Corpus baseline").
+- Tree layout now: `src/Charter/` (the language; `Surface/`, `Core/`, `Resolve/`,
+  `Eval/`, `Cli/` are the new pipeline, the rest is v0.3), `src/Main.lean`,
+  `Examples/` unchanged, `docs/spec/` (skeleton), `docs/completed/` (the v0.3 spec),
+  `test/eflint-corpus/`, `test/gates/`, `tools/battery`, `tools/corpus-baseline`.
+
+## What was done
+
+1. **Phase 0 closed** (plan §8): `docs/spec/README.md` chapter list with the
+   NON-COMPLIANT marker and `docs/spec/diagnostics.md` (CHR001–CHR021, CHR100–CHR105
+   allocated); `docs/charter-spec.md` archived; the eFLINT tests (116 files) and
+   examples (80 files) vendored unchanged with provenance hashes; `test/gates/` for
+   Laws 10, 11, 13; `tools/battery` (build, gates, `check`, `sim`, corpus). The Law 11
+   gate found the `verify` ledger printing `psa_program_is_lean_law` and "the Lean
+   law"; renamed to `*_program_is_companion_law` / "the companion law". The Law 13
+   gate found `toNeutralReserveOrCommons` in `CollateralPool` (the handoff's "leak grep
+   0" was wrong); renamed `…OrPool`.
+2. **Decisions.** D12 (duty violations reported on transition) recorded as
+   *delegated* at 80%. B9 (duplicate declarations) written as a **brief, not a
+   decision**: `tests/truth/infinite_even.eflint` and
+   `tests/parallel-comp/no_violations.eflint` deliberately redeclare a type and pass
+   only under eFLINT's replacement, so it is semantics and Eric's call; the code
+   replaces and warns (CHR019). B10 (who signs the artifact certificate) opened by the
+   server work. All in `docs/meetings/2026-10-23-briefs-for-ruling.md`.
+3. **Plan amended at Eric's direction** (commit `3dc5c3d`): §3a compiler/server split
+   (`charter` produces an artifact: law, certificate, document, one hash;
+   `charter-server` loads, verifies, evaluates, appends, replays, and links no parser),
+   goal 3 restated as one artifact in three hosts, Phase 3 reordered (artifact format
+   first, then `Amend` with the certificate check), Phase 3b (the server) added, gates
+   `replay`, `certificate-at-office`, `operator-blind`. The mission-text changes this
+   implies (goal 3 wording, a purpose sentence, an operator law, an amendment law, the
+   sharpened *checked* tag) are **drafted in §3a and not applied**: `docs/mission.md`
+   is untouched; Eric words them.
+4. **Phase 1, the eFLINT core** (commit `1651515`): a complete pipeline for `.eflint`
+   files in Lean with no `partial` and no `sorry`: `Surface/Lexer` (eFLINT's token
+   classes, including bracketed `[Recht beschrijving]` and space-joined `other
+   candidate` identifiers; one deterministic rule for the projection dot),
+   `Surface/Parser` (recursive descent; its disambiguation choices are in the module
+   header), `Core/{Term,Spec,State}` (records), `Resolve/Static` (eFLINT's static
+   evaluation: types, arities, checked terms, duty-clause desugaring, CHR01x),
+   `Eval/Eval` (the nondeterministic evaluator, fuel-bounded), `Eval/Interpreter`
+   (stratified saturation per D6 with CHR020; phrase semantics; D12 reporting), and
+   `charter run | test | check` on `.eflint` files. **All 116 of eFLINT's own tests
+   pass** (`charter test test/eflint-corpus/tests`). Examples: 54/80 before the
+   baseline (below).
+
+## The corpus against the eFLINT oracle
+
+The examples repository is not a test suite, so the Haskell eFLINT had to run to say
+which differences are Charter bugs. No GHC was installed; I installed `ghc@9.4` and
+`cabal-install` with Homebrew (reversible: `brew uninstall ghc@9.4 cabal-install`)
+and built `eflint-repl` from a *copy* of `.reference/eflint` in the session scratchpad
+(`.reference/` was not written to). The build needed `allow-newer: eflint:*`, the
+macOS SDK `usr/lib` for `iconv`, `SDKROOT` for the Security framework, and
+`gll-0.4.1.2` vendored with one added `liftA2` import (it assumes GHC ≥ 9.6). The
+binary is copied to `out/eflint-repl` (ignored); rebuild it the same way if `out/` is
+gone. `tools/corpus-baseline out/eflint-repl` produced
+`test/eflint-corpus/eflint-outcomes.txt` (committed): **eFLINT 4.1.0.1 fails 10 of its
+own 196 corpus files.** `charter test --expect … --tolerate …` compares file by file;
+the result, all in `test/eflint-corpus/tolerances.md`:
+
+- **Agree with eFLINT: 164 files**, including the two files eFLINT fails that Charter
+  also fails (`smart-access/simple-scenario.eflint`, a fragment other files require;
+  `school_policy/valid_dates.eflint`, a `Holds when` over a non-enumerable type with
+  no held instances).
+- **D6 (a), Charter right where eFLINT is order-dependent: 3 files.** eFLINT fails its
+  own `deriv_sum1a`, `deriv_sum1b`, `from_not_enabled2` because its inflationary
+  fixpoint evaluates `zz`/`aa` (and `prohibition`) before `y` (and `read`) are
+  derived and keeps the first answer; the stratified fixpoint passes them.
+- **D6 (b), Charter rejects a default rule eFLINT accepts: 24 files.** One program,
+  `dex-archetypes/archetypes.eflint` lines 78–93, derives `algorithm-provider-for`
+  (and two more) from `!(Exists algorithm-provider: algorithm-provider-for())`: a
+  default whose only reading is its own absence. CHR020 names the three types; the
+  23 scenarios and templates that include it fail with it. **This meets D6's reopen
+  condition** ("more than a handful of corpus programs stop passing"): Eric decides
+  whether a default rule gets a spelling (an explicit exception, as Catala has) or
+  stays rejected.
+- **D13 (delegated), placeholders: 1 file.** `tests/placeholders/with2.eflint`
+  creates an instance through `Placeholder a For b`; eFLINT tags it `a` and fails its
+  own test; Charter tags it `b` and passes.
+- **D14 (delegated), `When` precedence: 4 files.** eFLINT's generalised parser reads
+  `Terminates grounded When date + 1 == grounded.date` (caretaker contract) as
+  `(grounded When date) + 1 …` and rejects the program as ill-typed; Charter's
+  lowest-precedence `When` reads it as the author's comment says, and the four files
+  pass.
+
+`tools/battery` is green on this branch with the baseline and tolerances in place.
+
+## Observations
+
+- `tests/truth/dom_filter1.eflint` passes vacuously in eFLINT: in the phrase path
+  (`StaticEval.hs`, `compile_phrase (PDeclBlock)`) a `TypeDecl`'s `Where` constraint is
+  inserted uncompiled, so `x % 2` on a tagged value yields no result and every `?x(n)`
+  succeeds over an empty result list. Charter compiles the constraint (`compileTypeSpec`),
+  so the same queries pass non-vacuously. No outcome differs; the spec chapter 004
+  should say the constraint is checked.
+- eFLINT prints synced transitions in the order the clauses were *last* prepended
+  (`c` before `b` in `tests/syncs/hierarchy.eflint`'s tree); the comment in that file
+  shows `b` first. Charter prints as eFLINT's code does. Cosmetic; not in test mode.
+
+## Known gaps against Phase 1's exit criteria
+
+- `test/spec/` conformance tests for chapters 002–011 and the chapters themselves:
+  not written. The spec is a skeleton.
+- The evaluator's agreement proof with a declarative `Core.Semantics` (Law 9): not
+  started. Today the evaluator is the only definition.
+- `charter repl`, `--eflint` mode flag, `--out json`: not built. `--eflint` has nothing
+  to toggle until Phase 2 adds a Charter construct.
+- `find_transitions` (eFLINT's per-phrase enumeration of every possible trigger, used
+  only by its REPL `:options`) is not computed; nothing in test mode depends on it.
+- Time is fixed at 0 (`Current Time`, the `Time` domain); D7's time lands in Phase 2.
+- `charter test` judges a file on its own when no baseline line exists for it.
+
+## Pitfalls found (also in AGENTS.md)
+
+- A `for x in xs do` over a list of pairs inside a hand-written monad (`structure`
+  wrapping a function) hits a Lean 4.24 code-generation defect: the interpreter says
+  "incomplete case", the binary segfaults (exit 139). Bisected with `#eval`s on
+  `Resolve.executeDecls`; `forM` works. Keep `for` to `IO`.
+- Running `lean` outside the project directory used elan's default and downloaded Lean
+  4.35.0 into `~/.elan/toolchains` (harmless; delete with `elan toolchain uninstall
+  leanprover/lean4:v4.35.0`). Always run scratch files with `lake env lean` from the
+  repository.
+- The desktop shell drops a leading `cd` in some compound commands; a `git switch -c`
+  once ran inside `.reference/eflint` (restored to `master` and the branch deleted
+  before any file changed). Use `git -C <abs path>` and absolute paths.
+
+## Next
+
+1. Finish the oracle build, generate `eflint-outcomes.txt`, classify the 26 as above,
+   update `tolerances.md`, run `tools/battery` to green, open the PR.
+2. Take B9, B10, and the D6 reopen (default rules) to Eric; apply the mission-text
+   drafts from plan §3a when he words them.
+3. Phase 1's remaining exit criteria: spec chapters 002–011 with conformance tests;
+   the declarative semantics and the evaluator's agreement proof.
+4. Phase 2 per plan §8, starting with `Valid when` (D5) and time (D7).
+
+---
+
 # Handoff — 2026-10-23 (night): mission, decisions D1–D11, redesign plan, AGENTS.md; main at bc4d594
 
 ## Where
