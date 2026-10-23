@@ -268,6 +268,8 @@ inductive Output where
   | expectRes (what : Expect) (negated : Bool) (ok : Bool)
   /-- Charter (D7): the clock was set (environment input, not an event). -/
   | timeSet (t : Int)
+  /-- Charter (Law 6): the answer to `?why e`: one line per instance. -/
+  | whyRes (lines : List String)
 
 def Output.isFailure : Output → Bool
   | .diag d => d.isError
@@ -280,6 +282,20 @@ namespace Interp
 open M
 
 def diagOf (e : RuntimeError) : Output := .diag (Diagnostic.error e.code e.message)
+
+/-- For a derived fact, the rules of its type, as text. -/
+def ruleText (spec : Spec) (i : Info) : String :=
+  match i.origin with
+  | .derived d _ =>
+    match spec.findDecl d with
+    | some t =>
+      let rules := t.derivation.map fun
+        | .holdsWhen c => s!"Holds when {c}"
+        | .dv xs c => s!"Derived from (Foreach {", ".intercalate (xs.map toString)}: {c})"
+      s!"; rules: {"; ".intercalate rules}"
+    | none => ""
+  | _ => ""
+
 
 /-- Report the violations a trigger caused (eFLINT `tell_violations`). -/
 def triggerViolations (info : TransInfo) (fuel : Nat) : List Output :=
@@ -296,8 +312,20 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
   | fuel + 1, p =>
     let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state⟩ []
     match p with
-    | .onlyDecls => (some [], [])
+    | .onlyDecls init => (some init, [])
     | .scenario _ _ => (some [], [])
+    | .why xs t =>
+      match run (foreach M.fuel xs (whenTagged (eval M.fuel t) pure)) with
+      | .error e => (none, [diagOf e])
+      | .ok tess =>
+        let lines := tess.flatten.map fun te =>
+          match state.lookup te with
+          | none => s!"{te}: no assignment and not derived{if spec.closedType te.2 == some false then " (open type: input is missing)" else " (closed type: does not hold)"}"
+          | some i =>
+            let holds := if i.live state.time then "holds" else if i.value then "expired" else "does not hold"
+            let exp := match i.expiry with | some u => s!", until {u}" | none => ""
+            s!"{te}: {holds} since {i.since}{exp}; {i.origin.render}{ruleText spec i}"
+        (some [], [.whyRes lines])
     | .setTime _ => (some [], [])
     | .tick => (some [], [])
     | .expect w neg xs t =>
@@ -403,8 +431,8 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       | .error e => (cfg, warnOuts ++ [Interp.diagOf e])
       | .ok newTime =>
       let state0 := match newTime with
-        | some t => { cfg.state with time := t }
-        | none => cfg.state
+        | some t => { cfg.state with time := t, step := cfg.state.step + 1 }
+        | none => { cfg.state with step := cfg.state.step + 1 }
       let (store?, outs) := Interp.semPhrase spec' state0 1000 cp
       let outs := match newTime with
         | some t => Output.timeSet t :: outs

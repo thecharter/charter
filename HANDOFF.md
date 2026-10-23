@@ -196,8 +196,22 @@ the result, all in `test/eflint-corpus/tolerances.md`:
   `charter test` (a failed check fails the file); `charter trace <clause> <file>`.
   `//! expect-failed-claims: N` directive for fixtures that pin a failing check.
 - Spec chapter 012 drafted; 7 tests (99 total). The hash is `String.hash` as in v0.3.
-- Next slices: `Param` (D11, parameters as `Var` facts), `Module`/`Use` (D8), `?why`
-  (plan §2.2.11), `Invariant` exploration, the `lib/` modules, `prove`.
+## Late (2): Phase 2's fourth slice, `Param` (D11) and origins with `?why` (Law 6)
+
+- `Param name [: Int|Time|Duration] = n`: a `Var` fact with an initial instance, assigned
+  by the declaration block (`CPhrase.onlyDecls` now carries the block's initial store);
+  any numeric position names it; an act may create a new instance (spec 014.1).
+- `Info.origin` on every assignment: asserted by phrase n, supplied by the environment
+  (open type), by an act (`Assignment` carries the act; `instantiateTrans` tags its own
+  effects), derived by a type's rules (with the rules printed). `State.step` counts
+  phrases. `?why e` prints it (spec 004.10, 011.13); a report, never a claim.
+- A parser rule found by the `?why` test and now in spec 003.6: `Open`/`Closed` followed
+  by a declaration keyword starts the next frame; before, `Fact p … Open Fact o` opened
+  `p` (eFLINT's grammar has the same ambiguity; its corpus never hits it).
+- Spec 014 drafted; 3 tests (102 total).
+- Next slices: `Module`/`Use` (D8), `Invariant` exploration (`test --explore`), the
+  `lib/` modules as `.charter`, a first `prove` generator; then Phase 3's artifact
+  format (B10 first).
 
 ## Known gaps against Phase 1's exit criteria
 

@@ -287,6 +287,8 @@ inductive Decl where
   | clause (c : Clause)
   /-- Charter (D4): `Document "path"`. -/
   | document (path : String)
+  /-- Charter (D11): `Param name [: Int|Time|Duration] = n`, a `Var` fact with an initial instance. -/
+  | param (name : DomId) (dom : Domain) (value : Int)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
@@ -295,6 +297,7 @@ def Decl.isInitial : Decl → Bool
   | .typeExt .. => false
   | .clause .. => true
   | .document .. => true
+  | .param .. => true
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
@@ -302,6 +305,7 @@ def Decl.name : Decl → DomId
   | .placeholder f _ => f
   | .clause c => c.id
   | .document p => p
+  | .param n _ _ => n
 
 /-- Apply compiled extension clauses to a type (eFLINT `apply_type_ext`). -/
 def TypeSpec.applyExt (clauses : List ModClause) (t : TypeSpec) : TypeSpec :=

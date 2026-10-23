@@ -27,19 +27,21 @@ namespace Charter
 namespace Store
 
 /-- A creation merged with anything is still a creation. -/
-theorem combine_true_left (u : Option Int) (a : Assignment) :
-    ∃ u', union.combine (.holdsTrue u) a = .holdsTrue u' := by
-  cases a <;> exact ⟨_, rfl⟩
+theorem combine_true_left (u : Option Int) (b : Option Tagged) (a : Assignment) :
+    ∃ u' b', union.combine (.holdsTrue u b) a = .holdsTrue u' b' := by
+  cases a <;> exact ⟨_, _, rfl⟩
 
-theorem combine_true_right (u : Option Int) (a : Assignment) :
-    ∃ u', union.combine a (.holdsTrue u) = .holdsTrue u' := by
-  cases a <;> exact ⟨_, rfl⟩
+theorem combine_true_right (u : Option Int) (b : Option Tagged) (a : Assignment) :
+    ∃ u' b', union.combine a (.holdsTrue u b) = .holdsTrue u' b' := by
+  cases a <;> exact ⟨_, _, rfl⟩
 
 /-- 005.3: within one step, creating an instance beats terminating it, whichever
-side of the merge it comes from, and keeps its expiry; terminating beats forgetting. -/
-theorem create_beats_terminate (u : Option Int) :
-    union.combine (.holdsTrue u) .holdsFalse = .holdsTrue u ∧ union.combine .holdsFalse (.holdsTrue u) = .holdsTrue u ∧
-    union.combine .holdsFalse .unknown = .holdsFalse ∧ union.combine .unknown .holdsFalse = .holdsFalse :=
+side of the merge it comes from, and keeps its expiry and origin; terminating beats
+forgetting. -/
+theorem create_beats_terminate (u : Option Int) (b c : Option Tagged) :
+    union.combine (.holdsTrue u b) (.holdsFalse c) = .holdsTrue u b ∧
+    union.combine (.holdsFalse c) (.holdsTrue u b) = .holdsTrue u b ∧
+    union.combine (.holdsFalse c) .unknown = .holdsFalse c ∧ union.combine .unknown (.holdsFalse c) = .holdsFalse c :=
   ⟨rfl, rfl, rfl, rfl⟩
 
 end Store

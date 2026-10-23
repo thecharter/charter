@@ -116,6 +116,9 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
     | .timeSet t =>
       emit o (Json.mkObj [("kind", "clock"), ("time", Json.num t)]) (if o.testMode then "" else s!"  clock: {t}")
+    | .whyRes lines =>
+      if o.json then IO.println (Json.mkObj [("kind", "why"), ("claim", Json.str text), ("instances", Json.arr (lines.map Json.str).toArray)]).compress
+      else for l in lines do IO.println s!"  {l}"
     | .instQueryRes tes =>
       if o.json then
         IO.println (Json.mkObj [("kind", "instances"), ("claim", Json.str text),

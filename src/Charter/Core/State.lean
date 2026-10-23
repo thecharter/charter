@@ -13,6 +13,22 @@ CHR1xx diagnostics.
 
 namespace Charter
 
+/-- Where a fact came from (Law 6, plan §2.2.11): asserted by a phrase, supplied by the
+environment (an open type's input), created or terminated by an act, or derived by a
+type's rules. `step` is the phrase that did it. -/
+inductive Origin where
+  | asserted (step : Nat)
+  | environment (step : Nat)
+  | byAct (act : Tagged) (step : Nat)
+  | derived (rule : DomId) (step : Nat)
+  deriving Repr, Inhabited
+
+def Origin.render : Origin → String
+  | .asserted n => s!"asserted by phrase {n}"
+  | .environment n => s!"supplied by the environment at phrase {n}"
+  | .byAct a n => s!"by the act {a} at phrase {n}"
+  | .derived d n => s!"derived by the rules of {d} at phrase {n}"
+
 structure Info where
   value   : Bool
   fromSat : Bool
@@ -20,13 +36,17 @@ structure Info where
   since   : Int := 0
   /-- Charter (D7): the time at which a created instance stops holding, if any. -/
   expiry   : Option Int := none
-  deriving Repr, DecidableEq, Inhabited
+  /-- Charter (Law 6): where this assignment came from. -/
+  origin  : Origin := .asserted 0
+  deriving Repr, Inhabited
 
 /-- The knowledge base: an association list from instances to their info, and the
 clock. Lookups compare instances structurally. -/
 structure State where
   contents : List (Tagged × Info) := []
   time     : Int := 0
+  /-- The index of the phrase being evaluated (for origins). -/
+  step     : Nat := 0
   deriving Inhabited
 
 namespace State
@@ -63,11 +83,11 @@ def holds (s : State) (te : Tagged) : Bool :=
 
 /-- Record a true assignment now, keeping the original stamp if the instance already
 holds (Law 7: the time a fact was established). -/
-def create (s : State) (te : Tagged) (expiry : Option Int) : State :=
+def create (s : State) (te : Tagged) (expiry : Option Int) (origin : Origin) : State :=
   let since := match s.lookup te with
     | some i => if i.live s.time then i.since else s.time
     | none => s.time
-  s.insert te ⟨true, false, since, expiry⟩
+  s.insert te ⟨true, false, since, expiry, origin⟩
 
 /-- Remove every derived fact (eFLINT `rebase`), before re-deriving. -/
 def rebase (s : State) : State :=
@@ -80,7 +100,7 @@ whether anything changed. -/
 def derive (s : State) (since : Int) (te : Tagged) : State × Bool :=
   match s.lookup te with
   | some _ => (s, false)
-  | none => ({ s with contents := (te, ⟨true, true, since, none⟩) :: s.contents }, true)
+  | none => ({ s with contents := (te, ⟨true, true, since, none, .derived te.2 s.step⟩) :: s.contents }, true)
 
 /-- The stamp a re-derived fact keeps: its stamp among `prev` (the derived facts before
 rebasing) or `now`. -/
@@ -102,12 +122,19 @@ def derivedFacts (s : State) : List (Tagged × Info) := s.contents.filter (·.2.
 
 end State
 
-/-- The truth value an effect assigns; a creation may carry an expiry (D7). -/
+/-- The truth value an effect assigns; a creation may carry an expiry (D7); an
+assignment made by an act's effects names the act (Law 6). -/
 inductive Assignment
-  | holdsTrue (expiry : Option Int := none)
-  | holdsFalse
+  | holdsTrue (expiry : Option Int := none) (by_ : Option Tagged := none)
+  | holdsFalse (by_ : Option Tagged := none)
   | unknown
-  deriving Repr, DecidableEq, Inhabited
+  deriving Repr, Inhabited
+
+/-- Mark every assignment of a store as made by the act `a`. -/
+def Assignment.byAct (a : Tagged) : Assignment → Assignment
+  | .holdsTrue e _ => .holdsTrue e (some a)
+  | .holdsFalse _ => .holdsFalse (some a)
+  | .unknown => .unknown
 
 /-- A batch of assignments. -/
 abbrev Store := List (Tagged × Assignment)
@@ -126,12 +153,12 @@ def union (a b : Store) : Store :=
 where
   /-- `holdsTrue > holdsFalse > unknown`; two creations keep the later expiry (none is forever). -/
   combine : Assignment → Assignment → Assignment
-    | .holdsTrue a, .holdsTrue b => .holdsTrue (match a, b with
-        | none, _ => none | _, none => none | some x, some y => some (max x y))
-    | .holdsTrue a, _ => .holdsTrue a
-    | _, .holdsTrue b => .holdsTrue b
-    | .holdsFalse, _ => .holdsFalse
-    | _, .holdsFalse => .holdsFalse
+    | .holdsTrue a by1, .holdsTrue b _ => .holdsTrue (match a, b with
+        | none, _ => none | _, none => none | some x, some y => some (max x y)) by1
+    | .holdsTrue a by1, _ => .holdsTrue a by1
+    | _, .holdsTrue b by2 => .holdsTrue b by2
+    | .holdsFalse by1, _ => .holdsFalse by1
+    | _, .holdsFalse by2 => .holdsFalse by2
     | .unknown, .unknown => .unknown
 
 def unions (sts : List Store) : Store := sts.foldr union []
@@ -143,24 +170,28 @@ end Store
 instance of the type; of a `Function` type, every instance with the same first
 component. -/
 def State.makeAssignments (spec : Spec) (st : Store) (s : State) : State :=
+  let originOf (te : Tagged) (by_ : Option Tagged) : Origin := match by_ with
+    | some a => .byAct a s.step
+    | none => if spec.closedType te.2 == some false then .environment s.step else .asserted s.step
   st.foldr (fun (te, a) s => match a with
-    | .holdsTrue expiry =>
+    | .holdsTrue expiry by_ =>
+      let origin := originOf te by_
       match spec.restrictionOf te.2 with
       | some .var =>
         let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
-          if q.1.2 == te.2 then (q.1, ⟨false, false, s.time, none⟩) else q }
-        s.create te expiry
+          if q.1.2 == te.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q }
+        s.create te expiry origin
       | some .function =>
         match te.1 with
         | .prod [f, _] =>
           let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
             match q.1.1 with
-            | .prod [f', _] => if q.1.2 == te.2 && Elem.beq f.1 f'.1 && f.2 == f'.2 then (q.1, ⟨false, false, s.time, none⟩) else q
+            | .prod [f', _] => if q.1.2 == te.2 && Elem.beq f.1 f'.1 && f.2 == f'.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q
             | _ => q }
-          s.create te expiry
+          s.create te expiry origin
         | _ => s
-      | none => s.create te expiry
-    | .holdsFalse => s.insert te ⟨false, false, s.time, none⟩
+      | none => s.create te expiry origin
+    | .holdsFalse by_ => s.insert te ⟨false, false, s.time, none, originOf te by_⟩
     | .unknown => s.erase te) s
 
 /-- What one trigger did (eFLINT `TransInfo`). -/

@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-23 (late, 2) — Phase 2's fourth slice: `Param` (D11, chapter 014) and fact origins with `?why` (Law 6, 004.10). 102 conformance tests.
 - 2026-10-23 (late) — Phase 2's third slice, clauses and provenance (D4): chapter 012; `charter check` and `charter test` run the Law 8 checks as claims; `charter trace`. 99 conformance tests.
 - 2026-10-23 (night) — Phase 2's second slice, time (D7): the clock (`@ t.`, `tick.`), `Time`/`Duration` types and domains, stamps on every assignment, `Held(e) For d`, `Creates e For d`, `Due within d`; CHR106. 92 conformance tests.
 - 2026-10-23 (evening) — Phase 2's first slice: `Valid when` (005.9), `Except under` (007.2), `Immunity … Against … Unless` (007.4), `Scenario` and the claim phrases (011.11), `--eflint` mode (002.9, 011.10); CHR022. 82 conformance tests.
@@ -22,7 +23,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 001 design goals | `001_design_goals.md` | unwritten (source: `docs/mission.md`) |
 | 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green |
 | 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green (`Time`/`Duration` in 009) |
-| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 11 tests green (D6) |
+| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 12 tests green (D6; origins and `?why`) |
 | 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 10 tests green, `Valid when` (D5) included |
 | 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 6 tests green, `Due within` included |
 | 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 4 tests green (`Except under`, `Immunity`); duty precedence pending |
@@ -32,7 +33,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | unwritten (D8, D9) |
-| 014 parameters and regimes | `014_parameters_and_regimes.md` | unwritten (D11) |
+| 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
 | 015 modules and require | `015_modules_and_require.md` | unwritten (D8) |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |
 | 017 projections | `017_projections.md` | unwritten |

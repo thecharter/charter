@@ -51,6 +51,8 @@ inductive Phrase where
   | setTime (t : Term)
   /-- Charter (D7): `tick.` advances the clock by one. -/
   | tick
+  /-- Charter (Law 6, plan §2.2.11): `?why e` prints where each instance of `e` came from. -/
+  | why (t : Term)
   deriving Repr, Inhabited
 
 /-- `#include "file"` and `#require "file"`. -/

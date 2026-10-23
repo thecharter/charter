@@ -20,6 +20,8 @@ A *state* assigns truth values to instances. An assignment comes from a phrase (
 
 **4.8 `Conditioned by`.** A type's `Conditioned by` conditions are preconditions over its components. An instance that fails them is not derived by the type's rules and is not enabled (005.5); its assigned truth is unaffected. `test/spec/spec_004_8_conditioned_by.eflint`
 
-**4.9 Invariants and predicates.** `Predicate p When e` is a fact over no components holding when `e` does; `Invariant i When e` is the same and is additionally checked after every phrase, a violation being reported when it does not hold (006.6 reports; Phase 2 adds `charter test --explore`).
+**4.10 Origins (Law 6).** Every assignment records where it came from: *asserted* by a phrase, *supplied by the environment* (an assignment to an open type), made *by an act* (its effects), or *derived* by a type's rules; derived facts carry the rules. `?why e` prints, for each instance of `e`, whether it holds and since when, and this origin. No evaluator path creates a fact without one. `test/spec/spec_004_10_why.eflint`
+
+**4.9 Invariants and predicates. `Predicate p When e` is a fact over no components holding when `e` does; `Invariant i When e` is the same and is additionally checked after every phrase, a violation being reported when it does not hold (006.6 reports; Phase 2 adds `charter test --explore`).
 
 *Differences from eFLINT:* 4.6. eFLINT's `Saturation.hs` is an inflationary fixpoint over types in alphabetical order that evaluates negation against intermediate states; three of its own tests fail under it and pass here (`test/eflint-corpus/tolerances.md`, D6 (a)), and one of its examples, a default rule, is rejected here (D6 (b); the reopen condition of D6 is met and is Eric's).

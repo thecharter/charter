@@ -1,0 +1,13 @@
+// Every fact knows where it came from (Law 6): `?why e` prints, for each instance, whether it holds, since when, and its origin: asserted by a phrase, supplied by the environment, by an act, or derived by a type's rules.
+Fact p Identified by P
+Open Fact o Identified by O
+Fact q Identified by Q Holds when p(P)
+Act make Actor actor Creates p(P) Holds when True.
++actor(Alice).
++o(O).
+make(Alice).
+?why p(P).
+?why o(O).
+?why q(Q).
+?why actor(Alice).
+?p(P). ?q(Q).

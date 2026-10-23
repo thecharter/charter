@@ -1,0 +1,9 @@
+// A `Param` may be declared `: Time` or `: Duration` (D7), and then combines with the clock as its type allows.
+Param grace : Duration = 3
+Param opening : Time = 5
+Fact actor Identified by A.
+?(opening + grace == 8).
+@ 4.
+?(Current Time < opening).
+@ 9.
+?(Current Time > opening + grace).

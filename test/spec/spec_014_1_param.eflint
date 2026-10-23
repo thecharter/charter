@@ -1,0 +1,11 @@
+// `Param name = n` declares a `Var` fact over `Int` whose initial instance is `n`; any integer position may name it, and an act may create a new instance, which the program judges like any event (D11).
+Param notice-window = 10
+Fact actor Identified by Alice
+Fact deadline Identified by Int Derived from deadline(notice-window + 1)
+Act amend Actor actor Creates notice-window(20) Holds when True.
+?notice-window(10).
+?deadline(11).
+amend(Alice).
+?notice-window(20).
+?!notice-window(10).
+?deadline(21).

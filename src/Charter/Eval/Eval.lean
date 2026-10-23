@@ -330,7 +330,9 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
           let (ssAss, anyF) := syncTransInfos syncInfos
           -- D5: the act's own effects apply iff it is valid; synced transitions are judged on their own
           let stores ← if valid then effects.mapM (evalEffect fuel) else pure []
-          let ass := Store.union (Store.unions stores) ssAss
+          -- Law 6: the act is the origin of what its effects assign
+          let own : Store := (Store.unions stores).map fun (x, a) => (x, a.byAct te)
+          let ass := Store.union own ssAss
           let disabled := anyF || !enabled
           let forced := anyF || (!enabled && !physical)
           pure (.mk te ass forced disabled valid mActor syncInfos)
@@ -351,13 +353,13 @@ def evalEffect : Nat → Effect → M Store
   | 0, _ => err (.fuelExhausted "evaluating an effect")
   | fuel + 1, e => do
     match e with
-    | .cAll xs t none => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none))
+    | .cAll xs t none => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none none))
     | .cAll xs t (some d) =>
       -- D7: `Creates e For d` stamps the instances with the expiry now + d
       let now ← getTime
       let pairs ← foreach fuel xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
-      pure (pairs.map fun (te, u) => (te, .holdsTrue (some u)))
-    | .tAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse))
+      pure (pairs.map fun (te, u) => (te, .holdsTrue (some u) none))
+    | .tAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse none))
     | .oAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
 
 /-- Evaluate a checked term to its values (eFLINT `eval`). -/

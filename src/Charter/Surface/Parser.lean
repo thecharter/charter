@@ -531,8 +531,14 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     match ← peek with
     | .kw "." | .kw "}" | .eof => return some (.conditionedBy [])
     | _ => return some (.conditionedBy (← exprList))
-  | .kw "Closed" => advance; return some .close
-  | .kw "Open" => advance; return some .open
+  | .kw "Closed" | .kw "Open" =>
+    -- `Open Fact x` after a declaration starts the next frame; a bare `Open`/`Closed` is a clause
+    match ← peekAt 1 with
+    | .kw s => if ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
+                   "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param"].contains s
+               then return none
+               else (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
+    | _ => (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
   | .kw "Identified by" | .kw "Domain" =>
     if k == .fact then advance; return some (← extendDomainClause) else return none
   | .kw "Creates" =>
@@ -616,6 +622,17 @@ def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId
                   domainConstraint := filter, restriction := restr, derivation := [],
                   closed := if isClosed then none else some false, conditions := [] },
     .typeExt d cls ]
+
+/-- `: Int | Time | Duration` after a `Param` name; `Int` when absent. -/
+def paramDomain : P Domain := do
+  if ← isKw ":" then
+    advance
+    match ← peek with
+    | .kw "Int" => advance; return Domain.anyInt
+    | .kw "Time" => advance; return Domain.time
+    | .kw "Duration" => advance; return Domain.duration
+    | k => fail "CHR003" s!"expected Int, Time, or Duration after `:` but found {k.describe}"
+  else return Domain.anyInt
 
 /-- One frame: a type declaration, an `Extend`, or a `Placeholder`. -/
 def frame : P (List Decl) := do
@@ -721,6 +738,15 @@ def frame : P (List Decl) := do
     expectKw "For"
     let t ← ident
     return [.placeholder f t]
+  | .kw "Param" =>
+    advance
+    let name ← ident
+    let dom ← paramDomain
+    expectKw "="
+    let neg ← optKw "-"
+    let n ← intLit
+    let value : Int := if neg then -n else n
+    return [.param name dom value]
   | .kw "Document" =>
     advance
     match ← peek with
@@ -742,7 +768,7 @@ def startsFrame : P Bool := do
   let k ← peek
   let isFrameKw : TokKind → Bool
     | .kw s => ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document"].contains s
+                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param"].contains s
     | _ => false
   match k with
   | .kw "Open" | .kw "Closed" => return isFrameKw (← peekAt 1)
@@ -774,6 +800,7 @@ def phrase : P Phrase := do
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
   | .kw "@" => advance; return .setTime (← expression)
   | .kw "tick" => advance; return .tick
+  | .kw "?why" => advance; return .why (← expression)
   | .kw "!" => advance; let (xs, t) ← optForeach; return .trigger xs t
   | _ => let (xs, t) ← optForeach; return .trigger xs t
 

@@ -77,12 +77,12 @@ where they are atoms, as eFLINT reads them. -/
 def charterWordKeywords : List String :=
   [ "Except under", "Valid when", "Due within", "Commentary", "Acceptance", "Definition",
     "Immunity", "Duration", "Scenario", "Approved", "Document", "Against", "Clause", "Unless",
-    "Held", "Norm", "Text", "From", "tick" ]
+    "Param", "Held", "Norm", "Text", "From", "tick" ]
 
 /-- The claim phrases. Each is a keyword only when followed by whitespace, so that
 `?valid(5)` still queries a fact named `valid` and `?valid do(x)` is the claim. -/
 def charterSymbolKeywords : List String :=
-  [ "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid" ]
+  [ "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
 
 /-- Charter symbols that need no whitespace after them. -/
 def charterPlainSymbols : List String := [ "=>" ]

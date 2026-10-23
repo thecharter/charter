@@ -1,4 +1,5 @@
 import Charter.Surface.Ast
+import Charter.Core.State
 
 /-!
 # Charter.Resolve.Static — Names, types, arities, and the checked form of terms
@@ -34,7 +35,8 @@ inductive CPhrase where
   | obfuscate (xs : List Var) (t : Term)
   | query (t : Term)
   | instQuery (mustHold : Bool) (xs : List Var) (t : Term)
-  | onlyDecls
+  /-- Declarations executed; `init` holds the initial instances of `Param`s (D11). -/
+  | onlyDecls (init : Store := [])
   | par (ps : List CPhrase)
   /-- Charter: a scenario's phrases are resolved when `charter test` runs them. -/
   | scenario (name : String) (ps : List Phrase)
@@ -43,6 +45,8 @@ inductive CPhrase where
   /-- Charter (D7): `@ t.` and `tick.`, the clock as environment input. -/
   | setTime (t : Term)
   | tick
+  /-- Charter (Law 6): `?why e`, `xs` bound to every instance. -/
+  | why (xs : List Var) (t : Term)
   deriving Inhabited
 
 namespace Resolve
@@ -589,9 +593,13 @@ def builtins : List DomId := ["int", "string", "actor"]
 
 /-- Execute a block of declarations (eFLINT `compile_phrase (PDeclBlock ds)`):
 new types and placeholders first, as written; then each new type is compiled with
-every new name in scope; then the extensions. -/
-def executeDecls (ds : List Decl) : Stc Unit := do
+every new name in scope; then the extensions. Returns the initial instances of the
+block's `Param`s (D11). -/
+def executeDecls (ds : List Decl) : Stc Store := do
   let (inits, exts) := ds.partition Decl.isInitial
+  let init : Store := inits.filterMap fun d => match d with
+    | .param n _ v => some ((.int v, n), .holdsTrue none none)
+    | _ => none
   -- 1. insert the raw declarations so that mutually referring types resolve
   -- (`forM`, not `for`: see AGENTS.md, common mistakes)
   inits.forM fun d => do
@@ -604,6 +612,11 @@ def executeDecls (ds : List Decl) : Stc Unit := do
     | .placeholder f t => modifySpec (·.insertAlias f t)
     | .clause c => modifySpec (·.insertClause c)
     | .document p => modifySpec (fun s => { s with document := some p })
+    | .param n dom _ =>
+      let spec ← getSpec
+      if (spec.lookupDecl n).isSome then
+        warn "CHR019" s!"{n} is declared again; the new declaration replaces the earlier one (B9 pending)"
+      setSpec (spec.insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
     | .typeExt .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
@@ -625,6 +638,7 @@ def executeDecls (ds : List Decl) : Stc Unit := do
       let parts ← compileExt ty clauses
       parts.forM fun part => executeExt part.1 part.2
     | _ => pure ()
+  return init
 
 /-- Compile a transition phrase's term and bind its free variables (eFLINT
 `compile_trans_term`). -/
@@ -660,7 +674,14 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       let fs ← freeVarsChecked t
       let (t', _) ← compileTerm termFuel t
       return .instQuery b (xs ++ diff fs xs) t'
-    | .decls ds => executeDecls ds; return .onlyDecls
+    | .decls ds => return .onlyDecls (← executeDecls ds)
+    | .why t =>
+      let (t', ty) ← compileTerm termFuel t
+      match ty with
+      | .tagged _ =>
+        let fs ← freeVarsChecked t'
+        return .why fs t'
+      | _ => err "CHR015" s!"?why needs an instance, not {ty}"
     | .scenario name ps => return .scenario name ps
     | .setTime t => return .setTime (← convertTerm termFuel t .time)
     | .tick => return .tick
@@ -675,9 +696,9 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       -- declarations in a block are executed first, then the other phrases compiled
       let decls := ps.flatMap fun | .decls ds => ds | _ => []
       let rest := ps.filter fun | .decls _ => false | _ => true
-      executeDecls decls
+      let init ← executeDecls decls
       let cs ← rest.mapM (compilePhrase fuel)
-      return .par cs
+      return .par (.onlyDecls init :: cs)
 
 end Resolve
 
