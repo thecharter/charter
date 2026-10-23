@@ -18,6 +18,7 @@ more errors); `warning` does not.
 | CHR002 | error | unterminated string literal | `Charter.Surface.Lexer` |
 | CHR003 | error | unexpected token; the parser expected something else (message says what) | `Charter.Surface.Parser` |
 | CHR004 | error | a phrase or declaration is missing its `.` terminator at end of input | `Charter.Surface.Parser` |
+| CHR005 | error | a `#include` or `#require` names a file that cannot be found or read (the message lists the directories searched) or the include chain is too deep | `Charter.Cli.Load` |
 
 ## Resolution and typing (CHR010–CHR049)
 

@@ -33,8 +33,16 @@ scenario files `#require` their models relative to their own directory.
 
 ## Running
 
-    charter test test/eflint-corpus/tests test/eflint-corpus/examples
+    charter test test/eflint-corpus/tests test/eflint-corpus/examples \
+      --expect test/eflint-corpus/eflint-outcomes.txt --tolerate test/eflint-corpus/tolerances.md
 
-`tools/battery` runs this as part of the PR tier and fails if any file outside
-`tolerances.md` fails, or if a file listed there passes (a tolerance that is no
-longer needed is deleted, not kept).
+`eflint-outcomes.txt` records eFLINT 4.1.0.1's own outcome on every file, in
+the format `charter test` prints; `tools/corpus-baseline <eflint-repl>` produces
+it by running the Haskell implementation from each file's directory. The examples
+repository is not a test suite: some of its files are fragments another file
+`#require`s, or scenarios that eFLINT itself fails, and the baseline is what says
+so. A file passes the run when its outcome agrees with eFLINT's, or, for a file
+listed in `tolerances.md`, when it differs. `tools/battery` runs this as part of
+the PR tier and fails on any disagreement outside the tolerances, and on a
+tolerated file that agrees (a tolerance that is no longer needed is deleted, not
+kept).

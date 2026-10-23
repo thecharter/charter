@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Record eFLINT's own outcome on every corpus file, in the format `charter test`
+# prints, so that `charter test --expect` can compare against it.
+#
+#     tools/corpus-baseline <path to eflint-repl> > test/eflint-corpus/eflint-outcomes.txt
+#
+# eFLINT's criterion (run_tests.sh in the implementation): exit status 0 and
+# empty standard output in --test-mode. Each file is run from its own directory,
+# which is how the examples' own scripts run them and how `charter test` resolves
+# includes (the file's directory first).
+set -u
+cd "$(dirname "$0")/.." || exit 2
+EFLINT=${1:?usage: tools/corpus-baseline <eflint-repl>}
+EFLINT=$(cd "$(dirname "$EFLINT")" && pwd)/$(basename "$EFLINT")
+root=$(pwd)
+echo "# eFLINT 4.1.0.1 outcomes, produced by tools/corpus-baseline on $(date -u +%Y-%m-%d)"
+find test/eflint-corpus/tests test/eflint-corpus/examples -name '*.eflint' | LC_ALL=C sort | while read -r f; do
+  dir=$(dirname "$f"); base=$(basename "$f")
+  out=$(cd "$dir" && timeout 120 "$EFLINT" "$base" --test-mode 2>/dev/null); status=$?
+  if [ $status -eq 0 ] && [ -z "$out" ]; then
+    echo "ok   $f"
+  else
+    first=$(printf '%s\n' "$out" | head -1 | cut -c1-100)
+    echo "FAIL $f: exit $status: $first"
+  fi
+done

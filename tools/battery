@@ -57,13 +57,16 @@ s16=$(grep -c '(16/16 scenarios passed)' "$OUT/sim.log")
 s8=$(grep -c '(8/8 scenarios passed)' "$OUT/sim.log")
 step sim $(( st != 0 || s16 != 1 || s8 != 1 )) "psa 16/16: $s16, commons 8/8: $s8"
 
-# 6. the eFLINT corpus (D2), once `charter test` exists
-if "$B" help 2>/dev/null | grep -q '^  test '; then
-  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples > "$OUT/corpus.log" 2>&1; st=$?
-  step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
+# 6. the eFLINT corpus (D2): every file must agree with eFLINT's recorded outcome,
+#    except the tolerated differences, which must differ
+BASE=test/eflint-corpus/eflint-outcomes.txt
+TOL=test/eflint-corpus/tolerances.md
+if [ -f "$BASE" ]; then
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --expect "$BASE" --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 else
-  step eflint-corpus 1 "charter test is not implemented yet (Phase 1)"
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 fi
+step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
 exit $fail

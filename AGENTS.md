@@ -294,7 +294,7 @@ Today (v0.3; the target layout is plan §4 and this section is updated as it lan
 
 | Path | What |
 |---|---|
-| `src/Charter.lean`, `src/Charter/` | the language: `Core/` (syntax, semantics, provenance, views, explain, composition, ratchet, population, refinement), `Modules/` and `Substrate/` (standard library and substrate theorems), `Projection/` (veil, prompt, abi, visualization), `Surface/` (`.charter` grammar, lowering, export, `charter_program`, the Lean macros scheduled for deletion), `Tooling/Cli.lean` |
+| `src/Charter.lean`, `src/Charter/` | the language. **The eFLINT-core pipeline (Phase 1):** `Surface/` `Diagnostics`, `Lexer`, `Parser`, `Ast`; `Core/` `Term`, `Spec`, `State`; `Resolve/Static` (names, types, arities, checked terms); `Eval/Eval` (the evaluator) and `Eval/Interpreter` (stratified saturation, phrases, reports); `Cli/` `Load`, `Run`, `Test`. **The v0.3 tree, scheduled for replacement:** `Core/` (syntax, semantics, provenance, views, explain, composition, ratchet, population, refinement), `Modules/` and `Substrate/`, `Projection/`, `Surface/` (`Dsl`, `Lower`, `Unlower`, `Program`, `Syntax` macros), `Tooling/Cli.lean` (the dispatcher; `run`, `test`, and `check` on `.eflint` files go to `Cli/`) |
 | `Examples.lean`, `Examples/` | `SovereignAgency/` and `AutonomousCommons/`: each a `.charter` program, its English, scenarios, and a Lean companion with theorems and simulations (companions are deleted when their Charter replacements pass, D10) |
 | `src/Main.lean` | the `charter` executable |
 | `docs/mission.md`, `docs/meetings/`, `docs/plans/`, `docs/spec/`, `docs/completed/` | mission and laws, decisions, plans, the spec (skeleton) and its diagnostic-code registry, superseded documents |
