@@ -73,8 +73,8 @@ A downstream stage may propagate, materialize, and verify a fact; it never
 reconstructs or overrides one from text or representation. Smell test: if deleting
 a downstream heuristic could change which programs are accepted or what a transition
 reports, the boundary is wrong. When you fix a bug, move its answer to the owner;
-never add a second derivation. (Today's code has the v0.3 shape, `Charter/Surface`
-→ `Charter/Core` → `Charter/Projection` → `Charter/Tooling`; the same rule applies.)
+never add a second derivation. (Today's code has the v0.3 shape, `src/Charter/Surface`
+→ `src/Charter/Core` → `src/Charter/Projection` → `src/Charter/Tooling`; the same rule applies.)
 
 ## Ceremony is a design defect, not an author error
 
@@ -138,7 +138,7 @@ enumerable answer; test all of them and write the matrix. Concluding and patchin
 same question twice means stop and enumerate.
 
 **Code settles facts; intent is the maintainer's call.** When eFLINT's paper and its
-implementation disagree, or the spec and `Charter/Core/Semantics.lean` disagree,
+implementation disagree, or the spec and `src/Charter/Core/Semantics.lean` disagree,
 settle the fact by running and surface the contradiction. Never assume which side is
 canonical. Test the inconvenient premise first.
 
@@ -293,9 +293,9 @@ Today (v0.3; the target layout is plan §4 and this section is updated as it lan
 
 | Path | What |
 |---|---|
-| `Charter.lean`, `Charter/` | the language: `Core/` (syntax, semantics, provenance, views, explain, composition, ratchet, population, refinement), `Modules/` and `Substrate/` (standard library and substrate theorems), `Projection/` (veil, prompt, abi, visualization), `Surface/` (`.charter` grammar, lowering, export, `charter_program`, the Lean macros scheduled for deletion), `Tooling/Cli.lean` |
+| `src/Charter.lean`, `src/Charter/` | the language: `Core/` (syntax, semantics, provenance, views, explain, composition, ratchet, population, refinement), `Modules/` and `Substrate/` (standard library and substrate theorems), `Projection/` (veil, prompt, abi, visualization), `Surface/` (`.charter` grammar, lowering, export, `charter_program`, the Lean macros scheduled for deletion), `Tooling/Cli.lean` |
 | `Examples.lean`, `Examples/` | `SovereignAgency/` and `AutonomousCommons/`: each a `.charter` program, its English, scenarios, and a Lean companion with theorems and simulations (companions are deleted when their Charter replacements pass, D10) |
-| `Main.lean` | the `charter` executable |
+| `src/Main.lean` | the `charter` executable |
 | `docs/mission.md`, `docs/meetings/`, `docs/plans/`, `docs/charter-spec.md` | mission and laws, decisions, plans, the current spec |
 | `HANDOFF.md` | reverse-chronological session log (newest section first; verify every hash it names with `git log` before acting) |
 | `.reference/` | eFLINT, Catala, Quint, Symboleo checkouts; untracked, ignored, read-only |
@@ -305,7 +305,7 @@ Build: `lake build` (Lean 4.24, no Mathlib). The binary is `.lake/build/bin/char
 
 ## Common mistakes
 
-- Guessing an API or a keyword; read `Charter/Surface/Dsl.lean` and
+- Guessing an API or a keyword; read `src/Charter/Surface/Dsl.lean` and
   `.reference/eflint/src/Language/EFLINT/Parse.hs`.
 - Working around a semantics bug in a program instead of fixing the semantics.
 - Treating eFLINT's paper as the implementation; run the Haskell.
@@ -321,8 +321,8 @@ Build: `lake build` (Lean 4.24, no Mathlib). The binary is `.lake/build/bin/char
 ## Success checklist
 
 A change is acceptable only if, on a clean tree: `lake build` succeeds with zero
-warnings; the trust grep (`sorry`, `native_decide`, `axiom`) over `Charter/`,
-`Examples/`, `Main.lean` is empty; the leak grep over `Charter/` for any example
+warnings; the trust grep (`sorry`, `native_decide`, `axiom`) over `src/Charter/`,
+`Examples/`, `src/Main.lean` is empty; the leak grep over `src/Charter/` for any example
 name is empty; `charter check` on both examples reports zero FAIL and zero STALE;
 `charter sim` reports 16/16 and 8/8; every new fixture was seen failing before its
 fix; the decision log records any judgment call a future maintainer might

@@ -2,15 +2,17 @@ name = "charter"
 version = "0.3.0"
 defaultTargets = ["Charter", "Examples", "charter"]
 
-# The Charter language, standard library, projections, surface syntax & CLI harness.
+# The Charter language: compiler, semantics, standard library, projections, and CLI (plan §4: src/Charter/).
 [[lean_lib]]
 name = "Charter"
+srcDir = "src"
 
-# Example institutional programs written in Charter (import Charter, never the reverse).
+# Lean companions of the example programs (import Charter, never the reverse).
 [[lean_lib]]
 name = "Examples"
 
-# The `charter` command-line tool: Charter.Tooling.Cli + the registered examples.
+# The `charter` executable: src/Main.lean over Charter.Cli plus the registered examples.
 [[lean_exe]]
 name = "charter"
 root = "Main"
+srcDir = "src"

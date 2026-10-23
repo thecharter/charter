@@ -8,45 +8,45 @@ The repository has two layers with a strict dependency direction (`Examples → 
 2. **`Examples` (`Examples.lean` + `Examples/`) — programs written in Charter.** Two ship today, each a `.charter` file next to its authoritative Markdown and scenario files: *The Protocol of Sovereign Agency* (`psa`, `Examples/SovereignAgency/protocol-of-sovereign-agency.charter`, 61 clauses) and *The Autonomous Compute & Treasury Commons* (`commons`, `Examples/AutonomousCommons/autonomous-commons.charter`, 8 clauses). Each also keeps a Lean companion holding its theorems and quantitative world simulations, together with a kernel-checked proof (`psa_program_is_lean_law`, `commons_program_is_lean_law`) that lowering the `.charter` file yields exactly the law those theorems are about.
 
 Build: `lake build` (Lean 4.24, no Mathlib, no external dependencies). The CLI lands in `.lake/build/bin/charter`.
-Check trust: `grep -rn "sorry\|native_decide\|axiom " Charter/ Examples/ Main.lean Charter.lean Examples.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
+Check trust: `grep -rn "sorry\|native_decide\|axiom " src/Charter/ Examples/ src/Main.lean src/Charter.lean Examples.lean` is empty; every general theorem depends at most on Lean's standard `propext`, `Classical.choice`, `Quot.sound`, and every decided scenario depends on no axioms at all (`{}`).
 
 ## Repository Layout
 
 ```
 ── THE CHARTER LANGUAGE & STANDARD LIBRARY (Charter/) ──────────────────────────
 Charter.lean                                Umbrella module for the language, compiler & standard library
-Charter/Core/Provenance.lean                Spans, registers, lexical/normative/reverse coverage & AuthorshipQuestion
-Charter/Core/Syntax.lean                    Typed Hohfeldian normative AST (Duty, Power, Immunity, Law σ)
-Charter/Core/Semantics.lean                 Occurrence, compliance, and institutional validity semantics
-Charter/Core/Views.lean                     Generated legal, per-actor, operational, and trace views
-Charter/Core/Explain.lean                   Step-by-step counterfactual explanation engine
-Charter/Core/Graph.lean                     Law-agnostic AffiliationGraph & VerifiedBalanceSheet
-Charter/Core/Population.lean                Groups, members, stakeholders, operators: ParamEntityRef Role & population conservation
-Charter/Core/Refinement.lean                Polymorphic WorldSpec σ Q & GenericWorldState refinement theorems
-Charter/Core/Composition.lean               Vertical (L_sub ◁ L_super) & horizontal (L₁ ⊕ L₂) composition, SigEmbedding & LawInterface
-Charter/Core/Ratchet.lean                   Universal RatchetSpec P σ, ValidAmendmentTrajectory & sweepParameterGrid
-Charter/Modules/ResidualLedger.lean         Module 1: Non-interest residual ledger, sunset, royalty & buyout floor
-Charter/Modules/CollateralPool.lean         Module 2: Harm-scaled bonding, rolling exposure decay & long-tail reserve
-Charter/Modules/CircuitBreaker.lean         Module 3: Two-stage emergency freeze, probable cause & frozen-state protection
-Charter/Modules/EntityGroup.lean            Module 4: Multi-member group ledgers, carryover basis & innocent isolation
-Charter/Modules/ExitAndVoice.lean           Module 5: Deterministic unilateral exit precedence & rate-limited voice
-Charter/Modules/SortitionCourt.lean         Module 6: Sybil-resistant sortition, bounded appeals & priority fee waterfall
-Charter/Modules/AttestedLease.lean          Module 7: Time-bounded single operating lease, quarantine fencing & key erasure
-Charter/Modules/OracleFeed.lean             Module 8: Contestable valuation feeds & atomic settlement conservation
-Charter/Substrate/Attestation.lean          Substrate: attested execution leases, quarantine fencing & irreversible key erasure
-Charter/Substrate/Sortition.lean            Substrate: Sybil-resistant sortition, conflict/cluster filtering & supermajority
-Charter/Substrate/Settlement.lean           Substrate: contestable valuation resolution & atomic settlement conservation
-Charter/Projection/Veil.lean                Veil 2.0 transition-system lowering & preservation theorem
-Charter/Projection/Prompt.lean              AI constitutional system prompts, AlignmentCard & synthetic TrainingRow JSON
-Charter/Projection/ContractABI.lean         Smart-contract state-transition guard (requireComplies, executePowerGuard, Solidity & JSON ABI)
-Charter/Projection/Visualization.lean       Step-by-step annotated trace timelines & LawDiff amendment entrenchment audit
-Charter/Surface/Dsl.lean                    The .charter language: AST (Doc), tokenizer, parser (parseCharterText), validator (validate), printer (render)
-Charter/Surface/Lower.lean                  Meaning of a Doc: lowering to Law σ_dyn over the dynamic signature, string tables, parameter environments
-Charter/Surface/Unlower.lean                Exporting a Lean law as a Doc (sentinel-based parameter naming), embeddingOf
-Charter/Surface/Program.lean                `charter_program "file.charter"`: embeds a validated .charter file as a Lean term
-Charter/Surface/DslSample.lean              Kernel-decided toy program: parse, validate, print/parse round trip, lower, evaluate scenarios
-Charter/Surface/Syntax.lean                 charter_* Lean 4 macros for programs written directly in Lean (charter_clause, charter_duty, ...)
-Charter/Tooling/Cli.lean                    Program-agnostic `charter` CLI harness (Charter.Cli.Program, Charter.Cli.run)
+src/Charter/Core/Provenance.lean                Spans, registers, lexical/normative/reverse coverage & AuthorshipQuestion
+src/Charter/Core/Syntax.lean                    Typed Hohfeldian normative AST (Duty, Power, Immunity, Law σ)
+src/Charter/Core/Semantics.lean                 Occurrence, compliance, and institutional validity semantics
+src/Charter/Core/Views.lean                     Generated legal, per-actor, operational, and trace views
+src/Charter/Core/Explain.lean                   Step-by-step counterfactual explanation engine
+src/Charter/Core/Graph.lean                     Law-agnostic AffiliationGraph & VerifiedBalanceSheet
+src/Charter/Core/Population.lean                Groups, members, stakeholders, operators: ParamEntityRef Role & population conservation
+src/Charter/Core/Refinement.lean                Polymorphic WorldSpec σ Q & GenericWorldState refinement theorems
+src/Charter/Core/Composition.lean               Vertical (L_sub ◁ L_super) & horizontal (L₁ ⊕ L₂) composition, SigEmbedding & LawInterface
+src/Charter/Core/Ratchet.lean                   Universal RatchetSpec P σ, ValidAmendmentTrajectory & sweepParameterGrid
+src/Charter/Modules/ResidualLedger.lean         Module 1: Non-interest residual ledger, sunset, royalty & buyout floor
+src/Charter/Modules/CollateralPool.lean         Module 2: Harm-scaled bonding, rolling exposure decay & long-tail reserve
+src/Charter/Modules/CircuitBreaker.lean         Module 3: Two-stage emergency freeze, probable cause & frozen-state protection
+src/Charter/Modules/EntityGroup.lean            Module 4: Multi-member group ledgers, carryover basis & innocent isolation
+src/Charter/Modules/ExitAndVoice.lean           Module 5: Deterministic unilateral exit precedence & rate-limited voice
+src/Charter/Modules/SortitionCourt.lean         Module 6: Sybil-resistant sortition, bounded appeals & priority fee waterfall
+src/Charter/Modules/AttestedLease.lean          Module 7: Time-bounded single operating lease, quarantine fencing & key erasure
+src/Charter/Modules/OracleFeed.lean             Module 8: Contestable valuation feeds & atomic settlement conservation
+src/Charter/Substrate/Attestation.lean          Substrate: attested execution leases, quarantine fencing & irreversible key erasure
+src/Charter/Substrate/Sortition.lean            Substrate: Sybil-resistant sortition, conflict/cluster filtering & supermajority
+src/Charter/Substrate/Settlement.lean           Substrate: contestable valuation resolution & atomic settlement conservation
+src/Charter/Projection/Veil.lean                Veil 2.0 transition-system lowering & preservation theorem
+src/Charter/Projection/Prompt.lean              AI constitutional system prompts, AlignmentCard & synthetic TrainingRow JSON
+src/Charter/Projection/ContractABI.lean         Smart-contract state-transition guard (requireComplies, executePowerGuard, Solidity & JSON ABI)
+src/Charter/Projection/Visualization.lean       Step-by-step annotated trace timelines & LawDiff amendment entrenchment audit
+src/Charter/Surface/Dsl.lean                    The .charter language: AST (Doc), tokenizer, parser (parseCharterText), validator (validate), printer (render)
+src/Charter/Surface/Lower.lean                  Meaning of a Doc: lowering to Law σ_dyn over the dynamic signature, string tables, parameter environments
+src/Charter/Surface/Unlower.lean                Exporting a Lean law as a Doc (sentinel-based parameter naming), embeddingOf
+src/Charter/Surface/Program.lean                `charter_program "file.charter"`: embeds a validated .charter file as a Lean term
+src/Charter/Surface/DslSample.lean              Kernel-decided toy program: parse, validate, print/parse round trip, lower, evaluate scenarios
+src/Charter/Surface/Syntax.lean                 charter_* Lean 4 macros for programs written directly in Lean (charter_clause, charter_duty, ...)
+src/Charter/Tooling/Cli.lean                    Program-agnostic `charter` CLI harness (Charter.Cli.Program, Charter.Cli.run)
 
 ── EXAMPLE PROGRAMS WRITTEN IN CHARTER (Examples/) ─────────────────────────────
 Examples.lean                               Umbrella module for the example programs
@@ -82,7 +82,7 @@ Examples/AutonomousCommons/Export.lean      `charter export --law commons`
 Examples/AutonomousCommons/Cli.lean                 Registers commons with the charter CLI
 
 ── CLI & DOCUMENTATION ─────────────────────────────────────────────────────────
-Main.lean                                   `charter` executable: Charter.Cli.run over the registered examples
+src/Main.lean                                 `charter` executable: Charter.Cli.run over the registered examples
 docs/charter-spec.md                        Charter Language Specification (architecture & semantic commitments)
 HANDOFF.md                                  Orientation for the next maintainer
 ```
@@ -231,7 +231,7 @@ power P.REASSIGN
   removes allotted
 ```
 
-Clause spans come in five registers (`norm`, `definition`, `invariant`, `acceptance`, `commentary`); `check` verifies that the spans reproduce the clause exactly, that every norm span names a rule, that every rule is named by some span, and that each clause occurs verbatim in the `document`. Actor classes are `anyone`, `only r, s`, `except r, s`, `tagged f` (every role `r` carrying `f(r)`), or `tagged r: f(r), s: g(s)`. Conditions are `true`, `false`, `holds f`, `heldFor f n`, `countGe f n`, `countAtLeast f g`, `not`, `and`, `or`, and parentheses; conduct is `act a`, `anyOf a, b`, `exerciseOf P.X`, with the same connectives; numbers are literals, parameter names, or sums. Duty modifiers: `except when <cond>`, `except by power P.A, P.B`, `overridden by D.A`, `breach by P.FIND`, `remedies f, g`. Power effects: `adds f`, `adds f for n` (time-to-live), `adds f to role` (actor-indexed), `adds f if <cond>` (conditional), `removes f`, `establishes breach of D.X`. Immunities take `holder`, `against P.A, P.B`, `active`, and `except when`. `use module Name with a = 1` documents which standard-library pattern a program instantiates. The complete grammar is in the header of `Charter/Surface/Dsl.lean`.
+Clause spans come in five registers (`norm`, `definition`, `invariant`, `acceptance`, `commentary`); `check` verifies that the spans reproduce the clause exactly, that every norm span names a rule, that every rule is named by some span, and that each clause occurs verbatim in the `document`. Actor classes are `anyone`, `only r, s`, `except r, s`, `tagged f` (every role `r` carrying `f(r)`), or `tagged r: f(r), s: g(s)`. Conditions are `true`, `false`, `holds f`, `heldFor f n`, `countGe f n`, `countAtLeast f g`, `not`, `and`, `or`, and parentheses; conduct is `act a`, `anyOf a, b`, `exerciseOf P.X`, with the same connectives; numbers are literals, parameter names, or sums. Duty modifiers: `except when <cond>`, `except by power P.A, P.B`, `overridden by D.A`, `breach by P.FIND`, `remedies f, g`. Power effects: `adds f`, `adds f for n` (time-to-live), `adds f to role` (actor-indexed), `adds f if <cond>` (conditional), `removes f`, `establishes breach of D.X`. Immunities take `holder`, `against P.A, P.B`, `active`, and `except when`. `use module Name with a = 1` documents which standard-library pattern a program instantiates. The complete grammar is in the header of `src/Charter/Surface/Dsl.lean`.
 
 Workflow:
 
