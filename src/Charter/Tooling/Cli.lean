@@ -9,6 +9,7 @@ import Charter.Projection.Visualization
 import Charter.Surface.Syntax
 import Charter.Surface.Lower
 import Lean.Data.Json
+import Charter.Cli.Test
 
 /-!
 # Charter.Tooling.Cli — Program-Agnostic Command-Line Harness
@@ -443,7 +444,9 @@ def cmdVerify (targets : List Program) : IO Unit := do
 def usageText (programs : List Program) : String :=
   s!"usage: charter [--law <id> | --all] <command> [args] [file.charter ...]\n" ++
   s!"       registered programs: {knownIds programs}; any .charter file given is run directly\n" ++
-  "  check   [english.json]                  structure, coverage, provenance, staleness\n" ++
+  "  check   [english.json | file.eflint]    structure, coverage, provenance, staleness; or resolve an .eflint program\n" ++
+  "  run     <file.eflint>                   run the phrases: transitions with their three answers, violations, facts\n" ++
+  "  test    <file.eflint | dir> ...         run in test mode: a file passes with no errors and every query holding\n" ++
   "  trace   <clause-id>                     the span table for a clause\n" ++
   "  views                                   legal / agent / operational views\n" ++
   "  veil                                    Veil 2.0 transition-system & safety specification\n" ++
@@ -463,6 +466,12 @@ def usageText (programs : List Program) : String :=
 
 /-- Entry point: dispatch `args` over the registered `programs`. -/
 def run (registered : List Program) (args : List String) : IO UInt32 := do
+  -- the eFLINT-core pipeline: `run`, `test`, and `check` on `.eflint` files
+  match args with
+  | "run" :: rest => return (← runCommand rest)
+  | "test" :: rest => return (← testCommand rest)
+  | "check" :: rest => if rest.any (·.endsWith ".eflint") then return (← checkCommand rest) else pure ()
+  | _ => pure ()
   let charterFiles := args.filter (·.endsWith ".charter")
   let args := args.filter (fun a => !a.endsWith ".charter")
   match extractFlags args {} with

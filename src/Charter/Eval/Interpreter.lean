@@ -1,0 +1,360 @@
+import Charter.Eval.Eval
+import Charter.Resolve.Static
+
+/-!
+# Charter.Eval.Interpreter — Phrases, saturation, and what a step reports
+
+eFLINT's `Interpreter.hs` and `Saturation.hs`, per D2, with D6 and D12 applied:
+
+- **Saturation is a stratified fixpoint** (D6). The derived types are ordered by
+  their dependencies; a dependency through a non-monotone operator (`Not`,
+  `Forall`, `Count`, `Sum`, `Max`, `Min`) is negative, and a negative dependency
+  inside a cycle is rejected with CHR020 before anything runs. Each stratum is
+  then saturated to its least fixpoint with every lower stratum fixed, so the
+  result never depends on the order of type names. Assignments beat derivations
+  (`State.derive`), and derived facts are recomputed from scratch after every
+  phrase (`State.rebase`), as in eFLINT.
+- **A duty's violation is reported once** (D12), when it begins; whether it is
+  violated now is always `isViolated`.
+
+`runPhrase` is the step: resolve the phrase against the current spec, evaluate it
+to a store of assignments, apply the store, saturate, and report. A phrase that
+fails leaves the configuration unchanged (eFLINT `interpreter`).
+-/
+
+namespace Charter
+
+/-! ## Stratification (D6) -/
+
+namespace Stratify
+
+inductive Pol | pos | neg
+  deriving DecidableEq, Repr
+
+def Pol.under : Pol → Pol → Pol
+  | .pos, p => p
+  | .neg, _ => .neg
+
+/-- The type an instance-valued checked term denotes, if it is syntactically clear. -/
+def typeOf (spec : Spec) : Term → Option DomId
+  | .app d _ => some d
+  | .ref x => some (spec.removeDecoration x)
+  | .project _ x => some (spec.removeDecoration x)
+  | .tag _ d => some d
+  | .when t _ => typeOf spec t
+  | _ => none
+
+abbrev Dep := DomId × Pol
+
+/-- Binding a variable enumerates its type, which reads the type's holding instances
+when the domain is not enumerable (and its domain constraint always); every bound
+variable is therefore a read of its type. -/
+def binderDeps (spec : Spec) (xs : List Var) (p : Pol) : List Dep :=
+  xs.map fun x => (spec.removeDecoration x, p)
+
+mutual
+/-- The types a checked term reads, with the polarity of each read. `bound` are the
+variables bound by enclosing binders (their mention is a binding, not a read). -/
+def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
+  | 0, _, _, _ => []
+  | fuel + 1, bound, p, t =>
+    match t with
+    | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => []
+    | .ref x => if bound.contains x then [] else [(spec.removeDecoration x, p)]
+    | .app _ args => depsArgs spec fuel bound p args
+    | .present t => (typeOf spec t).toList.map (·, p) ++ deps spec fuel bound p t
+    | .violated t =>
+      let own := (typeOf spec t).toList.map (·, p)
+      let conds := match typeOf spec t with
+        | some d => match spec.findViolationCond d with
+          | some cs => depsList spec fuel (spec.components d) p cs
+          | none => []
+        | none => []
+      own ++ conds ++ deps spec fuel bound p t
+    | .enabled t =>
+      let own := (typeOf spec t).toList.map (·, p)
+      let more := match typeOf spec t with
+        | some d => enabledDeps spec fuel [] p d
+        | none => []
+      own ++ more ++ deps spec fuel bound p t
+    | .not t => deps spec fuel bound .neg t
+    | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
+    | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b =>
+      deps spec fuel bound p a ++ deps spec fuel bound p b
+    | .exists_ xs t => binderDeps spec xs p ++ deps spec fuel (bound ++ xs) p t
+    | .forall_ xs t | .count xs t | .sum xs t | .max xs t | .min xs t =>
+      binderDeps spec xs .neg ++ deps spec fuel (bound ++ xs) .neg t
+    | .project t _ | .tag t _ | .untag t => deps spec fuel bound p t
+def depsArgs (spec : Spec) : Nat → List Var → Pol → Args → List Dep
+  | 0, _, _, _ => []
+  | fuel + 1, bound, p, args =>
+    match args with
+    | .pos ts => depsList spec fuel bound p ts
+    | .named ms => depsMods spec fuel bound p ms
+def depsList (spec : Spec) : Nat → List Var → Pol → List Term → List Dep
+  | 0, _, _, _ => []
+  | _, _, _, [] => []
+  | fuel + 1, bound, p, t :: ts => deps spec fuel bound p t ++ depsList spec fuel bound p ts
+def depsMods (spec : Spec) : Nat → List Var → Pol → List (Var × Term) → List Dep
+  | 0, _, _, _ => []
+  | _, _, _, [] => []
+  | fuel + 1, bound, p, (_, t) :: ms => deps spec fuel bound p t ++ depsMods spec fuel bound p ms
+/-- What `Enabled(d(...))` reads beyond `d` itself: `d`'s conditions and the
+enabledness of every act it syncs with. -/
+def enabledDeps (spec : Spec) : Nat → List DomId → Pol → DomId → List Dep
+  | 0, _, _, _ => []
+  | fuel + 1, seen, p, d =>
+    if seen.contains d then [] else
+    match spec.findDecl d with
+    | none => []
+    | some tspec =>
+      let xs := spec.components d
+      let conds := depsList spec fuel xs p tspec.conditions
+      let syncs := match tspec.kind with
+        | .act a => a.syncs.flatMap fun s =>
+          binderDeps spec s.xs p ++ deps spec fuel (xs ++ s.xs) p s.t ++
+          (match typeOf spec s.t with
+            | some d' => [(d', p)] ++ enabledDeps spec fuel (d :: seen) p d'
+            | none => [])
+        | _ => []
+      conds ++ syncs
+end
+
+/-- The dependencies of a derived type: its derivation rules, its own conditions
+(derived instances must satisfy them), and its domain constraint. -/
+def typeDeps (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Dep :=
+  let xs := spec.components d
+  let fuel := 1000
+  let fromDerivations := tspec.derivation.flatMap fun
+    | .dv ys t => binderDeps spec ys .pos ++ deps spec fuel ys .pos t
+    | .holdsWhen t => binderDeps spec xs .pos ++ deps spec fuel xs .pos t
+  let fromConds := depsList spec fuel xs .pos tspec.conditions
+  let fromFilter := deps spec fuel xs .pos tspec.domainConstraint
+  fromDerivations ++ fromConds ++ fromFilter
+
+/-- Strata of the derived types, lowest first, or the types on a negative cycle. -/
+def strata (spec : Spec) : Except (List DomId) (List (List DomId)) :=
+  let derived := spec.derivedTypes
+  let edges : List (DomId × Dep) := derived.flatMap fun d =>
+    match spec.findDecl d with
+    | some t => (typeDeps spec d t).filter (fun e => derived.contains e.1) |>.map (d, ·)
+    | none => []
+  -- reachability by repeated relaxation
+  let direct (a b : DomId) : Bool := edges.any fun (x, (y, _)) => x == a && y == b
+  let rec closure (fuel : Nat) (reach : List (DomId × DomId)) : List (DomId × DomId) :=
+    match fuel with
+    | 0 => reach
+    | fuel + 1 =>
+      let more := reach.flatMap fun (a, b) => reach.filterMap fun (b', c) =>
+        if b == b' && !reach.contains (a, c) then some (a, c) else none
+      let more := more.eraseDups
+      if more.isEmpty then reach else closure fuel (reach ++ more)
+  let reach := closure (derived.length * derived.length + 1) (edges.map fun (a, (b, _)) => (a, b))
+  let reaches (a b : DomId) : Bool := a == b || reach.contains (a, b)
+  let bad := edges.filter fun (a, (b, p)) => p == .neg && reaches b a
+  if !bad.isEmpty then .error (bad.map (·.1) |>.eraseDups)
+  else
+    -- order: a type comes after everything it reaches that does not reach it back
+    let rec layers (fuel : Nat) (pending done : List DomId) (acc : List (List DomId)) : List (List DomId) :=
+      match fuel with
+      | 0 => acc ++ [pending]
+      | fuel + 1 =>
+        if pending.isEmpty then acc else
+        let ready := pending.filter fun d => pending.all fun e =>
+          e == d || !(direct d e || reach.contains (d, e)) || reaches e d
+        if ready.isEmpty then acc ++ [pending]
+        else
+          -- group mutually reachable ready types into one stratum each
+          let groups := ready.foldl (fun (gs : List (List DomId)) d =>
+            match gs.findIdx? (fun g => g.any fun e => reaches d e && reaches e d) with
+            | some i => gs.set i (gs[i]! ++ [d])
+            | none => gs ++ [[d]]) []
+          layers fuel (pending.filter (fun d => !ready.contains d)) (done ++ ready) (acc ++ groups)
+    .ok (layers (derived.length + 1) derived [] [])
+
+end Stratify
+
+/-! ## Saturation -/
+
+namespace Saturate
+
+open M
+
+def checkFilter {α} (p : α → M Bool) (m : M α) : M α := do
+  let a ← m
+  if ← p a then pure a else empty
+
+/-- Instances one derivation clause of `d` yields in the current state. -/
+def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagged) :=
+  let dyn (xs : List Var) (t : Term) : M (List Tagged) :=
+    foreach M.fuel xs (checkFilter (satConditions M.fuel) (whenTagged (eval M.fuel t) pure))
+  match c with
+  | .holdsWhen t =>
+    match tspec.domain with
+    | .products xs => dyn xs (.when (.app d (.named [])) t)
+    | _ => dyn [⟨d, ""⟩] (.when (.ref ⟨d, ""⟩) t)
+  | .dv xs t => dyn xs t
+
+def runM {α} (spec : Spec) (state : State) (m : M α) : Except RuntimeError (List α) :=
+  m.run ⟨spec, state⟩ []
+
+/-- One pass over the types of a stratum; returns the state and whether it grew. -/
+def pass (spec : Spec) (types : List DomId) (state : State) : Except RuntimeError (State × Bool) :=
+  types.foldlM (fun (s, changed) d =>
+    match spec.findDecl d with
+    | none => .ok (s, changed)
+    | some tspec =>
+      tspec.derivation.foldlM (fun (s, changed) c => do
+        let ress ← runM spec s (deriveClause d tspec c)
+        let (s', ch) := s.deriveAll ress.flatten
+        pure (s', changed || ch)) (s, changed)) (state, false)
+
+def saturateStratum (spec : Spec) (types : List DomId) : Nat → State → Except RuntimeError State
+  | 0, _ => .error (.fuelExhausted s!"saturating {", ".intercalate types}")
+  | fuel + 1, state => do
+    let (s', changed) ← pass spec types state
+    if changed then saturateStratum spec types fuel s' else pure s'
+
+/-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6). -/
+def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
+  strata.foldlM (fun s layer => saturateStratum spec layer 100000 s) state.rebase
+
+end Saturate
+
+/-! ## Phrases -/
+
+/-- The configuration between phrases: the spec, the state, its strata, and the
+duties violated after the last phrase (for D12 reporting). -/
+structure Config where
+  spec           : Spec := emptySpec
+  strata         : List (List DomId) := []
+  state          : State := {}
+  violatedDuties : List Tagged := []
+
+/-- What a phrase reports (eFLINT `Output`). -/
+inductive Output where
+  | diag (d : Diagnostic)
+  | executed (info : TransInfo)
+  | violation (v : Violation)
+  | queryRes (ok : Bool)
+  | instQueryRes (tes : List Tagged)
+
+def Output.isFailure : Output → Bool
+  | .diag d => d.isError
+  | .queryRes ok => !ok
+  | _ => false
+
+namespace Interp
+
+open M
+
+def diagOf (e : RuntimeError) : Output := .diag (Diagnostic.error e.code e.message)
+
+/-- Report the violations a trigger caused (eFLINT `tell_violations`). -/
+def triggerViolations (info : TransInfo) (fuel : Nat) : List Output :=
+  match fuel with
+  | 0 => []
+  | fuel + 1 =>
+    if info.isAction then (if info.forced then [.violation (.trigger info)] else [])
+    else info.syncs.flatMap (triggerViolations · fuel)
+
+/-- Evaluate a compiled phrase to the store it applies (eFLINT `sem_phrase`).
+`none` means the phrase failed and the configuration is unchanged. -/
+def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store × List Output
+  | 0, _ => (none, [.diag (Diagnostic.error "CHR104" "phrase too deeply nested")])
+  | fuel + 1, p =>
+    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state⟩ []
+    match p with
+    | .onlyDecls => (some [], [])
+    | .query t =>
+      match run (eval M.fuel t) with
+      | .error e => (none, [diagOf e])
+      | .ok vs => (some [], [.queryRes (vs.all (· == .bool true))])
+    | .instQuery b xs t =>
+      let t' := if b then Term.when t (.present t) else t
+      match run (foreach M.fuel xs (whenTagged (eval M.fuel t') pure)) with
+      | .error e => (none, [diagOf e])
+      | .ok vss => (some [], [.instQueryRes vss.flatten])
+    | .create xs t => effect (.cAll xs t)
+    | .terminate xs t => effect (.tAll xs t)
+    | .obfuscate xs t => effect (.oAll xs t)
+    | .trigger xs t =>
+      let m : M (Sum DomId (List TransInfo)) := do
+        let tes ← foreach M.fuel xs (whenTagged (eval M.fuel t) pure)
+        match tes with
+        | te :: _ =>
+          if spec.triggerable te.2 then .inr <$> tes.mapM (instantiateTrans M.fuel [])
+          else pure (.inl te.2)
+        | [] => pure (.inr [])
+      match run m with
+      | .error e => (none, [diagOf e])
+      | .ok [.inl d] => (some [], [.diag (Diagnostic.error "CHR103" s!"{d} is not an act or event and cannot be triggered")])
+      | .ok [.inr infos] =>
+        let outs := infos.flatMap fun i => Output.executed i :: triggerViolations i 1000
+        (some (Store.unions (infos.map (·.assignments))), outs)
+      | .ok _ => (none, [.diag (Diagnostic.error "CHR104" "a trigger produced an unexpected number of results")])
+    | .par ps =>
+      let rs := ps.map (semPhrase spec state fuel)
+      let outs := rs.flatMap (·.2)
+      if rs.all (·.1.isSome) then (some (Store.unions (rs.filterMap (·.1))), outs)
+      else (none, outs)
+where
+  effect (e : Effect) : Option Store × List Output :=
+    match (evalEffect M.fuel e).run ⟨spec, state⟩ [] with
+    | .error err => (none, [diagOf err])
+    | .ok stores => (some (Store.unions stores), [])
+
+/-- Apply a store, saturate, and find the violations (eFLINT `new_context`). -/
+def newContext (cfg : Config) (spec : Spec) (strata : List (List DomId)) (store : Store) :
+    Option Config × List Output :=
+  let state1 := State.makeAssignments spec store cfg.state
+  match Saturate.rebaseAndSat spec strata state1 with
+  | .error e => (none, [diagOf e])
+  | .ok state' =>
+    let duties := state'.holdsList.filter fun te => match spec.kindOf te.2 with
+      | some (.duty _) => true
+      | _ => false
+    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state'⟩ []
+    let violatedNow : Except RuntimeError (List Tagged) :=
+      duties.filterMapM fun te => do
+        let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te (spec.findViolationCond te.2)))
+        pure (if r.any id then some te else none)
+    match violatedNow with
+    | .error e => (none, [diagOf e])
+    | .ok violated =>
+      let newDuty := violated.filter (fun te => !cfg.violatedDuties.contains te)
+      let invs : Except RuntimeError (List DomId) :=
+        spec.invariants.filterMapM fun d => do
+          let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
+          let r ← run (ignoreMissingInput (checkFalse (eval M.fuel term)))
+          pure (if r.isEmpty then none else some d)
+      match invs with
+      | .error e => (none, [diagOf e])
+      | .ok invViol =>
+        let outs := newDuty.map (fun te => Output.violation (.duty te)) ++ invViol.map (fun d => Output.violation (.invariant d))
+        (some { spec, strata, state := state', violatedDuties := violated }, outs)
+
+end Interp
+
+/-- Run one phrase: resolve it against the configuration, evaluate, apply, saturate,
+report. On failure the configuration is returned unchanged. -/
+def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
+  match resolvePhrase cfg.spec p with
+  | .error ds => (cfg, ds.map .diag)
+  | .ok (spec', cp, warnings) =>
+    let warnOuts := warnings.map Output.diag
+    match Stratify.strata spec' with
+    | .error cycle =>
+      (cfg, warnOuts ++ [.diag (Diagnostic.error "CHR020"
+        s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
+    | .ok strata =>
+      let (store?, outs) := Interp.semPhrase spec' cfg.state 1000 cp
+      match store? with
+      | none => (cfg, warnOuts ++ outs)
+      | some store =>
+        let (cfg'?, outs2) := Interp.newContext cfg spec' strata store
+        match cfg'? with
+        | none => (cfg, warnOuts ++ outs ++ outs2)
+        | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
+
+end Charter

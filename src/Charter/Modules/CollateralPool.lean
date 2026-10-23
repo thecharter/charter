@@ -65,9 +65,9 @@ reimburses at most `verifiedDirectCosts` (zero net profit) and routes the
 remaining `counterStake - reimbursed` to the neutral reserve or commons pool. -/
 def routeFrivolousClaimStake (counterStake verifiedDirectCosts : Nat) : Nat × Nat × Nat :=
   let reimbursedCost := min counterStake verifiedDirectCosts
-  let toNeutralReserveOrCommons := counterStake - reimbursedCost
+  let toNeutralReserveOrPool := counterStake - reimbursedCost
   let toClaimantOrAgentProfit := 0
-  (reimbursedCost, toNeutralReserveOrCommons, toClaimantOrAgentProfit)
+  (reimbursedCost, toNeutralReserveOrPool, toClaimantOrAgentProfit)
 
 /-- Wrongful-suspension recovery and uncollectible excess liability accounting:
 given emergency `stake`, verified `actualDamages` and third-party `delayDamages`,

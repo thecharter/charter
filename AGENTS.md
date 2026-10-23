@@ -320,6 +320,11 @@ Build: `lake build` (Lean 4.24, no Mathlib). The binary is `.lake/build/bin/char
   many constructors: the Lean 4.24 code generator miscompiles it (segfault in
   `mi_malloc`). Use the `charter_string_table` command, which emits top-level
   definitions.
+- A `for x in xs do …` loop inside a hand-written monad (a `structure` wrapping a
+  function, like `Charter.Resolve.Stc`) over a list of pairs: the Lean 4.24 code
+  generator emits an unreachable branch for it (the interpreter says "incomplete
+  case", the binary segfaults). Use `xs.forM` or `mapM` in such monads; `for` is
+  fine in `IO`.
 - `git stash`.
 
 ## Success checklist
