@@ -1,0 +1,10 @@
+// A `Param` of type `Duration` may stand in any duration position, including the `For d` of `Creates e For d` (014.1, 009.3).
+Param window : Duration = 2
+Fact p Identified by P
+Event grant Creates p(P) For window.
+grant().
+?p(P).
+@ 1.
+?p(P).
+@ 2.
+?!p(P).

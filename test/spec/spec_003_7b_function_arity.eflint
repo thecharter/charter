@@ -1,0 +1,5 @@
+// A `Function` is a product of exactly two components; any other domain is CHR024 (eFLINT would silently ignore every assignment to it).
+//! expect-error: CHR024
+Fact a Identified by A
+Fact b Identified by B
+Function f Identified by a * b * int.

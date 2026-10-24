@@ -4,7 +4,7 @@
 
 A Charter source file is a sequence of tokens separated by whitespace and comments.
 
-**2.1 Identifiers.** An identifier is a word starting with a lowercase letter and continued by lowercase letters, `_`, or `-` immediately followed by a lowercase letter (`neighbour-of`, `cast_vote`). A digit ends the word: in `person1` the identifier is `person` and `1` is the *decoration* of a variable (003.3), and so is each `'` that follows (`actor'`). Decoration may be separated from the identifier by spaces (`actor 2`). `test/spec/spec_002_1_identifiers.eflint`
+**2.1 Identifiers.** An identifier is a word starting with a lowercase letter and continued by lowercase letters, `_`, or `-` immediately followed by a lowercase letter (`neighbour-of`, `cast_vote`). A digit ends the word: in `person1` the identifier is `person` and `1` is the *decoration* of a variable (003.3), and so is each `'` that follows (`actor'`). Decoration may be separated from the identifier by spaces (`actor 2`). A run of primes is decoration (`int'''`); two quotes in a row never begin a character literal (002.7). `test/spec/spec_002_1_identifiers.eflint`, `spec_002_8_prime_decorations.eflint`
 
 **2.2 Atoms.** A word starting with an uppercase letter and continued by letters, digits, or `_` is an atom: the string literal of its own spelling, so `Bob` and `"Bob"` are the same value. A keyword is never an atom. `test/spec/spec_002_2_atoms.eflint`
 

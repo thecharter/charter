@@ -254,7 +254,8 @@ def step (s : St) : Except Diagnostic St := do
     else if c.isUpper then
       let j := takeWhileFrom s.cs s.i isAtomChar
       return (s.advance (j - s.i)).push (.atom (sliceStr s.cs s.i j)) p
-    else if c == '\'' && s.peek 2 == some '\'' then
+    else if c == '\'' && (match s.peek 1 with | some ch => ch.isAlphanum | none => false) && s.peek 2 == some '\'' then
+      -- a character literal `'a'` (only in ranges); a run of primes is decoration
       match s.peek 1 with
       | some ch => return (s.advance 3).push (.chr ch) p
       | none => return (s.advance).push (.kw "'") p

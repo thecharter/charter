@@ -461,8 +461,10 @@ def compileEffect' (mk : List Var → Term → Effect) (bound xs : List Var) (t 
 def compileEffect (bound : List Var) : Effect → Stc Effect
   | .cAll xs t none => compileEffect' (fun xs t => .cAll xs t none) bound xs t
   | .cAll xs t (some d) => do
+    -- the expiry's free variables (a `Param`, 014.1) are bound with the effect's
     let d' ← convertTerm termFuel d .duration
-    compileEffect' (fun xs t => .cAll xs t (some d')) bound xs t
+    let dfs ← freeVarsChecked d'
+    compileEffect' (fun ys t => .cAll (ys ++ diff dfs (bound ++ ys)) t (some d')) bound xs t
   | .tAll xs t => compileEffect' .tAll bound xs t
   | .oAll xs t => compileEffect' .oAll bound xs t
 
@@ -638,6 +640,12 @@ def executeDecls (ds : List Decl) : Stc Store := do
       let spec ← getSpec
       if (spec.lookupDecl ty).isSome && !builtins.contains ty then
         warn "CHR019" s!"{ty} is declared again; the new declaration replaces the earlier one (B9 pending)"
+      -- a `Function` is a product of exactly two components (003.7); eFLINT silently
+      -- ignores every assignment to one that is not, so Charter refuses the declaration
+      if tspec.restriction == some .function then
+        match tspec.domain with
+        | .products [_, _] => pure ()
+        | _ => err "CHR024" s!"Function {ty}: the domain must be a product of exactly two components"
       setSpec (spec.insertDecl ty tspec)
     | .placeholder f t => modifySpec (·.insertAlias f t)
     | .clause c => modifySpec (·.insertClause c)

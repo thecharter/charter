@@ -38,6 +38,7 @@ more errors); `warning` does not.
 | CHR021 | error | a type used in a position that needs a composite (product) type | `Charter.Resolve` |
 | CHR022 | error | `Except under` or `Against` names something that is not an act | `Charter.Resolve` |
 | CHR023 | error | `Use` names no declared module, or gives the wrong number of arguments (D8) | `Charter.Resolve` |
+| CHR024 | error | a `Function` whose domain is not a product of exactly two components (003.7; eFLINT ignores its assignments silently) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

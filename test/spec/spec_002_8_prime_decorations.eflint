@@ -1,0 +1,8 @@
+// A run of primes after a type name is a decoration (`int'`, `int''`, `int'''`); a character literal `'a'` is one character between two quotes, so two quotes in a row never begin one.
+Fact quad Identified by int * int' * int'' * int'''.
++quad(1, 2, 3, 4).
+?quad(1, 2, 3, 4).
+?(Exists quad: quad.int''' == 4 && quad.int'' == 3).
+Fact letter Identified by 'a'..'c'.
++letter("b").
+?letter("b").
