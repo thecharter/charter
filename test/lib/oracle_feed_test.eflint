@@ -1,0 +1,66 @@
+// lib/oracle_feed used by a small program: one feed, two traders, two vaults.
+//! explore: 2
+#require "../../lib/oracle_feed.eflint".
+
+Fact feed Identified by Feed
+Fact trader Identified by Tam, Uma
+Fact vault Identified by V1, V2.
+
+Use oracle-feed(feed, trader, vault) As of.
+
++of-remaining-ledger(150).
+
+?of-one-settled-value(). ?of-waterfall-conserves-gross(). ?of-rates-in-range().
+
+Scenario uncontested-settles-after-window {
+  +of-proposed(V1, 400).
+  ?!of-settled(V1, 400).
+  @ 4.
+  ?!of-settled(V1, 400).
+  ?lawful of-contest(Tam, V1).
+  @ 5.
+  ?of-settled(V1, 400).
+  ?!valid of-contest(Tam, V1).
+  ?of-one-settled-value().
+}
+
+Scenario contest-blocks-until-ruling {
+  +of-proposed(V2, 900).
+  ?valid of-contest(Tam, V2).
+  of-contest(Tam, V2).
+  @ 9.
+  ?!of-settled(V2, 900).
+  ?of-contest-blocks-window-settlement().
+  +of-ruled(V2, 700).
+  ?of-settled(V2, 700).
+  ?!of-settled(V2, 900).
+  ?of-one-settled-value(). ?of-ruling-settles().
+}
+
+Scenario waterfall-conserves {
+  +of-inflow(V1, 1000, 30).
+  // expense used = min(1000, 30) = 30; net = 970; levy = 970*100/10000 = 9;
+  // distributable = 961; retirement = min(150, 961*2000/10000 = 192) = 150;
+  // royalty = (961-150)*500/10000 = 40; residual = 961 - 150 - 40 = 771
+  ?of-net(V1, 970). ?of-levy(V1, 9). ?of-retirement(V1, 150). ?of-royalty(V1, 40). ?of-residual(V1, 771).
+  ?of-pending-waterfall-conserves-net(). ?of-retirement-within-ledger(). ?of-levy-capped().
+  ?lawful of-settle-inflow(Feed, V1).
+  of-settle-inflow(Feed, V1).
+  ?of-distribution(V1, 1000, 30, 9, 150, 811).
+  ?of-remaining-ledger(0).
+  ?!of-inflow(V1, 1000, 30).
+  ?of-waterfall-conserves-gross(). ?of-ledger-never-negative().
+  // the ledger is retired: a second inflow pays no retirement
+  +of-inflow(V2, 500, 0).
+  ?of-retirement(V2, 0).
+}
+
+Scenario bought-out-royalty-is-zero {
+  +of-royalty-bought-out(V2).
+  +of-inflow(V2, 1000, 0).
+  ?of-royalty(V2, 0).
+  ?of-bought-out-pays-no-royalty().
+  of-settle-inflow(Feed, V2).
+  ?of-distribution(V2, 1000, 0, 10, 150, 840).
+  ?of-waterfall-conserves-gross().
+}

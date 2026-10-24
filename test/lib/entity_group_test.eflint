@@ -1,0 +1,82 @@
+// lib/entity_group used by a small program: a coop with three members and two stakeholders.
+//! explore: 1
+#require "../../lib/entity_group.eflint".
+
+Fact coop Identified by Coop
+Fact worker Identified by Ann, Ben, Cy
+Fact backer Identified by Pat, Quinn
+Fact units Identified by 0..12.
+
+Use entity-group(coop, worker, backer, units) As eg.
+
+// genesis
++eg-total-basis(15). +eg-total-loss(6). +eg-service-budget(5). +eg-lifecycle-reserve-min(5).
++eg-basis(Ann, 5). +eg-basis(Ben, 5). +eg-basis(Cy, 5).
++eg-loss(Ann, 6). +eg-loss(Ben, 0). +eg-loss(Cy, 0).
++eg-share(Pat, 60). +eg-share(Quinn, 40).
++eg-claimed(Ann, 0). +eg-claimed(Ben, 0). +eg-claimed(Cy, 0).
++eg-reserve(8).
+
+?eg-basis-conserved(). ?eg-loss-conserved(). ?eg-subsidy-within-budget(). ?eg-shares-within-whole().
+
+Scenario carryover-conserves {
+  ?lawful eg-transfer-carryover(Ann, Ben, 4).
+  eg-transfer-carryover(Ann, Ben, 4).
+  ?eg-basis(Ann, 1). ?eg-basis(Ben, 9).
+  ?eg-basis-conserved().
+  ?!lawful eg-transfer-carryover(Ann, Ben, 7).
+  ?!valid eg-transfer-carryover(Ann, Ann, 1).
+  ?lawful eg-transfer-loss(Ann, Cy, 6).
+  eg-transfer-loss(Ann, Cy, 6).
+  ?eg-loss(Cy, 6). ?eg-loss-conserved().
+}
+
+Scenario inflation-is-a-breach {
+  +eg-no-internal-basis-inflation(Ann, Coop).
+  ?!violated eg-no-internal-basis-inflation(Ann, Coop).
+  ?!lawful eg-inflate-basis(Ann, 12).
+  eg-inflate-basis(Ann, 12).
+  ?eg-basis(Ann, 17).
+  ?violated eg-no-internal-basis-inflation(Ann, Coop).
+  ?!eg-basis-conserved().
+  // undo the breach so that exploration starts from a conserving state
+  +eg-basis(Ann, 5).
+  ?eg-basis-conserved().
+}
+
+Scenario attestation-needs-reserve {
+  ?valid eg-attest-member(Coop, Cy).
+  +eg-reserve(1).
+  ?!valid eg-attest-member(Coop, Cy).
+  +eg-reserve(8).
+  +eg-exit-pending(Cy).
+  ?!valid eg-attest-member(Coop, Cy).
+  ?valid eg-attest-member(Coop, Ben).
+}
+
+Scenario amendment-needs-every-consent {
+  +eg-consents(Ann). +eg-consents(Ben).
+  ?!valid eg-amend-group(Ann, Coop).
+  +eg-consents(Cy).
+  ?valid eg-amend-group(Ann, Coop).
+  eg-amend-group(Ann, Coop).
+  ?eg-amended(Coop).
+}
+
+Scenario forfeiture-isolates-innocent {
+  ?!lawful eg-forfeit(Coop, Pat, 10).
+  +eg-forfeiture-ground(Pat).
+  ?lawful eg-forfeit(Coop, Pat, 10).
+  eg-forfeit(Coop, Pat, 10).
+  ?eg-share(Pat, 50). ?eg-share(Quinn, 40).
+  ?eg-shares-within-whole().
+}
+
+Scenario subsidy-capped {
+  eg-claim-subsidy(Ann, 3).
+  ?eg-claimed(Ann, 3).
+  ?!valid eg-claim-subsidy(Ben, 3).
+  ?valid eg-claim-subsidy(Ben, 2).
+  eg-claim-subsidy(Ben, 2).
+  ?eg-subsidy-within-budget().
+}

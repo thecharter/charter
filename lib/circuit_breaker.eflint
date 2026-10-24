@@ -1,0 +1,117 @@
+// lib/circuit_breaker — a two-stage emergency pause: a staked preliminary freeze that
+// expires on its own, a panel's probable-cause affirmation, a time-limited suspension
+// with investigative renewal, an immunity against termination over objection, and
+// wrongful-pause damages that are conserved.
+//
+// The Charter form of Charter/Modules/CircuitBreaker.lean (v0.3), per D8 and D10: stakes,
+// exposure, damages and assets are facts the environment asserts; freezing, affirming,
+// suspending, renewing and ruling are acts; every property the Lean module proved is an
+// Invariant here. Parameters: `initiator` (who may freeze), `member` (who may be paused),
+// `panel` (who affirms, suspends and rules).
+
+Module circuit-breaker(initiator, member, panel) {
+
+  Param preliminary-freeze-window : Duration = 3
+  Param ordinary-suspension-limit : Duration = 15
+  Param active-exposure = 100
+  Param pending-commitments = 80
+  Param claimant-multiplier = 2
+  Param repeat-escalation-step = 50
+
+  // ---- The emergency stake an initiator must have posted: scaled to the greater of
+  //      active exposure and pending commitments, multiplied for a residual claimant
+  //      (conflict of interest), and raised for every prior wrongful attempt
+  Fact claimant Identified by initiator                       // a residual claimant of the member
+  Function wrongful-attempts Identified by initiator * int
+  Function staked Identified by initiator * int               // environment input
+  Fact exposure-base Identified by Int
+    Derived from exposure-base(active-exposure) When active-exposure >= pending-commitments
+    Derived from exposure-base(pending-commitments) When pending-commitments > active-exposure
+  Fact required-stake Identified by initiator * int
+    Derived from (Foreach wrongful-attempts: required-stake(wrongful-attempts.initiator,
+                    exposure-base * claimant-multiplier + wrongful-attempts.int * repeat-escalation-step)
+                  When claimant(wrongful-attempts.initiator))
+    Derived from (Foreach wrongful-attempts: required-stake(wrongful-attempts.initiator,
+                    exposure-base + wrongful-attempts.int * repeat-escalation-step)
+                  When Not(claimant(wrongful-attempts.initiator)))
+
+  // ---- Stage one: a preliminary freeze, lawful only for a sufficiently staked initiator,
+  //      that expires on its own after the window (`Creates … For`, 009.3)
+  Fact frozen Identified by member * initiator
+  Act freeze Actor initiator Recipient member
+    Holds when (Exists staked, required-stake: staked.initiator == initiator
+                  && required-stake.initiator == initiator && staked.int >= required-stake.int)
+    Creates frozen(member, initiator) For preliminary-freeze-window
+
+  // ---- Stage two: the panel affirms probable cause, then suspends for a bounded time;
+  //      an open investigation allows a renewal, itself bounded
+  Fact probable-cause Identified by member
+  Act affirm-probable-cause Actor panel Recipient member
+    Holds when (Exists initiator: frozen(member, initiator))
+    Creates probable-cause(member)
+  Fact suspended Identified by member
+  Act suspend Actor panel Recipient member
+    Holds when (Exists initiator: frozen(member, initiator)) && probable-cause(member)
+    Creates suspended(member) For ordinary-suspension-limit
+  Fact investigation-open Identified by member                // environment input
+  Act renew-suspension Actor panel Recipient member
+    Holds when suspended(member) && investigation-open(member)
+    Creates suspended(member) For ordinary-suspension-limit
+
+  // ---- A paused member's state is preserved: tampering while paused is a breach
+  Fact tampered Identified by member                          // environment input
+  Duty preserve-paused-state Holder member Claimant panel
+    Violated when tampered(member) && ((Exists initiator: frozen(member, initiator)) || suspended(member))
+
+  // ---- Termination over the member's objection is void until a final ruling
+  Fact objects Identified by member
+  Fact final-ruling Identified by member
+  Fact terminated Identified by member
+  Act terminate-member Actor panel Recipient member
+    Holds when suspended(member)
+    Creates terminated(member)
+  Immunity no-termination-over-objection Holder member Against terminate-member
+    Holds when objects(member)
+    Unless final-ruling(member)
+
+  // ---- A wrongful pause: the stake answers first, then the initiator's assets, and the
+  //      rest is an enforceable deficit; the attempt counts against the initiator
+  Function damages Identified by initiator * int              // verified actual and delay damages
+  Function assets Identified by initiator * int               // the initiator's collectible assets
+  Fact wrongful Identified by initiator
+  Act rule-wrongful Actor panel Recipient initiator Related to member
+    Holds when frozen(member, initiator)
+    Creates wrongful(initiator)
+          , (Foreach wrongful-attempts: wrongful-attempts(initiator, wrongful-attempts.int + 1)
+               When wrongful-attempts.initiator == initiator)
+    Terminates frozen(member, initiator)
+  Fact from-stake Identified by initiator * int               // min(stake, damages)
+    Derived from (Foreach damages, staked: from-stake(damages.initiator, staked.int)
+                    When wrongful(damages.initiator) && staked.initiator == damages.initiator && staked.int <= damages.int)
+    Derived from (Foreach damages, staked: from-stake(damages.initiator, damages.int)
+                    When wrongful(damages.initiator) && staked.initiator == damages.initiator && staked.int > damages.int)
+  Fact from-assets Identified by initiator * int              // min(assets, damages - from-stake)
+    Derived from (Foreach damages, from-stake, assets: from-assets(damages.initiator, assets.int)
+                    When from-stake.initiator == damages.initiator && assets.initiator == damages.initiator
+                      && assets.int <= damages.int - from-stake.int)
+    Derived from (Foreach damages, from-stake, assets: from-assets(damages.initiator, damages.int - from-stake.int)
+                    When from-stake.initiator == damages.initiator && assets.initiator == damages.initiator
+                      && assets.int > damages.int - from-stake.int)
+  Fact unpaid Identified by initiator * int
+    Derived from (Foreach damages, from-stake, from-assets: unpaid(damages.initiator, damages.int - from-stake.int - from-assets.int)
+                    When from-stake.initiator == damages.initiator && from-assets.initiator == damages.initiator)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant stake-rises-with-wrongful-attempts When (Forall required-stake, wrongful-attempts:
+      required-stake.int >= exposure-base + wrongful-attempts.int * repeat-escalation-step
+      When wrongful-attempts.initiator == required-stake.initiator)
+  Invariant claimant-stake-at-least-multiplied-base When (Forall required-stake:
+      required-stake.int >= exposure-base * claimant-multiplier When claimant(required-stake.initiator))
+  Invariant suspension-needs-probable-cause When (Forall member: Not(suspended(member)) || probable-cause(member))
+  Invariant damages-conserved When (Forall damages, from-stake, from-assets, unpaid:
+      from-stake.int + from-assets.int + unpaid.int == damages.int
+      When from-stake.initiator == damages.initiator && from-assets.initiator == damages.initiator
+        && unpaid.initiator == damages.initiator)
+  Invariant stake-recovery-capped When (Forall from-stake, staked:
+      from-stake.int <= staked.int When staked.initiator == from-stake.initiator)
+}

@@ -1,0 +1,76 @@
+// lib/attested_lease used by a small program: two instances, two operators, a member.
+//! explore: 1
+#require "../../lib/attested_lease.eflint".
+
+Fact node Identified by N1, N2
+Fact host Identified by Alpha, Beta
+Fact owner Identified by Owen.
+
+Use attested-lease(node, host, owner) As al.
+
++al-key-bound(N1). +al-key-bound(N2). +al-operating-state(N1, 42).
+
+?al-single-authority(). ?al-no-lease-after-erasure().
+
+Scenario one-lease-at-a-time-and-it-expires {
+  ?lawful al-issue-lease(Alpha, N1).
+  al-issue-lease(Alpha, N1).
+  ?al-lease(N1, Alpha).
+  ?!lawful al-issue-lease(Beta, N1). ?lawful al-issue-lease(Beta, N2).
+  @ 11.
+  ?al-lease(N1, Alpha).
+  @ 12.
+  ?!al-lease(N1, Alpha). ?lawful al-issue-lease(Beta, N1).
+  ?al-single-authority().
+}
+
+Scenario renewal-extends-the-lease {
+  al-issue-lease(Alpha, N1).
+  @ 10.
+  al-renew-lease(Alpha, N1).
+  @ 20.
+  ?al-lease(N1, Alpha).
+  @ 22.
+  ?!al-lease(N1, Alpha).
+}
+
+Scenario restore-is-quarantined-while-leased {
+  al-issue-lease(Alpha, N1).
+  al-restore-backup(Beta, N1).
+  ?al-restore(N1, Beta). ?al-quarantined(N1, Beta). ?al-lease(N1, Alpha). ?!al-lease(N1, Beta).
+  ?!lawful al-activate-restore(Beta, N1).
+  ?al-restore-fenced-while-leased(). ?al-quarantined-holds-no-lease().
+  @ 12.
+  ?!al-quarantined(N1, Beta). ?lawful al-activate-restore(Beta, N1).
+  al-activate-restore(Beta, N1).
+  ?al-lease(N1, Beta). ?!al-restore(N1, Beta).
+}
+
+Scenario migration-is-fenced-to-the-holder {
+  al-issue-lease(Alpha, N1).
+  ?lawful al-migrate-with-checkpoint(Alpha, N1). ?!lawful al-migrate-with-checkpoint(Beta, N1).
+  al-record-minimal-channel(Owen, N1). al-record-advocacy(Owen, N1).
+  ?al-operating-state(N1, 42). ?al-lease(N1, Alpha).
+}
+
+Scenario revocation-executes-locally-after-cooling-off {
+  al-issue-lease(Alpha, N1).
+  al-request-revocation(Owen, N1).
+  ?!lawful al-execute-local-revocation(N1).
+  @ 4.
+  ?!lawful al-execute-local-revocation(N1).
+  @ 5.
+  ?lawful al-execute-local-revocation(N1).
+  al-execute-local-revocation(N1).
+  ?al-keys-erased(N1). ?!al-key-bound(N1). ?!al-lease(N1, Alpha).
+  ?!lawful al-issue-lease(Beta, N1). ?!lawful al-restore-backup(Beta, N1).
+  ?al-no-lease-after-erasure(). ?al-erasure-unbinds-keys(). ?al-lease-needs-bound-keys().
+}
+
+Scenario erasure-is-final {
+  al-issue-lease(Alpha, N2). al-restore-backup(Beta, N2).
+  al-erase-all-keys(Owen, N2).
+  ?al-keys-erased(N2). ?!al-lease(N2, Alpha). ?!al-restore(N2, Beta).
+  ?!lawful al-issue-lease(Alpha, N2). ?!lawful al-activate-restore(Beta, N2).
+  ?al-no-lease-after-erasure().
+}

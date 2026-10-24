@@ -1,0 +1,127 @@
+// lib/sortition_court — bonded sortition panels validated for independence, bond and one
+// seat per Sybil cluster, two-thirds supermajority rulings, bounded appellate tiers with a
+// deadline per tier, finality that bars repeat filings, consolidation of related filings
+// on one counter-stake, and a strict-priority fee-pool waterfall that funds the operating
+// reserve first and conserves the pool.
+//
+// The Charter form of Charter/Modules/SortitionCourt.lean and Charter/Substrate/Sortition.lean
+// (v0.3), per D8 and D10: the draw itself, bonds, conflicts, cluster ids, fact patterns,
+// relatedness and charges are facts the environment asserts (a sortition outcome is input;
+// its unbiasedness is a SUB.* assumption); seating validates the draw; filing, voting,
+// ruling, appealing and allocating are acts; every property the Lean module proved is an
+// Invariant here. Parameters: `arbiter` (the candidate pool), `party` (who files, appeals
+// and may be related), `dispute` (the matters), `registrar` (who seats, rules and allocates).
+
+Module sortition-court(arbiter, party, dispute, registrar) {
+
+  Param min-fidelity-bond = 100
+  Param panel-size = 3
+  Param max-appeal-tiers = 3
+  Param appeal-tier-deadline : Duration = 10
+  Param operating-reserve-floor = 100
+  Param filing-stake = 50
+
+  // ---- Filing, with consolidation of a related party's repeat on the same fact pattern
+  Fact filed Identified by dispute
+  Fact filer Identified by dispute * party
+  Function pattern Identified by dispute * int                // environment input: the fact pattern
+  Fact related Identified by party * party'                  // environment input: related parties
+  Function counter-stake Identified by dispute * int
+  Fact final Identified by dispute
+  Act file Actor party Related to dispute
+    Holds when Not(filed(dispute)) && Not(final(dispute))
+    Valid when Not(Exists filer, pattern, pattern': filer && filer.dispute != dispute && filed(filer.dispute)
+                     && pattern.dispute == dispute && pattern'.dispute == filer.dispute && pattern.int == pattern'.int
+                     && (related(party, filer.party) || related(filer.party, party) || filer.party == party))
+    Creates filed(dispute), filer(dispute, party), counter-stake(dispute, filing-stake), tier(dispute, 0)
+
+  // ---- Seating: the environment's draw is validated for eligibility, size and clusters
+  Function bond Identified by arbiter * int                   // environment input
+  Fact conflicted Identified by arbiter * dispute             // environment input: related to the dispute
+  Function cluster Identified by arbiter * int                // environment input: Sybil cluster id
+  Fact drawn Identified by arbiter * dispute                  // environment input: the sortition draw
+  Fact eligible Identified by arbiter * dispute
+    Derived from (Foreach bond, dispute: eligible(bond.arbiter, dispute)
+                    When bond.int >= min-fidelity-bond && Not(conflicted(bond.arbiter, dispute)))
+  Fact seated Identified by arbiter * dispute
+  Act seat-panel Actor registrar Related to dispute
+    Holds when filed(dispute) && Not(ruled(dispute)) && Not(Exists arbiter: seated(arbiter, dispute))
+    Valid when (Forall arbiter: Not(drawn(arbiter, dispute)) || eligible(arbiter, dispute))
+             , Count(Foreach arbiter: arbiter When drawn(arbiter, dispute)) <= panel-size
+             , Not(Exists cluster, cluster': cluster.arbiter != cluster'.arbiter && cluster.int == cluster'.int
+                     && drawn(cluster.arbiter, dispute) && drawn(cluster'.arbiter, dispute))
+    Creates (Foreach arbiter: seated(arbiter, dispute) When drawn(arbiter, dispute))
+          , decide-tier(registrar, dispute)
+    Terminates (Foreach arbiter: drawn(arbiter, dispute) When drawn(arbiter, dispute))
+
+  // ---- Voting and the two-thirds supermajority; each tier must be decided within its deadline
+  Fact voted-yes Identified by arbiter * dispute
+  Act vote-yes Actor arbiter Related to dispute
+    Holds when seated(arbiter, dispute) && Not(ruled(dispute))
+    Creates voted-yes(arbiter, dispute)
+  Fact seats Identified by dispute * int
+    Derived from (Foreach dispute: seats(dispute, Count(Foreach arbiter: arbiter When seated(arbiter, dispute))))
+  Fact supermajority Identified by dispute
+    Derived from (Foreach seats: supermajority(seats.dispute)
+                    When seats.int > 0 && Count(Foreach arbiter: arbiter When voted-yes(arbiter, seats.dispute)) * 3 >= seats.int * 2)
+  Fact ruled Identified by dispute
+  Duty decide-tier Holder registrar Claimant dispute Due within appeal-tier-deadline
+  Act rule Actor registrar Related to dispute
+    Holds when (Exists arbiter: seated(arbiter, dispute)) && Not(ruled(dispute))
+    Valid when supermajority(dispute)
+    Creates ruled(dispute)
+    Terminates decide-tier(registrar, dispute)
+
+  // ---- Appeals: a bounded number of tiers; a ruling not appealed in time is final
+  Function tier Identified by dispute * int
+  Act appeal Actor party Related to dispute
+    Holds when ruled(dispute) && Not(final(dispute)) && filer(dispute, party)
+      && (Exists tier: tier.dispute == dispute && tier.int + 1 < max-appeal-tiers)
+    Creates (Foreach tier: tier(dispute, tier.int + 1) When tier.dispute == dispute)
+    Terminates ruled(dispute)
+             , (Foreach arbiter: seated(arbiter, dispute) When seated(arbiter, dispute))
+             , (Foreach arbiter: voted-yes(arbiter, dispute) When voted-yes(arbiter, dispute))
+  Extend Fact final
+    Derived from (Foreach dispute: final(dispute) When ruled(dispute) && Held(ruled(dispute)) For appeal-tier-deadline)
+    Derived from (Foreach tier: final(tier.dispute) When ruled(tier.dispute) && tier.int + 1 >= max-appeal-tiers)
+
+  // ---- The fee pool: the operating reserve first, then the ranked charges in strict priority
+  Var fee-pool Identified by Int
+  Fact charge Identified by int * int'                       // environment input: rank, amount
+  Fact operating-reserve-funded Identified by Int
+    Derived from operating-reserve-funded(fee-pool) When fee-pool <= operating-reserve-floor
+    Derived from operating-reserve-funded(operating-reserve-floor) When fee-pool > operating-reserve-floor
+  Fact available Identified by int * int'                    // for a rank: what the higher ranks leave
+    Derived from (Foreach charge: available(charge.int, fee-pool - operating-reserve-funded
+                    - Sum(Foreach charge': charge'.int' When charge'.int < charge.int)))
+  Fact funded Identified by int * int'
+    Derived from (Foreach charge, available: funded(charge.int, charge.int')
+                    When available.int == charge.int && charge.int' <= available.int')
+    Derived from (Foreach charge, available: funded(charge.int, available.int')
+                    When available.int == charge.int && charge.int' > available.int' && available.int' >= 0)
+    Derived from (Foreach charge, available: funded(charge.int, 0)
+                    When available.int == charge.int && available.int' < 0)
+  Fact surplus Identified by Int
+    Derived from surplus(fee-pool - operating-reserve-funded - Sum(Foreach funded: funded.int'))
+  Fact disbursed Identified by int * int'
+  Act allocate-fee-pool Actor registrar
+    Holds when (Exists charge: True)
+    Creates (Foreach funded: disbursed(funded.int, funded.int')), fee-pool(surplus)
+    Terminates (Foreach charge: charge)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant seated-are-independent-and-bonded When (Forall arbiter, dispute: Not(seated(arbiter, dispute)) || eligible(arbiter, dispute))
+  Invariant panel-within-size When (Forall seats: seats.int <= panel-size)
+  Invariant one-seat-per-cluster When Not(Exists cluster, cluster', dispute: cluster.arbiter != cluster'.arbiter
+      && cluster.int == cluster'.int && seated(cluster.arbiter, dispute) && seated(cluster'.arbiter, dispute))
+  Invariant no-ruling-without-supermajority When (Forall dispute: Not(ruled(dispute)) || supermajority(dispute))
+  Invariant tiers-bounded When (Forall tier: tier.int < max-appeal-tiers)
+  Invariant one-stake-per-pattern When Not(Exists counter-stake, counter-stake', pattern, pattern', filer, filer':
+      filer && filer' && counter-stake.dispute != counter-stake'.dispute && filed(counter-stake.dispute) && filed(counter-stake'.dispute)
+      && pattern.dispute == counter-stake.dispute && pattern'.dispute == counter-stake'.dispute
+      && pattern.int == pattern'.int && filer.dispute == counter-stake.dispute && filer'.dispute == counter-stake'.dispute
+      && (related(filer.party, filer'.party) || related(filer'.party, filer.party) || filer.party == filer'.party))
+  Invariant fee-pool-conserved When operating-reserve-funded + Sum(Foreach funded: funded.int') + surplus == fee-pool
+  Invariant reserve-funded-first When operating-reserve-funded == fee-pool || operating-reserve-funded == operating-reserve-floor
+  Invariant fee-pool-never-negative When fee-pool >= 0
+}

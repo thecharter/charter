@@ -1,0 +1,75 @@
+// lib/collateral_pool used by a small program: two bonded entities, three actions, two claimants, an operator.
+//! explore: 1
+#require "../../lib/collateral_pool.eflint".
+
+Fact firm Identified by Acme, Bolt
+Fact job Identified by Dig, Spray, Launch
+Fact neighbour Identified by Nan, Ole
+Fact pool Identified by Pool.
+
+Use collateral-pool(firm, job, neighbour, pool) As cp.
+
++cp-stake(100). +cp-insurance(50). +cp-enforceable-capacity(50).
++cp-reserve(100).
++cp-high-risk(Spray). +cp-irreversible(Launch).
+
+?cp-group-exposure(0). ?cp-exposure-within-collateral(). ?cp-reserve-never-negative().
+
+Scenario commitments-stay-within-collateral {
+  +cp-proposed(Dig, Acme, 150).
+  ?lawful cp-commit(Acme, Dig).
+  cp-commit(Acme, Dig).
+  ?cp-exposure(Dig, Acme, 150). ?cp-group-exposure(150). ?cp-exposure-within-collateral().
+  +cp-proposed(Spray, Bolt, 60).
+  // 150 + 60 > 200: splitting the risk across another entity does not help (exposure is additive)
+  ?!lawful cp-commit-high-risk(Bolt, Spray).
+  +cp-proposed(Spray, Bolt, 50).
+  // every proposal for the action counts: 60 + 50 is still too much
+  ?!lawful cp-commit-high-risk(Bolt, Spray).
+  -cp-proposed(Spray, Bolt, 60).
+  ?lawful cp-commit-high-risk(Bolt, Spray).
+}
+
+Scenario exposure-decays-when-the-window-closes {
+  +cp-proposed(Dig, Acme, 150). +cp-proposed(Spray, Bolt, 50). +cp-proposed(Launch, Acme, 0).
+  cp-commit(Acme, Dig). cp-commit-high-risk(Bolt, Spray). cp-commit-irreversible(Acme, Launch).
+  ?cp-group-exposure(200).
+  @ 9.
+  ?cp-exposure(Dig, Acme, 150).
+  @ 10.
+  ?!cp-exposure(Dig, Acme, 150). ?cp-exposure(Spray, Bolt, 50). ?cp-group-exposure(50).
+  @ 20.
+  ?!cp-exposure(Spray, Bolt, 50). ?cp-exposure(Launch, Acme, 0).
+  @ 30.
+  ?!cp-exposure(Launch, Acme, 0). ?cp-group-exposure(0).
+}
+
+Scenario long-tail-reserve-pays-pro-rata {
+  +cp-claim(Nan, 60). +cp-claim(Ole, 20).
+  ?cp-total-claims(80). ?cp-payout(Nan, 60). ?cp-payout(Ole, 20).
+  cp-settle-claims(Pool).
+  ?cp-paid(Nan, 60). ?cp-paid(Ole, 20). ?cp-reserve(20). ?!cp-enforceable(Nan, 0).
+  +cp-claim(Nan, 30). +cp-claim(Ole, 10).
+  // 40 > 20 left: Nan gets 20*30/40 = 15, Ole 20*10/40 = 5; the rest carries as enforceable
+  ?cp-payout(Nan, 15). ?cp-payout(Ole, 5). ?cp-carryover(Nan, 15). ?cp-carryover(Ole, 5).
+  ?cp-payouts-within-reserve(). ?cp-claims-conserved().
+  cp-settle-claims(Pool).
+  ?cp-enforceable(Nan, 15). ?cp-enforceable(Ole, 5). ?cp-reserve(0). ?cp-reserve-never-negative().
+}
+
+Scenario mutual-forfeit-transfers-nothing {
+  +cp-escrow(Acme, 80). +cp-escrow(Bolt, 40).
+  ?cp-forfeit-each(Acme, Bolt, 20). ?cp-forfeit-within-escrows().
+  cp-mutual-forfeit(Pool, Acme, Bolt).
+  ?cp-forfeited(Acme, 20). ?cp-forfeited(Bolt, 20). ?cp-escrow(Acme, 60). ?cp-escrow(Bolt, 20).
+}
+
+Scenario frivolous-claim-yields-no-profit {
+  +cp-counter-stake(Nan, 100). +cp-verified-costs(Nan, 30).
+  ?cp-reimbursement(Nan, 30).
+  cp-rule-frivolous(Pool, Nan).
+  ?cp-reimbursed(Nan, 30). ?cp-to-pool(Nan, 70).
+  ?cp-reimbursement-within-costs(). ?cp-counter-stake-conserved().
+  +cp-counter-stake(Ole, 10). +cp-verified-costs(Ole, 30).
+  ?cp-reimbursement(Ole, 10).
+}

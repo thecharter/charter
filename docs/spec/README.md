@@ -37,7 +37,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
 | 013 invariants and proof | `013_invariants_and_proof.md` | draft; 4 tests green (invariants checked, `--explore`); `prove` pending |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
-| 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); `lib/` pending |
+| 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |
 | 017 projections | `017_projections.md` | unwritten |
 | 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: today's commands, flags, exit status; `prove`, `init`, `lsp`, the projections, and `charter-server` pending |

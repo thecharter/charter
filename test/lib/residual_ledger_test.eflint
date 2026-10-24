@@ -1,0 +1,89 @@
+// lib/residual_ledger used by a small program: a steward, two members, three periods.
+//! explore: 1
+#require "../../lib/residual_ledger.eflint".
+
+Fact steward Identified by Stew
+Fact founder Identified by Ava, Bo
+Fact quarter Identified by Q1, Q2, Q3.
+
+Use residual-ledger(steward, founder, quarter) As rl.
+
++rl-ledger(1000). +rl-living(Ava). +rl-living(Bo).
++rl-principal-received(300). +rl-principal-repaid(0).
+
+?rl-balance(1000). ?rl-ledger-never-negative(). ?rl-sunset-extinguishes(). ?rl-rates-in-range().
+
+Scenario retirement-absorbs-the-inflow {
+  +rl-inflow(Q1, Ava, 500).
+  ?rl-retire-attempt(Q1, Ava, 100). ?rl-to-retirement(Q1, Ava, 100). ?rl-to-royalty(Q1, Ava, 0).
+  ?rl-retirement-within-balance(). ?rl-royalty-only-after-retirement().
+  ?lawful rl-settle(Stew, Q1, Ava).
+  rl-settle(Stew, Q1, Ava).
+  ?rl-settlement(Q1, Ava, 500, 100, 0). ?rl-ledger(900). ?rl-balance(900).
+  ?!lawful rl-settle(Stew, Q1, Ava).
+}
+
+Scenario atomic-split-at-retirement {
+  +rl-ledger(60).
+  +rl-inflow(Q2, Bo, 500).
+  // attempt 100, retirement min(60, 100) = 60, excess 40 settles at the royalty rate: 40 * 5 / 20 = 10
+  ?rl-to-retirement(Q2, Bo, 60). ?rl-to-royalty(Q2, Bo, 10).
+  rl-settle(Stew, Q2, Bo).
+  ?rl-ledger(0). ?rl-balance(0).
+  +rl-inflow(Q3, Bo, 200).
+  ?rl-to-retirement(Q3, Bo, 0). ?rl-to-royalty(Q3, Bo, 10).
+  ?rl-royalty-only-after-retirement().
+}
+
+Scenario bought-out-member-pays-no-royalty {
+  +rl-ledger(0).
+  +rl-trailing-va(Ava, 20). +rl-annualized-va(Ava, 30).
+  ?rl-buyout-price(Ava, 300).
+  ?rl-buyout-price-at-least-floor(). ?rl-buyout-price-at-least-multiples().
+  +rl-paid-buyout(Ava, 250).
+  ?lawful rl-buy-out(Ava). ?!valid rl-buy-out(Ava).
+  +rl-paid-buyout(Ava, 300).
+  ?valid rl-buy-out(Ava).
+  rl-buy-out(Ava).
+  ?rl-bought-out(Ava).
+  +rl-inflow(Q3, Ava, 400).
+  ?rl-to-royalty(Q3, Ava, 0). ?rl-bought-out-pays-no-royalty().
+  +rl-trailing-va(Bo, 10). +rl-annualized-va(Bo, 10).
+  ?rl-buyout-price(Bo, 250).
+}
+
+Scenario sunset-extinguishes-the-ledger {
+  @ 999.
+  ?rl-balance(1000).
+  @ 1000.
+  ?rl-balance(0). ?rl-sunset-extinguishes().
+  +rl-inflow(Q1, Ava, 500).
+  ?rl-to-retirement(Q1, Ava, 0). ?rl-to-royalty(Q1, Ava, 25).
+}
+
+Scenario extinction-extinguishes-the-ledger {
+  -rl-living(Ava). -rl-living(Bo).
+  ?rl-balance(0).
+}
+
+Scenario loan-principal-is-exempt-one-for-one {
+  +rl-repayment(Q1, 200).
+  ?rl-exempt(Q1, 200).
+  rl-repay(Stew, Q1).
+  ?rl-repayment-split(Q1, 200, 200, 0). ?rl-principal-repaid(200).
+  +rl-repayment(Q2, 150).
+  ?rl-exempt(Q2, 100).
+  rl-repay(Stew, Q2).
+  ?rl-repayment-split(Q2, 150, 100, 50). ?rl-principal-repaid(300).
+  ?rl-repaid-within-received(). ?rl-repayment-split-conserved().
+}
+
+Scenario expenditure-is-recognised-once {
+  +rl-expenditure(Q1, 120, 100).
+  ?rl-qualified(Q1, 100).
+  ?lawful rl-capitalize(Stew, Q1). ?lawful rl-expense(Stew, Q1).
+  rl-capitalize(Stew, Q1).
+  ?rl-capitalized(Q1, 100).
+  ?!lawful rl-expense(Stew, Q1). ?!lawful rl-capitalize(Stew, Q1).
+  ?rl-single-recognition(). ?rl-recognition-within-benchmark().
+}

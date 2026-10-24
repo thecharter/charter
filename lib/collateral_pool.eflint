@@ -1,0 +1,132 @@
+// lib/collateral_pool — harm-scaled collateral: an entity may commit to an action only
+// while the group's active exposure stays within the stake, insurance and enforceable
+// capacity behind it; exposure decays when an action's observation window closes; a
+// long-tail reserve pays validated latent-harm claims pro rata and carries the rest as
+// enforceable; matched escrows forfeit mutually with no transfer to anyone; a frivolous
+// claim's counter-stake reimburses verified costs and routes the rest to the pool.
+//
+// The Charter form of Charter/Modules/CollateralPool.lean (v0.3), per D8 and D10:
+// commitments, stake, insurance, capacity, claims, escrows and cost findings are facts
+// the environment asserts; committing, settling, forfeiting and ruling are acts; every
+// property the Lean module proved is an Invariant here. One deviation: the Lean module
+// scales the observation window multiplicatively (base × risk × irreversibility); Charter
+// has no Duration × Int (009.2), so the window here is the base plus one extension per
+// risk class (brief B11, docs/meetings/2026-10-24-briefs-for-ruling.md).
+// Parameters: `entity` (who commits and posts escrow), `action` (what is committed to),
+// `claimant` (who may hold a latent-harm claim), `operator` (who settles and rules).
+
+Module collateral-pool(entity, action, claimant, operator) {
+
+  Param base-observation-window : Duration = 10
+  Param risk-extension : Duration = 10                        // added for a high-risk domain
+  Param irreversibility-extension : Duration = 20             // added for an irreversible action
+  Param mutual-forfeit-cap-pct = 50
+
+  // ---- Collateral behind the group, and the rolling exposure it must cover
+  Var stake Identified by Int                                 // environment input
+  Var insurance Identified by Int                             // environment input
+  Var enforceable-capacity Identified by Int                  // environment input
+  Fact high-risk Identified by action                         // environment input: domain class
+  Fact irreversible Identified by action                      // environment input
+  Fact proposed Identified by action * entity * int           // environment input: plausible external loss
+  Fact exposure Identified by action * entity * int           // active while the window is open
+  Fact group-exposure Identified by Int
+    Derived from group-exposure(Sum(Foreach exposure: exposure.int))
+
+  // Committing is lawful only while the aggregate stays covered; the exposure then
+  // decays on its own when the action's observation window closes (`Creates … For`).
+  Act commit Actor entity Related to action
+    Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
+      && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
+           <= stake + insurance + enforceable-capacity
+      && Not(high-risk(action)) && Not(irreversible(action))
+    Creates (Foreach proposed: exposure(action, entity, proposed.int)
+               When proposed.action == action && proposed.entity == entity) For base-observation-window
+    Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
+  Act commit-high-risk Actor entity Related to action
+    Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
+      && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
+           <= stake + insurance + enforceable-capacity
+      && high-risk(action) && Not(irreversible(action))
+    Creates (Foreach proposed: exposure(action, entity, proposed.int)
+               When proposed.action == action && proposed.entity == entity) For base-observation-window + risk-extension
+    Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
+  Act commit-irreversible Actor entity Related to action
+    Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
+      && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
+           <= stake + insurance + enforceable-capacity
+      && irreversible(action)
+    Creates (Foreach proposed: exposure(action, entity, proposed.int)
+               When proposed.action == action && proposed.entity == entity) For base-observation-window + irreversibility-extension
+    Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
+  Duty collateral-limit Holder entity Claimant operator
+    Violated when group-exposure > stake + insurance + enforceable-capacity
+
+  // ---- Long-tail reserve: validated claims are paid pro rata, the rest carries as enforceable
+  Var reserve Identified by Int
+  Fact claim Identified by claimant * int                     // environment input: validated latent harm
+  Fact total-claims Identified by Int
+    Derived from total-claims(Sum(Foreach claim: claim.int))
+  Fact payout Identified by claimant * int
+    Derived from (Foreach claim: payout(claim.claimant, claim.int) When total-claims <= reserve)
+    Derived from (Foreach claim: payout(claim.claimant, reserve * claim.int / total-claims) When total-claims > reserve)
+  Fact carryover Identified by claimant * int
+    Derived from (Foreach claim, payout: carryover(claim.claimant, claim.int - payout.int) When payout.claimant == claim.claimant)
+  Fact paid Identified by claimant * int
+  Fact enforceable Identified by claimant * int
+  Act settle-claims Actor operator
+    Holds when (Exists claim: True)
+    Creates (Foreach payout: paid(payout.claimant, payout.int))
+          , (Foreach carryover: enforceable(carryover.claimant, carryover.int) When carryover.int > 0)
+          , reserve(reserve - Sum(Foreach payout: payout.int))
+    Terminates (Foreach claim: claim)
+
+  // ---- Mutual forfeit of matched escrows: each side loses the same capped amount; nobody gains
+  Function escrow Identified by entity * int                  // environment input
+  Fact forfeit-each Identified by entity * entity' * int      // min(escrows) * cap / 100
+    Derived from (Foreach escrow, escrow': forfeit-each(escrow.entity, escrow'.entity, escrow.int * mutual-forfeit-cap-pct / 100)
+                    When escrow.entity != escrow'.entity && escrow.int <= escrow'.int)
+    Derived from (Foreach escrow, escrow': forfeit-each(escrow.entity, escrow'.entity, escrow'.int * mutual-forfeit-cap-pct / 100)
+                    When escrow.entity != escrow'.entity && escrow'.int < escrow.int)
+  Fact forfeited Identified by entity * int
+  Act mutual-forfeit Actor operator Related to entity, entity'
+    Holds when entity != entity' && (Exists forfeit-each: forfeit-each.entity == entity && forfeit-each.entity' == entity')
+    Creates (Foreach forfeit-each: forfeited(entity, forfeit-each.int) When forfeit-each.entity == entity && forfeit-each.entity' == entity')
+          , (Foreach forfeit-each: forfeited(entity', forfeit-each.int) When forfeit-each.entity == entity && forfeit-each.entity' == entity')
+          , (Foreach forfeit-each, escrow: escrow(entity, escrow.int - forfeit-each.int)
+               When forfeit-each.entity == entity && forfeit-each.entity' == entity' && escrow.entity == entity)
+          , (Foreach forfeit-each, escrow: escrow(entity', escrow.int - forfeit-each.int)
+               When forfeit-each.entity == entity && forfeit-each.entity' == entity' && escrow.entity == entity')
+
+  // ---- A frivolous claim: its counter-stake reimburses verified costs, the rest goes to the pool
+  Function counter-stake Identified by claimant * int         // environment input
+  Function verified-costs Identified by claimant * int        // environment input: the panel's finding
+  Fact reimbursement Identified by claimant * int             // min(counter-stake, verified costs)
+    Derived from (Foreach counter-stake, verified-costs: reimbursement(counter-stake.claimant, verified-costs.int)
+                    When verified-costs.claimant == counter-stake.claimant && verified-costs.int <= counter-stake.int)
+    Derived from (Foreach counter-stake, verified-costs: reimbursement(counter-stake.claimant, counter-stake.int)
+                    When verified-costs.claimant == counter-stake.claimant && verified-costs.int > counter-stake.int)
+  Fact reimbursed Identified by claimant * int
+  Fact to-pool Identified by claimant * int
+  Act rule-frivolous Actor operator Recipient claimant
+    Holds when (Exists reimbursement: reimbursement.claimant == claimant)
+    Creates (Foreach reimbursement: reimbursed(claimant, reimbursement.int) When reimbursement.claimant == claimant)
+          , (Foreach reimbursement, counter-stake: to-pool(claimant, counter-stake.int - reimbursement.int)
+               When reimbursement.claimant == claimant && counter-stake.claimant == claimant)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant exposure-within-collateral When group-exposure <= stake + insurance + enforceable-capacity
+  Invariant exposure-is-additive When group-exposure == Sum(Foreach exposure: exposure.int)
+  Invariant payouts-within-reserve When Sum(Foreach payout: payout.int) <= reserve
+  Invariant claims-conserved When (Forall claim, payout, carryover:
+      payout.int + carryover.int == claim.int When payout.claimant == claim.claimant && carryover.claimant == claim.claimant)
+  Invariant reserve-never-negative When reserve >= 0
+  Invariant forfeit-within-escrows When (Forall forfeit-each, escrow, escrow':
+      forfeit-each.int <= escrow.int && forfeit-each.int <= escrow'.int
+      When escrow.entity == forfeit-each.entity && escrow'.entity == forfeit-each.entity')
+  Invariant reimbursement-within-costs When (Forall reimbursed, verified-costs:
+      reimbursed.int <= verified-costs.int When verified-costs.claimant == reimbursed.claimant)
+  Invariant counter-stake-conserved When (Forall reimbursed, to-pool, counter-stake:
+      reimbursed.int + to-pool.int == counter-stake.int
+      When to-pool.claimant == reimbursed.claimant && counter-stake.claimant == reimbursed.claimant)
+}

@@ -2,7 +2,7 @@
 
 Architecture and design decisions and *why*. Newest first. Each entry records the ruling, the laws it instances (`docs/mission.md`), the context, the alternatives weighed, what the reference projects do (`.reference/`), mission fit, the cost accepted, and the condition that would reopen it. A decision that supersedes or sharpens an earlier one says so in both. Delegated decisions (an agent's committed prediction of Eric's ruling, at 75% or better, on a reversible question that is not about semantics or trust) record the full brief; a veto is a revert plus a new entry. Examples, UAT fixtures, and spec wording are never delegated.
 
-Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations, awaiting ruling).
+Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations; B10, the certificate's signer; awaiting ruling), `2026-10-24-briefs-for-ruling.md` (B11, acts that name an amount; B12, `Duration * Int`; awaiting ruling).
 
 ## Decisions
 

@@ -1,0 +1,95 @@
+// lib/oracle_feed — a contestable valuation feed and an atomic point-of-settlement
+// waterfall.
+//
+// The Charter form of Charter/Modules/OracleFeed.lean and Charter/Substrate/Settlement.lean
+// (v0.3), per D8 and D10: valuations, rulings, and inflows are facts the environment
+// asserts (D10 clause 3: substrate inputs are facts); contesting and settling are acts;
+// the settled value and the waterfall are derived with the rounding stated; every
+// property the Lean module proved is an Invariant here.
+//
+// Parameters: `oracle` (who settles), `party` (who may contest), `asset` (what is valued).
+// Amounts are `Int` facts; every division rounds toward negative infinity (010.2) and all
+// amounts are taken to be non-negative, as the Lean module's `Nat`s were.
+
+Module oracle-feed(oracle, party, asset) {
+
+  Param contest-window : Duration = 5
+  Param levy-cap-bps = 100            // basis points of net value added, at most
+  Param retirement-bps = 2000         // rates are at most 10000 bps (rates-in-range)
+  Param royalty-bps = 500
+
+  // ---- A contestable valuation: proposed by the feed, possibly contested, possibly ruled
+  Function proposed Identified by asset * int        // environment input: the feed's value
+  Fact contested Identified by asset
+  Function ruled Identified by asset * int           // environment input: a panel's ruling
+
+  Act contest Actor party Related to asset
+    Holds when (Exists proposed: proposed.asset == asset)
+    Valid when Not(Exists settled: settled.asset == asset)      // too late once settled
+    Creates contested(asset)
+
+  // Settled: a ruling settles at once; an uncontested proposal settles when the
+  // contest window has passed (a condition over the stamp, Law 7).
+  Fact settled Identified by asset * int
+    Derived from (Foreach ruled: settled(ruled.asset, ruled.int))
+    Derived from (Foreach proposed: settled(proposed.asset, proposed.int)
+                    When Not(contested(proposed.asset))
+                      && Not(Exists ruled: ruled.asset == proposed.asset)
+                      && Held(proposed) For contest-window)
+
+  // ---- Atomic waterfall over a gross inflow: expense, levy, retirement, royalty, residual
+  Var remaining-ledger Identified by Int             // the founding ledger still to retire
+  Fact royalty-bought-out Identified by asset
+  Fact inflow Identified by asset * int * int'       // environment input: gross, qualified expense
+  // the five parts, each derived from the inflow that holds
+  Fact expense-used Identified by asset * int                   // min(gross, qualified expense)
+    Derived from (Foreach inflow: expense-used(inflow.asset, inflow.int') When inflow.int' <= inflow.int)
+    Derived from (Foreach inflow: expense-used(inflow.asset, inflow.int) When inflow.int' > inflow.int)
+  Fact net Identified by asset * int
+    Derived from (Foreach inflow, expense-used: net(inflow.asset, inflow.int - expense-used.int) When expense-used.asset == inflow.asset)
+  Fact levy Identified by asset * int
+    Derived from (Foreach net: levy(net.asset, net.int * levy-cap-bps / 10000))
+  Fact distributable Identified by asset * int
+    Derived from (Foreach net, levy: distributable(net.asset, net.int - levy.int) When levy.asset == net.asset)
+  Fact retirement Identified by asset * int                     // min(remaining ledger, the rate's share)
+    Derived from (Foreach distributable: retirement(distributable.asset, remaining-ledger)
+                    When remaining-ledger <= distributable.int * retirement-bps / 10000)
+    Derived from (Foreach distributable: retirement(distributable.asset, distributable.int * retirement-bps / 10000)
+                    When distributable.int * retirement-bps / 10000 < remaining-ledger)
+  Fact royalty Identified by asset * int
+    Derived from (Foreach distributable, retirement: royalty(distributable.asset, (distributable.int - retirement.int) * royalty-bps / 10000)
+                    When retirement.asset == distributable.asset && Not(royalty-bought-out(distributable.asset)))
+    Derived from (Foreach distributable: royalty(distributable.asset, 0) When royalty-bought-out(distributable.asset))
+  Fact residual Identified by asset * int
+    Derived from (Foreach distributable, retirement, royalty: residual(distributable.asset, distributable.int - retirement.int - royalty.int)
+                    When retirement.asset == distributable.asset && royalty.asset == distributable.asset)
+
+  Fact distribution Identified by asset * int * int' * int'' * int''' * int''''
+    // gross, expense reimbursed, levy, retirement, royalty + residual recorded as int''' and int''''
+
+  Act settle-inflow Actor oracle Related to asset
+    Holds when (Exists inflow: inflow.asset == asset)
+    Creates (Foreach inflow, expense-used, levy, retirement, royalty, residual:
+               distribution(asset, inflow.int, expense-used.int, levy.int, retirement.int, royalty.int + residual.int)
+               When inflow.asset == asset && expense-used.asset == asset && levy.asset == asset
+                 && retirement.asset == asset && royalty.asset == asset && residual.asset == asset)
+          , (Foreach retirement: remaining-ledger(remaining-ledger - retirement.int) When retirement.asset == asset)
+    Terminates (Foreach inflow: inflow When inflow.asset == asset)
+
+  // ---- Properties
+  Invariant one-settled-value When Not(Exists settled, settled': settled.asset == settled'.asset && settled.int != settled'.int)
+  Invariant contest-blocks-window-settlement When Not(Exists proposed: contested(proposed.asset)
+                                                        && Not(Exists ruled: ruled.asset == proposed.asset)
+                                                        && settled(proposed.asset, proposed.int))
+  Invariant ruling-settles When (Forall ruled: settled(ruled.asset, ruled.int))
+  Invariant waterfall-conserves-gross When (Forall distribution: distribution.int' + distribution.int'' + distribution.int''' + distribution.int'''' == distribution.int)
+  Invariant pending-waterfall-conserves-net When (Forall net: (Forall levy, retirement, royalty, residual:
+                                                     levy.int + retirement.int + royalty.int + residual.int == net.int
+                                                     When levy.asset == net.asset && retirement.asset == net.asset
+                                                       && royalty.asset == net.asset && residual.asset == net.asset))
+  Invariant retirement-within-ledger When (Forall retirement: retirement.int <= remaining-ledger)
+  Invariant levy-capped When (Forall net, levy: levy.int <= net.int * levy-cap-bps / 10000 When levy.asset == net.asset)
+  Invariant bought-out-pays-no-royalty When Not(Exists royalty: royalty-bought-out(royalty.asset) && royalty.int > 0)
+  Invariant ledger-never-negative When Not(remaining-ledger < 0)
+  Invariant rates-in-range When levy-cap-bps <= 10000 && retirement-bps <= 10000 && royalty-bps <= 10000
+}

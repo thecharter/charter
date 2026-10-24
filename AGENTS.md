@@ -302,6 +302,8 @@ Today (v0.3; the target layout is plan §4 and this section is updated as it lan
 | `test/eflint-corpus/` | the vendored eFLINT tests and examples (D2), protected; `tolerances.md` lists the only accepted differences |
 | `test/gates/` | the Law 14 gates; one script per law so far |
 | `test/spec/` | one conformance test per normative statement of `docs/spec/` chapters 002–011 (`.eflint` until the `.charter` extension moves to the new grammar); `//!` directives expect diagnostics |
+| `lib/` | the standard library (D8, spec 015.5): the eight patterns of `src/Charter/Modules/` as Charter modules, their properties as `Invariant`s; `lib/README.md` has the conventions |
+| `test/lib/` | one program per `lib/` module that `#require`s and `Use`s it, with scenarios and `//! explore: 1`; run by the battery |
 | `tools/battery` | the PR-tier runner (build, gates, checks, sims, corpus) |
 | `HANDOFF.md` | reverse-chronological session log (newest section first; verify every hash it names with `git log` before acting) |
 | `.reference/` | eFLINT, Catala, Quint, Symboleo checkouts; untracked, ignored, read-only |

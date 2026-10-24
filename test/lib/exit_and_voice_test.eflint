@@ -1,0 +1,111 @@
+// lib/exit_and_voice used by a small program: two members, an operator, a panel.
+//! explore: 1
+#require "../../lib/exit_and_voice.eflint".
+
+Fact citizen Identified by Kim, Lee
+Fact host Identified by Host
+Fact panel Identified by Panel.
+
+Use exit-and-voice(citizen, host, panel) As ev.
+
++ev-voice-budget(2).
++ev-statements(Kim, 0). +ev-statements(Lee, 0).
+
+?ev-voice-within-budget(). ?ev-one-exit-outcome().
+
+Scenario exit-after-cooling-off {
+  ev-initiate-exit(Kim).
+  ?!ev-exit-due(Kim). ?!lawful ev-execute-exit(Host, Kim).
+  @ 4.
+  ?!ev-exit-due(Kim).
+  @ 5.
+  ?ev-exit-due(Kim). ?lawful ev-execute-exit(Host, Kim).
+  ev-execute-exit(Host, Kim).
+  ?ev-exit-executed(Kim). ?!ev-exit-requested(Kim). ?ev-one-exit-outcome().
+}
+
+Scenario withdrawal-cancels {
+  ev-initiate-exit(Kim).
+  @ 3.
+  ev-withdraw-exit(Kim).
+  @ 9.
+  ?!ev-exit-due(Kim). ?!ev-exit-executed(Kim).
+}
+
+Scenario refused-clean-state-delays {
+  ev-initiate-exit(Lee).
+  +ev-clean-state-refused(Lee).
+  @ 9.
+  ?!ev-exit-due(Lee).
+  @ 10.
+  ?ev-exit-due(Lee). ?ev-no-exit-before-cooling-off().
+}
+
+Scenario stay-is-bounded-by-the-deadline {
+  ev-initiate-exit(Kim).
+  +ev-stayed(Kim).
+  @ 12.
+  ?!ev-exit-due(Kim).
+  +ev-adjudication-concluded(Kim).
+  ?ev-exit-due(Kim).
+}
+
+Scenario stay-without-ruling-ends-at-the-deadline {
+  ev-initiate-exit(Kim).
+  +ev-stayed(Kim).
+  @ 19.
+  ?!ev-exit-due(Kim).
+  @ 20.
+  ?ev-exit-due(Kim). ?ev-exit-due-by-the-bound().
+}
+
+Scenario disconnected-node-executes-locally-after-tolling {
+  ev-initiate-exit(Kim).
+  +ev-disconnected(Kim).
+  @ 5.
+  ?ev-exit-due(Kim). ?ev-exit-tolled(Kim).
+  ?!lawful ev-execute-exit(Host, Kim).
+  ?!lawful ev-execute-exit-locally(Kim).
+  @ 8.
+  ?!lawful ev-execute-exit-locally(Kim).
+  @ 9.
+  ?lawful ev-execute-exit-locally(Kim). ?!lawful ev-cancel-exit-by-default(Kim).
+  ev-execute-exit-locally(Kim).
+  ?ev-exit-executed(Kim).
+}
+
+Scenario withdraw-default-cancels-after-tolling {
+  +ev-withdraw-by-default(Lee).
+  ev-initiate-exit(Lee).
+  +ev-disconnected(Lee).
+  @ 5.
+  // tolling runs from the step at which the exit was found due (a derived fact is stamped
+  // when first derived, 009.3), so the clock must be observed at 5
+  ?ev-exit-tolled(Lee).
+  @ 9.
+  ?!lawful ev-execute-exit-locally(Lee). ?lawful ev-cancel-exit-by-default(Lee).
+  ev-cancel-exit-by-default(Lee).
+  ?!ev-exit-requested(Lee). ?!ev-exit-executed(Lee).
+}
+
+Scenario voice-is-rate-limited-and-budgeted {
+  ?lawful ev-inscribe-voice(Kim).
+  ev-inscribe-voice(Kim).
+  ?ev-statements(Kim, 1). ?ev-voice-budget(1).
+  ?!lawful ev-inscribe-voice(Kim). ?lawful ev-inscribe-voice(Lee).
+  @ 3.
+  ?lawful ev-inscribe-voice(Kim).
+  ev-inscribe-voice(Lee).
+  ?ev-voice-budget(0).
+  ?!lawful ev-inscribe-voice(Kim). ?ev-voice-within-budget().
+}
+
+Scenario redaction-keeps-byte-length {
+  +ev-testimony(Kim, 1, 120). +ev-testimony(Kim, 2, 80).
+  ?!lawful ev-redact(Panel, Kim).
+  +ev-redaction-order(Kim, 2, 7).
+  ?lawful ev-redact(Panel, Kim).
+  ev-redact(Panel, Kim).
+  ?ev-marker(Kim, 2, 80, 7). ?!ev-marker(Kim, 1, 120, 7).
+  ?ev-markers-keep-byte-length().
+}

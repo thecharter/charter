@@ -1,0 +1,112 @@
+// lib/exit_and_voice — unilateral exit with a cooling-off period, a clean-state delay, a
+// stay during adjudication bounded by a deadline, tolling when the member's node is
+// disconnected with a pre-committed censorship default, and rate-limited, budgeted member
+// voice whose redaction keeps every byte count.
+//
+// The Charter form of Charter/Modules/ExitAndVoice.lean (v0.3), per D8 and D10: refusals,
+// suspensions, adjudication outcomes, connectivity and redaction orders are facts the
+// environment asserts (stamped when asserted, Law 7); initiating, withdrawing, executing,
+// inscribing and redacting are acts; every property the Lean module proved is an Invariant
+// here. Parameters: `member` (who may exit and speak), `operator` (who executes an exit on
+// the connected path), `panel` (who orders redactions).
+
+Module exit-and-voice(member, operator, panel) {
+
+  Param cooling-off-window : Duration = 5
+  Param clean-state-delay : Duration = 5
+  Param resolution-deadline : Duration = 20
+  Param tolling-extension : Duration = 4
+  Param voice-interval : Duration = 3
+
+  // ---- A standing exit request and the circumstances that move its execution time
+  Fact exit-requested Identified by member                    // stamped at initiation
+  Fact exit-executed Identified by member
+  Fact withdraw-by-default Identified by member               // the pre-committed censorship default (else: execute)
+  Fact clean-state-refused Identified by member               // environment input
+  Fact stayed Identified by member                            // environment input: suspended during the stay
+  Fact adjudication-concluded Identified by member            // environment input
+  Fact disconnected Identified by member                      // environment input
+
+  Act initiate-exit Actor member
+    Holds when Not(exit-requested(member)) && Not(exit-executed(member))
+    Creates exit-requested(member)
+  Act withdraw-exit Actor member
+    Holds when exit-requested(member)
+    Terminates exit-requested(member)
+
+  // When the exit falls due (the Lean `baseRevocationTime`): after the cooling-off window,
+  // plus the clean-state delay if the member refused a clean state; under a stay, at the
+  // deadline, or earlier once adjudication has concluded and the clean time has passed.
+  Fact exit-due Identified by member
+    Derived from exit-due(member)
+      When exit-requested(member) && Not(stayed(member)) && Not(clean-state-refused(member))
+        && Held(exit-requested(member)) For cooling-off-window
+    Derived from exit-due(member)
+      When exit-requested(member) && Not(stayed(member)) && clean-state-refused(member)
+        && Held(exit-requested(member)) For cooling-off-window + clean-state-delay
+    Derived from exit-due(member)
+      When exit-requested(member) && stayed(member)
+        && Held(exit-requested(member)) For resolution-deadline
+    Derived from exit-due(member)
+      When exit-requested(member) && stayed(member) && adjudication-concluded(member) && Not(clean-state-refused(member))
+        && Held(exit-requested(member)) For cooling-off-window
+    Derived from exit-due(member)
+      When exit-requested(member) && stayed(member) && adjudication-concluded(member) && clean-state-refused(member)
+        && Held(exit-requested(member)) For cooling-off-window + clean-state-delay
+
+  // Connected: the operator executes a due exit. Disconnected: tolling runs from the
+  // moment the exit is due (a derived fact keeps its stamp, 009.3); after the extension
+  // the member's own node applies the pre-committed default.
+  Act execute-exit Actor operator Recipient member
+    Holds when exit-due(member) && Not(disconnected(member))
+    Creates exit-executed(member)
+    Terminates exit-requested(member)
+  Fact exit-tolled Identified by member
+    Derived from exit-tolled(member) When exit-due(member) && disconnected(member)
+  Act execute-exit-locally Actor member
+    Holds when exit-tolled(member) && Not(withdraw-by-default(member))
+      && Held(exit-tolled(member)) For tolling-extension
+    Creates exit-executed(member)
+    Terminates exit-requested(member)
+  Act cancel-exit-by-default Actor member
+    Holds when exit-tolled(member) && withdraw-by-default(member)
+      && Held(exit-tolled(member)) For tolling-extension
+    Terminates exit-requested(member)
+
+  // ---- Voice: a bounded statement at most once per interval while the budget lasts
+  Var voice-budget Identified by Int
+  Fact voice-cooling Identified by member                     // expires on its own after the interval
+  Fact statements Identified by member * int                  // how many statements inscribed
+  Act inscribe-voice Actor member
+    Holds when voice-budget > 0 && Not(voice-cooling(member))
+    Creates voice-cooling(member) For voice-interval
+          , voice-budget(voice-budget - 1)
+          , (Foreach statements: statements(member, statements.int + 1) When statements.member == member)
+    Terminates (Foreach statements: statements When statements.member == member)
+  Duty no-censorship Holder operator Claimant member
+    Violated when censored(member)
+  Fact censored Identified by member                          // environment input: a statement was suppressed
+
+  // ---- Redaction under a panel order replaces an entry with a marker of the same byte length
+  Fact testimony Identified by member * int * int'            // entry, byte length
+  Fact redaction-order Identified by member * int * int'      // entry, order id (environment input)
+  Fact marker Identified by member * int * int' * int''       // entry, byte length, order id
+  Act redact Actor panel Recipient member
+    Holds when (Exists redaction-order, testimony: redaction-order.member == member
+                  && testimony.member == member && testimony.int == redaction-order.int)
+    Creates (Foreach redaction-order, testimony: marker(member, testimony.int, testimony.int', redaction-order.int')
+               When redaction-order.member == member && testimony.member == member && testimony.int == redaction-order.int)
+    Terminates (Foreach redaction-order: redaction-order When redaction-order.member == member)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant no-exit-before-cooling-off When (Forall member:
+      Not(exit-due(member)) || Held(exit-requested(member)) For cooling-off-window)
+  Invariant exit-due-by-the-bound When (Forall member:
+      Not(exit-requested(member) && Held(exit-requested(member)) For resolution-deadline
+          && Held(exit-requested(member)) For cooling-off-window + clean-state-delay)
+      || exit-due(member))
+  Invariant one-exit-outcome When Not(Exists member: exit-executed(member) && exit-requested(member))
+  Invariant voice-within-budget When voice-budget >= 0
+  Invariant markers-keep-byte-length When (Forall marker, testimony:
+      marker.int' == testimony.int' When testimony.member == marker.member && testimony.int == marker.int)
+}

@@ -1,0 +1,108 @@
+// lib/sortition_court used by a small program: five arbiters, three parties, two disputes, a registrar.
+//! explore: 1
+#require "../../lib/sortition_court.eflint".
+
+Fact judge Identified by Ana, Bea, Cal, Dev, Eli
+Fact litigant Identified by Pia, Quo, Rex
+Fact matter Identified by M1, M2
+Fact clerk Identified by Clerk.
+
+Use sortition-court(judge, litigant, matter, clerk) As sc.
+
++sc-bond(Ana, 150). +sc-bond(Bea, 150). +sc-bond(Cal, 100). +sc-bond(Dev, 50). +sc-bond(Eli, 200).
++sc-cluster(Ana, 1). +sc-cluster(Bea, 2). +sc-cluster(Cal, 3). +sc-cluster(Dev, 4). +sc-cluster(Eli, 1).
++sc-pattern(M1, 7). +sc-pattern(M2, 7).
++sc-related(Pia, Quo).
++sc-fee-pool(300).
+
+?sc-eligible(Ana, M1). ?!sc-eligible(Dev, M1).
+
+Scenario draw-is-validated {
+  sc-file(Pia, M1).
+  ?sc-filed(M1). ?sc-counter-stake(M1, 50). ?sc-tier(M1, 0).
+  +sc-drawn(Ana, M1). +sc-drawn(Dev, M1).
+  ?lawful sc-seat-panel(Clerk, M1). ?!valid sc-seat-panel(Clerk, M1).          // Dev is under-bonded
+  -sc-drawn(Dev, M1). +sc-drawn(Eli, M1).
+  ?!valid sc-seat-panel(Clerk, M1).                                            // Ana and Eli share a cluster
+  -sc-drawn(Eli, M1). +sc-drawn(Bea, M1). +sc-drawn(Cal, M1).
+  +sc-conflicted(Cal, M1).
+  ?!valid sc-seat-panel(Clerk, M1).                                            // Cal is conflicted
+  -sc-conflicted(Cal, M1).
+  ?valid sc-seat-panel(Clerk, M1).
+  sc-seat-panel(Clerk, M1).
+  ?sc-seated(Ana, M1). ?sc-seated(Bea, M1). ?sc-seated(Cal, M1). ?sc-seats(M1, 3).
+  ?sc-seated-are-independent-and-bonded(). ?sc-panel-within-size(). ?sc-one-seat-per-cluster().
+}
+
+Scenario minority-cannot-rule {
+  sc-file(Pia, M1).
+  +sc-drawn(Ana, M1). +sc-drawn(Bea, M1). +sc-drawn(Cal, M1).
+  sc-seat-panel(Clerk, M1).
+  sc-vote-yes(Ana, M1).
+  ?!sc-supermajority(M1). ?!valid sc-rule(Clerk, M1).
+  sc-vote-yes(Bea, M1).
+  ?sc-supermajority(M1). ?valid sc-rule(Clerk, M1).
+  sc-rule(Clerk, M1).
+  ?sc-ruled(M1). ?sc-no-ruling-without-supermajority().
+  ?!lawful sc-vote-yes(Cal, M1).
+}
+
+Scenario tier-deadline-is-a-duty {
+  sc-file(Pia, M1).
+  +sc-drawn(Ana, M1). +sc-drawn(Bea, M1).
+  sc-seat-panel(Clerk, M1).
+  ?!violated sc-decide-tier(Clerk, M1).
+  @ 10.
+  ?violated sc-decide-tier(Clerk, M1).
+  sc-vote-yes(Ana, M1). sc-vote-yes(Bea, M1).
+  sc-rule(Clerk, M1).
+  ?!sc-decide-tier(Clerk, M1).
+}
+
+Scenario appeals-are-bounded-and-finality-bars-repeats {
+  sc-file(Pia, M1).
+  +sc-drawn(Ana, M1). +sc-drawn(Bea, M1).
+  sc-seat-panel(Clerk, M1). sc-vote-yes(Ana, M1). sc-vote-yes(Bea, M1). sc-rule(Clerk, M1).
+  ?lawful sc-appeal(Pia, M1). ?!lawful sc-appeal(Rex, M1).
+  sc-appeal(Pia, M1).
+  ?sc-tier(M1, 1). ?!sc-ruled(M1). ?!sc-seated(Ana, M1).
+  +sc-drawn(Cal, M1). +sc-drawn(Eli, M1).
+  sc-seat-panel(Clerk, M1). sc-vote-yes(Cal, M1). sc-vote-yes(Eli, M1). sc-rule(Clerk, M1).
+  sc-appeal(Pia, M1).
+  ?sc-tier(M1, 2).
+  +sc-drawn(Ana, M1). +sc-drawn(Bea, M1).
+  sc-seat-panel(Clerk, M1). sc-vote-yes(Ana, M1). sc-vote-yes(Bea, M1). sc-rule(Clerk, M1).
+  ?sc-final(M1). ?!lawful sc-appeal(Pia, M1). ?sc-tiers-bounded().
+  -sc-filed(M1).
+  ?!lawful sc-file(Quo, M1).
+}
+
+Scenario unappealed-ruling-becomes-final {
+  sc-file(Pia, M1).
+  +sc-drawn(Ana, M1). +sc-drawn(Bea, M1).
+  sc-seat-panel(Clerk, M1). sc-vote-yes(Ana, M1). sc-vote-yes(Bea, M1). sc-rule(Clerk, M1).
+  @ 9.
+  ?!sc-final(M1). ?lawful sc-appeal(Pia, M1).
+  @ 10.
+  ?sc-final(M1). ?!lawful sc-appeal(Pia, M1).
+}
+
+Scenario related-repeat-filing-is-consolidated {
+  sc-file(Pia, M1).
+  ?lawful sc-file(Quo, M2). ?!valid sc-file(Quo, M2).
+  ?valid sc-file(Rex, M2).
+  sc-file(Quo, M2).
+  ?!sc-filed(M2). ?!sc-counter-stake(M2, 50). ?sc-one-stake-per-pattern().
+}
+
+Scenario fee-pool-waterfall {
+  +sc-charge(1, 80). +sc-charge(2, 100). +sc-charge(3, 60). +sc-charge(4, 40). +sc-charge(5, 30).
+  ?sc-operating-reserve-funded(100). ?sc-reserve-funded-first().
+  // 200 left: 80, 100, then 20 of 60, then nothing
+  ?sc-funded(1, 80). ?sc-funded(2, 100). ?sc-funded(3, 20). ?sc-funded(4, 0). ?sc-funded(5, 0). ?sc-surplus(0).
+  ?sc-fee-pool-conserved().
+  sc-allocate-fee-pool(Clerk).
+  ?sc-disbursed(3, 20). ?sc-fee-pool(0). ?sc-fee-pool-never-negative().
+  +sc-fee-pool(60).
+  ?sc-operating-reserve-funded(60). ?sc-reserve-funded-first().
+}

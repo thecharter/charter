@@ -72,5 +72,10 @@ step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 "$B" test test/spec > "$OUT/spec.log" 2>&1; st=$?
 step spec-conformance $st "$(tail -1 "$OUT/spec.log")"
 
+# 8. the standard library (D8, spec 015.5): each lib/ module used by a program, with
+#    its invariants checked after every phrase and explored from every end state
+"$B" test test/lib > "$OUT/lib.log" 2>&1; st=$?
+step standard-library $st "$(tail -1 "$OUT/lib.log")"
+
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
 exit $fail

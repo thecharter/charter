@@ -1,0 +1,85 @@
+// lib/entity_group — a multi-member group with per-member ledgers, stakeholder shares,
+// consent-gated group-wide amendment, and a capped shared service budget.
+//
+// The Charter form of Charter/Modules/EntityGroup.lean (v0.3), per D8: every property
+// the Lean module proved is an Invariant here, checked after every phrase and by
+// `charter test --explore`; the Lean theorems are to be reattached by name under
+// lib/lean/ once `prove` can discharge them (spec 013.4, 015.5).
+//
+// Parameters: `group` (the group type), `member` (its members), `stakeholder` (holders
+// of shares in its founding ledger), and `amount`: the amounts an act may name. Ledgers
+// are `Int` facts, so a quantifier over them ranges over what holds (004.7); an act's
+// amount component must be enumerable for the act to be lawful by derivation (005.5,
+// 004.7), so the using program declares `amount` as a range (`Fact amount Identified by
+// 0..N`). This is the compromise of brief B11 (docs/meetings/2026-10-24-briefs-for-ruling.md).
+
+Module entity-group(group, member, stakeholder, amount) {
+
+  // ---- Ledgers (one value per member or stakeholder: Function replaces the old value)
+  Function basis Identified by member * int             // qualified cost basis
+  Function loss Identified by member * int              // loss carryforward
+  Function share Identified by stakeholder * int        // share of the founding ledger, percent
+  Function claimed Identified by member * int           // service subsidy claimed so far
+
+  Param total-basis = 0                                 // set by the using program at genesis
+  Param total-loss = 0
+  Param service-budget = 0
+  Param lifecycle-reserve-min = 0
+
+  Var reserve Identified by Int                         // lifecycle reserve balance
+  Fact exit-pending Identified by member
+  Fact attested Identified by member
+  Fact consents Identified by member                    // consent to a group-wide amendment
+  Fact forfeiture-ground Identified by stakeholder
+  Fact amended Identified by group
+
+  // ---- Intra-group carryover transfer: conserves basis and loss
+  Act transfer-carryover Actor member Recipient member' Related to amount
+    Holds when (Exists basis: basis.member == member && basis.int >= amount)
+    Valid when member != member'
+    Creates (Foreach basis: basis(member, basis.int - amount) When basis.member == member)
+          , (Foreach basis: basis(member', basis.int + amount) When basis.member == member')
+
+  Act transfer-loss Actor member Recipient member' Related to amount
+    Holds when (Exists loss: loss.member == member && loss.int >= amount)
+    Valid when member != member'
+    Creates (Foreach loss: loss(member, loss.int - amount) When loss.member == member)
+          , (Foreach loss: loss(member', loss.int + amount) When loss.member == member')
+
+  // ---- Basis inflation inside the group is never lawful, and is a breach of the duty
+  Act inflate-basis Actor member Related to amount
+    Creates (Foreach basis: basis(member, basis.int + amount) When basis.member == member)
+  Duty no-internal-basis-inflation Holder member Claimant group
+    Violated when (Exists basis: basis.member == member && basis.int > total-basis)
+
+  // ---- Attesting a new member needs a funded lifecycle reserve and no pending exit
+  Act attest-member Actor group Recipient member
+    Holds when True
+    Valid when reserve >= lifecycle-reserve-min && Not(exit-pending(member))
+    Creates attested(member)
+
+  // ---- Group-wide amendment needs every member's consent
+  Act amend-group Actor member Related to group
+    Holds when True
+    Valid when (Forall member': consents(member'))
+    Creates amended(group)
+
+  // ---- Targeted forfeiture touches the offender's share only
+  Act forfeit Actor group Recipient stakeholder Related to amount
+    Holds when forfeiture-ground(stakeholder)
+    Creates (Foreach share: share(stakeholder, share.int - amount)
+               When share.stakeholder == stakeholder && share.int >= amount)
+
+  // ---- Shared service subsidy, capped by the budget
+  Act claim-subsidy Actor member Related to amount
+    Holds when True
+    Valid when Sum(Foreach claimed: claimed.int) + amount <= service-budget
+    Creates (Foreach claimed: claimed(member, claimed.int + amount) When claimed.member == member)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant basis-conserved When Sum(Foreach basis: basis.int) == total-basis
+  Invariant loss-conserved When Sum(Foreach loss: loss.int) == total-loss
+  Invariant subsidy-within-budget When Sum(Foreach claimed: claimed.int) <= service-budget
+  Invariant shares-within-whole When Sum(Foreach share: share.int) <= 100
+  Invariant shares-nonnegative When Not(Exists share: share.int < 0)
+}

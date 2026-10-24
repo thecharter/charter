@@ -1,0 +1,90 @@
+// lib/attested_lease — single-authority execution leases for attested instances: one lease
+// at a time, expiring on its own; a backup restore attempted while a lease is active is
+// quarantined and takes no authority; migration is fenced to the lease holder; minimal and
+// advocacy channels record without touching operating state; a standing revocation executes
+// locally after the cooling-off period and erases the keys; erasure is final.
+//
+// The Charter form of Charter/Modules/AttestedLease.lean and Charter/Substrate/Attestation.lean
+// (v0.3), per D8 and D10: key binding is a fact the environment asserts (attestation is a
+// SUB.* assumption); issuing, renewing, restoring, activating, migrating, recording,
+// requesting and erasing are acts; every property the Lean module proved as a state
+// property is an Invariant here (the frame properties, that channel records leave the
+// operating state unchanged, are properties of acts and await `prove`, 013.4).
+// Parameters: `instance` (the attested member instance; its own node acts), `operator`
+// (who may hold its lease), `member` (who may request revocation or erasure and record).
+
+Module attested-lease(instance, operator, member) {
+
+  Param lease-period : Duration = 12
+  Param cooling-off-window : Duration = 5
+
+  // ---- Keys and the lease
+  Fact key-bound Identified by instance                       // environment input: attested key binding
+  Fact keys-erased Identified by instance
+  Fact lease Identified by instance * operator                // expires on its own after the period
+  Act issue-lease Actor operator Recipient instance
+    Holds when key-bound(instance) && Not(keys-erased(instance)) && Not(Exists operator': lease(instance, operator'))
+    Creates lease(instance, operator) For lease-period
+  Act renew-lease Actor operator Recipient instance
+    Holds when lease(instance, operator)
+    Creates lease(instance, operator) For lease-period
+
+  // ---- A restore from backup: quarantined while another lease is active, authority only when none is
+  Fact restore Identified by instance * operator
+  Fact quarantined Identified by instance * operator
+    Derived from (Foreach instance, operator: quarantined(instance, operator)
+                    When restore(instance, operator) && (Exists operator': operator' != operator && lease(instance, operator')))
+  Act restore-backup Actor operator Recipient instance
+    Holds when key-bound(instance) && Not(keys-erased(instance))
+    Creates restore(instance, operator)
+  Act activate-restore Actor operator Recipient instance
+    Holds when restore(instance, operator) && key-bound(instance) && Not(keys-erased(instance))
+      && Not(Exists operator': lease(instance, operator'))
+    Creates lease(instance, operator) For lease-period
+    Terminates restore(instance, operator)
+
+  // ---- Migration is fenced to the lease holder
+  Fact checkpoint Identified by instance * operator
+  Act migrate-with-checkpoint Actor operator Recipient instance
+    Holds when lease(instance, operator)
+    Creates checkpoint(instance, operator)
+
+  // ---- Pause channels record without changing the operating state
+  Fact operating-state Identified by instance * int           // environment input: state hash
+  Fact minimal-channel-record Identified by instance * member
+  Fact advocacy-record Identified by instance * member
+  Act record-minimal-channel Actor member Recipient instance
+    Holds when True
+    Creates minimal-channel-record(instance, member)
+  Act record-advocacy Actor member Recipient instance
+    Holds when True
+    Creates advocacy-record(instance, member)
+
+  // ---- Revocation and erasure
+  Fact revocation-requested Identified by instance
+  Act request-revocation Actor member Recipient instance
+    Holds when key-bound(instance) && Not(revocation-requested(instance))
+    Creates revocation-requested(instance)
+  Act execute-local-revocation Actor instance
+    Holds when revocation-requested(instance) && Held(revocation-requested(instance)) For cooling-off-window
+    Creates keys-erased(instance)
+    Terminates key-bound(instance), revocation-requested(instance)
+             , (Foreach operator: lease(instance, operator) When lease(instance, operator))
+             , (Foreach operator: restore(instance, operator) When restore(instance, operator))
+  Act erase-all-keys Actor member Recipient instance
+    Holds when True
+    Creates keys-erased(instance)
+    Terminates key-bound(instance)
+             , (Foreach operator: lease(instance, operator) When lease(instance, operator))
+             , (Foreach operator: restore(instance, operator) When restore(instance, operator))
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant single-authority When Not(Exists instance, operator, operator': operator != operator'
+      && lease(instance, operator) && lease(instance, operator'))
+  Invariant restore-fenced-while-leased When (Forall instance, operator: Not(restore(instance, operator))
+      || Not(Exists operator': operator' != operator && lease(instance, operator')) || quarantined(instance, operator))
+  Invariant quarantined-holds-no-lease When Not(Exists instance, operator: quarantined(instance, operator) && lease(instance, operator))
+  Invariant no-lease-after-erasure When Not(Exists instance, operator: keys-erased(instance) && lease(instance, operator))
+  Invariant erasure-unbinds-keys When Not(Exists instance: keys-erased(instance) && key-bound(instance))
+  Invariant lease-needs-bound-keys When Not(Exists instance, operator: lease(instance, operator) && Not(key-bound(instance)))
+}

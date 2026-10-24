@@ -1,0 +1,83 @@
+// lib/circuit_breaker used by a small program: two initiators (one a claimant), two members, a court.
+//! explore: 1
+#require "../../lib/circuit_breaker.eflint".
+
+Fact watcher Identified by Ida, Jo
+Fact node Identified by Mo, Nia
+Fact court Identified by Court.
+
+Use circuit-breaker(watcher, node, court) As cb.
+
++cb-staked(Ida, 100). +cb-staked(Jo, 150).
++cb-wrongful-attempts(Ida, 0). +cb-wrongful-attempts(Jo, 0).
++cb-claimant(Jo).
+
+?cb-exposure-base(100).
+?cb-required-stake(Ida, 100). ?cb-required-stake(Jo, 200).
+?cb-stake-rises-with-wrongful-attempts(). ?cb-claimant-stake-at-least-multiplied-base().
+
+Scenario freeze-needs-the-scaled-stake {
+  ?lawful cb-freeze(Ida, Mo).
+  ?!lawful cb-freeze(Jo, Mo).
+  +cb-staked(Jo, 200).
+  ?lawful cb-freeze(Jo, Mo).
+}
+
+Scenario preliminary-freeze-expires {
+  cb-freeze(Ida, Mo).
+  ?cb-frozen(Mo, Ida).
+  @ 2.
+  ?cb-frozen(Mo, Ida).
+  @ 3.
+  ?!cb-frozen(Mo, Ida).
+  ?!lawful cb-affirm-probable-cause(Court, Mo).
+}
+
+Scenario suspension-needs-cause-and-is-bounded {
+  cb-freeze(Ida, Mo).
+  ?!lawful cb-suspend(Court, Mo).
+  cb-affirm-probable-cause(Court, Mo).
+  ?lawful cb-suspend(Court, Mo).
+  cb-suspend(Court, Mo).
+  ?cb-suspended(Mo). ?cb-suspension-needs-probable-cause().
+  @ 14.
+  ?cb-suspended(Mo).
+  ?!lawful cb-renew-suspension(Court, Mo).
+  +cb-investigation-open(Mo).
+  cb-renew-suspension(Court, Mo).
+  @ 20.
+  ?cb-suspended(Mo).
+  @ 29.
+  ?!cb-suspended(Mo).
+}
+
+Scenario tampering-while-paused-is-a-breach {
+  +cb-preserve-paused-state(Mo, Court).
+  +cb-tampered(Mo).
+  ?!violated cb-preserve-paused-state(Mo, Court).
+  cb-freeze(Ida, Mo).
+  ?violated cb-preserve-paused-state(Mo, Court).
+}
+
+Scenario termination-over-objection-is-void {
+  cb-freeze(Ida, Mo). cb-affirm-probable-cause(Court, Mo). cb-suspend(Court, Mo).
+  ?valid cb-terminate-member(Court, Mo).
+  +cb-objects(Mo).
+  ?!valid cb-terminate-member(Court, Mo).
+  ?lawful cb-terminate-member(Court, Mo).
+  +cb-final-ruling(Mo).
+  ?valid cb-terminate-member(Court, Mo).
+}
+
+Scenario wrongful-pause-conserves-damages {
+  cb-freeze(Ida, Mo).
+  +cb-damages(Ida, 180). +cb-assets(Ida, 50).
+  ?lawful cb-rule-wrongful(Court, Ida, Mo).
+  cb-rule-wrongful(Court, Ida, Mo).
+  ?!cb-frozen(Mo, Ida).
+  ?cb-wrongful-attempts(Ida, 1).
+  ?cb-required-stake(Ida, 150).
+  ?cb-from-stake(Ida, 100). ?cb-from-assets(Ida, 50). ?cb-unpaid(Ida, 30).
+  ?cb-damages-conserved(). ?cb-stake-recovery-capped().
+  ?!lawful cb-freeze(Ida, Nia).
+}

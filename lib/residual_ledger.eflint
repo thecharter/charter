@@ -1,0 +1,133 @@
+// lib/residual_ledger — a founding (residual-claim) ledger retired from members' net
+// value added, with a royalty that starts only once the ledger is retired, a calendar
+// sunset, one-for-one loan principal repayment, single recognition of qualified
+// expenditures, and a perpetual royalty buyout at a floored price.
+//
+// The Charter form of Charter/Modules/ResidualLedger.lean (v0.3), per D8 and D10: inflows,
+// repayments, expenditures and valuations are facts the environment asserts; settling,
+// repaying, recognising and buying out are acts; every division rounds toward negative
+// infinity (010.2), stated here as the protocol states it; every property the Lean module
+// proved is an Invariant here. Parameters: `steward` (who settles), `member` (whose inflows
+// retire the ledger), `period` (the accounting periods inflows and expenditures are filed under).
+
+Module residual-ledger(steward, member, period) {
+
+  Param retirement-rate-pct = 20          // of an inflow, while the ledger is unretired (0 < rate <= 100)
+  Param royalty-rate-pct = 5              // of an inflow, once the ledger is retired
+  Param sunset : Time = 1000              // the ledger is extinguished at this time
+  Param buyout-multiple = 10
+  Param min-buyout-floor = 250
+
+  // ---- The ledger: the founding obligation still to retire, and its effective balance
+  Var ledger Identified by Int                                // set by the using program at genesis
+  Fact living Identified by member                            // environment input: members still alive
+  Fact balance Identified by Int                              // zero at sunset or on group extinction
+    Derived from balance(ledger) When Current Time < sunset && (Exists member: living(member))
+    Derived from balance(0) When Current Time >= sunset || Not(Exists member: living(member))
+
+  // ---- Settling a member's net value-added inflow: retirement first, royalty after
+  Fact inflow Identified by period * member * int             // environment input: net value added
+  Fact bought-out Identified by member
+  Fact retire-attempt Identified by period * member * int
+    Derived from (Foreach inflow: retire-attempt(inflow.period, inflow.member, inflow.int * retirement-rate-pct / 100))
+  Fact to-retirement Identified by period * member * int      // min(balance, attempt)
+    Derived from (Foreach retire-attempt: to-retirement(retire-attempt.period, retire-attempt.member, balance)
+                    When balance <= retire-attempt.int)
+    Derived from (Foreach retire-attempt: to-retirement(retire-attempt.period, retire-attempt.member, retire-attempt.int)
+                    When retire-attempt.int < balance)
+  Fact to-royalty Identified by period * member * int
+    Derived from (Foreach inflow: to-royalty(inflow.period, inflow.member, 0) When bought-out(inflow.member))
+    Derived from (Foreach inflow: to-royalty(inflow.period, inflow.member, inflow.int * royalty-rate-pct / 100)
+                    When Not(bought-out(inflow.member)) && balance == 0)
+    Derived from (Foreach inflow, retire-attempt, to-retirement:
+                    to-royalty(inflow.period, inflow.member, (retire-attempt.int - to-retirement.int) * royalty-rate-pct / retirement-rate-pct)
+                    When Not(bought-out(inflow.member)) && balance > 0
+                      && retire-attempt.period == inflow.period && retire-attempt.member == inflow.member
+                      && to-retirement.period == inflow.period && to-retirement.member == inflow.member)
+  Fact settlement Identified by period * member * int * int' * int''   // inflow, retirement, royalty
+  Act settle Actor steward Related to period, member
+    Holds when (Exists inflow: inflow.period == period && inflow.member == member)
+    Creates (Foreach inflow, to-retirement, to-royalty:
+               settlement(period, member, inflow.int, to-retirement.int, to-royalty.int)
+               When inflow.period == period && inflow.member == member
+                 && to-retirement.period == period && to-retirement.member == member
+                 && to-royalty.period == period && to-royalty.member == member)
+          , (Foreach to-retirement: ledger(ledger - to-retirement.int)
+               When to-retirement.period == period && to-retirement.member == member)
+    Terminates (Foreach inflow: inflow When inflow.period == period && inflow.member == member)
+
+  // ---- Registered arm's-length loan principal: repayment is exempt one-for-one
+  Var principal-received Identified by Int
+  Var principal-repaid Identified by Int
+  Fact repayment Identified by period * int                   // environment input
+  Fact exempt Identified by period * int                      // min(payment, outstanding principal)
+    Derived from (Foreach repayment: exempt(repayment.period, repayment.int)
+                    When repayment.int <= principal-received - principal-repaid)
+    Derived from (Foreach repayment: exempt(repayment.period, principal-received - principal-repaid)
+                    When repayment.int > principal-received - principal-repaid)
+  Fact repayment-split Identified by period * int * int' * int''        // payment, exempt principal, excess
+  Act repay Actor steward Related to period
+    Holds when (Exists repayment: repayment.period == period)
+    Creates (Foreach repayment, exempt: repayment-split(period, repayment.int, exempt.int, repayment.int - exempt.int)
+               When repayment.period == period && exempt.period == period)
+          , (Foreach exempt: principal-repaid(principal-repaid + exempt.int) When exempt.period == period)
+    Terminates (Foreach repayment: repayment When repayment.period == period)
+
+  // ---- Qualified expenditures are recognised once, as basis or as expense, within the benchmark
+  Fact expenditure Identified by period * int * int'          // environment input: paid, arm's-length benchmark
+  Fact qualified Identified by period * int                   // min(paid, benchmark)
+    Derived from (Foreach expenditure: qualified(expenditure.period, expenditure.int) When expenditure.int <= expenditure.int')
+    Derived from (Foreach expenditure: qualified(expenditure.period, expenditure.int') When expenditure.int > expenditure.int')
+  Fact capitalized Identified by period * int
+  Fact expensed Identified by period * int
+  Act capitalize Actor steward Related to period
+    Holds when (Exists qualified: qualified.period == period)
+      && Not(Exists capitalized: capitalized.period == period) && Not(Exists expensed: expensed.period == period)
+    Creates (Foreach qualified: capitalized(period, qualified.int) When qualified.period == period)
+  Act expense Actor steward Related to period
+    Holds when (Exists qualified: qualified.period == period)
+      && Not(Exists capitalized: capitalized.period == period) && Not(Exists expensed: expensed.period == period)
+    Creates (Foreach qualified: expensed(period, qualified.int) When qualified.period == period)
+
+  // ---- Perpetual royalty buyout: the greatest of the multiples and the floor
+  Function trailing-va Identified by member * int             // environment input
+  Function annualized-va Identified by member * int           // environment input
+  Function paid-buyout Identified by member * int             // environment input
+  Fact buyout-price Identified by member * int
+    Derived from (Foreach trailing-va, annualized-va: buyout-price(trailing-va.member, trailing-va.int * buyout-multiple)
+                    When annualized-va.member == trailing-va.member
+                      && trailing-va.int >= annualized-va.int && trailing-va.int * buyout-multiple >= min-buyout-floor)
+    Derived from (Foreach trailing-va, annualized-va: buyout-price(trailing-va.member, annualized-va.int * buyout-multiple)
+                    When annualized-va.member == trailing-va.member
+                      && annualized-va.int > trailing-va.int && annualized-va.int * buyout-multiple >= min-buyout-floor)
+    Derived from (Foreach trailing-va, annualized-va: buyout-price(trailing-va.member, min-buyout-floor)
+                    When annualized-va.member == trailing-va.member
+                      && trailing-va.int * buyout-multiple < min-buyout-floor && annualized-va.int * buyout-multiple < min-buyout-floor)
+  Act buy-out Actor member
+    Holds when (Exists buyout-price: buyout-price.member == member) && Not(bought-out(member))
+    Valid when (Exists paid-buyout, buyout-price: paid-buyout.member == member && buyout-price.member == member
+                  && paid-buyout.int >= buyout-price.int)
+    Creates bought-out(member)
+
+  // ---- Properties (the Lean module's theorems, as checked invariants)
+  Invariant retirement-within-balance When (Forall to-retirement: to-retirement.int <= balance)
+  Invariant settlement-conserves-attempt When (Forall settlement:
+      settlement.int' <= settlement.int * retirement-rate-pct / 100)
+  Invariant royalty-only-after-retirement When Not(Exists to-royalty, to-retirement, retire-attempt:
+      to-royalty.int > 0 && to-retirement.int == retire-attempt.int && balance > 0
+      && to-retirement.period == to-royalty.period && to-retirement.member == to-royalty.member
+      && retire-attempt.period == to-royalty.period && retire-attempt.member == to-royalty.member)
+  Invariant bought-out-pays-no-royalty When Not(Exists to-royalty: bought-out(to-royalty.member) && to-royalty.int > 0)
+  Invariant ledger-never-negative When ledger >= 0
+  Invariant sunset-extinguishes When Current Time < sunset || balance == 0
+  Invariant repaid-within-received When principal-repaid <= principal-received
+  Invariant repayment-split-conserved When (Forall repayment-split: repayment-split.int' + repayment-split.int'' == repayment-split.int)
+  Invariant single-recognition When Not(Exists capitalized, expensed: capitalized.period == expensed.period)
+  Invariant recognition-within-benchmark When (Forall capitalized, expenditure:
+      capitalized.int <= expenditure.int' When expenditure.period == capitalized.period)
+  Invariant buyout-price-at-least-floor When (Forall buyout-price: buyout-price.int >= min-buyout-floor)
+  Invariant buyout-price-at-least-multiples When (Forall buyout-price, trailing-va, annualized-va:
+      buyout-price.int >= trailing-va.int * buyout-multiple && buyout-price.int >= annualized-va.int * buyout-multiple
+      When trailing-va.member == buyout-price.member && annualized-va.member == buyout-price.member)
+  Invariant rates-in-range When retirement-rate-pct > 0 && retirement-rate-pct <= 100 && royalty-rate-pct <= 100
+}

@@ -5,6 +5,68 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-24: Phase 2's seventh slice, the eight `lib/` modules as Charter programs (D8); two Resolve fixes
+
+## Where
+
+- `main`, pushed directly (landing rule of 2026-10-23). Two commits: the Resolve and lexer
+  fixes with their fixtures, then the library with its tests, battery step, spec updates,
+  briefs B11–B12 and this section. `tools/battery`: PASS on all ten steps (build, three gates, check 280 ok, sim 16/16 and 8/8, corpus 196/196 with 32 tolerated, spec 113/113, standard library 8/8) on the maintainer machine with the pinned toolchain, before the push.
+
+## What was done
+
+1. **`lib/`** — `entity_group`, `oracle_feed`, `circuit_breaker`, `residual_ledger`,
+   `collateral_pool`, `exit_and_voice`, `sortition_court`, `attested_lease`, each a
+   `Module` with its Lean theorems as named `Invariant`s, and `lib/README.md` with the
+   conventions. **`test/lib/`** — one program per module that `#require`s and `Use`s it,
+   with scenarios and `//! explore: 1`; 8/8 pass in about 6 s; `tools/battery` step 8 runs
+   them. Spec 015.5 and 013.5 updated; proofs under `lib/lean/` and the *proved* tag wait
+   for `prove` (013.4).
+2. **Resolve fix (spec 014.1):** a `Param` used as the `For d` of `Creates e For d` was
+   CHR102 ("variable cb-preliminary-freeze-window is not bound"): `compileEffect` bound the
+   effect's free variables but not the expiry's. Fixture `spec_014_1c_param_as_duration`
+   (seen failing with that CHR102; passes after).
+3. **Resolve diagnostic CHR024 (spec 003.7):** a `Function` whose domain is not a product of
+   exactly two components. eFLINT's `function_assignment _ s = s` ignores every assignment to
+   one silently, and Charter did the same (`+of-inflow(V1, 1000, 30)` on a three-component
+   `Function` created nothing and `?--of-inflow` was empty); a silent tool is a bug. Every
+   `Function` in the corpus has two components, so refusing is D2-safe. Fixture
+   `spec_003_7b_function_arity`.
+4. **Lexer (spec 002.1):** a run of primes is decoration (`int'''`); the old rule read `''`
+   as the start of a character literal. Fixture `spec_002_8_prime_decorations`.
+5. **Briefs for Eric** in `docs/meetings/2026-10-24-briefs-for-ruling.md`: **B11**, an act
+   that names an amount is never lawful by derivation (eFLINT's rule; measured costs of the
+   finite-menu workaround; recommendation: lawfulness is asked of the instance); **B12**,
+   `Duration * Int`.
+
+## Lessons that cost time (now in spec 004.7 and `lib/README.md`)
+
+- A binder over a type whose components are all enumerable ranges over the whole domain, so
+  in a rule `(Exists frozen: frozen.member == member)` is true for every member; say
+  `frozen && …` or use the application form. Over a type with an `Int` component the binder
+  ranges over what holds. I misread this as an evaluator bug three times (reductions in the
+  scratchpad: `Forall worker: (Exists basis: basis.worker == worker)` was "true" with one
+  basis instance because `basis(Ben, 0)` is a domain element).
+- `Holds when` on an act with an `Int` component derives nothing (B11). `Min(Foreach int'': …)`
+  over `int` is empty; write min/max as paired `Derived from` clauses.
+- A derived fact is stamped at the phrase that first derived it (009.3); a scenario that
+  jumps the clock past the instant a `Held … For` condition became true gets the later stamp.
+- Exploration cost: with amount-carrying acts over `0..12` and three members, depth 2 took
+  181 s and depth 1 takes 3 s; `enabledActs` re-enumerates every act domain per state. The
+  library tests use depth 1. Exploration found three real modelling bugs in first drafts
+  (a second proposal doubling a commitment's exposure; an invariant counting unfiled
+  disputes; a lease holder's own restore counted as quarantined).
+- `Function` with one or three components silently creates nothing (now CHR024).
+
+## Next
+
+1. Eric rules B9–B12; apply B11's edit to `entity-group` if (B) is chosen.
+2. The kernel-oriented Core for `prove` (013.4), then `lib/lean/Modules/` proofs attached by
+   invariant name (D8).
+3. Phase 3's artifact format after B10.
+
+---
+
 # Handoff — 2026-10-23 (day): Phase 0 closed, Phase 1 eFLINT core running the corpus, plan amended for the server; branch `phase-0-1-eflint-core`
 
 ## Where
