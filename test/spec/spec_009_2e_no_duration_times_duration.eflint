@@ -1,0 +1,5 @@
+// In `*` at most one operand may be a duration (D16).
+//! expect-error: CHR012
+Fact window Identified by Duration.
++window(3).
+?(window * window == 9).

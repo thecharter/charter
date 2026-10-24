@@ -1,0 +1,12 @@
+// `Duration * Int`, `Int * Duration`, and `Duration / Int` are durations (D16, brief B12); `/` rounds toward negative infinity.
+Fact window Identified by Duration
+Fact factor Identified by Int
+Param base : Duration = 10.
++window(3). +factor(4).
+?(window * 2 == 6).
+?(2 * window == 6).
+?(window * factor == 12).
+?(window / 2 == 1).
+?((0 - window) / 2 == 0 - 2).
+?(base * factor / 2 == 20).
+?(Current Time + base * 2 == 20).

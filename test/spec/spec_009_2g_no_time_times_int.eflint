@@ -1,0 +1,5 @@
+// An instant cannot be scaled: `Time * Int` is CHR012 (D16).
+//! expect-error: CHR012
+Fact deadline Identified by Time.
++deadline(3).
+?(deadline * 2 == 6).

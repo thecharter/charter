@@ -22,17 +22,19 @@ Scenario commitments-stay-within-collateral {
   ?cp-exposure(Dig, Acme, 150). ?cp-group-exposure(150). ?cp-exposure-within-collateral().
   +cp-proposed(Spray, Bolt, 60).
   // 150 + 60 > 200: splitting the risk across another entity does not help (exposure is additive)
-  ?!lawful cp-commit-high-risk(Bolt, Spray).
+  ?!lawful cp-commit(Bolt, Spray).
   +cp-proposed(Spray, Bolt, 50).
   // every proposal for the action counts: 60 + 50 is still too much
-  ?!lawful cp-commit-high-risk(Bolt, Spray).
+  ?!lawful cp-commit(Bolt, Spray).
   -cp-proposed(Spray, Bolt, 60).
-  ?lawful cp-commit-high-risk(Bolt, Spray).
+  ?lawful cp-commit(Bolt, Spray).
 }
 
 Scenario exposure-decays-when-the-window-closes {
   +cp-proposed(Dig, Acme, 150). +cp-proposed(Spray, Bolt, 50). +cp-proposed(Launch, Acme, 0).
-  cp-commit(Acme, Dig). cp-commit-high-risk(Bolt, Spray). cp-commit-irreversible(Acme, Launch).
+  // windows: Dig 10, Spray 10 × 2 (high-risk), Launch 10 × 3 (irreversible)
+  ?cp-risk-factor(Spray, 2). ?cp-risk-factor(Dig, 1). ?cp-irreversibility-factor(Launch, 3).
+  cp-commit(Acme, Dig). cp-commit(Bolt, Spray). cp-commit(Acme, Launch).
   ?cp-group-exposure(200).
   @ 9.
   ?cp-exposure(Dig, Acme, 150).

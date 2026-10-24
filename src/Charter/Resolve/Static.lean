@@ -249,9 +249,9 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
     | .leq a b => do let (a', b') ← compileCompare fuel a b; return (.leq a' b', .bool)
     | .le a b => do let (a', b') ← compileCompare fuel a b; return (.le a' b', .bool)
     | .ge a b => do let (a', b') ← compileCompare fuel a b; return (.ge a' b', .bool)
-    | .mult a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.mult a' b', .ints)
+    | .mult a b => do let (a', b', ty) ← compileScale fuel false a b; return (.mult a' b', ty)
     | .mod a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.mod a' b', .ints)
-    | .div a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.div a' b', .ints)
+    | .div a b => do let (a', b', ty) ← compileScale fuel true a b; return (.div a' b', ty)
     | .sub a b => do let (a', b', ty) ← compileArith fuel true a b; return (.sub a' b', ty)
     | .add a b => do let (a', b', ty) ← compileArith fuel false a b; return (.add a' b', ty)
     | .heldFor t d => do
@@ -381,6 +381,31 @@ def compileArith : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
       else if tb == .ints && literalArith b' && (ta == .time || ta == .duration) then
         return (a', b', ta)
       else err "CHR012" s!"cannot {if isSub then "subtract" else "add"} {tb} {if isSub then "from" else "to"} {ta} (D7: a time and a duration combine, two times only subtract)"
+/-- `*`/`/` over integers and durations (D16, brief B12): `Int * Int : Int`,
+`Duration * Int : Duration`, `Int * Duration : Duration`, `Duration / Int : Duration`
+(rounding toward negative infinity, as `Int /`); at most one operand of `*` may be a
+duration, an instant is never scaled, and `Int / Duration` has no meaning. A literal
+beside a duration resolves to `Int`, so `base * 2` is unambiguous (D7). -/
+def compileScale : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
+  | 0, _, _, _ => err "CHR003" "expression too deeply nested to resolve"
+  | fuel + 1, isDiv, a, b => do
+    let (a', ta) ← compileTerm fuel a
+    let (b', tb) ← compileTerm fuel b
+    let (a', ta) ← asNumber a' ta
+    let (b', tb) ← asNumber b' tb
+    let op := if isDiv then "/" else "*"
+    match ta, tb with
+    | .ints, .ints => return (a', b', .ints)
+    | .duration, .ints => return (a', b', .duration)
+    | .ints, .duration =>
+      if isDiv then err "CHR012" s!"cannot divide an integer by a duration (D16: `Duration / Int` is a duration; `Int / Duration` has no meaning)"
+      else return (a', b', .duration)
+    | .duration, .duration =>
+      err "CHR012" s!"cannot {if isDiv then "divide" else "multiply"} a duration by a duration (D16: in `{op}` at most one operand may be a duration)"
+    | .time, _ | _, .time => err "CHR012" s!"cannot use an instant in `{op}` (D16: a time is never scaled)"
+    | .ints, other | .duration, other => convErr other .ints
+    | other, _ => convErr other .ints
+
 def compilePrimitiveApplication : Nat → DomId → Args → Stc (Term × Ty)
   | 0, _, _ => err "CHR003" "expression too deeply nested to resolve"
   | fuel + 1, d, args => do

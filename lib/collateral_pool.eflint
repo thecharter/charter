@@ -8,18 +8,17 @@
 // The Charter form of Charter/Modules/CollateralPool.lean (v0.3), per D8 and D10:
 // commitments, stake, insurance, capacity, claims, escrows and cost findings are facts
 // the environment asserts; committing, settling, forfeiting and ruling are acts; every
-// property the Lean module proved is an Invariant here. One deviation: the Lean module
-// scales the observation window multiplicatively (base × risk × irreversibility); Charter
-// has no Duration × Int (009.2), so the window here is the base plus one extension per
-// risk class (brief B11, docs/meetings/2026-10-24-briefs-for-ruling.md).
+// property the Lean module proved is an Invariant here. The observation window scales as
+// the Lean module's does, base × risk multiplier × irreversibility multiplier, each
+// multiplier read as 1 when it is below 1 (`Duration * Int`, D16, spec 009.2).
 // Parameters: `entity` (who commits and posts escrow), `action` (what is committed to),
 // `claimant` (who may hold a latent-harm claim), `operator` (who settles and rules).
 
 Module collateral-pool(entity, action, claimant, operator) {
 
   Param base-observation-window : Duration = 10
-  Param risk-extension : Duration = 10                        // added for a high-risk domain
-  Param irreversibility-extension : Duration = 20             // added for an irreversible action
+  Param risk-multiplier = 2                                   // for a high-risk domain
+  Param irreversibility-multiplier = 3                        // for an irreversible action
   Param mutual-forfeit-cap-pct = 50
 
   // ---- Collateral behind the group, and the rolling exposure it must cover
@@ -33,31 +32,25 @@ Module collateral-pool(entity, action, claimant, operator) {
   Fact group-exposure Identified by Int
     Derived from group-exposure(Sum(Foreach exposure: exposure.int))
 
+  // The window's factors per action: the multiplier where the class applies, else 1
+  Fact risk-factor Identified by action * int
+    Derived from (Foreach action: risk-factor(action, risk-multiplier) When high-risk(action) && risk-multiplier > 1)
+    Derived from (Foreach action: risk-factor(action, 1) When Not(high-risk(action)) || risk-multiplier <= 1)
+  Fact irreversibility-factor Identified by action * int
+    Derived from (Foreach action: irreversibility-factor(action, irreversibility-multiplier)
+                    When irreversible(action) && irreversibility-multiplier > 1)
+    Derived from (Foreach action: irreversibility-factor(action, 1) When Not(irreversible(action)) || irreversibility-multiplier <= 1)
+
   // Committing is lawful only while the aggregate stays covered; the exposure then
   // decays on its own when the action's observation window closes (`Creates … For`).
   Act commit Actor entity Related to action
     Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
       && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
            <= stake + insurance + enforceable-capacity
-      && Not(high-risk(action)) && Not(irreversible(action))
-    Creates (Foreach proposed: exposure(action, entity, proposed.int)
-               When proposed.action == action && proposed.entity == entity) For base-observation-window
-    Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
-  Act commit-high-risk Actor entity Related to action
-    Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
-      && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
-           <= stake + insurance + enforceable-capacity
-      && high-risk(action) && Not(irreversible(action))
-    Creates (Foreach proposed: exposure(action, entity, proposed.int)
-               When proposed.action == action && proposed.entity == entity) For base-observation-window + risk-extension
-    Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
-  Act commit-irreversible Actor entity Related to action
-    Holds when (Exists proposed: proposed.action == action && proposed.entity == entity)
-      && group-exposure + Sum(Foreach proposed: proposed.int When proposed.action == action && proposed.entity == entity)
-           <= stake + insurance + enforceable-capacity
-      && irreversible(action)
-    Creates (Foreach proposed: exposure(action, entity, proposed.int)
-               When proposed.action == action && proposed.entity == entity) For base-observation-window + irreversibility-extension
+    Creates (Foreach proposed, risk-factor, irreversibility-factor: exposure(action, entity, proposed.int)
+               When proposed.action == action && proposed.entity == entity
+                 && risk-factor.action == action && irreversibility-factor.action == action)
+            For base-observation-window * risk-factor.int * irreversibility-factor.int
     Terminates (Foreach proposed: proposed When proposed.action == action && proposed.entity == entity)
   Duty collateral-limit Holder entity Claimant operator
     Violated when group-exposure > stake + insurance + enforceable-capacity

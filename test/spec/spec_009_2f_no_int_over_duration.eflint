@@ -1,0 +1,5 @@
+// `Int / Duration` has no meaning (D16); `Duration / Int` does.
+//! expect-error: CHR012
+Fact window Identified by Duration.
++window(3).
+?(6 / window == 2).

@@ -6,7 +6,7 @@ An expression denotes zero or more values: a term with free variables takes ever
 
 **10.1 Booleans.** `&&`, `||`, `!` and `Not`; `&&` and `||` do not evaluate the right operand when the left decides. `test/spec/spec_010_1_booleans.eflint`
 
-**10.2 Arithmetic.** `+ - * / %` on integers; `/` and `%` round toward negative infinity (the sign of `%` follows the divisor), as eFLINT's Haskell `div` and `mod`. `+` and `-` also combine times and durations as 009.2 says. `test/spec/spec_010_2_arithmetic.eflint`, `spec_009_2_time_and_duration_types.eflint`
+**10.2 Arithmetic.** `+ - * / %` on integers; `/` and `%` round toward negative infinity (the sign of `%` follows the divisor), as eFLINT's Haskell `div` and `mod`. `+` and `-` also combine times and durations, and `*` and `/` scale a duration by an integer, as 009.2 says (D7, D16). `test/spec/spec_010_2_arithmetic.eflint`, `spec_009_2_time_and_duration_types.eflint`, `spec_009_2d_duration_times_int.eflint`
 
 **10.3 Comparisons.** `< <= > >=` on integers; `==` and `!=` on integers, strings, booleans, and instances (structurally). For `==`/`!=` the two sides are resolved to one type by trying the left side's type first, then the right's. `test/spec/spec_010_3_comparisons.eflint`
 
