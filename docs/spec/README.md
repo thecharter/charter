@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-24 — D15 (an act whose domain is not enumerable is judged for the instance; CHR025; the `explore-domain` menu) in 004.1, 004.7, 005.5, 013.2, 018; D16 (`Duration * Int`) in 009.2, 010.2. 121 conformance tests.
 - 2026-10-23 (late, 5) — Chapter 018 (toolchain and CLI, today's commands) drafted; `Charter.Prove.Run` gives the evaluator as a pure function for `prove`. The kernel-decision feasibility result is in 013.4.
 - 2026-10-23 (late, 4) — Phase 2's sixth slice: invariant exploration, `charter test --explore N` and `//! explore: N` (chapter 013). 110 conformance tests.
 - 2026-10-23 (late, 3) — Phase 2's fifth slice: `Module name(params) { … }` and `Use name(args) As prefix` (D8, chapter 015); CHR023. 106 conformance tests.
@@ -26,16 +27,16 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 001 design goals | `001_design_goals.md` | unwritten (source: `docs/mission.md`) |
 | 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green |
 | 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green (`Time`/`Duration` in 009) |
-| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 12 tests green (D6; origins and `?why`) |
-| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 10 tests green, `Valid when` (D5) included |
+| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 13 tests green (D6; origins and `?why`; D15 in 4.1 and 4.7) |
+| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 11 tests green, `Valid when` (D5) and judged acts (D15) included |
 | 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 6 tests green, `Due within` included |
 | 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 4 tests green (`Except under`, `Immunity`); duty precedence pending |
 | 008 events, physical, syncs | `008_events_physical_syncs.md` | draft; 4 tests green |
-| 009 time | `009_time.md` | draft; 10 tests green (D7: the clock, `Time`/`Duration`, stamps, `Held … For`, expiry) |
+| 009 time | `009_time.md` | draft; 14 tests green (D7: the clock, `Time`/`Duration`, stamps, `Held … For`, expiry; D16: `Duration * Int`) |
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
 | 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
-| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 4 tests green (invariants checked, `--explore`); `prove` pending |
+| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 6 tests green (invariants checked, `--explore`, the `explore-domain` menu and its loud default); `prove` pending |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
 | 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |

@@ -2,10 +2,12 @@
 
 Architecture and design decisions and *why*. Newest first. Each entry records the ruling, the laws it instances (`docs/mission.md`), the context, the alternatives weighed, what the reference projects do (`.reference/`), mission fit, the cost accepted, and the condition that would reopen it. A decision that supersedes or sharpens an earlier one says so in both. Delegated decisions (an agent's committed prediction of Eric's ruling, at 75% or better, on a reversible question that is not about semantics or trust) record the full brief; a veto is a revert plus a new entry. Examples, UAT fixtures, and spec wording are never delegated.
 
-Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations; B10, the certificate's signer; awaiting ruling), `2026-10-24-briefs-for-ruling.md` (B11, acts that name an amount; B12, `Duration * Int`; awaiting ruling).
+Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations; B10, the certificate's signer; awaiting ruling), `2026-10-24-briefs-for-ruling.md` (B11, acts that name an amount; B12, `Duration * Int`; ruled as D15–D16).
 
 ## Decisions
 
+- [D16 — `Duration * Int`, `Int * Duration` and `Duration / Int` are durations; a duration is never multiplied by a duration, an instant is never scaled](2026-10-24-D16-duration-times-int.md)
+- [D15 — An act whose domain is not enumerable is judged for the instance asked about: `Holds when` is read with the components bound, never materialised (fifth eFLINT tolerance)](2026-10-24-D15-an-act-that-names-an-amount-is-judged-for-the-instance.md)
 - [D14 — In `e When c` the condition extends as far right as it can: `When`/`Where` has the lowest precedence (fourth eFLINT tolerance; delegated)](2026-10-23-D14-when-has-the-lowest-precedence.md)
 - [D13 — An instance named through a placeholder is an instance of the aliased type (third eFLINT tolerance; delegated)](2026-10-23-D13-placeholder-instances-belong-to-the-aliased-type.md)
 - [D12 — A duty's violation is reported once, when it begins; `Violated()` still answers at any time (second eFLINT tolerance; delegated)](2026-10-23-D12-duty-violations-are-reported-on-transition.md)

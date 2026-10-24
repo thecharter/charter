@@ -1,0 +1,21 @@
+// An act whose domain is not enumerable is lawful when its `Holds when` is true of the instance asked about (D15, brief B11); no instance is materialised, and an assignment still beats the rule.
+Fact member Identified by Ann, Ben
+Function basis Identified by member * int
+Act transfer Actor member Recipient member' Related to int
+  Holds when (Exists basis: basis.member == member && basis.int >= int)
+  Valid when member != member'
+  Creates (Foreach basis: basis(member, basis.int - int) When basis.member == member)
+        , (Foreach basis: basis(member', basis.int + int) When basis.member == member').
++basis(Ann, 5). +basis(Ben, 0).
+?lawful transfer(Ann, Ben, 4).
+?Enabled(transfer(Ann, Ben, 5)).
+?transfer(Ann, Ben, 5).
+?!lawful transfer(Ann, Ben, 7).
+?!lawful transfer(Ben, Ann, 1).
+transfer(Ann, Ben, 4).
+?basis(Ann, 1). ?basis(Ben, 4).
+?!lawful transfer(Ann, Ben, 2).
+?lawful transfer(Ben, Ann, 3).
+-transfer(Ben, Ann, 3).
+?!lawful transfer(Ben, Ann, 3).
+?lawful transfer(Ben, Ann, 2).

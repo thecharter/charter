@@ -206,6 +206,17 @@ def arithTy (isSub : Bool) : Ty → Ty → Option Ty
 def convErr {α} (source target : Ty) : Stc α :=
   err "CHR012" s!"cannot use {source} where {target} is needed"
 
+/-- D15 (brief B11): a binder over an act whose domain is not enumerable and that has a
+`Holds when` sees only the act's assigned instances; the rule is judged per instance and
+never materialised, so the binder is almost never what the author meant. CHR025 says so. -/
+def warnJudgedBinders (xs : List Var) : Stc Unit := do
+  let spec ← getSpec
+  xs.forM fun x => do
+    let d := spec.removeDecoration x
+    match spec.judgedAct d with
+    | some _ => warn "CHR025" s!"a binder over {d} sees only its assigned instances: the domain of {d} is not enumerable and its Holds when is judged per instance, never materialised (D15)"
+    | none => pure ()
+
 mutual
 
 /-- Infer the type of a term and rewrite it into checked form (eFLINT `compile_term`). -/
@@ -261,7 +272,7 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         let d' ← convertTerm fuel d .duration
         return (.heldFor t' d', .bool)
       | _ => err "CHR015" s!"Held({t}) needs an instance, not {ty}"
-    | .sum xs t => do let t' ← convertTerm fuel t .ints; return (.sum xs t', .ints)
+    | .sum xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.sum xs t', .ints)
     | .eq a b =>
       orElse
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.eq a' b', .bool))
@@ -270,9 +281,9 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       orElse
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.neq a' b', .bool))
         (do let (b', tb) ← compileTerm fuel b; let a' ← convertTerm fuel a tb; return (.neq a' b', .bool))
-    | .count xs t => do let (t', _) ← compileTerm fuel t; return (.count xs t', .ints)
-    | .max xs t => do let t' ← convertTerm fuel t .ints; return (.max xs t', .ints)
-    | .min xs t => do let t' ← convertTerm fuel t .ints; return (.min xs t', .ints)
+    | .count xs t => do warnJudgedBinders xs; let (t', _) ← compileTerm fuel t; return (.count xs t', .ints)
+    | .max xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.max xs t', .ints)
+    | .min xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.min xs t', .ints)
     | .when a c => do let (a', ta) ← compileTerm fuel a; let c' ← convertTerm fuel c .bool; return (.when a' c', ta)
     | .present t => do
       let (t', ty) ← compileTerm fuel t
@@ -289,8 +300,8 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       match ty with
       | .tagged _ => return (.enabled t', .bool)
       | _ => err "CHR015" s!"Enabled({t}) needs an instance, not {ty}"
-    | .exists_ xs t => do let t' ← convertTerm fuel t .bool; return (.exists_ xs t', .bool)
-    | .forall_ xs t => do let t' ← convertTerm fuel t .bool; return (.forall_ xs t', .bool)
+    | .exists_ xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .bool; return (.exists_ xs t', .bool)
+    | .forall_ xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .bool; return (.forall_ xs t', .bool)
     | .project t x => do
       let (t', ty) ← compileTerm fuel t
       match ty with
@@ -481,6 +492,7 @@ def compileSync (bound : List Var) (s : Sync) : Stc Sync := do
 def compileEffect' (mk : List Var → Term → Effect) (bound xs : List Var) (t : Term) : Stc Effect := do
   let (t', _) ← compileTerm termFuel t
   let fs ← freeVarsChecked t'
+  warnJudgedBinders (xs ++ diff fs (bound ++ xs))
   return mk (xs ++ diff fs (bound ++ xs)) t'
 
 def compileEffect (bound : List Var) : Effect → Stc Effect
@@ -498,10 +510,12 @@ def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Deriva
     let t' ← convertTerm termFuel t .bool
     let fs ← freeVarsChecked t'
     let unbound := diff fs bound
+    warnJudgedBinders unbound
     return .holdsWhen (if unbound.isEmpty then t' else .exists_ unbound t')
   | .dv xs t => do
     let t' ← convertTerm termFuel t (.tagged d)
     let fs ← freeVarsChecked t'
+    warnJudgedBinders (xs ++ diff fs xs)
     return .dv (xs ++ diff fs xs) t'
 
 /-- Every name in `as` must be a declared act (Charter's `Except under` and `Against`). -/
@@ -738,6 +752,7 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
     | .instQuery b xs t =>
       let fs ← freeVarsChecked t
       let (t', _) ← compileTerm termFuel t
+      warnJudgedBinders (xs ++ diff fs xs)
       return .instQuery b (xs ++ diff fs xs) t'
     | .decls ds => return .onlyDecls (← executeDecls ds)
     | .why t =>

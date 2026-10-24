@@ -5,6 +5,64 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-24 (later): D15 and D16 ruled and implemented — acts over a non-enumerable domain are judged per instance, CHR025, the `explore-domain` menu; `Duration * Int`
+
+## Where
+
+- `main`, pushed directly (landing rule of 2026-10-23). Two commits: D16 (`compileScale`, four
+  fixtures, the collateral pool's multiplied window), then D15 (the membership path, CHR025,
+  the explore menu, four fixtures, `entity-group` back to `Related to int`, the decision
+  entries, spec, tolerance ledger, this section). `tools/battery`: PASS on all ten steps (build, three gates, check 280 ok, sim 16/16 and 8/8, corpus 196/196 with 32 tolerated, spec 121/121, standard library 8/8) on the maintainer machine with the pinned toolchain, on the tree of the second commit, before the push.
+
+## What was done
+
+1. **D16, brief B12 (Eric: allow).** `Resolve.compileScale`: `Duration * Int`, `Int * Duration`,
+   `Duration / Int` are durations; `Duration * Duration`, `Time * …`, `Int / Duration` are
+   CHR012 with messages naming D16. Fixture `spec_009_2d_duration_times_int` seen failing
+   (14 CHR012) before the change; `2e`–`2g` are the refusals. `lib/collateral_pool.eflint`:
+   multipliers as `Param`s, `risk-factor`/`irreversibility-factor` derived per action (1 where
+   the class does not apply or the multiplier is below 1, the Lean `max 1`), one `commit` act,
+   `For base-observation-window * risk-factor.int * irreversibility-factor.int`. Spec 009.2,
+   010.2.
+2. **D15, brief B11 (Eric: (B) with two sharpenings, acts only).**
+   - `Spec.judgedAct` names the acts concerned (non-enumerable domain, has `Holds when`);
+     `Eval.isHolds` reads their clauses with the instance's components bound when no
+     assignment exists (assignment still wins, 004.3); `?why` says which path answered.
+     Fixture `spec_005_5b_act_with_int_component_judged_per_instance` (seen failing: 5 claims).
+   - **CHR025** (warning) at every binder site in Resolve (`Exists`/`Forall`/aggregates,
+     `Foreach` in effects and `Derived from`, free variables of a `Holds when`, `?-x()`): a binder
+     over a judged act sees only its assigned instances. Fixture `spec_004_7b`.
+   - **Explore menu.** `//! explore-domain: <type> = v, a..b, "s"` and `--explore-domain`
+     supply the candidates for a judged act's primitive components (`Explore.scopeJudged`).
+     Without a menu the search uses the values of that kind found in the state (*state-values*,
+     named in the output) and reports the act **unexplored** as a failed claim (`tag:
+     "unexplored"` in JSON). Fixtures `spec_013_2d_explore_menu` (the menu reaches the
+     violation) and `spec_013_2e_explore_without_menu_is_not_a_pass`. `entity-group` dropped its
+     `amount` parameter; its test carries `//! explore-domain: int = 0..12` and runs in 0.2 s
+     (was 3.3 s with the finite menu in the institution).
+   - Corpus baseline after the change: 196/196, 164 agree, 32 tolerated (all pre-existing);
+     CHR025 fires in no corpus file. The D15 tolerance row therefore names no files.
+   - Spec 004.1, 004.7, 005.5, 013.2, 018; `diagnostics.md` CHR025; `lib/README.md`.
+3. Decision entries `docs/meetings/2026-10-24-D15-…` and `…-D16-…` carry Eric's reasoning;
+   the briefs file marks both ruled; plan §9 and `docs/meetings/README.md` updated.
+
+## Notes for `prove` (013.4)
+
+The evaluator's agreement proof now has two paths for "holds": materialised (saturation) and
+membership (`isHolds` on a judged act). Both have to be covered; the membership path is the
+direct reading of 004.1 and is the easier of the two to state.
+
+## Next
+
+1. Eric rules B9 and B10.
+2. The kernel-oriented Core for `prove` (013.4), then `lib/lean/Modules/` proofs attached by
+   invariant name (D8).
+3. Phase 3's artifact format after B10.
+4. D15's reopen condition: a PSA clause needing `Holds when` on an `Int`-carrying fact with a
+   time condition (the stamp of an intensional fact is undefined).
+
+---
+
 # Handoff — 2026-10-24: Phase 2's seventh slice, the eight `lib/` modules as Charter programs (D8); two Resolve fixes
 
 ## Where

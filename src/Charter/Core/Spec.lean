@@ -253,6 +253,22 @@ def enumerableFuel (s : Spec) : Nat → Domain → Bool
 
 def enumerable (s : Spec) (dom : Domain) : Bool := s.enumerableFuel (s.decls.length + 1) dom
 
+/-- Charter (D15, brief B11): the `Holds when` clauses of an act whose domain is not
+enumerable. Such an act is never materialised by saturation; it is judged for the
+instance asked about (`Enabled`, `?lawful`, a performance), with its components bound.
+`none` for anything else: a fact, an enumerable act, or an act with no `Holds when`. -/
+def judgedAct (s : Spec) (d : DomId) : Option (List Term) :=
+  match s.findDecl d with
+  | some t =>
+    match t.kind with
+    | .act _ =>
+      if s.enumerable t.domain then none
+      else
+        let clauses := t.derivation.filterMap fun | .holdsWhen c => some c | _ => none
+        if clauses.isEmpty then none else some clauses
+    | _ => none
+  | none => none
+
 def kindOf (s : Spec) (d : DomId) : Option Kind := (s.findDecl d).map (·.kind)
 
 def triggerable (s : Spec) (d : DomId) : Bool :=

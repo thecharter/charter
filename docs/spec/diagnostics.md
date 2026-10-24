@@ -39,6 +39,7 @@ more errors); `warning` does not.
 | CHR022 | error | `Except under` or `Against` names something that is not an act | `Charter.Resolve` |
 | CHR023 | error | `Use` names no declared module, or gives the wrong number of arguments (D8) | `Charter.Resolve` |
 | CHR024 | error | a `Function` whose domain is not a product of exactly two components (003.7; eFLINT ignores its assignments silently) | `Charter.Resolve` |
+| CHR025 | warning | a binder over an act whose domain is not enumerable and that has a `Holds when`: it sees only the act's assigned instances, since the rule is judged per instance and never materialised (004.7, D15) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

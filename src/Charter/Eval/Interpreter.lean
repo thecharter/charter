@@ -320,7 +320,14 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
       | .ok tess =>
         let lines := tess.flatten.map fun te =>
           match state.lookup te with
-          | none => s!"{te}: no assignment and not derived{if spec.closedType te.2 == some false then " (open type: input is missing)" else " (closed type: does not hold)"}"
+          | none =>
+            match spec.judgedAct te.2 with
+            | some _ =>
+              -- D15: judged for this instance, never materialised
+              match run (isHolds M.fuel te) with
+              | .ok [true] => s!"{te}: holds; judged for this instance by its Holds when (D15: the domain of {te.2} is not enumerable, so no instance is materialised)"
+              | _ => s!"{te}: does not hold; its Holds when is false for this instance (D15: the domain of {te.2} is not enumerable, so no instance is materialised)"
+            | none => s!"{te}: no assignment and not derived{if spec.closedType te.2 == some false then " (open type: input is missing)" else " (closed type: does not hold)"}"
           | some i =>
             let holds := if i.live state.time then "holds" else if i.value then "expired" else "does not hold"
             let exp := match i.expiry with | some u => s!", until {u}" | none => ""
@@ -452,16 +459,94 @@ namespace Explore
 
 open M
 
+/-- D15: where the candidates for a component of a judged act (`Spec.judgedAct`) came
+from: the `explore-domain` menu, or the values of that kind found in the state (the
+named heuristic `state-values`, reported and never a passing claim on its own). -/
+inductive Source where
+  | menu
+  | stateValues
+  deriving Repr, BEq, Inhabited
+
+/-- One component of a judged act whose candidates had to be supplied: the act, the
+component's type, and where its candidates came from. -/
+structure Coverage where
+  act    : DomId
+  comp   : DomId
+  source : Source
+  deriving Repr, Inhabited
+
+/-- The menu for exploration: candidate values per type (D15, `//! explore-domain: t = …`). -/
+abbrev Menu := List (DomId × List Elem)
+
+/-- The primitive leaves of an element. -/
+partial def Elem.leaves : Elem → List Elem
+  | .prod xs => xs.flatMap (fun p => Elem.leaves p.1)
+  | e => [e]
+
+/-- The values of a primitive kind that occur anywhere in the instances that hold. -/
+def stateValues (s : State) (dom : Domain) : List Elem :=
+  let leaves := s.holdsList.flatMap (fun te => Elem.leaves te.1)
+  let wanted := leaves.filter fun e => match dom, e with
+    | .anyInt, .int _ | .time, .int _ | .duration, .int _ => true
+    | .anyString, .str _ => true
+    | _, _ => false
+  wanted.foldl (fun acc e => if acc.any (Elem.beq e) then acc else acc ++ [e]) []
+
+/-- Whether a component type of a judged act needs a menu: its domain is a primitive
+that cannot be listed. A product component with an `Int` inside ranges over what holds. -/
+def needsMenu (spec : Spec) (d : DomId) : Option Domain :=
+  match spec.findDecl d with
+  | some t => match t.domain with
+    | .anyInt | .anyString | .time | .duration => some t.domain
+    | _ => none
+  | none => none
+
+/-- The components of every judged act that need candidates, and where they come from
+under `menu`. -/
+def coverage (spec : Spec) (menu : Menu) : List Coverage :=
+  spec.decls.flatMap fun (p : DomId × TypeSpec) =>
+    match spec.judgedAct p.1 with
+    | none => []
+    | some _ => (spec.components p.1).filterMap fun x =>
+      let d := spec.removeDecoration x
+      match needsMenu spec d with
+      | none => none
+      | some _ => some ⟨p.1, d, if menu.any (·.1 == d) then .menu else .stateValues⟩
+
+/-- Bind each component of a judged act: an enumerable or product component as `scope`
+does, a primitive non-enumerable one over the menu's values for its type, else over the
+values of that kind in the state (D15). -/
+def scopeJudged (menu : Menu) : Nat → List Var → M Tagged → M Tagged
+  | 0, _, _ => err (.fuelExhausted "binding a judged act's components")
+  | _, [], m => m
+  | fuel + 1, x :: xs, m => do
+    let spec ← getSpec
+    let state ← getState
+    let d := spec.removeDecoration x
+    let te ← match needsMenu spec d with
+      | none => everyValidSubs fuel x
+      | some dom =>
+        let vals := match menu.find? (·.1 == d) with
+          | some (_, vs) => vs
+          | none => stateValues state dom
+        let te ← nd (vals.map fun e => ((e, d) : Tagged))
+        if ← isValidInstance fuel te then pure te else empty
+    bindVar x te (scopeJudged menu fuel xs m)
+
 /-- Every instance of every act type that is enabled in the configuration: the
-candidates for a next step under lawful behaviour. -/
-def enabledActs (cfg : Config) : Except RuntimeError (List Tagged) := do
+candidates for a next step under lawful behaviour. A judged act's candidates come from
+the menu or the state (D15). -/
+def enabledActs (menu : Menu) (cfg : Config) : Except RuntimeError (List Tagged) := do
   let spec := cfg.spec
   let acts := spec.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
     | .act _ => some p.1
     | _ => none
   acts.foldlM (fun acc d => do
     let xs := spec.components d
-    let m : M (List Tagged) := results (scope M.fuel xs (whenTagged (eval M.fuel (.app d (.named []))) pure))
+    let body : M Tagged := whenTagged (eval M.fuel (.app d (.named []))) pure
+    let m : M (List Tagged) := results (match spec.judgedAct d with
+      | some _ => scopeJudged menu M.fuel xs body
+      | none => scope M.fuel xs body)
     let insts ← (ignoreMissingInput m).run ⟨spec, cfg.state⟩ []
     let insts := insts.flatten
     let enabled ← insts.filterMapM fun te => do
@@ -492,8 +577,9 @@ def stateKey (s : State) : String :=
 
 /-- The outcome of an exploration. -/
 inductive Result where
-  /-- No invariant violated within the bound; how many distinct states were visited. -/
-  | safe (visited : Nat)
+  /-- No invariant violated within the bound; how many distinct states were visited, and
+  which judged acts' components were explored from a menu or from the state (D15). -/
+  | safe (visited : Nat) (cov : List Coverage)
   | violated (invariant : DomId) (trace : List Tagged) (visited : Nat)
   | error (e : RuntimeError)
 
@@ -501,22 +587,23 @@ inductive Result where
 visited states, returning the shortest violating trace. Deterministic: candidates
 are taken in declaration order, so the same program and depth always give the same
 answer (the "seed" of plan §2.2.7 is the declaration order). -/
-def bfs (cfg : Config) (depth cap : Nat) : Result :=
+def bfs (menu : Menu) (cfg : Config) (depth cap : Nat) : Result :=
+  let cov := coverage cfg.spec menu
   match violatedInvariants cfg with
   | d :: _ => .violated d [] 1
   | [] =>
     let rec go (frontier : List (Config × List Tagged)) (seen : List String) (fuel : Nat) : Result :=
       match fuel with
-      | 0 => .safe seen.length
+      | 0 => .safe seen.length cov
       | fuel + 1 =>
-        if frontier.isEmpty then .safe seen.length else
+        if frontier.isEmpty then .safe seen.length cov else
         -- expand the whole frontier one level
         let step := frontier.foldl (fun (acc : Except RuntimeError (List (Config × List Tagged) × List String × Option (DomId × List Tagged))) (c, trace) =>
           match acc with
           | .error e => .error e
           | .ok (next, seen, some v) => .ok (next, seen, some v)
           | .ok (next, seen, none) =>
-            match enabledActs c with
+            match enabledActs menu c with
             | .error e => .error e
             | .ok cands =>
               cands.foldl (fun acc te =>

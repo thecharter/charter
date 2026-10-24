@@ -6,14 +6,14 @@
 // `charter test --explore`; the Lean theorems are to be reattached by name under
 // lib/lean/ once `prove` can discharge them (spec 013.4, 015.5).
 //
-// Parameters: `group` (the group type), `member` (its members), `stakeholder` (holders
-// of shares in its founding ledger), and `amount`: the amounts an act may name. Ledgers
-// are `Int` facts, so a quantifier over them ranges over what holds (004.7); an act's
-// amount component must be enumerable for the act to be lawful by derivation (005.5,
-// 004.7), so the using program declares `amount` as a range (`Fact amount Identified by
-// 0..N`). This is the compromise of brief B11 (docs/meetings/2026-10-24-briefs-for-ruling.md).
+// Parameters: `group` (the group type), `member` (its members), and `stakeholder`
+// (holders of shares in its founding ledger). Ledgers are `Int` facts, so a quantifier
+// over them ranges over what holds (004.7). An act that names an amount is `Related to
+// int`: its lawfulness is judged for the instance performed or asked about (D15, 005.5),
+// and a program that explores it names the candidate amounts with
+// `//! explore-domain: int = 0..N` (013.2).
 
-Module entity-group(group, member, stakeholder, amount) {
+Module entity-group(group, member, stakeholder) {
 
   // ---- Ledgers (one value per member or stakeholder: Function replaces the old value)
   Function basis Identified by member * int             // qualified cost basis
@@ -34,21 +34,21 @@ Module entity-group(group, member, stakeholder, amount) {
   Fact amended Identified by group
 
   // ---- Intra-group carryover transfer: conserves basis and loss
-  Act transfer-carryover Actor member Recipient member' Related to amount
-    Holds when (Exists basis: basis.member == member && basis.int >= amount)
+  Act transfer-carryover Actor member Recipient member' Related to int
+    Holds when (Exists basis: basis.member == member && basis.int >= int)
     Valid when member != member'
-    Creates (Foreach basis: basis(member, basis.int - amount) When basis.member == member)
-          , (Foreach basis: basis(member', basis.int + amount) When basis.member == member')
+    Creates (Foreach basis: basis(member, basis.int - int) When basis.member == member)
+          , (Foreach basis: basis(member', basis.int + int) When basis.member == member')
 
-  Act transfer-loss Actor member Recipient member' Related to amount
-    Holds when (Exists loss: loss.member == member && loss.int >= amount)
+  Act transfer-loss Actor member Recipient member' Related to int
+    Holds when (Exists loss: loss.member == member && loss.int >= int)
     Valid when member != member'
-    Creates (Foreach loss: loss(member, loss.int - amount) When loss.member == member)
-          , (Foreach loss: loss(member', loss.int + amount) When loss.member == member')
+    Creates (Foreach loss: loss(member, loss.int - int) When loss.member == member)
+          , (Foreach loss: loss(member', loss.int + int) When loss.member == member')
 
   // ---- Basis inflation inside the group is never lawful, and is a breach of the duty
-  Act inflate-basis Actor member Related to amount
-    Creates (Foreach basis: basis(member, basis.int + amount) When basis.member == member)
+  Act inflate-basis Actor member Related to int
+    Creates (Foreach basis: basis(member, basis.int + int) When basis.member == member)
   Duty no-internal-basis-inflation Holder member Claimant group
     Violated when (Exists basis: basis.member == member && basis.int > total-basis)
 
@@ -65,16 +65,16 @@ Module entity-group(group, member, stakeholder, amount) {
     Creates amended(group)
 
   // ---- Targeted forfeiture touches the offender's share only
-  Act forfeit Actor group Recipient stakeholder Related to amount
+  Act forfeit Actor group Recipient stakeholder Related to int
     Holds when forfeiture-ground(stakeholder)
-    Creates (Foreach share: share(stakeholder, share.int - amount)
-               When share.stakeholder == stakeholder && share.int >= amount)
+    Creates (Foreach share: share(stakeholder, share.int - int)
+               When share.stakeholder == stakeholder && share.int >= int)
 
   // ---- Shared service subsidy, capped by the budget
-  Act claim-subsidy Actor member Related to amount
+  Act claim-subsidy Actor member Related to int
     Holds when True
-    Valid when Sum(Foreach claimed: claimed.int) + amount <= service-budget
-    Creates (Foreach claimed: claimed(member, claimed.int + amount) When claimed.member == member)
+    Valid when Sum(Foreach claimed: claimed.int) + int <= service-budget
+    Creates (Foreach claimed: claimed(member, claimed.int + int) When claimed.member == member)
 
   // ---- Properties (the Lean module's theorems, as checked invariants)
   Invariant basis-conserved When Sum(Foreach basis: basis.int) == total-basis

@@ -10,11 +10,11 @@
 |---|---|
 | `charter check <file.eflint> …` | resolve every phrase in order without evaluating; report diagnostics and, for a program with `Document`/`Clause`s, the Law 8 provenance checks (012) |
 | `charter run <file.eflint>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
-| `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`) |
+| `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`, `explore-domain`) |
 | `charter repl [file.eflint]` | load the file, then run phrases typed at `charter> ` (`:display`, `:help`, `:quit`) |
 | `charter trace <clause> <file.eflint>` | a clause's span table (012.9) |
 
-Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diagnostic`, `claim`, `transition`, `violation`, `fact`, `clock`, `why`, `scenario`, `summary`), `--eflint` (eFLINT's keyword set only, 002.9), `--explore N` (`run`, `test`). `test` also takes `--expect <outcomes>` and `--tolerate <tolerances.md>` for the corpus comparison (`test/eflint-corpus/README.md`).
+Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diagnostic`, `claim`, `transition`, `violation`, `fact`, `clock`, `why`, `scenario`, `summary`), `--eflint` (eFLINT's keyword set only, 002.9), `--explore N` and `--explore-domain "<type> = values"` (`run`, `test`; 013.2, D15). `test` also takes `--expect <outcomes>` and `--tolerate <tolerances.md>` for the corpus comparison (`test/eflint-corpus/README.md`).
 
 **18.3 Exit status.** `0` when every file passed; `1` when any failed; `2` for a usage error.
 

@@ -1,6 +1,6 @@
 # 005 — Acts, validity, effects
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 and D5; wording awaits Eric. Implementation: compliant, including 5.9 (`Valid when`, Phase 2's first construct, landed the same day).
+**Status:** draft (2026-10-23, 5.5 revised 2026-10-24 for D15). Meaning fixed by D2, D5 and D15; wording awaits Eric. Implementation: compliant, including 5.9 (`Valid when`, Phase 2's first construct, landed the same day).
 
 An act is a type whose instances are performed. Performing one is an event in the history and is judged by three independent answers (Law 2): it *occurred* (always, once performed: Law 1), it was *lawful* (eFLINT's *enabled*: the instance holds, its conditions hold, and nothing it syncs with is forced), and it was *valid* (it had institutional effect). In the eFLINT core every performed act is valid, so a disabled act still has its effects and the violation is reported, not enforced (D5).
 
@@ -12,7 +12,7 @@ An act is a type whose instances are performed. Performing one is an event in th
 
 **5.4 Binding.** Components of the act are bound to the performed instance's arguments while its effects, conditions, and syncs are evaluated; further free variables of an effect are bound to every valid instance (as `Foreach`). `test/spec/spec_005_4_foreach_effects.eflint`
 
-**5.5 Enabled.** An act instance is enabled when it holds (acts are facts: an act with no `Holds when` and no assignment is not enabled), its `Conditioned by` conditions hold, and no transition it syncs with is forced (008.2). `test/spec/spec_005_5_act_is_enabled_when_it_holds.eflint`
+**5.5 Enabled.** An act instance is enabled when it holds (acts are facts: an act with no `Holds when` and no assignment is not enabled), its `Conditioned by` conditions hold, and no transition it syncs with is forced (008.2). Whether an act whose domain is not enumerable (a component over `Int`, `String`, `Time`, `Duration`, or a product containing one) holds is judged for the instance asked about: its `Holds when` clauses are read with the components bound, by `Enabled(a(…))`, `?lawful a(…)`, and a performance; no instance is materialised, an assignment still beats the rule (004.3), and `?why` says which path answered (D15; Law 2: the event is given, so judging it never enumerates every event). `test/spec/spec_005_5_act_is_enabled_when_it_holds.eflint`, `spec_005_5b_act_with_int_component_judged_per_instance.eflint`
 
 **5.6 `Physical`.** A `Physical` act holds for every actor without being created (`Holds when True`), may be conditioned, and when performed while disabled is reported disabled but not violating. `test/spec/spec_005_6_physical_acts_hold.eflint`
 

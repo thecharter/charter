@@ -1,0 +1,9 @@
+// An exploration that meets an act whose domain is not enumerable and has no menu for it reports the act as unexplored and makes no passing claim (D15): the one failed claim here is that report, not a violation.
+//! explore: 1
+//! expect-failed-claims: 1
+Fact member Identified by Ann
+Var balance Identified by Int
+Act spend Actor member Related to int Holds when int > 0 Creates balance(balance - int)
+Invariant solvent When balance >= 0.
++balance(5).
+?solvent().

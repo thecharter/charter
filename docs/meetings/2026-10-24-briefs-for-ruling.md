@@ -7,6 +7,8 @@ edits named below under either ruling.
 
 ## B11. An act that names an amount is never lawful by derivation (blocks nothing today; decide before the PSA rewrite, Phase 3)
 
+**Ruled 2026-10-24: (B), with two sharpenings (what binders see is a warning, CHR025; the exploration menu is a test directive with a loud default); acts only. See D15.**
+
 **Finding.** `Act transfer Actor member Recipient member' Related to int Holds when (Exists
 basis: basis.member == member && basis.int >= int)` is never enabled. `Holds when` is a
 derivation over the act's domain (005.5, 004.1); `Int` is not enumerable, so a binder over
@@ -52,6 +54,8 @@ them by name (`settle-inflow Actor oracle Related to asset`).
 again, and add `Regime`/menu lines to `test/lib/entity_group_test.eflint` for exploration.
 
 ## B12. `Duration * Int` (blocks nothing; a D7 spelling)
+
+**Ruled 2026-10-24: allow `Duration * Int`, `Int * Duration`, `Duration / Int`; refuse the rest. See D16.**
 
 **Finding.** `Charter/Modules/CollateralPool.lean` scales an observation window
 multiplicatively, `base * max 1 domainMultiplier * max 1 irreversibilityMultiplier`. In

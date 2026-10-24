@@ -208,9 +208,19 @@ def isHolds : Nat → Tagged → M Bool
       match state.lookup te with
       | some i => pure (i.live state.time)
       | none =>
-        match spec.closedType te.2 with
-        | some false => err (.missingInput (.assignments [te]))
-        | _ => pure false
+        match spec.judgedAct te.2 with
+        | some clauses =>
+          -- D15 (brief B11): an act whose domain is not enumerable is judged for the
+          -- instance asked about; its `Holds when` is read with the components bound,
+          -- as saturation would have read it had the domain been finite (004.1, 005.5).
+          let tspec ← getTypeSpec te.2
+          withSubs (Tagged.bindings tspec.domain te) do
+            let rs ← results (do let c ← nd clauses; whenBool (eval fuel c) pure)
+            if rs.any id then satConditions fuel te else pure false
+        | none =>
+          match spec.closedType te.2 with
+          | some false => err (.missingInput (.assignments [te]))
+          | _ => pure false
 
 /-- Whether an act or event instance is enabled: it holds, its conditions hold,
 and no transition it syncs with is forced (eFLINT `is_enabled`). Charter's

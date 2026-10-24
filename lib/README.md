@@ -29,15 +29,17 @@ grammar (spec 011.10).
   nothing. A binder over a type whose components are all enumerable ranges over the whole
   domain; write the application form (`frozen(member, initiator)`) or say the instance holds
   (`filer && …`).
-- **An amount an act names is a type parameter.** An act with an `Int` component is never
-  lawful by derivation (004.7; brief B11). `entity-group` therefore takes `amount`, which the
-  program declares as a small range (`Fact units Identified by 0..12`); the ranges in
-  `test/lib/` are sized for `//! explore: 1` to run in seconds.
+- **An amount an act names is `Related to int`.** The act's lawfulness is judged for the
+  instance performed or asked about (D15, 005.5), so nothing is enumerated. A binder over
+  such an act sees only its assigned instances (CHR025); a module that needs "every
+  transfer so far" records them with an effect. A test that explores such an act names the
+  candidates with `//! explore-domain: int = 0..N` (013.2); without one the act is reported
+  unexplored and the exploration is not a pass.
 - **Minimum and maximum are conditional derivations.** `min(a, b)` is two `Derived from`
   clauses with `When a <= b` and `When b < a`; `Min(Foreach int'': …)` ranges over held `int`
   instances and so is empty.
-- **Durations add.** `Duration + Duration` is defined, `Duration * Int` is not (brief B12), so
-  windows are a base plus extensions.
+- **Durations add and scale.** `Duration + Duration`, `Duration * Int`, and `Duration / Int`
+  are durations (D16); a window the English scales is written `base * factor`.
 - **Every property is an `Invariant`** named for the Lean theorem it replaces, checked after
   every phrase and explored from every end state by `charter test`. Frame properties of
   acts are not state invariants and wait for `prove` (spec 013.4).

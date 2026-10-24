@@ -1,0 +1,6 @@
+// A binder over an act whose domain is not enumerable and that has a `Holds when` sees only the act's assigned instances, never the ones its rule would judge lawful (D15): CHR025 says so.
+//! expect-warning: CHR025
+Fact member Identified by Ann
+Act transfer Actor member Related to int Holds when int > 0
+Fact any-transfer Identified by member Holds when (Exists transfer: transfer.member == member).
+?!any-transfer(Ann).

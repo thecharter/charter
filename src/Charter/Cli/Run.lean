@@ -32,6 +32,8 @@ structure RunOpts where
   scenarios : Bool := false
   /-- Explore enabled acts from the end state up to this depth (0 = off); plan §2.2.7. -/
   explore   : Nat := 0
+  /-- D15: candidate values per type for the components of judged acts (`explore-domain`). -/
+  exploreMenu : Explore.Menu := []
 
 structure RunStats where
   phrases       : Nat := 0
@@ -140,20 +142,66 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       emit o (Json.mkObj [("kind", "fact"), ("change", Json.str ch), ("instance", Json.str te.pp)]) s!"  {ch}{te}"
   return stats
 
+/-- `t = v1, v2, a..b, "s"`: one `explore-domain` menu line (D15). -/
+def parseMenuLine (line : String) : Except String (DomId × List Elem) := do
+  match line.splitOn "=" with
+  | [lhs, rhs] =>
+    let d := lhs.trim
+    if d.isEmpty then throw s!"explore-domain: a type name is needed before `=` in `{line}`"
+    let items := (rhs.splitOn ",").map String.trim |>.filter (!·.isEmpty)
+    if items.isEmpty then throw s!"explore-domain: no values after `=` in `{line}`"
+    let vals ← items.mapM fun it => do
+      if it.startsWith "\"" && it.endsWith "\"" && it.length >= 2 then
+        pure [Elem.str ((it.drop 1).dropRight 1)]
+      else match it.splitOn ".." with
+        | [a, b] =>
+          match a.trim.toInt?, b.trim.toInt? with
+          | some lo, some hi =>
+            if hi < lo then throw s!"explore-domain: empty range `{it}`"
+            else pure ((List.range (hi - lo + 1).toNat).map fun (k : Nat) => Elem.int (lo + (k : Int)))
+          | _, _ => throw s!"explore-domain: `{it}` is not a range of integers"
+        | [a] => match a.toInt? with
+          | some i => pure [Elem.int i]
+          | none => throw s!"explore-domain: `{it}` is not an integer, a range, or a quoted string"
+        | _ => throw s!"explore-domain: `{it}` is not a range"
+    pure (d, vals.flatten)
+  | _ => throw s!"explore-domain: expected `type = values`, got `{line}`"
+
+def ppElem : Elem → String
+  | .int i => toString i
+  | .str s => s!"\"{s}\""
+  | .prod _ => "(…)"
+
 /-- Explore from a configuration (plan §2.2.7): a violated invariant within the depth
-is a failed claim whose text is the shortest trace. -/
+is a failed claim whose text is the shortest trace. D15: a judged act whose component
+had no menu is reported as unexplored, and the claim is then not a pass. -/
 def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats) : IO RunStats := do
   if o.explore == 0 || cfg.spec.invariants.isEmpty then return stats
-  match Explore.bfs cfg o.explore 5000 with
+  match Explore.bfs o.exploreMenu cfg o.explore 5000 with
   | .error e =>
     let d := Diagnostic.error e.code e.message
     emit o (diagJson d) d.render (toErr := true)
     return { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
-  | .safe n =>
-    let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool true),
-      ("depth", Json.num o.explore), ("states", Json.num n)]
-    if !o.testMode || o.json then emit o j s!"{where_}: explore: no invariant violated within {o.explore} step(s) ({n} states)"
-    return stats
+  | .safe n cov =>
+    let covJson := Json.arr (cov.map fun c => Json.mkObj [("act", Json.str c.act), ("component", Json.str c.comp),
+      ("candidates", Json.str (match c.source with | .menu => "menu" | .stateValues => "state-values"))]).toArray
+    let unexplored := cov.filter (·.source == .stateValues)
+    let fromMenu := cov.filter (·.source == .menu)
+    let menuNote := if fromMenu.isEmpty then "" else
+      s!"; candidates from the menu for {", ".intercalate ((fromMenu.map (·.comp)).eraseDups)}"
+    if unexplored.isEmpty then
+      let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool true),
+        ("depth", Json.num o.explore), ("states", Json.num n), ("coverage", covJson)]
+      if !o.testMode || o.json then emit o j s!"{where_}: explore: no invariant violated within {o.explore} step(s) ({n} states{menuNote})"
+      return stats
+    else
+      let tried := unexplored.map fun c =>
+        let vals := Explore.stateValues cfg.state ((Explore.needsMenu cfg.spec c.comp).getD .anyInt)
+        s!"{c.act} ({c.comp}: tried the state's values {if vals.isEmpty then "(none)" else ", ".intercalate (vals.map ppElem)})"
+      let j := Json.mkObj [("kind", "claim"), ("tag", "unexplored"), ("about", "invariants"), ("result", Json.bool false),
+        ("depth", Json.num o.explore), ("states", Json.num n), ("coverage", covJson)]
+      emit o j s!"{where_}: explore: incomplete: no invariant violated within {o.explore} step(s) ({n} states{menuNote}), but no menu names the candidates for {", ".intercalate tried}; add `//! explore-domain: {(unexplored.head!).comp} = …` (D15)"
+      return { stats with failedQueries := stats.failedQueries + 1 }
   | .violated d trace n =>
     let traceS := ", ".intercalate (trace.map Tagged.pp)
     let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool false),
@@ -237,6 +285,7 @@ structure RunFlags where
   json    : Bool := false
   eflint  : Bool := false
   explore : Nat := 0
+  exploreMenu : Explore.Menu := []
   rest    : List String := []
 
 def takeFlags (args : List String) : Except String RunFlags :=
@@ -251,6 +300,10 @@ def takeFlags (args : List String) : Except String RunFlags :=
       | some k => go rest { f with explore := k }
       | none => .error s!"--explore needs a depth, not {n}"
     | ["--explore"], _ => .error "--explore needs a depth"
+    | "--explore-domain" :: m :: rest, f => match parseMenuLine m with
+      | .ok entry => go rest { f with exploreMenu := f.exploreMenu ++ [entry] }
+      | .error e => .error e
+    | ["--explore-domain"], _ => .error "--explore-domain needs `type = values`"
     | a :: rest, f => go rest { f with rest := a :: f.rest }
   go args {}
 
@@ -262,13 +315,13 @@ def summaryJson (stats : RunStats) : Json :=
 def runCommand (args : List String) : IO UInt32 := do
   match takeFlags args with
   | .error e => IO.eprintln s!"charter run: {e}"; return 2
-  | .ok { json, eflint, explore, rest := [f] } =>
-    let stats ← runProgram { json, eflint, explore } f
+  | .ok { json, eflint, explore, exploreMenu, rest := [f] } =>
+    let stats ← runProgram { json, eflint, explore, exploreMenu } f
     if json then IO.println (summaryJson stats).compress
     else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
     return (if stats.ok then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--explore <depth>]"
+    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--explore <depth>] [--explore-domain \"type = values\"]"
     return 2
 
 /-- `charter check <file.eflint> ... [--out json] [--eflint]`: resolve every phrase in

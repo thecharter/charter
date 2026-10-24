@@ -20,7 +20,10 @@ anywhere in the file:
   (queries, expectations, or provenance checks) and no error is reported;
 - `//! explore: N` — explore enabled acts to depth `N` from the file's end state and
   each scenario's (plan §2.2.7); a violated invariant is a failed claim. `--explore N`
-  on the command line sets the depth for every file without the directive.
+  on the command line sets the depth for every file without the directive;
+- `//! explore-domain: <type> = v, a..b, "s"` — the candidates for a component of an act
+  whose domain is not enumerable (D15, spec 013.2); without one such an act is reported
+  unexplored and that report is a failed claim. `--explore-domain "<type> = …"` adds to it.
 
 With `--expect <file>`, each file's outcome is compared with the outcome recorded
 there (lines `ok   <path>` / `FAIL <path>`, the format this command prints, which
@@ -91,6 +94,10 @@ structure Directives where
   expectFailedClaims : Option Nat := none
   /-- `//! explore: N`: explore enabled acts to depth N from the end states. -/
   explore        : Option Nat := none
+  /-- `//! explore-domain: t = v, a..b, "s"`: the candidates for a judged act's component (D15). -/
+  exploreMenu    : Explore.Menu := []
+  /-- A malformed `explore-domain` line, reported as CHR001 against the file. -/
+  menuErrors     : List String := []
 
 def readDirectives (src : String) : Directives :=
   src.splitOn "\n" |>.foldl (fun d line =>
@@ -102,6 +109,10 @@ def readDirectives (src : String) : Directives :=
       else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
       else if body.startsWith "expect-failed-claims:" then { d with expectFailedClaims := (body.drop 21).trim.toNat? }
       else if body.startsWith "explore:" then { d with explore := (body.drop 8).trim.toNat? }
+      else if body.startsWith "explore-domain:" then
+        match parseMenuLine (body.drop 15).trim with
+        | .ok entry => { d with exploreMenu := d.exploreMenu ++ [entry] }
+        | .error e => { d with menuErrors := d.menuErrors ++ [e] }
       else d
     else d) {}
 
@@ -149,7 +160,11 @@ def testCommand (args : List String) : IO UInt32 := do
     let src ← IO.FS.readFile f
     let d := readDirectives src
     let depth := d.explore.getD fl.explore
-    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, explore := depth } f
+    for e in d.menuErrors do
+      IO.eprintln s!"{f}: error CHR001: {e}"
+    let menu := d.exploreMenu ++ fl.exploreMenu
+    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, explore := depth, exploreMenu := menu } f
+    let stats := if d.menuErrors.isEmpty then stats else { stats with errors := stats.errors + d.menuErrors.length }
     let (outcome, why) := verdict d stats
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)
