@@ -5,6 +5,54 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-24 (night): guardrails for kernel experiments after a crash; the evaluator made structurally recursive, and the first kernel decision of a Charter program
+
+## Where
+
+- `main`, pushed directly. Two commits: `tools/kernel-probe` with the AGENTS.md rule, then
+  the evaluator change with spec 013.4's finding and this section. `tools/battery`:
+  PASS on all ten steps (build, three gates, check 280 ok, sim 16/16 and 8/8, corpus 196/196 with 32 tolerated, spec 121/121, standard library 8/8) on the maintainer machine with the pinned toolchain, on the tree of the second commit, before the push.
+
+## The incident, and the guardrail
+
+Five kernel-decision probes (`by decide` on the evaluator with `maxHeartbeats 4000000`,
+`maxRecDepth 100000`, no memory limit) were run in parallel in the background; together
+they took 128 GB and crashed Eric's machine. **Rule (AGENTS.md, "Working efficiently"):**
+any ad-hoc `lean` run that may reduce an unbounded term goes through
+`tools/kernel-probe FILE.lean [--mem MB] [--time S]`: Lean's own `--memory` cap plus a
+resident-size watchdog over the whole process tree (`timeout` → `lake` → `lean`, polled
+every 0.25 s), a wall-time cap, and a run lock so probes never overlap. Defaults 6 GB /
+300 s, memory never above 16 GB. Verified: a held 2.3 GB allocation killed under a 512 MB
+cap within a second; a kernel decision that reached 4.5 GB killed under a 4 GB cap; a
+60 s sleep killed by a 5 s cap.
+
+## What was found (the kernel finding of 013.4, cause located)
+
+1. `Charter.M.eval` and its mutual block were compiled by **well-founded recursion**
+   (`#print M.eval` showed `@[irreducible] … instantiateDomain._mutual`), which the kernel
+   never unfolds, so `decide` got *stuck*, not slow. Cause: `foreach`/`scope` were
+   polymorphic (`{α : Type}`) inside the block, which makes `brecOn`'s motive ill-typed.
+   Fix: `scopeWith`/`foreachWith` outside the block, parameterised by the binder
+   (`everyValidSubs fuel`); the block now carries `termination_by structural n => n` on
+   every function and `#print M.eval` shows `Nat.brecOn`. `foreach`/`scope` remain as
+   wrappers for the Interpreter. Spec 121/121 and lib 8/8 unchanged.
+2. Measured (through the probe tool after the crash): parsing the three-phrase text in the
+   kernel exceeds 180 s, so `prove`'s generator must embed **parsed items as data**, never
+   text; resolving a declaration decides in 0.2 s; the create phrase's `semPhrase` is where
+   the remaining time goes; the whole three-phrase program from parsed items decided in
+   about 200 s of wall time (170 s CPU) with no error, the first kernel decision of a
+   Charter program.
+
+## Next
+
+1. Locate the create phrase's kernel cost (candidates: `M.fuel = 100000` through
+   `Nat.brecOn`, `Store.union`, string comparisons on `DomId`), one capped probe at a time;
+   then interning names to `Nat` if strings dominate (013.4).
+2. `Prove.LeanGen`: embed items as data, one theorem per invariant and expectation.
+3. Eric rules B9 and B10; Phase 3's artifact format after B10.
+
+---
+
 # Handoff — 2026-10-24 (later): D15 and D16 ruled and implemented — acts over a non-enumerable domain are judged per instance, CHR025, the `explore-domain` menu; `Duration * Int`
 
 ## Where

@@ -127,6 +127,18 @@ def indexOf (x : Var) (rs : List Var) : Option Nat :=
     | r :: rs, k => if r == x then some k else go rs (k + 1)
   go rs 0
 
+/-- Bind each variable in turn with `bind` and run `m` (eFLINT `foreach`). Outside the
+evaluator's mutual block so that the block stays polymorphism-free and structurally
+recursive on its fuel: the kernel can then unfold it (`prove`, 013.4). -/
+def scopeWith {α} (bind : Var → M Tagged) : List Var → M α → M α
+  | [], m => m
+  | x :: xs, m => do
+    let te ← bind x
+    bindVar x te (scopeWith bind xs m)
+
+def foreachWith {α} (bind : Var → M Tagged) (xs : List Var) (m : M α) : M (List α) :=
+  results (scopeWith bind xs m)
+
 mutual
 
 /-- Every element of a domain (eFLINT `instantiate_domain`). -/
@@ -143,6 +155,7 @@ def instantiateDomain : Nat → DomId → Domain → M Elem
     | .products xs => do
       let args ← xs.mapM (everyValidSubs fuel)
       pure (.prod args)
+termination_by structural n => n
 
 /-- Every instance a variable may be bound to: all elements of an enumerable
 domain that pass the domain constraint, or the instances known to hold of a
@@ -164,6 +177,7 @@ def everyValidSubs : Nat → Var → M Tagged
       match spec.closedType d with
       | some false => if trues.isEmpty && falses.isEmpty then err (.missingInput (.instances d)) else nd trues
       | _ => nd trues
+termination_by structural n => n
 
 /-- Whether an instance is well-formed: in its domain and passing the constraint. -/
 def isValidInstance : Nat → Tagged → M Bool
@@ -184,6 +198,7 @@ def isValidInstance : Nat → Tagged → M Bool
         if oks.all id then check else pure false
       else pure false
     | _, _ => pure false
+termination_by structural n => n
 
 /-- Whether the `Conditioned by` conditions of an instance's type hold for it. -/
 def satConditions : Nat → Tagged → M Bool
@@ -195,6 +210,7 @@ def satConditions : Nat → Tagged → M Bool
       withSubs (Tagged.bindings tspec.domain te) do
         let bs ← tspec.conditions.mapM (fun c => whenBool (eval fuel c) pure)
         pure (bs.all id)
+termination_by structural n => n
 
 /-- Whether an instance holds (eFLINT `is_holds`): its assignment, or false for a
 closed type, or missing input for an open one. -/
@@ -221,6 +237,7 @@ def isHolds : Nat → Tagged → M Bool
           match spec.closedType te.2 with
           | some false => err (.missingInput (.assignments [te]))
           | _ => pure false
+termination_by structural n => n
 
 /-- Whether an act or event instance is enabled: it holds, its conditions hold,
 and no transition it syncs with is forced (eFLINT `is_enabled`). Charter's
@@ -238,7 +255,7 @@ def isEnabled : Nat → Tagged → M Bool
           let subs ← getSubs
           let rs ← a.exceptUnder.mapM fun d' => do
             let free := (spec.components d').filter (fun x => !(subs.any (fun p => p.1 == x)))
-            let insts ← results (scope fuel free (whenTagged (eval fuel (.app d' (.named []))) pure))
+            let insts ← results (scopeWith (everyValidSubs fuel) free (whenTagged (eval fuel (.app d' (.named []))) pure))
             let oks ← insts.mapM fun inst => do
               if ← isEnabled fuel inst then isValid fuel inst else pure false
             pure (oks.any id)
@@ -252,6 +269,7 @@ def isEnabled : Nat → Tagged → M Bool
     | _ =>
       if !(← isHolds fuel te) then pure false
       else satConditions fuel te
+termination_by structural n => n
 
 /-- Charter (D5, plan §2.2.1–2): whether performing an act instance has institutional
 effect: every `Valid when` condition holds and no immunity protects its recipient. An
@@ -271,6 +289,7 @@ def isValid : Nat → Tagged → M Bool
           pure (!blocked)
         | _, _ => pure true
     | _ => pure true
+termination_by structural n => n
 
 /-- Whether some immunity instance that holds protects `party` against the act `act`:
 its holder is `party`, `act` is in its `Against`, and none of its `Unless` conditions hold. -/
@@ -295,6 +314,7 @@ def immunityBlocks : Nat → DomId → Tagged → M Bool
         | _ => pure false
       pure (bs.any id)
     pure (rs.any id)
+termination_by structural n => n
 
 def evalViolationCondition : Nat → Tagged → Option (List Term) → M Bool
   | 0, _, _ => err (.fuelExhausted "checking a violation condition")
@@ -302,24 +322,14 @@ def evalViolationCondition : Nat → Tagged → Option (List Term) → M Bool
     let (dom, _) ← getDom te.2
     let cond := (mconds.getD []).foldr Term.or (.boolLit false)
     withSubs (Tagged.bindings dom te) (whenBool (eval fuel cond) pure)
+termination_by structural n => n
 
 def isViolated : Nat → Tagged → M Bool
   | 0, _ => err (.fuelExhausted "deciding whether a duty is violated")
   | fuel + 1, te => do
     if !(← isHolds fuel te) then pure false
     else evalViolationCondition fuel te ((← getSpec).findViolationCond te.2)
-
-/-- Bind each variable in turn to every valid instance and run `m` (eFLINT `foreach`). -/
-def foreach {α} : Nat → List Var → M α → M (List α)
-  | 0, _, _ => err (.fuelExhausted "iterating a Foreach")
-  | fuel + 1, xs, m => results (scope fuel xs m)
-
-def scope {α} : Nat → List Var → M α → M α
-  | 0, _, _ => err (.fuelExhausted "iterating a Foreach")
-  | _, [], m => m
-  | fuel + 1, x :: xs, m => do
-    let te ← everyValidSubs fuel x
-    bindVar x te (scope fuel xs m)
+termination_by structural n => n
 
 /-- What triggering an act or event instance does (eFLINT `instantiate_trans'`),
 with `done` guarding sync cycles. -/
@@ -354,23 +364,26 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
         let valid ← isValid fuel te
         doTransition actor valid a.effects a.syncs a.physical
       | .event e => doTransition none true e.effects e.syncs true
+termination_by structural n => n
 
 def evalSync : Nat → List Tagged → Sync → M (List TransInfo)
   | 0, _, _ => err (.fuelExhausted "evaluating a sync")
-  | fuel + 1, done, s => foreach fuel s.xs (whenTagged (eval fuel s.t) (instantiateTrans fuel done))
+  | fuel + 1, done, s => foreachWith (everyValidSubs fuel) s.xs (whenTagged (eval fuel s.t) (instantiateTrans fuel done))
+termination_by structural n => n
 
 def evalEffect : Nat → Effect → M Store
   | 0, _ => err (.fuelExhausted "evaluating an effect")
   | fuel + 1, e => do
     match e with
-    | .cAll xs t none => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none none))
+    | .cAll xs t none => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none none))
     | .cAll xs t (some d) =>
       -- D7: `Creates e For d` stamps the instances with the expiry now + d
       let now ← getTime
-      let pairs ← foreach fuel xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
+      let pairs ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
       pure (pairs.map fun (te, u) => (te, .holdsTrue (some u) none))
-    | .tAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse none))
-    | .oAll xs t => let tes ← foreach fuel xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
+    | .tAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse none))
+    | .oAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
+termination_by structural n => n
 
 /-- Evaluate a checked term to its values (eFLINT `eval`). -/
 def eval : Nat → Term → M Value
@@ -415,13 +428,13 @@ def eval : Nat → Term → M Value
     | .add a b => whenInt (eval fuel a) (fun x => whenInt (eval fuel b) (fun y => pure (.int (x + y))))
     | .eq a b => do let x ← eval fuel a; let y ← eval fuel b; pure (.bool (x == y))
     | .neq a b => do let x ← eval fuel a; let y ← eval fuel b; pure (.bool (!(x == y)))
-    | .sum xs t => do let is ← foreach fuel xs (whenInt (eval fuel t) pure); pure (.int (is.foldl (· + ·) 0))
-    | .count xs t => do let vs ← foreach fuel xs (eval fuel t); pure (.int vs.length)
+    | .sum xs t => do let is ← foreachWith (everyValidSubs fuel) xs (whenInt (eval fuel t) pure); pure (.int (is.foldl (· + ·) 0))
+    | .count xs t => do let vs ← foreachWith (everyValidSubs fuel) xs (eval fuel t); pure (.int vs.length)
     | .max xs t => do
-      let is ← foreach fuel xs (whenInt (eval fuel t) pure)
+      let is ← foreachWith (everyValidSubs fuel) xs (whenInt (eval fuel t) pure)
       pure (.int (match is with | [] => 0 | i :: rest => rest.foldl max i))
     | .min xs t => do
-      let is ← foreach fuel xs (whenInt (eval fuel t) pure)
+      let is ← foreachWith (everyValidSubs fuel) xs (whenInt (eval fuel t) pure)
       pure (.int (match is with | [] => 0 | i :: rest => rest.foldl min i))
     | .when t c => do
       let v ← eval fuel t
@@ -438,10 +451,10 @@ def eval : Nat → Term → M Value
     | .violated t => whenTagged (eval fuel t) (fun te => .bool <$> isViolated fuel te)
     | .enabled t => whenTagged (eval fuel t) (fun te => .bool <$> isEnabled fuel te)
     | .exists_ xs t => do
-      let rs ← results (scope fuel xs (checkTrue (eval fuel t)))
+      let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)
     | .forall_ xs t => do
-      let bs ← results (scope fuel xs (whenBool (eval fuel t) pure))
+      let bs ← results (scopeWith (everyValidSubs fuel) xs (whenBool (eval fuel t) pure))
       pure (.bool (bs.all id))
     | .project t x => whenTagged (eval fuel t) (fun te => do
         match te.1 with
@@ -460,6 +473,11 @@ def eval : Nat → Term → M Value
         | _ => empty)
 
 end
+
+/-- Bind each variable in turn to every valid instance and run `m` (eFLINT `foreach`). -/
+def foreach {α} (fuel : Nat) (xs : List Var) (m : M α) : M (List α) := foreachWith (everyValidSubs fuel) xs m
+
+def scope {α} (fuel : Nat) (xs : List Var) (m : M α) : M α := scopeWith (everyValidSubs fuel) xs m
 
 /-- Fuel for one evaluation: bounds nesting depth, not total work. -/
 def fuel : Nat := 100000
