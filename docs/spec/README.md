@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-25 (3) — `Examples/Tenancy/` (plan §4, §8): the toy program and its document, one clause per Phase 2 addition, six clauses approved, seven scenarios, explored invariants; battery step `examples`.
 - 2026-10-25 (2) — 007.3 duty precedence: `Duty d … Overridden by d'` (shared components, declared, one level); CHR026. 123 conformance tests.
 - 2026-10-25 — `charter prove` is a checkpointed chain (013.4, ruled by Eric): one kernel theorem per phrase, closed by `kernel_rfl`, memory bounded by a phrase; whole `lib/` tests decide under the default cap. A failing step names the phrase the kernel disagrees about (Law 9). `test/prove/scenario.eflint`.
 - 2026-10-24 (night) — `charter prove` lands as Phase 2's maintainer tool (013.3, 013.4, 018.2): the generator embeds phrases as data, one kernel decision per program with `decide +kernel`, one *decided* claim per theorem, capped; `test/prove/`. The evaluator depends on no axiom. Measured limit recorded in 013.4.

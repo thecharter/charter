@@ -1,0 +1,197 @@
+// The tenancy agreement (Examples/Tenancy/tenancy.md), the toy the spec and the tests use
+// (plan §4, §8). Every Phase 2 addition to the language is exercised by the clause that
+// needs it: clauses and provenance (012), `Param` (014), time (009: the clock, `Held … For`,
+// `Due within`, `Creates … For`), `Valid when` (005.9), `Immunity` (007.4), `Except under`
+// (007.2), `Overridden by` (007.3), `Module`/`Use` (015), `Invariant` with exploration
+// (013), `Scenario` and the claims `?lawful`/`?valid`/`?violated` (011.11), and `?why`
+// (004.10). `charter check` runs the provenance checks; `charter test` runs the scenarios
+// and explores the invariants; `charter prove` decides every claim.
+//! explore: 2
+//! explore-domain: int = 0, 1000, 1100, 2000, 2001, 3000
+Document "tenancy.md"
+
+// ---- Parties and parameters
+Fact tenant Identified by Tess
+Fact landlord Identified by Lou
+Fact premises Identified by Flat
+
+Param rent = 1000
+Param rent-window : Duration = 5
+Param notice-window : Duration = 1
+Param deposit-cap-months = 2
+Param repair-window : Duration = 7
+Param review-notice : Duration = 30
+
+// ---- T.1 Rent: a duty created when rent falls due, discharged by payment, breached by delay
+Event rent-falls-due Related to tenant, landlord
+Act pay-rent Actor tenant Recipient landlord Holds when True
+Duty rent-due Holder tenant Claimant landlord
+  Created by rent-falls-due
+  Terminated by pay-rent
+  Due within rent-window
+  From T.1 "The tenant pays the rent within five days of the first of each month."
+
+// ---- T.2 and T.3 Entry: notice or emergency makes it lawful; notice or emergency makes it effective
+Fact noticed Identified by tenant
+Fact emergency Identified by premises
+Act give-notice Actor landlord Recipient tenant Holds when True Creates noticed(tenant)
+Act entry-with-notice Actor landlord Recipient tenant Holds when Held(noticed(tenant)) For notice-window
+  From T.2 "The landlord may enter the premises after giving the tenant one day's notice."
+Act emergency-entry Actor landlord Recipient tenant Holds when emergency(Flat)
+  From T.2 "The landlord may also enter without notice to deal with an emergency."
+Act enter Actor landlord Recipient tenant Except under entry-with-notice, emergency-entry
+  From T.2 "An entry with neither notice nor emergency is a breach."
+Immunity quiet-enjoyment Holder tenant Against enter
+  Unless Held(noticed(tenant)) For notice-window, emergency(Flat)
+  From T.3 "an entry the tenant was not given notice of has no effect on the tenant's rights, unless an emergency is in progress."
+
+// ---- T.4 Deposit: a module, instantiated for this landlord and tenant
+Module trust-deposit(holder, beneficiary) {
+  Function deposit Identified by beneficiary * int
+  Param cap = 0
+  Act take-deposit Actor holder Recipient beneficiary Related to int
+    Holds when int > 0
+    Valid when int <= cap
+    Creates deposit(beneficiary, int)
+  Act return-excess Actor holder Recipient beneficiary
+    Holds when (Exists deposit: deposit.beneficiary == beneficiary && deposit.int > cap)
+    Creates (Foreach deposit: deposit(beneficiary, cap) When deposit.beneficiary == beneficiary)
+  Invariant deposit-within-cap When (Forall deposit: deposit.int <= cap)
+}
+Use trust-deposit(landlord, tenant) As td
+Extend Act td-take-deposit From T.4 "The landlord holds the deposit in trust for the tenant."
+Extend Act td-return-excess From T.4 "A deposit taken above that amount is void and the excess is returned."
+Extend Fact td-deposit-within-cap From T.4 "The deposit never exceeds two months' rent."
+
+// ---- T.5 Repairs: a deadline duty, suspended while an emergency repair is under way
+Fact defect Identified by Leak, Fuse
+Event report-defect Related to landlord, tenant, defect
+Act repair Actor landlord Recipient tenant Related to defect Holds when True
+Duty repair-due Holder landlord Claimant tenant Related to defect
+  Created by report-defect
+  Terminated by repair
+  Due within repair-window
+  Overridden by emergency-repair
+  From T.5 "The landlord repairs any defect the tenant has reported within seven days of the report."
+Duty emergency-repair Holder landlord Claimant tenant
+  From T.5 "While an emergency repair of the premises is under way, the ordinary repair duty is suspended."
+
+// ---- T.6 Rent review: an amendment of a parameter, valid only after thirty days' notice
+Fact review-noticed Identified by tenant
+Act notify-review Actor landlord Recipient tenant Holds when True Creates review-noticed(tenant)
+Act change-rent Actor landlord Recipient tenant Related to int
+  Holds when int > 0
+  Valid when Held(review-noticed(tenant)) For review-notice
+  Creates rent(int)
+  From T.6 "The rent may be changed only by a review the tenant was notified of thirty days in advance."
+Invariant rent-positive When rent > 0
+Extend Fact rent-positive From T.1 "The amount of the rent is fixed at the start of the tenancy and changes only by review under T.6."
+
+// ---- The clauses, their registers, and the rules each span means
+Clause T.1 Approved 15712184425892403623
+  Norm "The tenant pays the rent within five days of the first of each month." => rent-due, pay-rent
+  Definition " Rent not paid within those five days is in arrears." => rent-due
+  Norm " The amount of the rent is fixed at the start of the tenancy and changes only by review under T.6." => change-rent
+Clause T.2 Approved 15873163296628407514
+  Norm "The landlord may enter the premises after giving the tenant one day's notice." => entry-with-notice, give-notice
+  Norm " The landlord may also enter without notice to deal with an emergency." => emergency-entry
+  Norm " An entry with neither notice nor emergency is a breach." => enter
+Clause T.3 Approved 3664202125157082975
+  Definition "The tenant is entitled to quiet enjoyment of the premises: "
+  Norm "an entry the tenant was not given notice of has no effect on the tenant's rights, unless an emergency is in progress." => quiet-enjoyment
+Clause T.4 Approved 17590845497843624049
+  Norm "The landlord holds the deposit in trust for the tenant." => td-take-deposit
+  Invariant " The deposit never exceeds two months' rent." => td-deposit-within-cap
+  Norm " A deposit taken above that amount is void and the excess is returned." => td-return-excess, td-take-deposit
+Clause T.5 Approved 235917821464054547
+  Norm "The landlord repairs any defect the tenant has reported within seven days of the report." => repair-due, repair
+  Norm " While an emergency repair of the premises is under way, the ordinary repair duty is suspended." => emergency-repair
+Clause T.6 Approved 17522972544613794594
+  Norm "The rent may be changed only by a review the tenant was notified of thirty days in advance." => change-rent, notify-review
+  Norm " A change without that notice has no effect." => change-rent
+.
+
+// ---- Genesis
++td-cap(2000). +quiet-enjoyment(Tess).
+td-take-deposit(Lou, Tess, 2000).
+?td-deposit(Tess, 2000).
+?td-deposit-within-cap(). ?rent-positive().
+?why td-deposit(Tess, 2000).
+
+Scenario rent-paid-in-time {
+  rent-falls-due(Tess, Lou).
+  ?rent-due(Tess, Lou). ?!violated rent-due(Tess, Lou).
+  @ 4.
+  ?!violated rent-due(Tess, Lou).
+  pay-rent(Tess, Lou).
+  ?!rent-due(Tess, Lou).
+  @ 5.
+  ?!violated rent-due(Tess, Lou).
+}
+
+Scenario rent-in-arrears {
+  rent-falls-due(Tess, Lou).
+  @ 5.
+  ?violated rent-due(Tess, Lou).
+  pay-rent(Tess, Lou).
+  ?!rent-due(Tess, Lou).
+}
+
+Scenario entry-needs-notice-or-emergency {
+  ?!lawful enter(Lou, Tess).
+  ?!valid enter(Lou, Tess).
+  give-notice(Lou, Tess).
+  ?!lawful enter(Lou, Tess).                 // notice given today is not a day's notice
+  tick.
+  ?lawful enter(Lou, Tess).
+  ?valid enter(Lou, Tess).
+  enter(Lou, Tess).
+}
+
+Scenario emergency-entry-is-lawful-and-effective {
+  ?!lawful enter(Lou, Tess).
+  +emergency(Flat).
+  ?lawful enter(Lou, Tess).
+  ?valid enter(Lou, Tess).
+  -emergency(Flat).
+  ?!lawful enter(Lou, Tess).
+  ?!valid enter(Lou, Tess).
+}
+
+Scenario deposit-is-capped {
+  ?!valid td-take-deposit(Lou, Tess, 3000).
+  ?lawful td-take-deposit(Lou, Tess, 3000).
+  td-take-deposit(Lou, Tess, 3000).
+  ?td-deposit(Tess, 2000).                   // the void taking changed nothing
+  ?td-deposit-within-cap().
+}
+
+Scenario repair-deadline-and-emergency-precedence {
+  report-defect(Lou, Tess, Leak).
+  ?repair-due(Lou, Tess, Leak).
+  @ 6.
+  ?!violated repair-due(Lou, Tess, Leak).
+  @ 7.
+  ?violated repair-due(Lou, Tess, Leak).
+  +emergency-repair(Lou, Tess).
+  ?!violated repair-due(Lou, Tess, Leak).    // suspended while the emergency repair is under way
+  -emergency-repair(Lou, Tess).
+  ?violated repair-due(Lou, Tess, Leak).
+  repair(Lou, Tess, Leak).
+  ?!repair-due(Lou, Tess, Leak).
+}
+
+Scenario rent-review-needs-notice {
+  ?!valid change-rent(Lou, Tess, 1100).
+  ?lawful change-rent(Lou, Tess, 1100).
+  change-rent(Lou, Tess, 1100).
+  ?rent(1000).                               // void: the rent is unchanged
+  notify-review(Lou, Tess).
+  @ 29.
+  ?!valid change-rent(Lou, Tess, 1100).
+  @ 30.
+  ?valid change-rent(Lou, Tess, 1100).
+  change-rent(Lou, Tess, 1100).
+  ?rent(1100). ?!rent(1000).
+  ?rent-positive().
+}
