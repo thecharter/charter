@@ -295,7 +295,12 @@ trailer, or credit; no `Co-Authored-By` for AI assistance (adopted 2026-10-23).
   wall time with `timeout` (default 300 s), and runs one probe at a time. Never call
   `lake env lean` on such a file directly, never run probes in parallel, and never
   raise `maxHeartbeats`/`maxRecDepth` without the cap in place: on 2026-10-24 five
-  uncapped probes in parallel took 128 GB and crashed the maintainer's machine.
+  uncapped probes in parallel took 128 GB and crashed the maintainer's machine. The
+  probe prints the peak resident size it saw. `charter prove` applies the same caps
+  itself (`--memory`, `--time`, a resident-size watchdog), so running it on a fixture
+  is allowed; `charter prove --emit-only` plus `tools/kernel-probe` on the written file
+  is the way to measure a program. Kernel memory grows with kernel time (about 230 MB
+  per second of work, 013.4): a program that needs minutes needs more than the cap.
 
 ## Repository layout
 

@@ -5,6 +5,75 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-24 (night, 2): `charter prove` lands as the generator; the kernel's memory limit measured
+
+## Where
+
+- `main`, pushed directly. One commit. `tools/battery`: PASS on all eleven steps on this
+  tree before the push (the new step `prove` runs `tools/prove-check test/prove`).
+
+## What landed
+
+- `Charter.Prove.Run`: `Phrase.claimCount`/`claimTexts` (mutual structural blocks with
+  their list helpers), `claimVerdicts`, `Summary`, `summarize`, `summary` (every claim's
+  verdict in order; every invariant that does not hold at the program's end state or a
+  scenario's), `claimLabels`.
+- `Charter.Prove.LeanGen.generate`: the project text. Phrases embedded as data through
+  the derived `Repr` (its output is Lean syntax for these records, on one line each);
+  `theorem program_decided : Prove.summary items = (verdicts, violated) := by decide +kernel`
+  with the literal the compiled evaluator produced; per claim
+  `theorem claim_k : (Prove.summary items).1[k]? = some true := by rw [program_decided]; rfl`
+  and per invariant `… .2.contains "d" = false`; `#print axioms` after every theorem.
+- `Charter.Cli.Prove`: `charter prove <file.eflint> … [--dir] [--memory MB] [--time S]
+  [--show-checker] [--emit-only] [--out json] [--eflint]`. Loads with the includes
+  inlined, writes `.charter/prove/<stem>/<stem>.lean`, finds the repository root by
+  its manifest, reads `PATH`/`LEAN_PATH` from `lake env printenv`, runs `lean --memory`
+  directly with a `ps`-based resident-size watchdog and a time cap, maps the checker's
+  error lines to theorems, treats an axiom dependence as failure (Law 10), prints one
+  line per theorem and `prove: D decided, F failed`; exit 0/1/2. The plan's flag name
+  `--show-lean` became `--show-checker`: the Law 11 gate greps the help text for
+  `\blean\b` and `-` is a word boundary. Eric may want to rule on the name.
+- Axiom hygiene: `showString` folds over `s.toList` (`String.foldl` carries `propext`);
+  `Kind.lowerName` replaces `k.name.toLower.decapitalize` in two resolver messages.
+  `#print axioms Charter.Prove.summary`: none. `String.splitOn`, `startsWith`, `trim`,
+  `replace`, `endsWith`, `toNat?`, `dropWhile`, `any`, and `List.mergeSort` also carry
+  axioms; none is reachable from the evaluator today. Keep it so.
+- Fixtures `test/prove/three_phrase.eflint` (`//! prove-failed: 1`) and
+  `test/prove/module_use.eflint`; `tools/prove-check`; battery step 9.
+- `tools/kernel-probe` prints the peak resident size.
+
+## Measured (through the probe, one at a time)
+
+| program | theorems | result |
+|---|---|---|
+| three_phrase | 3 | under 1 s |
+| module_use (entity-group instantiated, conserving genesis) | 6 | ~2 s, 1.8 GB |
+| entity_group_test genesis prefix (19 phrases) | 9 | 21 s, 4.9 GB |
+| … plus its first scenario (9 more phrases) | 18 | killed at 12.5 GB after 51 s |
+
+Kernel memory grows with kernel time, about 230 MB/s, about a second per phrase of a
+`lib/` program. The whole lib test (about 70 phrases) is out of reach under 16 GB.
+
+## Dead ends, so nobody repeats them
+
+- `Phrase.claimCount` as a plain recursive def over `.par ps` was compiled by WF
+  recursion (`@[irreducible]`) and stalled the kernel at 6 GB in 5 s, exactly like the
+  evaluator's block before. Any def the generator's statement reaches must be
+  structural; check with `#print` for `@[irreducible]`.
+- The invariant theorem as "never reported violated after any phrase" fails honest
+  programs: genesis builds a state over several phrases. It is now about end states.
+
+## Next (needs Eric's ruling between the two)
+
+1. (a) Checkpointed chain: the generator writes the configuration after every phrase as
+   data, one small theorem per phrase, a chaining lemma proved once in `Prove.Run`;
+   bounded memory for any program length. Needs `Repr`/`DecidableEq` (or a `BEq`
+   theorem form) on `Config`, `Spec`, `State`. (b) Intern type names to `Nat`, recompute
+   strata only on declaration phrases; scales the constant only. Phase 3 needs (a).
+2. Eric rules B9 and B10; Phase 3's artifact format after B10.
+
+---
+
 # Handoff — 2026-10-24 (late night): the create phrase's cost located; it was the elaborator, not the kernel
 
 ## Where

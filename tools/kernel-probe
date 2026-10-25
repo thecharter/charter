@@ -51,8 +51,10 @@ start=$(date +%s)
 timeout -k 5 "$secs" lake env lean --memory="$mem" "$file" &
 child=$!
 killed_by=""
+peak_kb=0
 while kill -0 "$child" 2>/dev/null; do
   total_kb=$(tree_rss_kb "$child")
+  [ "$total_kb" -gt "$peak_kb" ] && peak_kb=$total_kb
   if [ "$total_kb" -gt $(( mem * 1024 )) ]; then
     killed_by="the memory watchdog (RSS $(( total_kb / 1024 )) MB > ${mem} MB)"
     kill_tree "$child"
@@ -62,10 +64,11 @@ while kill -0 "$child" 2>/dev/null; do
 done
 wait "$child"; st=$?
 end=$(date +%s)
+peak="peak RSS $(( peak_kb / 1024 )) MB"
 if [ -n "$killed_by" ]; then echo "kernel-probe: KILLED by $killed_by after $((end-start)) s"; exit 137; fi
 case $st in
-  0)   echo "kernel-probe: ok in $((end-start)) s" ;;
-  124|137) echo "kernel-probe: KILLED by the time cap after $((end-start)) s" ;;
-  *)   echo "kernel-probe: lean exited $st after $((end-start)) s (a memory-cap abort from Lean prints its own message above)" ;;
+  0)   echo "kernel-probe: ok in $((end-start)) s ($peak)" ;;
+  124|137) echo "kernel-probe: KILLED by the time cap after $((end-start)) s ($peak)" ;;
+  *)   echo "kernel-probe: lean exited $st after $((end-start)) s ($peak; a memory-cap abort from Lean prints its own message above)" ;;
 esac
 exit $st

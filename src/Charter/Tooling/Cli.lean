@@ -10,6 +10,7 @@ import Charter.Surface.Syntax
 import Charter.Surface.Lower
 import Lean.Data.Json
 import Charter.Cli.Test
+import Charter.Cli.Prove
 import Charter.Cli.Repl
 
 /-!
@@ -448,6 +449,7 @@ def usageText (programs : List Program) : String :=
   "  check   [english.json | file.eflint]    structure, coverage, provenance, staleness; or resolve an .eflint program\n" ++
   "  run     <file.eflint>                   run the phrases: transitions with their three answers, violations, facts\n" ++
   "  test    <file.eflint | dir> ...         run in test mode: a file passes with no errors and every query holding\n" ++
+  "  prove   <file.eflint> ...               decide every claim and invariant in the kernel (maintainer tool; see --show-checker)\n" ++
   "  repl    [file.eflint]                   load the file, then read and run phrases interactively\n" ++
   "          (run, test, check take --out json: one record per line; test takes --expect, --tolerate)\n" ++
   "  trace   <clause-id>                     the span table for a clause\n" ++
@@ -474,6 +476,7 @@ def run (registered : List Program) (args : List String) : IO UInt32 := do
   | "run" :: rest => return (← runCommand rest)
   | "test" :: rest => return (← testCommand rest)
   | "repl" :: rest => return (← replCommand rest)
+  | "prove" :: rest => return (← proveCommand rest)
   | "trace" :: cid :: rest =>
     if rest.any (·.endsWith ".eflint") then return (← traceCommand cid rest) else pure ()
   | "check" :: rest => if rest.any (·.endsWith ".eflint") then return (← checkCommand rest) else pure ()

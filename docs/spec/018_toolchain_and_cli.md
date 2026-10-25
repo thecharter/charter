@@ -13,6 +13,7 @@
 | `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`, `explore-domain`) |
 | `charter repl [file.eflint]` | load the file, then run phrases typed at `charter> ` (`:display`, `:help`, `:quit`) |
 | `charter trace <clause> <file.eflint>` | a clause's span table (012.9) |
+| `charter prove <file.eflint> …` | decide every claim and invariant of the program in the kernel (013.4): one *decided* claim per theorem, `--memory MB` and `--time S` caps (defaults 6144, 300), `--dir` for the project, `--show-checker` to see the checker's output, `--emit-only` to write the project and stop; a maintainer tool run inside the repository until Phase 4 |
 
 Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diagnostic`, `claim`, `transition`, `violation`, `fact`, `clock`, `why`, `scenario`, `summary`), `--eflint` (eFLINT's keyword set only, 002.9), `--explore N` and `--explore-domain "<type> = values"` (`run`, `test`; 013.2, D15). `test` also takes `--expect <outcomes>` and `--tolerate <tolerances.md>` for the corpus comparison (`test/eflint-corpus/README.md`).
 
@@ -20,4 +21,4 @@ Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diag
 
 **18.4 Diagnostics and claims are data (plan §3).** Every error and warning is a record with a CHR code (016); every claim carries a tag (*checked* today; *decided* and *proved* with `prove`) and the question it answers (*holds*, *lawful*, *valid*, *violated*, *provenance*, *invariants*).
 
-**18.5 Pending (plan §6).** `init`, `fmt`, `lsp`, `doc`; `why <fact>` as a command (the phrase `?why` exists, 004.10); `prove` (13.4, D9: a generator that fetches its own pinned toolchain by digest into `~/.charter/toolchains/<digest>/`, `--offline` refusing rather than searching PATH); the projections `render`, `prompt`, `abi`, `views`, `explain`, `veil`, `diff`, `explore`; `import x.eflint`; `--itf`; and the second binary `charter-server` (plan §3a: `serve`, `replay`, `verify`).
+**18.5 Pending (plan §6).** `init`, `fmt`, `lsp`, `doc`; `why <fact>` as a command (the phrase `?why` exists, 004.10); `prove`'s managed toolchain (13.4, D9: fetched by digest into `~/.charter/toolchains/<digest>/`, `--offline` refusing rather than searching PATH; today `prove` runs inside the repository with its own toolchain); the projections `render`, `prompt`, `abi`, `views`, `explain`, `veil`, `diff`, `explore`; `import x.eflint`; `--itf`; and the second binary `charter-server` (plan §3a: `serve`, `replay`, `verify`).

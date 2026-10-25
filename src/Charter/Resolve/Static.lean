@@ -525,7 +525,7 @@ def checkActs (what : String) (as : List DomId) : Stc Unit := do
     match spec.findDecl a with
     | some t => match t.kind with
       | .act _ => pure ()
-      | k => err "CHR022" s!"`{what}` names {a}, which is {k.name.toLower.decapitalize}, not an act"
+      | k => err "CHR022" s!"`{what}` names {a}, which is {k.lowerName}, not an act"
     | none => err "CHR010" s!"undeclared type {a} in `{what}`"
 
 def compileKind (d : DomId) (tspec : TypeSpec) : Kind → Stc Kind
@@ -623,7 +623,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
           let d' ← convertTerm termFuel d .duration
           let v ← compileViolationCondition ty (.heldFor (.app ty (.named [])) d')
           return [(ty, [.violation [v]])]
-        | k => err "CHR003" s!"`Due within` applies to a Duty, not {k.name.toLower.decapitalize}"
+        | k => err "CHR003" s!"`Due within` applies to a Duty, not {k.lowerName}"
     let parts ← clauses.mapM one
     return parts.flatten
 

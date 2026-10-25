@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Run `charter prove` on every fixture under the given paths and compare each outcome
+# with its directive `//! prove-failed: N` (default 0): exactly N theorems must fail.
+# The binary must already be built (tools/battery builds it first).
+#
+#     tools/prove-check test/prove
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+[ -x "$B" ] || { echo "FAIL prove-check: $B is not built"; exit 2; }
+pass=0; fail=0
+for f in $(find "$@" -name '*.eflint' | sort); do
+  want=$(grep -o '^//! prove-failed: [0-9]*' "$f" | awk '{print $3}'); want=${want:-0}
+  out=$("$B" prove "$f" 2>&1); st=$?
+  got=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided, [0-9]* failed' | awk '{print $4}')
+  decided=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided' | awk '{print $2}')
+  if [ "$want" -eq 0 ]; then wantst=0; else wantst=1; fi
+  if [ "${got:-x}" = "$want" ] && [ $st -eq $wantst ]; then
+    echo "ok   $f (${decided:-0} decided, $got failed)"; pass=$((pass+1))
+  else
+    printf '%s\n' "$out" | sed 's/^/     /'
+    echo "FAIL $f (expected $want failed; got ${got:-no summary}, exit $st)"; fail=$((fail+1))
+  fi
+done
+echo "$pass passed, $fail failed, $((pass+fail)) total"
+[ $fail -eq 0 ]

@@ -77,5 +77,10 @@ step spec-conformance $st "$(tail -1 "$OUT/spec.log")"
 "$B" test test/lib > "$OUT/lib.log" 2>&1; st=$?
 step standard-library $st "$(tail -1 "$OUT/lib.log")"
 
+# 9. charter prove on the kernel fixtures (spec 013.4): every claim and invariant decided
+#    by the kernel, the false claims reported as failed; programs that decide in seconds
+tools/prove-check test/prove > "$OUT/prove.log" 2>&1; st=$?
+step prove $st "$(tail -1 "$OUT/prove.log")"
+
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
 exit $fail

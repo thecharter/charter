@@ -1,0 +1,9 @@
+// The first program decided in the kernel (spec 013.4): one fact, one creation, two
+// claims of which the second is false, and an invariant. `charter prove` must decide
+// the true claim and the invariant and report the false claim as failed.
+//! prove-failed: 1
+Fact x Identified by A.
++x(A).
+?x(A).
+?!x(A).
+Invariant inv When x(A).

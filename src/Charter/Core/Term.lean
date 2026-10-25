@@ -83,9 +83,11 @@ def Tagged.cmp (a b : Tagged) : Ordering :=
 
 instance : BEq Tagged := ⟨fun a b => a.2 == b.2 && Elem.beq a.1 b.1⟩
 
-/-- Haskell `show` of a string: double quotes, with `"` and `\` escaped. -/
+/-- Haskell `show` of a string: double quotes, with `"` and `\` escaped. Folds over the
+character list, not with `String.foldl`, whose termination proof uses `propext`: a decided
+program must depend on no axioms (Law 10, 013.4). -/
 def showString (s : String) : String :=
-  "\"" ++ (s.foldl (fun acc c => acc ++ (match c with
+  "\"" ++ (s.toList.foldl (fun acc c => acc ++ (match c with
     | '"' => "\\\"" | '\\' => "\\\\" | '\n' => "\\n" | '\t' => "\\t" | c => c.toString)) "") ++ "\""
 
 -- eFLINT's `ppTagged`: `actor("Alice")`, `x(3)`, `comp(a("A1"),b("B2"))`.

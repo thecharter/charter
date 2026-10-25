@@ -97,6 +97,11 @@ inductive Kind where
 def Kind.name : Kind → String
   | .fact _ => "Fact" | .act _ => "Act" | .duty _ => "Duty" | .event _ => "Event" | .immunity _ => "Immunity"
 
+/-- The kind's name in lower case, spelled out: `String.toLower` carries a `propext` proof,
+and a decided program must depend on no axioms (Law 10, 013.4). -/
+def Kind.lowerName : Kind → String
+  | .fact _ => "fact" | .act _ => "act" | .duty _ => "duty" | .event _ => "event" | .immunity _ => "immunity"
+
 /-- One type declaration (eFLINT `TypeSpec`). `closed = none` means closed by
 default and still openable; `some b` is an explicit setting. -/
 structure TypeSpec where

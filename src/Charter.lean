@@ -43,10 +43,12 @@ import Charter.Eval.Eval
 import Charter.Eval.Interpreter
 import Charter.Eval.Properties
 import Charter.Prove.Run
+import Charter.Prove.LeanGen
 import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Cli.Test
 import Charter.Cli.Repl
+import Charter.Cli.Prove
 
 /-!
 # `Charter` — Universal Institutional Specification Language & Standard Library

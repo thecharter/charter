@@ -10,3 +10,6 @@ build/
 .idea/
 .reference/
 out/
+
+# projects written by `charter prove` (spec 013.4); regenerated on every run
+.charter/

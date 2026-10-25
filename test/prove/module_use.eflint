@@ -1,0 +1,10 @@
+// A standard-library module used by a program (D8, spec 015.5), decided in the kernel:
+// a conserving genesis, one claim, and the module's five invariants at the end state
+// (spec 013.4).
+#require "../../lib/entity_group.eflint".
+Fact coop Identified by Coop
+Fact worker Identified by Ann, Ben, Cy
+Fact backer Identified by Pat, Quinn.
+Use entity-group(coop, worker, backer) As eg.
++eg-total-basis(15). +eg-basis(Ann, 5). +eg-basis(Ben, 5). +eg-basis(Cy, 5).
+?eg-basis-conserved().
