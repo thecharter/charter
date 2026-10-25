@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-25 — `charter prove` is a checkpointed chain (013.4, ruled by Eric): one kernel theorem per phrase, closed by `kernel_rfl`, memory bounded by a phrase; whole `lib/` tests decide under the default cap. A failing step names the phrase the kernel disagrees about (Law 9). `test/prove/scenario.eflint`.
 - 2026-10-24 (night) — `charter prove` lands as Phase 2's maintainer tool (013.3, 013.4, 018.2): the generator embeds phrases as data, one kernel decision per program with `decide +kernel`, one *decided* claim per theorem, capped; `test/prove/`. The evaluator depends on no axiom. Measured limit recorded in 013.4.
 - 2026-10-24 — D15 (an act whose domain is not enumerable is judged for the instance; CHR025; the `explore-domain` menu) in 004.1, 004.7, 005.5, 013.2, 018; D16 (`Duration * Int`) in 009.2, 010.2. 121 conformance tests.
 - 2026-10-23 (late, 5) — Chapter 018 (toolchain and CLI, today's commands) drafted; `Charter.Prove.Run` gives the evaluator as a pure function for `prove`. The kernel-decision feasibility result is in 013.4.
@@ -37,7 +38,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
 | 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
 | 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
-| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 6 tests green (invariants checked, `--explore`, the `explore-domain` menu and its loud default); `prove` as a maintainer tool, 2 kernel fixtures under `test/prove/`; module theorems (13.5) pending |
+| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 6 tests green (invariants checked, `--explore`, the `explore-domain` menu and its loud default); `prove` as a maintainer tool (the checkpointed chain), 3 kernel fixtures under `test/prove/`; module theorems (13.5) pending |
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
 | 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |

@@ -30,6 +30,8 @@ structure ProveOpts where
   dir         : Option String := none
   memory      : Nat := 6144
   time        : Nat := 300
+  /-- Phrases per checkpoint module (013.4); each module is one checker process. -/
+  chunk       : Nat := 5
   files       : List String := []
 
 def parseProveArgs : List String → ProveOpts → Except String ProveOpts
@@ -51,6 +53,10 @@ def parseProveArgs : List String → ProveOpts → Except String ProveOpts
     | some k => parseProveArgs rest { o with time := k }
     | none => .error s!"--time needs seconds, not {n}"
   | ["--time"], _ => .error "--time needs seconds"
+  | "--chunk" :: n :: rest, o => match n.toNat? with
+    | some k => if k == 0 then .error "--chunk needs a positive number of phrases" else parseProveArgs rest { o with chunk := k }
+    | none => .error s!"--chunk needs a number of phrases, not {n}"
+  | ["--chunk"], _ => .error "--chunk needs a number of phrases"
   | a :: rest, o => parseProveArgs rest { o with files := a :: o.files }
 
 /-- The repository root: the nearest ancestor of the working directory holding the
@@ -81,11 +87,11 @@ def residentMB (pid : UInt32) : IO Nat := do
 seen; `none` on the time cap or the memory cap (the process was killed). Two memory caps:
 the checker's own accounting (`--memory`) and a resident-size watchdog polled every quarter
 second, since an allocator may hold memory the checker's counter does not see. -/
-def runChecker (root file : System.FilePath) (memory time : Nat) : IO (Option (UInt32 × String) × Nat × String) := do
+def runChecker (root dir file : System.FilePath) (olean : Option System.FilePath) (memory time : Nat) : IO (Option (UInt32 × String) × Nat × String) := do
   let some path ← lakeEnvVar root "PATH" | return (none, 0, "the checker's toolchain could not be found")
-  let leanPath := (← lakeEnvVar root "LEAN_PATH").getD ""
+  let leanPath := dir.toString ++ ":" ++ (← lakeEnvVar root "LEAN_PATH").getD ""
   let memFlag : String := "--memory=" ++ toString memory
-  let args : Array String := #[memFlag, file.toString]
+  let args : Array String := #[memFlag, file.toString] ++ (olean.map (fun o => #["-o", o.toString])).getD #[]
   let env : Array (String × Option String) := #[("PATH", some path), ("LEAN_PATH", some leanPath)]
   let spawnArgs : IO.Process.SpawnArgs :=
     { cmd := "lean", args := args, cwd := some root, stdout := .piped, stderr := .piped, env := env }
@@ -116,10 +122,15 @@ def runChecker (root file : System.FilePath) (memory time : Nat) : IO (Option (U
     let err ← IO.ofExcept errT.get
     return (some (st, out ++ err), peak, "")
 
-/-- The line an error line of the checker's output names, if it is one. -/
-def errorLine (l : String) : Option Nat :=
+/-- The module and line an error line of the checker's output names, if it is one. -/
+def errorLine (l : String) : Option Prove.Loc :=
   match l.splitOn ":" with
-  | _ :: line :: _ :: kind :: _ => if kind.trim == "error" then line.toNat? else none
+  | file :: line :: _ :: kind :: _ =>
+    if kind.trim == "error" then
+      match line.toNat?, (System.FilePath.mk file).fileStem with
+      | some n, some m => some (m, n)
+      | _, _ => none
+    else none
   | _ => none
 
 /-- The theorem whose `#print axioms` line this is, if it reports a dependence. -/
@@ -130,11 +141,12 @@ def axiomUser (l : String) : Option String :=
     | _ => none
   else none
 
-/-- The theorem a line of the generated file belongs to: the last one starting at or
-before it. -/
-def owner (decided : String × Nat) (obls : List (Prove.Obligation × Nat)) (line : Nat) : Option String :=
-  let starts := (decided.1, decided.2) :: obls.map (fun (o, l) => (o.name, l))
-  (starts.filter (·.2 ≤ line)).foldl (fun acc (n, l) => match acc with
+/-- The theorem a line of the generated file belongs to: the last one (or checkpoint
+block) starting at or before it. -/
+def owner (proj : Prove.Project) (loc : Prove.Loc) : Option String :=
+  let starts := (proj.decided.1, proj.decided.2) :: proj.steps.map (fun (s, l) => (s.name, l))
+    ++ proj.obligations.map (fun (o, l) => (o.name, l))
+  (starts.filter fun (_, (m, l)) => m == loc.1 && l ≤ loc.2).foldl (fun acc (n, (_, l)) => match acc with
     | some (_, l') => if l ≥ l' then some (n, l) else acc
     | none => some (n, l)) none |>.map (·.1)
 
@@ -158,16 +170,36 @@ def proveFile (o : ProveOpts) (root : System.FilePath) (path : String) : IO (Nat
     | some d => System.FilePath.mk d
     | none => root / ".charter" / "prove" / stem
   IO.FS.createDirAll dir
-  let proj := Prove.generate path (items.map (·.item))
-  let file := dir / (stem ++ ".lean")
-  IO.FS.writeFile file proj.source
+  let proj := Prove.generate path stem (items.map (·.item)) o.chunk
+  for (m, src) in proj.files do
+    IO.FS.writeFile (dir / (m ++ ".lean")) src
   if proj.obligations.isEmpty then
     IO.println s!"{path}: prove: the program makes no claim and declares no invariant; nothing to decide"
     return (0, 0)
   if o.emitOnly then
-    IO.println s!"{path}: prove: project written ({proj.obligations.length} theorem(s)); not run (--emit-only)"
+    IO.println s!"{path}: prove: project written ({proj.files.length} module(s), {proj.steps.length} checkpoint(s), {proj.obligations.length} theorem(s) about claims); not run (--emit-only)"
     return (0, 0)
-  let (result, peak, stopped) ← runChecker root file o.memory o.time
+  -- one checker process per module, in order (each imports the one before); the time cap
+  -- is the whole run's, the memory cap each process's
+  let mut result : Option (UInt32 × String) := some (0, "")
+  let mut peak := 0
+  let mut stopped := ""
+  let mut left := o.time
+  let n := proj.files.length
+  for ((m, _), i) in proj.files.zipIdx do
+    let file := dir / (m ++ ".lean")
+    let olean := if i + 1 < n then some (dir / (m ++ ".olean")) else none
+    let t0 ← IO.monoMsNow
+    let (r, pk, st) ← runChecker root dir file olean o.memory left
+    let spent := ((← IO.monoMsNow) - t0) / 1000
+    left := if spent + 1 < left then left - spent else 1
+    if pk > peak then peak := pk
+    match r, result with
+    | none, _ => result := none; stopped := st; break
+    | some (code, out), some (code0, out0) =>
+      result := some (if code != 0 then code else code0, out0 ++ out)
+      if code != 0 then break -- a failing module's import would fail every later one
+    | _, _ => pure ()
   let mut decided := 0
   let mut failed := 0
   let report (ob : Prove.Obligation) (ok : Bool) (note : String) : IO Unit := do
@@ -183,13 +215,23 @@ def proveFile (o : ProveOpts) (root : System.FilePath) (path : String) : IO (Nat
     if o.showChecker then IO.println out
     let lines := out.splitOn "\n"
     let errLines := lines.filterMap errorLine
-    let failing := (errLines.filterMap (owner proj.decided proj.obligations)).eraseDups
+    let failing := (errLines.filterMap (owner proj)).eraseDups
     let axiomatic := (lines.filterMap axiomUser).eraseDups
-    let decidedFailed := failing.contains proj.decided.1 || axiomatic.contains proj.decided.1
+    -- a checkpoint the kernel disagrees with names its phrase (Law 9); the chain, and with it
+    -- every claim, then fails
+    let failedSteps := proj.steps.filter fun (s, _) => failing.contains s.name
+    let disagreement := match failedSteps with
+      | [] => ""
+      | (s, _) :: _ => match s.about with
+        | "phrase" => s!"the kernel's run of the phrase at line {s.line} disagrees with the evaluator's (Law 9); nothing is decided"
+        | "scenario" => s!"the kernel's check of the scenario at line {s.line} disagrees with the evaluator's (Law 9); nothing is decided"
+        | _ => "the kernel's check of the program's end state disagrees with the evaluator's (Law 9); nothing is decided"
+    let decidedFailed := !disagreement.isEmpty || failing.contains proj.decided.1 || axiomatic.contains proj.decided.1
     let unattributed := st != 0 && errLines.isEmpty
     for (ob, _) in proj.obligations do
       let note :=
-        if decidedFailed then "the kernel's run of the program disagrees with the evaluator's; nothing is decided"
+        if !disagreement.isEmpty then disagreement
+        else if decidedFailed then "the chain of checkpoints did not close; --show-checker prints the checker's output"
         else if unattributed then
           if (out.splitOn "memory").length > 1 then s!"not decided within {o.memory} MB"
           else "the checker could not run; --show-checker prints its output"
@@ -203,9 +245,9 @@ def proveFile (o : ProveOpts) (root : System.FilePath) (path : String) : IO (Nat
   if o.showChecker then IO.println s!"checker peak resident size: {peak} MB"
   return (decided, failed)
 
-/-- `charter prove <file.eflint> … [--dir DIR] [--memory MB] [--time S] [--show-checker] [--out json] [--eflint]` -/
+/-- `charter prove <file.eflint> … [--dir DIR] [--memory MB] [--time S] [--chunk N] [--show-checker] [--out json] [--eflint]` -/
 def proveCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter prove <file.eflint> ... [--dir <directory>] [--memory <MB>] [--time <seconds>] [--show-checker] [--emit-only] [--out json] [--eflint]"
+  let usage := "usage: charter prove <file.eflint> ... [--dir <directory>] [--memory <MB>] [--time <seconds>] [--chunk <phrases>] [--show-checker] [--emit-only] [--out json] [--eflint]"
   match parseProveArgs args {} with
   | .error e => IO.eprintln s!"charter prove: {e}"; IO.eprintln usage; return 2
   | .ok o =>

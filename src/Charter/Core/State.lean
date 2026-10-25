@@ -47,7 +47,7 @@ structure State where
   time     : Int := 0
   /-- The index of the phrase being evaluated (for origins). -/
   step     : Nat := 0
-  deriving Inhabited
+  deriving Repr, Inhabited
 
 namespace State
 

@@ -256,6 +256,7 @@ structure Config where
   strata         : List (List DomId) := []
   state          : State := {}
   violatedDuties : List Tagged := []
+  deriving Repr, Inhabited
 
 /-- What a phrase reports (eFLINT `Output`). -/
 inductive Output where

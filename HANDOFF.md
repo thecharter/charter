@@ -5,6 +5,103 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-25: the checkpointed chain; `charter prove` decides whole `lib/` tests
+
+## Where
+
+- `main`, pushed directly. One commit. `tools/battery`: PASS on this tree before the push.
+- Eric ruled (a), the checkpointed chain, over (b), interning names: interning scales the
+  constant and the asymptote was the problem (0.23 GB per phrase in one declaration);
+  (a) lives in `Prove/` and touches nothing the pipeline depends on. (b) is reopened only
+  when a single phrase exceeds the cap on its own, which the chain will name (013.4).
+
+## What landed
+
+- `Charter.Prove.Run`: `S0`, `Phrase.scenarioParts`, `afterScenario`, `stepPhrase`,
+  `stepItem`; `summarize` is now `addViolated (items.foldl stepItem S0)`; the chaining
+  lemmas `foldl_step`, `stepItem_phrase`, `stepPhrase_of_none`, `foldl_phrase`,
+  `foldl_scenario`, proved by `rw`/`unfold`/`show` alone. `#print axioms`: none.
+- `Charter.Prove.Kernel` (new, a separate root of the `Charter` library in
+  `lakefile.toml`, so the executable never links the elaborator): the tactic
+  `kernel_rfl`, which closes `a = b` with `Eq.refl b` added through `mkAuxLemma`, the way
+  `decide +kernel` adds its `decide p = true`. The elaborator never compares the sides;
+  no `DecidableEq` is needed (Lean cannot derive one for `Term`/`Elem`, nested inductives).
+- `Charter.Prove.LeanGen`: per phrase `p_k`, `cfg_k`, `S_k` (the record, as the compiled
+  evaluator produced it) and `theorem step_k : stepSummary S_{k-1} p_k = S_k := by
+  kernel_rfl`; per scenario the sub-chain `step_k_j`, `scen_k` (rewriting with
+  `foldl_step`), `viol_k` (`addViolated` at its end state, `kernel_rfl`), `after_k`
+  (`afterScenario … = S_k := rfl`); `viol_final`; `run_decided : summarize items = S_fin`
+  by one `rw` per item with `foldl_phrase step_k rfl` or `foldl_scenario scen_k viol_k
+  after_k`; `program_decided` and the per-claim theorems as before. `Project.steps`
+  records each checkpoint's block start and program line.
+- The chain is split into modules of `--chunk` phrases (default 5), `<stem>_steps_n`,
+  each importing the one before; the main file `<stem>` imports the last. Measured first
+  in one process: the checker's resident size grows monotonically through the file (about
+  30 MB/s, sampled every 2 s on the entity-group test; 10 GB for the 145-phrase sortition
+  test), so the per-declaration bound did not bound the process. `Project.files` lists
+  the modules; locations are `(module, line)`.
+- `Charter.Cli.Prove`: writes every module, runs one checker process per module in order
+  (`lean --memory … -o <module>.olean`, the project directory on `LEAN_PATH`), the time cap
+  shared by the run and the memory cap applied to each process; stops at the first failing
+  module. A failing step theorem is reported on every claim as "the kernel's run of the
+  phrase at line L disagrees with the evaluator's (Law 9)"; a chain that fails for another
+  reason says so and points at `--show-checker`. `--chunk N`.
+- `Repr` derived for `Spec`, `State`, `Config`, `Summary` (the checkpoints are printed
+  through it). `tools/prove-check` runs with `--show-checker` and fails on any
+  `#print axioms` line naming `propext`, `Classical.choice`, or `Quot.sound`.
+- Fixture `test/prove/scenario.eflint` (a scenario's sub-chain, its end state, the
+  restored configuration). Spec 013.4 rewritten for the chain; 018.2; plan §3 and §6
+  note the `--show-checker` spelling; AGENTS.md's kernel rule says what a `prove` cap
+  hit now means (one phrase, not the program).
+
+## Measured (`charter prove --show-checker`, one at a time, default 6144 MB cap)
+
+| program | phrases | theorems | result |
+|---|---|---|---|
+| test/prove/three_phrase | 5 | 3 | 1.6 s, 0.5 GB |
+| test/prove/module_use | 6 | 6 | 6 s, 1.3 GB |
+| test/lib/entity_group_test | 70 | 40 | 68 s, 2.7 GB |
+| test/lib/exit_and_voice_test | 92 | 52 | 155 s, 3.3 GB |
+| test/lib/oracle_feed_test | 52 | 45 | 183 s, 4.1 GB |
+| test/lib/attested_lease_test | 73 | 50 | 187 s, 5.7 GB |
+| test/lib/circuit_breaker_test | 68 | 41 | 274 s, 3.6 GB |
+| test/lib/collateral_pool_test | 89 | 59 | 478 s, 4.6 GB |
+| test/lib/residual_ledger_test | 87 | 66 | 573 s, 4.6 GB |
+| test/lib/sortition_court_test, one process | 145 | 70 | killed at the 6144 MB cap after 360 s; under a 12288 MB cap 1189 s, 10.1 GB |
+| … in modules of 10 phrases, scenarios whole | 145 | 70 | 1277 s, 5.6 GB (7 modules) |
+| … in modules of 10 phrases, scenarios split | 145 | 70 | 1493 s, 4.7 GB (resident size resets at every module) |
+
+The rows above the sortition ones were measured in one process, before the module split.
+Before the chain, the entity-group test's genesis prefix plus one scenario (28 phrases) was
+killed at 12.5 GB; the whole file was out of reach. Every lib test now decides under the
+default cap; `--time` must be raised above 300 s for the longer ones. Sampled every 2 s on
+the entity-group test in one process, the checker's resident size rose monotonically,
+about 30 MB/s, with no drop between theorems: the per-declaration bound did not bound
+the process, hence the modules. The sortition test's phrases cost about 400 MB each
+inside a module, so the default is 5 phrases per module (about 2.5 GB there), chosen from
+the 10-phrase trace, not re-measured.
+
+## Dead ends, so nobody repeats them
+
+- `rfl` passed where a lemma's conclusion has an implicit the hypothesis should fix
+  (`hc : afterScenario s s'' = s₃`) leaves `s₃` as the unevaluated application, and the
+  next rewrite finds no `S_k`. Every such hypothesis is a named theorem in the generated
+  file (`after_k : afterScenario S_{k-1} S_k_v = S_k := rfl`).
+- `deriving DecidableEq` on `Elem`, `Term`, `Args`: "None of the deriving handlers
+  applied" (nested inductives). Not needed with `kernel_rfl`; do not hand-write one.
+- `simp` in a chaining lemma would close goals through `eq_self`, which carries
+  `propext`; the lemmas use `rw` only, and the gate now catches a relapse.
+
+## Next
+
+1. The two things the chain makes possible, when a measured program asks for them: one
+   module per step theorem, run as separate bounded processes in parallel; a cache keyed
+   by the hash of `(S_{k-1}, p_k)` so an unchanged prefix is not re-decided.
+2. Eric rules B9 and B10; Phase 3's artifact format after B10. `lib/lean/Modules/`
+   proofs by invariant name (D8, 13.5).
+
+---
+
 # Handoff — 2026-10-24 (night, 2): `charter prove` lands as the generator; the kernel's memory limit measured
 
 ## Where

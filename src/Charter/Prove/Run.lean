@@ -98,8 +98,12 @@ structure Summary where
   cfg      : Config
   verdicts : List Bool
   violated : List DomId
+  deriving Repr
 
 instance : Inhabited Summary := ⟨⟨{}, [], []⟩⟩
+
+/-- The record before the first phrase. -/
+def S0 : Summary := ⟨{}, [], []⟩
 
 /-- Run one phrase from a configuration, recording its claims. -/
 def stepSummary (s : Summary) (p : Phrase) : Summary :=
@@ -109,23 +113,72 @@ def stepSummary (s : Summary) (p : Phrase) : Summary :=
 def addViolated (s : Summary) : Summary :=
   { s with violated := s.violated ++ (Explore.violatedInvariants s.cfg).filter (fun d => !s.violated.contains d) }
 
-/-- Run a program's items: scenarios run from the configuration at their point and
-leave it unchanged (011.11), their end states checked for invariants; directives are
-ignored (the loader has inlined them). -/
+/-- A scenario's name and phrases, when a phrase is one. -/
+def _root_.Charter.Phrase.scenarioParts : Phrase → Option (String × List Phrase)
+  | .scenario name ps => some (name, ps)
+  | _ => none
+
+/-- The record after a scenario: its claims and violations kept, the configuration
+restored to the one it ran from (011.11). -/
+def afterScenario (s s' : Summary) : Summary := { s' with cfg := s.cfg }
+
+/-- One phrase's effect on the record: a scenario runs from the configuration at its
+point, its end state is checked for invariants, and the configuration is restored. -/
+def stepPhrase (s : Summary) (p : Phrase) : Summary :=
+  match p.scenarioParts with
+  | some (_, ps) => afterScenario s (addViolated (ps.foldl stepSummary s))
+  | none => stepSummary s p
+
+/-- One item's effect on the record; directives are ignored (the loader inlined them). -/
+def stepItem (s : Summary) (it : Item) : Summary :=
+  match it.val with
+  | .inl _ => s
+  | .inr p => stepPhrase s p
+
+/-- Run a program's items; the program's end state is checked for invariants. -/
 def summarize (items : List Item) : Summary :=
-  let s := items.foldl (fun s it => match it.val with
-    | .inl _ => s
-    | .inr (.scenario _ ps) =>
-      let s' := addViolated (ps.foldl stepSummary s)
-      { s' with cfg := s.cfg }
-    | .inr p => stepSummary s p) ⟨{}, [], []⟩
-  addViolated s
+  addViolated (items.foldl stepItem S0)
 
 /-- The decided data of a program: its claims' verdicts and the invariants that do not
-hold at some end state. The generator's one kernel theorem is about this pair. -/
+hold at some end state. The generator's theorems are about this pair. -/
 def summary (items : List Item) : List Bool × List DomId :=
-  let s := summarize items
-  (s.verdicts, s.violated)
+  ((summarize items).verdicts, (summarize items).violated)
+
+/-! ### The chain (013.4)
+
+The generator checkpoints the record after every phrase as data, and the kernel decides
+one phrase per theorem (`stepSummary s p = s'`, by `kernel_rfl`), so the memory a decision
+needs is bounded by one phrase's evaluation, not the program's. The lemmas below chain
+those theorems into `summarize items = s`; they are the only general statements involved,
+proved once here by rewriting alone (no `simp`: its closing lemma `eq_self` carries
+`propext`, and a decided theorem must depend on no axioms, Law 10). -/
+
+theorem foldl_step {s s' : Summary} {p : Phrase} {ps : List Phrase} (h : stepSummary s p = s') :
+    (p :: ps).foldl stepSummary s = ps.foldl stepSummary s' := by
+  rw [List.foldl_cons, h]
+
+theorem stepItem_phrase (s : Summary) (pos : Pos) (text : String) (p : Phrase) :
+    stepItem s ⟨pos, text, Sum.inr p⟩ = stepPhrase s p := rfl
+
+theorem stepPhrase_of_none {s : Summary} {p : Phrase} (hs : p.scenarioParts = none) :
+    stepPhrase s p = stepSummary s p := by
+  unfold stepPhrase; rw [hs]
+
+/-- A phrase that is not a scenario advances the chain by its checkpoint theorem. -/
+theorem foldl_phrase {s s' : Summary} {pos : Pos} {text : String} {p : Phrase} {rest : List Item}
+    (h : stepSummary s p = s') (hs : p.scenarioParts = none) :
+    (⟨pos, text, Sum.inr p⟩ :: rest).foldl stepItem s = rest.foldl stepItem s' := by
+  rw [List.foldl_cons, stepItem_phrase, stepPhrase_of_none hs, h]
+
+/-- A scenario advances the chain by its own sub-chain (`h`), the check of its end state
+(`hv`), and the restored configuration (`hc`, by `rfl` in the generated project). -/
+theorem foldl_scenario {s s' s'' s₃ : Summary} {pos : Pos} {text name : String} {ps : List Phrase}
+    {rest : List Item} (h : ps.foldl stepSummary s = s') (hv : addViolated s' = s'')
+    (hc : afterScenario s s'' = s₃) :
+    (⟨pos, text, Sum.inr (.scenario name ps)⟩ :: rest).foldl stepItem s = rest.foldl stepItem s₃ := by
+  rw [List.foldl_cons, stepItem_phrase]
+  show rest.foldl stepItem (afterScenario s (addViolated (ps.foldl stepSummary s))) = _
+  rw [h, hv, hc]
 
 /-- The labels of a program's claims, in the order of `summary`: `(file line, text)`;
 a scenario's claims carry the scenario's line and name. -/

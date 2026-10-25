@@ -300,7 +300,11 @@ trailer, or credit; no `Co-Authored-By` for AI assistance (adopted 2026-10-23).
   itself (`--memory`, `--time`, a resident-size watchdog), so running it on a fixture
   is allowed; `charter prove --emit-only` plus `tools/kernel-probe` on the written file
   is the way to measure a program. Kernel memory grows with kernel time (about 230 MB
-  per second of work, 013.4): a program that needs minutes needs more than the cap.
+  per second of work, 013.4) and is released only when a declaration ends, so a single
+  declaration that needs minutes needs more than the cap; `charter prove` therefore
+  writes one theorem per phrase, in modules of `--chunk` phrases run as separate processes
+  (the checkpointed chain, 013.4), and a `prove` run that hits the cap means one module
+  is too big, not the program: lower `--chunk` before raising `--memory`.
 
 ## Repository layout
 

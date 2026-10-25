@@ -11,11 +11,18 @@ B=.lake/build/bin/charter
 pass=0; fail=0
 for f in $(find "$@" -name '*.eflint' | sort); do
   want=$(grep -o '^//! prove-failed: [0-9]*' "$f" | awk '{print $3}'); want=${want:-0}
-  out=$("$B" prove "$f" 2>&1); st=$?
+  # --show-checker, so the checker's own `#print axioms` lines are seen here as well as by
+  # the tool: a theorem depending on a real axiom (not `sorryAx`, which a failed theorem
+  # carries by design) is a Law 10 failure of the battery, not a note (spec 013.4)
+  out=$("$B" prove "$f" --show-checker 2>&1); st=$?
   got=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided, [0-9]* failed' | awk '{print $4}')
   decided=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided' | awk '{print $2}')
+  axioms=$(printf '%s\n' "$out" | grep -cE "depends on axioms: \[.*(propext|Classical\.choice|Quot\.sound)")
   if [ "$want" -eq 0 ]; then wantst=0; else wantst=1; fi
-  if [ "${got:-x}" = "$want" ] && [ $st -eq $wantst ]; then
+  if [ "$axioms" -ne 0 ]; then
+    printf '%s\n' "$out" | grep -E "depends on axioms: \[.*(propext|Classical\.choice|Quot\.sound)" | sed 's/^/     /'
+    echo "FAIL $f ($axioms theorem(s) depend on an axiom; Law 10)"; fail=$((fail+1))
+  elif [ "${got:-x}" = "$want" ] && [ $st -eq $wantst ]; then
     echo "ok   $f (${decided:-0} decided, $got failed)"; pass=$((pass+1))
   else
     printf '%s\n' "$out" | sed 's/^/     /'

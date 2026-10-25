@@ -6,6 +6,8 @@ defaultTargets = ["Charter", "Examples", "charter"]
 [[lean_lib]]
 name = "Charter"
 srcDir = "src"
+# Charter.Prove.Kernel imports the elaborator; the generated project imports it, the executable never does.
+roots = ["Charter", "Charter.Prove.Kernel"]
 
 # Lean companions of the example programs (import Charter, never the reverse).
 [[lean_lib]]

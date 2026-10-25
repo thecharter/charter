@@ -196,7 +196,7 @@ structure Spec where
   clauses  : List Clause := []
   /-- Charter (D8): declared modules, by name: their parameters and body. -/
   modules  : List (DomId × List DomId × List Decl) := []
-  deriving Inhabited
+  deriving Repr, Inhabited
 
 namespace Spec
 

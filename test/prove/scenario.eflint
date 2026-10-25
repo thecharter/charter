@@ -1,0 +1,16 @@
+// A scenario decided in the kernel (spec 013.4, the chain): its phrases are a sub-chain
+// forked from the record at its point, its end state is checked for the invariant, and
+// the configuration is restored (011.11), so the claim after it sees the state before it.
+Fact p Identified by P, Q.
++p(P).
+Invariant inv When p(P).
+Scenario adds-q {
+  ?!p(Q).
+  +p(Q).
+  ?p(Q).
+  ?p(P).
+}
+?!p(Q).
+Scenario still-absent {
+  ?!p(Q).
+}
