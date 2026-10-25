@@ -528,6 +528,21 @@ def checkActs (what : String) (as : List DomId) : Stc Unit := do
       | k => err "CHR022" s!"`{what}` names {a}, which is {k.lowerName}, not an act"
     | none => err "CHR010" s!"undeclared type {a} in `{what}`"
 
+/-- `Terminated by a` and `Created by a` bind the duty's components from the act's (006.4):
+every component of the duty must be one of `a`'s, by name, or the effect added to `a` would
+leave it unbound and fail at run time (CHR102 on the declaration, seen twice on
+2026-10-25). CHR027 says so at resolution instead. -/
+def checkBinds (what : String) (d : DomId) (xs : List Var) (as : List DomId) : Stc Unit := do
+  let spec ← getSpec
+  as.forM fun a =>
+    match spec.findDecl a with
+    | none => pure () -- CHR010 is reported where the act is used
+    | some _ =>
+      let ys := spec.components a
+      match xs.find? (fun x => !ys.contains x) with
+      | some x => err "CHR027" s!"`{what} {a}` on {d}: the component {x} of {d} is not a component of {a}, so {a} cannot bind it"
+      | none => pure ()
+
 /-- `Overridden by` names duties (007.3): anything else is CHR026. -/
 def checkDuties (what : String) (ds : List DomId) : Stc Unit := do
   let spec ← getSpec
@@ -598,6 +613,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
           return (ty, [ModClause.violation [t]])
         return (ty, [.enforcingActs as]) :: viols
       | .terminatedBy as =>
+        checkBinds "Terminated by" ty xs as
         let posts ← as.mapM fun a => do
           let e ← compileEffect' .tAll xs [] (.app ty (.named []))
           return (a, [ModClause.postCond [e]])
@@ -609,6 +625,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         checkDuties "Overridden by" ds
         return [(ty, [.overriddenBy ds])]
       | .createdBy as =>
+        checkBinds "Created by" ty xs as
         let posts ← as.mapM fun a => do
           let e ← compileEffect' (fun xs t => .cAll xs t none) xs [] (.app ty (.named []))
           return (a, [ModClause.postCond [e]])

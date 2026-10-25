@@ -4,11 +4,11 @@
 
 **6.1 Duty instances.** `Duty d Holder h Claimant c [Related to …]` declares a type whose instances have a holder, a claimant, and the related objects, created and terminated like any fact (by `+`/`-` or by effects). `test/spec/spec_006_1_duty_instance.eflint`
 
-**6.2 Violation.** A duty instance is *violated* when it holds and one of its `Violated when` conditions holds, the duty's components bound to the instance. Violation is a fact of the state (Law 3): `Violated(d(…))` answers it at any time. `test/spec/spec_006_2_violated_when.eflint`, `spec_006_5_violated_needs_holding.eflint`
+**6.2 Violation.** A duty instance is *violated* when it holds and one of its `Violated when` conditions holds, the duty's components bound to the instance. Violation is a fact of the state (Law 3): `Violated(d(…))` answers it at any time. `test/spec/spec_006_2_violated_when.eflint`, `spec_006_5_violated_needs_holding.eflint`; proved: `Charter.isViolated_of_holds`, for an instance that holds the query is the violation condition itself, the same function the report of 6.5 evaluates (`src/Charter/Eval/Properties.lean`)
 
 **6.3 `Enforced by`.** `Enforced by a` adds the condition "`a` is enabled" to `Violated when`, with the duty's components bound. `test/spec/spec_006_3_enforced_by.eflint`
 
-**6.4 `Created by`, `Terminated by`.** `Created by a` adds `Creates d()` to the act `a`; `Terminated by a` adds `Terminates d()` to `a` and makes `a` hold while `d()` holds (so the terminating act is enabled exactly while the duty exists). The duty's components are bound from the act's. `test/spec/spec_006_4_terminated_by_created_by.eflint`
+**6.4 `Created by`, `Terminated by`.** `Created by a` adds `Creates d()` to the act `a`; `Terminated by a` adds `Terminates d()` to `a` and makes `a` hold while `d()` holds (so the terminating act is enabled exactly while the duty exists). The duty's components are bound from the act's, so every component of the duty must be one of the act's, by name; one that is not is CHR027. `test/spec/spec_006_4_terminated_by_created_by.eflint`, `spec_006_4b_terminated_by_binds_components.eflint`
 
 **6.5 Reporting (D12).** After each phrase a duty violation is reported once, for duties violated now that were not violated after the previous phrase. Invariant violations (004.9) and disabled-act violations (005.2) are reported for the phrase that produced them.
 

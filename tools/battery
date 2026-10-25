@@ -82,10 +82,11 @@ step standard-library $st "$(tail -1 "$OUT/lib.log")"
 tools/prove-check test/prove > "$OUT/prove.log" 2>&1; st=$?
 step prove $st "$(tail -1 "$OUT/prove.log")"
 
-# 10. the example programs written in Charter (plan §8, Phase 2's exit): the tenancy toy and
-#     the commons over the eight lib/ modules (its eight Lean simulations as scenarios);
-#     `test` runs their scenarios, explores their invariants, and runs the provenance checks
-"$B" test Examples/Tenancy Examples/AutonomousCommons/commons.eflint > "$OUT/examples.log" 2>&1; st=$?
+# 10. the example programs written in Charter (plan §8, Phase 2's exit): the tenancy toy, the
+#     commons over the eight lib/ modules (its eight Lean simulations as scenarios), and PSA
+#     Law 3 with INV.8 and INV.9; `test` runs their scenarios, explores their invariants, and
+#     runs the provenance checks
+"$B" test Examples/Tenancy Examples/AutonomousCommons/commons.eflint Examples/SovereignAgency/law3.eflint > "$OUT/examples.log" 2>&1; st=$?
 step examples $st "$(tail -1 "$OUT/examples.log")"
 
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi

@@ -5,6 +5,97 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-25 (2): Phase 2's exit criteria; Phase 1's remaining proofs
+
+## Where
+
+- `main`, pushed directly, one commit per slice: 007.3 (`bf08db6`), `Examples/Tenancy`
+  (`51cfff5`), the commons in Charter (`ab30684`), then Law 3 and the evaluator proofs
+  (this section's commit). `tools/battery`: PASS before every push; it now has twelve steps, the new
+  one `examples` (`charter test` on the tenancy, the commons and Law 3).
+- Eric's instruction: "complete phase 1 and 2". Phase 2's features and exit criteria are
+  done (below); Phase 1's exit item, the evaluator's agreement proof with a declarative
+  semantics, is **not**: the declarative semantics does not exist yet. What was provable
+  without it landed in `Eval/Properties.lean` and is listed honestly as properties of the
+  evaluator, not as that proof.
+
+## What landed
+
+- **007.3 duty precedence**: `Duty d … Overridden by d'`; an instance of `d` is not
+  violated while an instance of `d'` holds that shares the components the two duties
+  have in common (by name, as `Except under` shares them); declared, one level deep.
+  CHR026 for a non-duty. `evalViolationCondition` consults it, so the query and the
+  once-only report (D12) agree. This draft's lift of v0.3's state-level precedence to
+  instances awaits Eric's wording (spec 007).
+- **`Examples/Tenancy/`**: `tenancy.md` and `tenancy.eflint`, six clauses, one per Phase 2
+  addition (provenance, `Param`, time, `Valid when`, `Immunity`, `Except under`,
+  `Overridden by`, `Module`/`Use`, explored `Invariant`s, scenarios with the three claims,
+  `?why`). `charter check` passes every provenance check; `charter test` every scenario;
+  `charter prove` decides all 40 theorems (59 s, 1.2 GB).
+- **`Examples/AutonomousCommons/commons.eflint`**: the commons over the eight `lib/`
+  modules, its eight clauses with the texts the v0.3 companion approved (same hashes),
+  every one of its ~140 rules named by a span, the commons' own rules in Charter, nine
+  scenarios reproducing the eight Lean simulations' quantities, breaches and powers.
+  `charter test` in 14 s with every invariant explored. The v0.3 `.charter` and Lean
+  companion stay until Phase 3's deletions.
+- **`Examples/SovereignAgency/law3.eflint`**: the fourteen LAW3 clauses (the plan says
+  fifteen; the v0.3 program has fourteen) with their approved texts, all 68 rules the
+  clauses name as acts, duties and one immunity, INV.8 `frozen-state` and INV.9
+  `guaranteed-last-choice` as `Invariant`s, twelve scenarios. Reading of the v0.3
+  records recorded in the file's header (a power's `valid` is the act's `Holds when`;
+  `forbid act a` is a duty violated when the fact `a` records holds; "anyone" is the
+  type `party` with roles as facts). Three spans naming theorems outside Law 3 are
+  `Commentary` until Phase 3 (texts unchanged, approvals stand). `charter test` passes,
+  every invariant explored. `charter prove --chunk 1 --memory 8192`: 122 of its 276 phrases decided in 56 minutes, then one phrase of the scenario at line 551 exceeded 8 GB on its own and the run stopped; INV.8 and INV.9 are therefore **not** discharged by `prove`, the one Phase 2 exit item still open besides Phase 1's proof. Each decided phrase took about 30 s. A rerun under the 16 GB maximum would take over an hour and may still fail on that phrase; option (b) is the remedy.
+- **`Eval/Properties.lean`**: `Elem.beq_iff`/`Tagged.beq_iff` (the hand-written `==` is
+  equality, by mutual structural induction on the nested inductive);
+  `Saturate.rebaseAndSat_assigned` (004.3 in full: an assigned fact is exactly what the
+  state holds after saturation, with stamp, expiry and origin);
+  `isViolated_of_holds` (006.2 and 006.5 agree: for an instance that holds, the query is
+  the violation condition the report evaluates). Standard axioms only; cited in specs 004
+  and 006.
+
+## Measured
+
+- Law 3's phrases are expensive in the kernel: one assertion (`+bound(Ava).`) alone is
+  36 s and 4.2 GB, because every phrase re-saturates a spec with 55 derived act types;
+  the single declaration block of 68 rules passed 12 GB in 49 s. The block is now
+  fifteen declaration phrases (one per section), each under the cap. This is the
+  measured reopen condition for the per-phrase cost (013.4, option (b): interning type
+  names to `Nat`, recomputing strata only on declaration phrases): a `lib/` program's
+  phrase costs a second; a protocol law's costs forty.
+
+## Dead ends, so nobody repeats them
+
+- `Terminated by a` and `Created by a` bind the duty's components from the act's: a duty
+  `Holder tenant Claimant landlord Terminated by pay` needs `pay` to carry both. The
+  resolver does not catch the missing binding; it surfaces at run time as CHR102 on the
+  declaration phrase and every later phrase then fails with CHR010. A static check is
+  worth adding (Resolve, duty clauses).
+- `Except under` shares components by name: `terminate-agent(party, agent) Except under
+  revoke(agent)` made every termination lawful whenever the agent could revoke. The
+  agent's own end is a separate act, not an exception on the interference.
+- An exploration (`//! explore`) fails from a scenario end state where an invariant is
+  already violated; a scenario that shows a breach must undo it before it ends.
+- `Invariant d When e` takes no clauses; its `From` goes on `Extend Fact d From …`.
+- `Document "…"` must be ended with `.` when a `#require` follows.
+- The commons' `//! explore-domain: int = 0..3000` made `charter test` run past five
+  minutes; a menu is a short list of the amounts the scenarios use.
+
+## Next
+
+1. Phase 1's exit: the declarative semantics (`Charter.Core.Meaning`, say): a relational
+   meaning of terms, derivation as the least fixpoint, triggers and violations, and the
+   evaluator proved sound and complete against it; leastness of 004.5 needs
+   monotonicity, which needs it. Weeks, not a session.
+2. 013.4 option (b), now measured as needed by Law 3.
+3. 13.5 / D8: the `lib/lean/Modules/` proofs by invariant name, which need (1)'s
+   reasoning principles over the evaluator; the binding mechanism in `prove` waits for a
+   first honest theorem to attach.
+4. Eric rules B9 and B10; the 7.3 wording; Phase 3's artifact format after B10.
+
+---
+
 # Handoff — 2026-10-25: the checkpointed chain; `charter prove` decides whole `lib/` tests
 
 ## Where

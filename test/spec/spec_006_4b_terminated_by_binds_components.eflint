@@ -1,0 +1,6 @@
+// 006.4: `Terminated by a` and `Created by a` bind the duty's components from the act's; a component of the duty that `a` does not have is CHR027 at resolution, not a run-time failure.
+//! expect-error: CHR027
+Fact tenant Identified by T
+Fact landlord Identified by L
+Act pay Actor tenant
+Duty rent-due Holder tenant Claimant landlord Terminated by pay.

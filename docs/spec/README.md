@@ -7,6 +7,8 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-25 (6) — `Eval/Properties.lean`: 004.3 in full (`rebaseAndSat_assigned`), 006.2/006.5 agreement (`isViolated_of_holds`), instances compare structurally (`Elem.beq_iff`); 006.4 CHR027 (`Terminated by`/`Created by` must be able to bind the duty's components). 124 conformance tests.
+- 2026-10-25 (5) — `Examples/SovereignAgency/law3.eflint` (plan §8, Phase 2's exit): PSA Law 3's fourteen clauses in Charter with the approved texts, its 68 rules as acts, duties and an immunity, INV.8 `frozen-state` and INV.9 `guaranteed-last-choice` as invariants, twelve scenarios, in the battery's `examples` step; `charter prove` decides 122 of its 276 phrases before one exceeds 8 GB (013.4, the reopen condition for interning).
 - 2026-10-25 (4) — `Examples/AutonomousCommons/commons.eflint` (plan §8, Phase 2's exit): the commons in Charter over the eight `lib/` modules, its eight clauses with every rule's English, the eight Lean simulations reproduced as scenarios by `charter test`; in the battery's `examples` step.
 - 2026-10-25 (3) — `Examples/Tenancy/` (plan §4, §8): the toy program and its document, one clause per Phase 2 addition, six clauses approved, seven scenarios, explored invariants; battery step `examples`.
 - 2026-10-25 (2) — 007.3 duty precedence: `Duty d … Overridden by d'` (shared components, declared, one level); CHR026. 123 conformance tests.

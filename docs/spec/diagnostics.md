@@ -41,6 +41,7 @@ more errors); `warning` does not.
 | CHR024 | error | a `Function` whose domain is not a product of exactly two components (003.7; eFLINT ignores its assignments silently) | `Charter.Resolve` |
 | CHR025 | warning | a binder over an act whose domain is not enumerable and that has a `Holds when`: it sees only the act's assigned instances, since the rule is judged per instance and never materialised (004.7, D15) | `Charter.Resolve` |
 | CHR026 | error | `Overridden by` names something that is not a duty (007.3) | `Charter.Resolve` |
+| CHR027 | error | `Terminated by` or `Created by` names an act that lacks one of the duty's components, so it cannot bind it (006.4) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

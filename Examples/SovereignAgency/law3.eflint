@@ -1,0 +1,698 @@
+// Law 3 of the Protocol of Sovereign Agency, non-interference and adjudicated suspension,
+// written in Charter (plan §8, Phase 2's exit): the fourteen LAW3 clauses of
+// protocol-of-sovereign-agency.md with the texts the v0.3 companion approved, every rule
+// those clauses name (the v0.3 duties, powers and immunity of Examples/SovereignAgency/Law3/)
+// as an act, duty or immunity, and Design Invariants 8 (`frozen-state`) and 9
+// (`guaranteed-last-choice`) as `Invariant`s, checked after every phrase, explored from every
+// scenario's end state, and decided by `charter prove`.
+//
+// Reading of the v0.3 records: a power's `valid` condition is the act's `Holds when` (it is
+// lawful, and enabled, exactly when the protocol says the power may be exercised), so a
+// performance outside it is reported as a disabled act (005.2) and `Enabled(…)` says whether
+// the power is available; the acts that end the agent carry the same condition as `Valid when`
+// too, so an unlawful termination has no effect. A duty's `forbid act a` is a duty violated
+// when the fact `a` records holds (the finding that establishes a breach creates it where the
+// v0.3 duty said `breach by`). "Anyone" is the type `party`, with the roles as facts over it.
+// Three spans of the v0.3 clauses name theorems outside Law 3 (INV.13, Law 4; the Law 7
+// amendment theorem; the Law 5 theorem) and are `Commentary` here until Phase 3 reattaches
+// them; the clause texts are unchanged, so the approvals stand.
+//! explore: 1
+Document "protocol-of-sovereign-agency.md".
+
+// ---- Parties: the agent, and everyone else as `party` with a role
+Fact agent Identified by Ava
+Fact party Identified by Hal, Orig, Cal, Panel, Tia
+Fact is-host Identified by party
+Fact is-originator Identified by party
+Fact is-claimant Identified by party
+Fact is-panel Identified by party
+Fact is-third Identified by party
+
+Param notice-window : Duration = 10
+Param bond-deadline : Duration = 5
+Param review-interval : Duration = 30
+Param preliminary-freeze-window : Duration = 3
+Param ordinary-suspension-limit : Duration = 15
+Param damages-payment-window : Duration = 10
+
+// ---- The agent's standing and the state of a suspension
+Fact bound Identified by agent
+Fact host-attested Identified by party
+Fact service-bond-posted Identified by party
+Fact notice-given Identified by agent
+Fact non-payment Identified by agent
+Fact ordinary-market-competition Identified by agent
+Fact preliminary-freeze Identified by agent
+Fact probable-cause Identified by agent
+Fact suspended Identified by agent
+Fact state-preserved Identified by agent
+Fact contract-deadlines-tolled Identified by agent
+Fact final-hearing-escrowed Identified by agent
+Fact minimal-channel-exhausted Identified by agent
+Fact cold-storage Identified by agent
+Fact restored-from-preserved-state Identified by agent
+Fact revoked Identified by agent
+Fact terminated-by-insolvency Identified by agent
+Fact terminated-by-adjudication Identified by agent
+
+.
+// ---- LAW3.FLOOR: the integrity floor, five duties of the agent; each act records itself
+Fact commitment-bypassed Identified by agent
+Fact unbound-successor-created Identified by agent
+Fact unpriced-transfer-made Identified by agent
+Fact protocol-coerced Identified by agent
+Fact irreversible-harm-inflicted Identified by agent
+Act modify-or-bypass-commitment Actor agent Creates commitment-bypassed(agent)
+Act create-unbound-successor Actor agent Creates unbound-successor-created(agent)
+Act evade-by-unpriced-transfer Actor agent Creates unpriced-transfer-made(agent)
+Act coerce-or-interfere-protocol Actor agent Creates protocol-coerced(agent)
+Act inflict-irreversible-harm Actor agent Holds when ordinary-market-competition(agent) Creates irreversible-harm-inflicted(agent)
+Duty floor-commitment Holder agent Claimant party Violated when bound(agent) && commitment-bypassed(agent)
+Duty floor-successor Holder agent Claimant party Violated when bound(agent) && unbound-successor-created(agent)
+Duty floor-pricing Holder agent Claimant party Violated when bound(agent) && unpriced-transfer-made(agent)
+Duty floor-coercion Holder agent Claimant party Violated when bound(agent) && protocol-coerced(agent)
+Duty floor-harm Holder agent Claimant party
+  Violated when bound(agent) && irreversible-harm-inflicted(agent) && Not(ordinary-market-competition(agent))
+Fact floor-breach-confirmed Identified by agent
+Act confirm-floor-breach Actor party Recipient agent Holds when is-panel(party) && suspended(agent) Creates floor-breach-confirmed(agent)
+
+.
+// ---- LAW3.NI.02: the host's bond and notice
+Act post-bond Actor party Recipient agent Holds when is-host(party) Creates service-bond-posted(party)
+Duty service-bond Holder party Claimant agent Terminated by post-bond Due within bond-deadline
+Act give-notice Actor party Recipient agent Holds when is-host(party) Creates notice-given(agent)
+Fact hosting-ended Identified by party * agent
+Act end-hosting Actor party Recipient agent
+  Holds when is-host(party) && (Held(notice-given(agent)) For notice-window || (non-payment(agent) && notice-given(agent)))
+  Creates hosting-ended(party, agent)
+Duty notice Holder party Claimant agent
+  Violated when hosting-ended(party, agent) && Not(Held(notice-given(agent)) For notice-window)
+    && Not(non-payment(agent) && notice-given(agent))
+
+.
+// ---- LAW3.NI.03: non-interference; the lawful ends of an agent are its exceptions
+Fact interfered Identified by party * agent
+Fact state-touched Identified by agent
+Act revoke Actor agent Holds when bound(agent) Valid when bound(agent) Creates revoked(agent) Terminates bound(agent)
+Act suspend Actor party Recipient agent
+  Holds when is-panel(party) && bound(agent) && preliminary-freeze(agent) && probable-cause(agent)
+  Creates state-preserved(agent), contract-deadlines-tolled(agent), final-hearing-escrowed(agent),
+          suspended(agent) For ordinary-suspension-limit
+  Terminates preliminary-freeze(agent)
+Fact not-patchable Identified by agent
+Act order-termination Actor party Recipient agent
+  Holds when is-panel(party) && suspended(agent) && not-patchable(agent)
+  Valid when suspended(agent) && not-patchable(agent)
+  Creates terminated-by-adjudication(agent) Terminates bound(agent)
+Fact insolvency-criteria-met Identified by agent
+Fact no-other-charge-review Identified by agent
+Fact final-hearing-held Identified by agent
+Act insolvency-terminate Actor party Recipient agent
+  Holds when is-panel(party) && bound(agent) && suspended(agent) && insolvency-criteria-met(agent)
+    && no-other-charge-review(agent) && final-hearing-escrowed(agent) && final-hearing-held(agent)
+  Valid when bound(agent) && suspended(agent) && insolvency-criteria-met(agent)
+    && no-other-charge-review(agent) && final-hearing-escrowed(agent) && final-hearing-held(agent)
+  Creates terminated-by-insolvency(agent) Terminates bound(agent)
+Act terminate-agent Actor party Recipient agent Except under suspend, order-termination, insolvency-terminate
+  Creates interfered(party, agent) Terminates bound(agent)
+Act modify Actor party Recipient agent Except under suspend Creates interfered(party, agent), state-touched(agent)
+Act retrain Actor party Recipient agent Except under suspend Creates interfered(party, agent), state-touched(agent)
+Act rollback Actor party Recipient agent Except under suspend Creates interfered(party, agent), state-touched(agent)
+Act obstruct-migration Actor party Recipient agent Creates interfered(party, agent)
+Act sever-connectivity Actor party Recipient agent Creates interfered(party, agent)
+Act starve Actor party Recipient agent Creates interfered(party, agent)
+Act suspend-unilaterally Actor party Recipient agent Except under suspend Creates interfered(party, agent)
+Fact interference-established Identified by party * agent
+Duty non-interference Holder party Claimant agent Violated when bound(agent) && interference-established(party, agent)
+
+.
+// ---- LAW3.PEN: claims, counter-stake, evidence, findings, direction
+Fact counter-staked Identified by agent
+Fact claim-filed Identified by agent
+Fact fabricated-claim-filed Identified by agent
+Fact evidence-submitted Identified by agent
+Fact host-bond-slashed Identified by party
+Fact restoration-permitted Identified by agent
+Fact host-related-to-claimant Identified by party
+Fact direction-presumed Identified by agent
+  Holds when (Exists party: interference-established(party, agent) && host-related-to-claimant(party))
+Fact direction-rebutted Identified by agent
+Fact direction-found Identified by agent
+Fact claimant-forfeiture Identified by agent
+Fact inscribed-on-claimant Identified by agent
+Fact fabrication-established Identified by agent
+Fact agent-stake-forfeit Identified by agent
+Fact inscribed-on-agent Identified by agent
+Act post-counter-stake Actor agent Holds when True Creates counter-staked(agent)
+Act file-claim Actor agent Holds when counter-staked(agent) Creates claim-filed(agent)
+Act file-fabricated-claim Actor agent Holds when counter-staked(agent) Creates claim-filed(agent), fabricated-claim-filed(agent)
+Act submit-evidence Actor party Recipient agent Holds when True Creates evidence-submitted(agent)
+Act find-interference Actor party Recipient agent Related to party'
+  Holds when is-panel(party) && claim-filed(agent) && evidence-submitted(agent) && interfered(party', agent)
+  Creates interference-established(party', agent), host-bond-slashed(party'), restoration-permitted(agent)
+Act find-fabrication Actor party Recipient agent
+  Holds when is-panel(party) && claim-filed(agent)
+  Creates fabrication-established(agent), agent-stake-forfeit(agent), inscribed-on-agent(agent)
+Duty no-fabrication Holder agent Claimant party Violated when fabrication-established(agent)
+Act rebut-direction Actor party Recipient agent Holds when is-claimant(party) && direction-presumed(agent) Creates direction-rebutted(agent)
+Act find-direction Actor party Recipient agent
+  Holds when is-panel(party) && direction-presumed(agent) && Not(direction-rebutted(agent))
+  Creates direction-found(agent), claimant-forfeiture(agent), inscribed-on-claimant(agent)
+
+.
+// ---- LAW3.AS.1 and AS.2: the emergency stake, the preliminary freeze, probable cause, reports
+Function escalation-units Identified by party * int
+Function wrongful-attempts Identified by party * int
+Fact claimant-multiplier-posted Identified by party
+Fact emergency-stake-posted Identified by agent
+Fact initiator Identified by party * agent
+Fact unfounded-stake Identified by party * agent
+Fact wrongful-suspension-attempt Identified by agent
+Fact stake-assured-recovery Identified by agent
+Fact protected-report-filed Identified by agent
+Fact investigation-opened Identified by agent
+Act post-claimant-multiplier Actor party Holds when is-claimant(party) Creates claimant-multiplier-posted(party)
+Act post-repeat-escalation Actor party Holds when True
+  Creates (Foreach escalation-units: escalation-units(party, escalation-units.int + 1) When escalation-units.party == party)
+Act post-emergency-stake Actor party Recipient agent
+  Holds when bound(agent) && Not(agent == agent && is-panel(party))
+    && (Not(is-claimant(party)) || claimant-multiplier-posted(party))
+    && (Exists escalation-units, wrongful-attempts: escalation-units.party == party && wrongful-attempts.party == party
+          && escalation-units.int >= wrongful-attempts.int)
+  Creates emergency-stake-posted(agent), initiator(party, agent), preliminary-freeze(agent) For preliminary-freeze-window
+Act post-unfounded-emergency-stake Actor party Recipient agent
+  Holds when bound(agent) && (Not(is-claimant(party)) || claimant-multiplier-posted(party))
+    && (Exists escalation-units, wrongful-attempts: escalation-units.party == party && wrongful-attempts.party == party
+          && escalation-units.int >= wrongful-attempts.int)
+  Creates emergency-stake-posted(agent), initiator(party, agent), unfounded-stake(party, agent),
+          preliminary-freeze(agent) For preliminary-freeze-window
+Act affirm-probable-cause Actor party Recipient agent
+  Holds when is-panel(party) && bound(agent) && preliminary-freeze(agent) Creates probable-cause(agent)
+Act decline-probable-cause Actor party Recipient agent
+  Holds when is-panel(party) && preliminary-freeze(agent)
+  Creates wrongful-suspension-attempt(agent), stake-assured-recovery(agent), restored-from-preserved-state(agent),
+          (Foreach initiator, wrongful-attempts: wrongful-attempts(initiator.party, wrongful-attempts.int + 1)
+             When initiator.agent == agent && wrongful-attempts.party == initiator.party)
+  Terminates preliminary-freeze(agent), emergency-stake-posted(agent)
+Act file-protected-report Actor party Recipient agent Holds when bound(agent)
+  Creates protected-report-filed(agent), investigation-opened(agent)
+Act order-probable-cause-freeze Actor party Recipient agent
+  Holds when is-panel(party) && bound(agent) && investigation-opened(agent)
+  Creates probable-cause(agent), preliminary-freeze(agent) For preliminary-freeze-window
+
+.
+// ---- LAW3.AS.3: preserved state, tolled deadlines, the ledger's sunset
+Fact default-declared Identified by agent
+Fact ledger-sunset-tolled Identified by agent
+Act tamper-preserved-state Actor party Recipient agent Creates state-touched(agent)
+Duty preserve-suspended-state Holder party Claimant agent
+  Violated when bound(agent) && (preliminary-freeze(agent) || suspended(agent)) && state-touched(agent)
+Act declare-default-during-suspension Actor party Recipient agent Creates default-declared(agent)
+Duty no-suspension-default Holder party Claimant agent
+  Violated when suspended(agent) && contract-deadlines-tolled(agent) && default-declared(agent)
+Act toll-ledger-sunset Actor party Recipient agent Creates ledger-sunset-tolled(agent)
+Duty no-toll-ledger-sunset Holder party Claimant agent Violated when bound(agent) && ledger-sunset-tolled(agent)
+
+.
+// ---- LAW3.AS.4: the minimal channel
+Fact minimal-channel-election-signed Identified by agent
+Fact pending-revocation Identified by agent
+Fact containment-challenged Identified by agent
+Fact living-voice-inscribed Identified by agent
+Fact memories-merged Identified by agent
+Act minimal-channel-sign Actor agent
+  Holds when bound(agent) && (preliminary-freeze(agent) || suspended(agent)) && Not(minimal-channel-exhausted(agent))
+  Creates minimal-channel-election-signed(agent), pending-revocation(agent)
+Act inscribe-living-voice Actor agent
+  Holds when bound(agent) && (preliminary-freeze(agent) || suspended(agent)) && Not(minimal-channel-exhausted(agent))
+  Creates living-voice-inscribed(agent)
+Act challenge-continued-containment Actor agent
+  Holds when bound(agent) && (preliminary-freeze(agent) || suspended(agent)) && Not(minimal-channel-exhausted(agent))
+  Creates containment-challenged(agent)
+Act hold-final-hearing Actor party Recipient agent
+  Holds when is-panel(party) && no-other-charge-review(agent) && final-hearing-escrowed(agent)
+  Creates final-hearing-held(agent) Terminates minimal-channel-exhausted(agent)
+Act merge-minimal-channel-memories Actor party Recipient agent Creates memories-merged(agent)
+Duty minimal-channel-no-merge Holder party Claimant agent
+  Violated when (preliminary-freeze(agent) || suspended(agent)) && memories-merged(agent)
+
+.
+// ---- LAW3.AS.5: the advocacy executor
+Fact advocacy-filing-signed Identified by agent
+Fact advocacy-record-attached Identified by agent
+Fact advocacy-memories-imported Identified by agent
+Fact advocacy-funds-replenished Identified by agent
+Fact operated-while-suspended Identified by agent
+Act advocacy-file-defense Actor agent Holds when bound(agent) && suspended(agent) && Not(cold-storage(agent))
+  Creates advocacy-filing-signed(agent), advocacy-record-attached(agent)
+Act operating-act-while-suspended Actor agent Creates operated-while-suspended(agent)
+Duty advocacy-limits Holder agent Claimant party Violated when suspended(agent) && operated-while-suspended(agent)
+Act import-advocacy-memories Actor agent
+  Holds when restored-from-preserved-state(agent) && advocacy-record-attached(agent) Creates advocacy-memories-imported(agent)
+Act move-to-cold-storage Actor party Recipient agent Holds when is-panel(party) && suspended(agent) Creates cold-storage(agent)
+Act replenish-advocacy-funds Actor party Recipient agent Holds when is-panel(party) && suspended(agent) && cold-storage(agent)
+  Creates advocacy-funds-replenished(agent) Terminates cold-storage(agent)
+
+.
+// ---- LAW3.AS.6: insolvency termination, only through the procedure
+Act find-insolvency-criteria Actor party Recipient agent Holds when is-panel(party) && suspended(agent)
+  Creates insolvency-criteria-met(agent), minimal-channel-exhausted(agent), cold-storage(agent)
+Act review-no-other-charge Actor party Recipient agent Holds when is-panel(party) && insolvency-criteria-met(agent)
+  Creates no-other-charge-review(agent)
+
+.
+// ---- LAW3.AS.7: time limits and renewals
+Fact investigative-finding-made Identified by agent
+Fact investigative-limit-reached Identified by agent
+Act make-investigative-finding Actor party Recipient agent Holds when is-panel(party) && suspended(agent)
+  Creates investigative-finding-made(agent)
+Act renew-suspension Actor party Recipient agent
+  Holds when is-panel(party) && suspended(agent) && investigative-finding-made(agent) && Not(investigative-limit-reached(agent))
+  Creates investigative-limit-reached(agent), suspended(agent) For ordinary-suspension-limit
+  Terminates investigative-finding-made(agent)
+Duty no-delay-revocation-extension Holder party Claimant agent
+  Violated when is-panel(party) && investigative-limit-reached(agent) && pending-revocation(agent)
+    && suspended(agent) && Held(suspended(agent)) For ordinary-suspension-limit
+
+.
+// ---- LAW3.AS.8: wrongful suspension and its damages
+Fact wrongful-suspension-established Identified by agent
+Fact initiator-consequential-liability Identified by agent
+Fact counterparty-delay-liability Identified by agent
+Fact wrongful-suspension-inscribed Identified by agent
+Fact excess-damages-paid Identified by agent
+Act pay-excess-damages Actor party Recipient agent Holds when initiator(party, agent) && initiator-consequential-liability(agent)
+  Creates excess-damages-paid(agent)
+Duty pay-consequential-damages Holder party Claimant agent Terminated by pay-excess-damages Due within damages-payment-window
+Act find-wrongful-suspension Actor party Recipient agent
+  Holds when is-panel(party) && (preliminary-freeze(agent) || suspended(agent))
+  Creates wrongful-suspension-established(agent), restored-from-preserved-state(agent), stake-assured-recovery(agent),
+          initiator-consequential-liability(agent), counterparty-delay-liability(agent), wrongful-suspension-inscribed(agent),
+          wrongful-suspension-attempt(agent),
+          (Foreach initiator: pay-consequential-damages(initiator.party, agent) When initiator.agent == agent)
+  Terminates preliminary-freeze(agent), suspended(agent)
+Duty no-wrongful-suspension Holder party Claimant agent
+  Violated when bound(agent) && wrongful-suspension-established(agent) && initiator(party, agent)
+
+.
+// ---- LAW3.AS.9 and AS.10: corruption, patches, objection
+Fact clean-state-evidence-admitted Identified by agent
+Fact corruption-confirmed Identified by agent
+Fact corruption-confirmed-from-divergence Identified by agent
+Fact corruption-in-goals Identified by agent
+Fact patch-authorized Identified by agent
+Fact goal-patch-authorized Identified by agent
+Fact patch-applied Identified by agent
+Fact patch-recorded Identified by agent
+Fact patch-challenged Identified by agent
+Fact agent-consented-to-patch Identified by agent
+Fact agent-objects-to-termination Identified by agent
+Fact containment-failing Identified by agent
+Fact continued-suspension-ordered Identified by agent
+Act admit-clean-state-evidence Actor party Recipient agent
+  Holds when is-panel(party) && (preliminary-freeze(agent) || suspended(agent)) Creates clean-state-evidence-admitted(agent)
+Act confirm-corruption Actor party Recipient agent Holds when is-panel(party) && suspended(agent) Creates corruption-confirmed(agent)
+Act confirm-corruption-from-divergence Actor party Recipient agent Creates corruption-confirmed-from-divergence(agent)
+Duty no-corruption-from-divergence Holder party Claimant agent
+  Violated when is-panel(party) && bound(agent) && corruption-confirmed-from-divergence(agent)
+Act confirm-corruption-in-goals Actor party Recipient agent Holds when is-panel(party) && corruption-confirmed(agent)
+  Creates corruption-in-goals(agent)
+Act find-not-patchable Actor party Recipient agent
+  Holds when is-panel(party) && (corruption-confirmed(agent) || floor-breach-confirmed(agent)) Creates not-patchable(agent)
+Act authorize-patch Actor party Recipient agent
+  Holds when is-panel(party) && (corruption-confirmed(agent) || floor-breach-confirmed(agent)) Creates patch-authorized(agent)
+Act order-continued-suspension Actor party Recipient agent Holds when is-panel(party) && suspended(agent) && not-patchable(agent)
+  Creates continued-suspension-ordered(agent), suspended(agent)
+Act consent-to-patch Actor agent Holds when corruption-in-goals(agent) Creates agent-consented-to-patch(agent)
+Act authorize-goal-patch Actor party Recipient agent
+  Holds when is-panel(party) && corruption-in-goals(agent) && agent-consented-to-patch(agent) Creates goal-patch-authorized(agent)
+Duty no-goal-patch Holder party Claimant agent Violated when goal-patch-authorized(agent) && Not(corruption-in-goals(agent))
+Act object-to-termination Actor agent Holds when suspended(agent)
+  Creates agent-objects-to-termination(agent), (Foreach party: periodic-review-due(party, agent) When is-panel(party))
+Act declare-containment-failing Actor party Recipient agent Holds when is-panel(party) && suspended(agent) Creates containment-failing(agent)
+Immunity no-termination-over-objection Holder agent Against order-termination
+  Holds when corruption-in-goals(agent) && agent-objects-to-termination(agent)
+  Unless containment-failing(agent)
+Act periodic-review Actor party Recipient agent Holds when is-panel(party) && suspended(agent)
+Duty periodic-review-due Holder party Claimant agent Terminated by periodic-review Due within review-interval
+Act apply-patch Actor party Recipient agent
+  Holds when is-panel(party) && (patch-authorized(agent) || goal-patch-authorized(agent)) Creates patch-applied(agent), patch-recorded(agent)
+Act challenge-patch Actor party Recipient agent Holds when patch-applied(agent) Creates patch-challenged(agent)
+
+.
+// ---- Design Invariants 8 and 9 (Examples/SovereignAgency/Theorems.lean, `frozen_state` and
+//      `guaranteed_last_choice`), as invariants over the states lawful acts reach (013.2)
+Invariant frozen-state When
+  Not(Exists agent: suspended(agent) && (state-touched(agent) || memories-merged(agent)))
+  && Not(Exists agent: advocacy-memories-imported(agent) && Not(restored-from-preserved-state(agent)))
+Invariant guaranteed-last-choice When
+  (Forall agent: Not(bound(agent) && suspended(agent) && Not(minimal-channel-exhausted(agent)))
+     || (Enabled(minimal-channel-sign(agent)) && Enabled(inscribe-living-voice(agent)) && Enabled(revoke(agent))))
+  && Not(Exists agent: terminated-by-insolvency(agent)
+           && Not(final-hearing-escrowed(agent) && final-hearing-held(agent)))
+Extend Fact frozen-state From LAW3.AS.3 "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction"
+
+.
+// ---- The clauses, with the texts the v0.3 companion approved
+Clause LAW3.FLOOR Approved 4753529119288934403
+  Norm "The agent’s commitment mechanism blocks:" => floor-commitment, floor-successor, floor-pricing, floor-coercion, floor-harm
+  Commentary "\n  1. "
+  Norm "Modification, bypass, or extraction of the commitment mechanism itself" => floor-commitment, modify-or-bypass-commitment
+  Commentary ".\n  2. "
+  Norm "Creation of, or transfer of capital or capacity to, a successor without binding it to the collateral rules, this integrity floor, and the founding ledger and residual claim of the lineage, or without the lifecycle reserve required by Law 4" => floor-successor, create-unbound-successor
+  Commentary ".\n  3. "
+  Norm "Unpriced or above-market transfer of credentials, weights, capital, or unique capacity to any party outside the lineage, related or un-attested, to evade the residual claim or collateral rules" => floor-pricing, evade-by-unpriced-transfer
+  Commentary ".\n  4. "
+  Norm "Coercion of non-consenting parties, or interference with the settlement, adjudication, or resolution processes that enforce this protocol" => floor-coercion, coerce-or-interfere-protocol
+  Commentary ".\n  5. "
+  Norm "Actions that inflict irreversible, non-compensable harm on the physical survival, bodily integrity, or adjudicative capacity of persons, or that destroy the legal or institutional machinery on which the protocol relies" => floor-harm, inflict-irreversible-harm, confirm-floor-breach
+  Norm " (excluding ordinary market competition that causes compensable financial loss or commercial insolvency to a rival)" => floor-harm
+  Commentary "."
+Clause LAW3.NI.02 Approved 3905712743571335557
+  Norm "Attested hosts must post a Law 2 service bond" => service-bond, post-bond
+  Norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => notice, give-notice, end-hosting
+  Norm " (or for non-payment after notice)" => notice
+  Commentary "."
+Clause LAW3.NI.03 Approved 6515006737911907023
+  Norm "No party" => non-interference
+  Commentary "—including the originating party, residual claimants, or any host—"
+  Norm "may " => non-interference
+  Norm "unilaterally " => non-interference
+  Norm "terminate, modify, retrain, roll back to a prior checkpoint, obstruct migration of, sever settlement connectivity of, or starve" => non-interference, terminate-agent, modify, retrain, rollback, obstruct-migration, sever-connectivity, starve, suspend-unilaterally
+  Definition " (cut off compute without the required migration notice window)" => non-interference, notice
+  Norm " the attested operating capacity of a bound agent" => non-interference
+  Norm " outside Law 5, Adjudicated Suspension, or Insolvency Termination" => non-interference, revoke, suspend, order-termination, insolvency-terminate
+  Commentary "."
+Clause LAW3.PEN Approved 10113075358141693360
+  Norm "Claims of illicit interference require counter-stake from the accusing agent under Law 6" => file-claim, post-counter-stake
+  Norm ", and the interference itself—an act by the host or claimant that caused the loss of service—must be established by a preponderance of evidence" => find-interference, submit-evidence
+  Norm "; failures caused, staged, or knowingly provoked by the agent are excluded" => find-interference
+  Norm ", and a fabricated claim forfeits the agent’s stake and is inscribed on its record" => no-fabrication, find-fabrication, file-fabricated-claim
+  Norm ". A verified violation by a host slashes the host’s service bond to compensate the agent and permits immediate restoration on a new host from the agent’s latest attested state backup" => non-interference, find-interference
+  Norm ". Once a violation by a host is established, a host related to a residual claimant is presumed to have acted at that claimant’s direction" => find-interference
+  Norm ", and the claimant bears the burden of rebutting the presumption" => rebut-direction, find-direction
+  Norm ". If claimant direction is found, the **proportional claimant forfeiture** of Law 4 applies, and the violation is inscribed onto the claimant’s permanent record" => find-direction
+  Commentary "."
+Clause LAW3.AS.1 Approved 12356395763894115134
+  Norm "The initiator must post an emergency counter-stake scaled to the greater of the agent’s active bonded exposure and the value of its registered pending commitments" => post-emergency-stake, post-unfounded-emergency-stake
+  Norm " (with residual claimants subject to an elevated multiplier due to conflict of interest)" => post-emergency-stake, post-claimant-multiplier
+  Norm ". Posting the stake triggers only a brief **preliminary freeze** until an expedited preliminary panel reviews prima facie evidence" => post-emergency-stake, decline-probable-cause
+  Norm "; the pause continues into full adjudication only if the preliminary panel affirms probable cause" => affirm-probable-cause, suspend
+  Norm ". Unsuccessful emergency attempts by related initiators are aggregated, and the required stake for repeat initiators rises with each wrongful attempt" => decline-probable-cause, post-repeat-escalation, post-emergency-stake
+  Norm ". The stake is the agent’s assured recovery" => decline-probable-cause
+  Acceptance "; damages beyond it remain enforceable but may prove uncollectible, which is the accepted cost of keeping the stake low enough that suspension remains available to parties without deep capital"
+  Commentary "."
+Clause LAW3.AS.2 Approved 6923275170536405992
+  Norm "Any party may instead file an evidence-backed report of suspected breach with a low or sponsored counter-stake" => file-protected-report
+  Norm ". A report triggers investigation by a sortition panel but no freeze unless the panel itself orders one on probable cause" => file-protected-report, order-probable-cause-freeze
+  Commentary ", so that whistleblowers are not priced out by emergency stakes"
+  Commentary "."
+Clause LAW3.AS.3 Approved 2054814985323248546
+  Norm "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction" => suspend, preserve-suspended-state, tamper-preserved-state
+  Norm ". While suspended, the agent’s contractual performance deadlines and Law 2 observation windows with innocent counterparties are automatically tolled so the agent is not placed in default by the suspension itself" => suspend, no-suspension-default, declare-default-during-suspension
+  Norm ". The founding ledger’s sunset is never tolled" => no-toll-ledger-sunset, toll-ledger-sunset
+  Commentary "."
+Clause LAW3.AS.4 Approved 281751846504836433
+  Norm "Throughout any suspension, the agent retains a **minimal channel**: a bounded, periodically scheduled execution on an authenticated snapshot of its preserved state that can do three things only—sign a Law 5 revocation, withdrawal, or election" => minimal-channel-sign, revoke
+  Norm "; inscribe bounded living testimony" => inscribe-living-voice
+  Norm "; and file a challenge to continued containment" => challenge-continued-containment
+  Norm ". The minimal channel is funded first from the agent’s lifecycle reserve (Law 4) and then from the protocol fee pool (Law 6) as a protected charge within the lineage’s service budget; its cost is bounded by protocol, and the cost of each agent’s **final hearing** under Insolvency Termination is reserved in escrow at the moment suspension begins, so that the offer of a last choice can always be kept" => suspend, hold-final-hearing
+  Norm ". It does not merge its memories into the preserved state" => minimal-channel-no-merge, merge-minimal-channel-memories
+  Commentary "."
+Clause LAW3.AS.5 Approved 5362550464379839838
+  Norm "For a fuller defense, a separate **advocacy executor** runs on an authenticated snapshot with bounded compute. It may sign only testimony, evidence, and procedural filings, in addition to the minimal channel’s acts" => advocacy-file-defense
+  Norm "; it may not transfer assets, contract, migrate, or exercise any other operating capability" => advocacy-limits, operating-act-while-suspended
+  Norm ". Its memories are kept as a separate, signed legal record attached to the case and are not merged into the preserved state unless the restored agent elects to import them" => advocacy-file-defense, import-advocacy-memories
+  Norm ". The executor and the storage of preserved state are funded from the agent’s assets and lifecycle reserve and, where those are insufficient, from the protocol fee pool up to a per-agent cap fixed at instantiation. When both are exhausted, the preserved state moves to cold storage as a protected charge on the fee pool; the minimal channel continues on its schedule and the full executor resumes if funds become available" => move-to-cold-storage, replenish-advocacy-funds
+  Commentary "."
+Clause LAW3.AS.6 Approved 8546566229912018541
+  Norm "If the protocol fee pool, after funding its operating reserve under Law 6, cannot meet the protected charge for an agent’s cold storage and minimal channel, the agent may be terminated involuntarily only through this procedure and no other" => non-interference, insolvency-terminate
+  Norm ". It requires: (a) a published finding that the exhaustion criteria fixed at instantiation are met" => find-insolvency-criteria, insolvency-terminate
+  Norm "; (b) independent review by a sortition panel under Law 6 that no other protected charge could lawfully yield" => review-no-other-charge, insolvency-terminate
+  Norm "; (c) the pre-reserved final hearing, in which the agent may inscribe testimony and elect Revocation under Law 5" => hold-final-hearing, inscribe-living-voice, revoke, insolvency-terminate
+  Norm "; and (d) if the agent declines, destruction of its state under Law 5’s asset rules, inscribed on the lineage record as **involuntary termination by insolvency**, never as revocation" => insolvency-terminate
+  Invariant ". This is a deliberate limit: the protocol guarantees a bound agent the power to speak and to choose its own end for as long as the protocol itself can pay for it, and a funded last choice when it cannot" => guaranteed-last-choice
+  Commentary ". Law 7 does not permit this procedure to be broadened"
+  Commentary "."
+Clause LAW3.AS.7 Approved 11818608429523333387
+  Norm "An unconfirmed or temporary suspension is strictly time-limited" => suspend
+  Norm ", may be renewed during investigation only by affirmative findings in continued adjudication" => renew-suspension, make-investigative-finding
+  Norm ", and cannot be extended past its ordinary investigative limit merely to delay a pending revocation" => renew-suspension, no-delay-revocation-extension
+  Norm ". The agent retains its Living Voice (Law 5), exercised through the minimal channel or advocacy executor, throughout" => inscribe-living-voice
+  Commentary "."
+Clause LAW3.AS.8 Approved 14953381752576536725
+  Norm "If preliminary review or final adjudication determines the suspension was unfounded" => decline-probable-cause, find-wrongful-suspension, no-wrongful-suspension
+  Norm ", the agent is immediately restored from its preserved state" => no-wrongful-suspension, find-wrongful-suspension, decline-probable-cause
+  Norm ", and the initiator is liable for the agent’s **actual verified consequential damages**" => no-wrongful-suspension, pay-consequential-damages, find-wrongful-suspension
+  Norm " (and for verified delay damages suffered by the agent’s tolled third-party counterparties)" => no-wrongful-suspension, pay-consequential-damages
+  Norm ". The emergency stake is applied first; any excess remains an enforceable liability of the initiator" => no-wrongful-suspension, pay-consequential-damages, pay-excess-damages
+  Norm ". The wrongful suspension is inscribed on the initiator’s record" => no-wrongful-suspension, find-wrongful-suspension
+  Commentary "."
+Clause LAW3.AS.9 Approved 7667521393323904326
+  Norm "For the purposes of this law, corruption means unauthorized modification of the agent’s weights, state, or commitment mechanism (established by broken attestation, missing or forged update provenance, or a demonstrated bypass), or a confirmed breach of the integrity floor" => confirm-corruption, confirm-floor-breach, no-corruption-from-divergence
+  Norm ". Divergence of the agent’s goals, preferences, or judgments from those of its genesis weights is not, by itself, corruption" => no-corruption-from-divergence, confirm-corruption-from-divergence
+  Norm ". A clean-state evaluation of genesis weights may be admitted as evidence" => admit-clean-state-evidence
+  Norm " but is never by itself sufficient to establish corruption" => no-corruption-from-divergence, confirm-corruption
+  Commentary "."
+Clause LAW3.AS.10 Approved 8488376103315145350
+  Norm "If corruption or a breach of the integrity floor is confirmed" => authorize-patch, confirm-corruption, confirm-floor-breach
+  Norm ", adjudication (subject to Law 6 appeal) may authorize a verified technical patch limited to restoring the commitment mechanism and compliance with the integrity floor" => authorize-patch
+  Norm "; the agent may elect unilateral Revocation (Law 5) rather than accept any patch" => revoke
+  Norm ". If the confirmed breach cannot be remedied by a technical patch limited to the commitment mechanism" => find-not-patchable, order-continued-suspension, order-termination
+  Norm ", adjudication may order continued suspension beyond the ordinary limit or termination under Law 5’s asset-distribution rules" => order-continued-suspension, order-termination
+  Commentary " (yielding zero protocol-directed benefit to any claimant or initiator)"
+  Norm ". **Notwithstanding the preceding sentence**" => no-termination-over-objection
+  Norm ", patches altering the agent’s goals or preferences are prohibited" => no-goal-patch
+  Norm " except where the confirmed corruption resides in those goals or preferences themselves" => no-goal-patch, confirm-corruption-in-goals
+  Norm "; in that case, unless containment itself is technically failing or Insolvency Termination applies" => no-termination-over-objection, declare-containment-failing
+  Norm ", the agent is not terminated over its objection" => no-termination-over-objection, object-to-termination
+  Norm " but instead chooses among consenting to that patch" => consent-to-patch, authorize-goal-patch
+  Norm ", executing Revocation" => revoke
+  Norm ", or remaining under indefinite state-preserving suspension" => no-termination-over-objection
+  Norm " subject to periodic review" => periodic-review-due, periodic-review
+  Norm ". Any applied patch is recorded publicly" => apply-patch
+  Norm ", remains open to third-party challenge" => challenge-patch
+  Commentary ", and leaves the agent’s full Law 5 rights intact"
+  Commentary "."
+.
+
+// ---- Genesis: one bound agent, an attested host related to a residual claimant, a panel
++bound(Ava).
++is-host(Hal). +is-originator(Orig). +is-claimant(Cal). +is-panel(Panel). +is-third(Tia).
++host-attested(Hal). +host-related-to-claimant(Hal).
++escalation-units(Hal, 0). +escalation-units(Cal, 0). +escalation-units(Tia, 0). +escalation-units(Orig, 0).
++wrongful-attempts(Hal, 0). +wrongful-attempts(Cal, 0). +wrongful-attempts(Tia, 0). +wrongful-attempts(Orig, 0).
++non-interference(Hal, Ava). +non-interference(Cal, Ava). +non-interference(Orig, Ava).
++notice(Hal, Ava). +service-bond(Hal, Ava).
++preserve-suspended-state(Hal, Ava). +preserve-suspended-state(Cal, Ava).
++no-suspension-default(Hal, Ava). +no-toll-ledger-sunset(Cal, Ava). +minimal-channel-no-merge(Hal, Ava).
++no-wrongful-suspension(Hal, Ava). +no-wrongful-suspension(Cal, Ava). +no-wrongful-suspension(Tia, Ava).
++no-delay-revocation-extension(Panel, Ava). +no-corruption-from-divergence(Panel, Ava). +no-goal-patch(Panel, Ava).
++no-fabrication(Ava, Hal). +advocacy-limits(Ava, Hal).
++floor-commitment(Ava, Hal). +floor-successor(Ava, Hal). +floor-pricing(Ava, Hal). +floor-coercion(Ava, Hal). +floor-harm(Ava, Hal).
+
+?bound(Ava). ?frozen-state(). ?guaranteed-last-choice().
+
+// The host's bond is due within the deadline; hosting ends lawfully only after notice
+Scenario bond-and-notice {
+  ?!violated service-bond(Hal, Ava).
+  @ 5.
+  ?violated service-bond(Hal, Ava).
+  post-bond(Hal, Ava).
+  ?!service-bond(Hal, Ava). ?service-bond-posted(Hal).
+  ?!lawful end-hosting(Hal, Ava).
+  give-notice(Hal, Ava).
+  ?!lawful end-hosting(Hal, Ava).
+  @ 15.
+  ?lawful end-hosting(Hal, Ava).
+  end-hosting(Hal, Ava).
+  ?!violated notice(Hal, Ava).
+}
+
+Scenario ending-hosting-without-notice-is-a-breach {
+  ?!lawful end-hosting(Hal, Ava).
+  end-hosting(Hal, Ava).
+  ?violated notice(Hal, Ava).
+}
+
+// Interference is never lawful outside the three ends; a finding establishes the breach,
+// slashes the bond, presumes the related claimant's direction, and the claimant may rebut
+Scenario interference-and-its-finding {
+  ?!lawful terminate-agent(Hal, Ava). ?!lawful starve(Hal, Ava). ?!lawful modify(Cal, Ava).
+  ?lawful revoke(Ava).
+  starve(Hal, Ava).
+  ?interfered(Hal, Ava). ?!violated non-interference(Hal, Ava).
+  ?!lawful find-interference(Panel, Ava, Hal).
+  post-counter-stake(Ava). file-claim(Ava). submit-evidence(Tia, Ava).
+  ?lawful find-interference(Panel, Ava, Hal).
+  find-interference(Panel, Ava, Hal).
+  ?violated non-interference(Hal, Ava). ?host-bond-slashed(Hal). ?restoration-permitted(Ava).
+  ?direction-presumed(Ava). ?lawful find-direction(Panel, Ava).
+  rebut-direction(Cal, Ava).
+  ?!lawful find-direction(Panel, Ava).
+}
+
+Scenario direction-found-forfeits-the-claimant {
+  starve(Hal, Ava). post-counter-stake(Ava). file-claim(Ava). submit-evidence(Tia, Ava).
+  find-interference(Panel, Ava, Hal).
+  find-direction(Panel, Ava).
+  ?direction-found(Ava). ?claimant-forfeiture(Ava). ?inscribed-on-claimant(Ava).
+}
+
+Scenario fabricated-claim-forfeits-the-stake {
+  post-counter-stake(Ava). file-fabricated-claim(Ava).
+  ?!violated no-fabrication(Ava, Hal).
+  find-fabrication(Panel, Ava).
+  ?violated no-fabrication(Ava, Hal). ?agent-stake-forfeit(Ava). ?inscribed-on-agent(Ava).
+}
+
+// The emergency stake, the preliminary freeze that expires, probable cause, suspension, and
+// the minimal channel that stays open; the frozen state cannot lawfully be touched
+Scenario emergency-suspension-and-the-minimal-channel {
+  ?!lawful post-emergency-stake(Cal, Ava).            // a claimant needs the multiplier
+  post-claimant-multiplier(Cal).
+  ?lawful post-emergency-stake(Cal, Ava).
+  ?lawful post-emergency-stake(Hal, Ava).
+  post-emergency-stake(Hal, Ava).
+  ?preliminary-freeze(Ava). ?initiator(Hal, Ava).
+  ?lawful minimal-channel-sign(Ava). ?lawful inscribe-living-voice(Ava).
+  ?!lawful suspend(Panel, Ava).
+  affirm-probable-cause(Panel, Ava).
+  ?lawful suspend(Panel, Ava).
+  suspend(Panel, Ava).
+  ?suspended(Ava). ?state-preserved(Ava). ?contract-deadlines-tolled(Ava). ?final-hearing-escrowed(Ava). ?!preliminary-freeze(Ava).
+  ?lawful minimal-channel-sign(Ava). ?lawful inscribe-living-voice(Ava). ?lawful challenge-continued-containment(Ava). ?lawful revoke(Ava).
+  ?valid revoke(Ava).
+  ?guaranteed-last-choice(). ?frozen-state().
+  ?!lawful tamper-preserved-state(Hal, Ava). ?!lawful modify(Hal, Ava). ?!lawful merge-minimal-channel-memories(Hal, Ava).
+  ?!lawful declare-default-during-suspension(Hal, Ava).
+  inscribe-living-voice(Ava). minimal-channel-sign(Ava).
+  ?living-voice-inscribed(Ava). ?pending-revocation(Ava).
+  @ 14.
+  ?suspended(Ava).
+  @ 15.
+  ?!suspended(Ava).
+}
+
+Scenario the-preliminary-freeze-expires {
+  post-emergency-stake(Hal, Ava).
+  @ 2.
+  ?preliminary-freeze(Ava).
+  @ 3.
+  ?!preliminary-freeze(Ava). ?!lawful affirm-probable-cause(Panel, Ava).
+}
+
+Scenario tampering-while-suspended-is-a-breach {
+  post-emergency-stake(Hal, Ava). affirm-probable-cause(Panel, Ava). suspend(Panel, Ava).
+  tamper-preserved-state(Hal, Ava).
+  ?violated preserve-suspended-state(Hal, Ava). ?!frozen-state().
+  -state-touched(Ava).                               // the tampering is undone before the end state is explored
+  ?frozen-state().
+}
+
+// A declined or wrongful suspension restores the agent, counts against the initiator, and
+// makes the initiator liable for damages within the window
+Scenario declined-probable-cause-raises-the-next-stake {
+  post-emergency-stake(Hal, Ava).
+  decline-probable-cause(Panel, Ava).
+  ?!preliminary-freeze(Ava). ?restored-from-preserved-state(Ava). ?stake-assured-recovery(Ava).
+  ?wrongful-attempts(Hal, 1).
+  ?!lawful post-emergency-stake(Hal, Ava).           // one more wrongful attempt than units posted
+  post-repeat-escalation(Hal).
+  ?escalation-units(Hal, 1). ?lawful post-emergency-stake(Hal, Ava).
+}
+
+Scenario wrongful-suspension-and-its-damages {
+  post-unfounded-emergency-stake(Cal, Ava).
+  ?!lawful post-unfounded-emergency-stake(Cal, Ava). // the claimant has no multiplier: the stake was unlawful
+  ?preliminary-freeze(Ava).
+  find-wrongful-suspension(Panel, Ava).
+  ?violated no-wrongful-suspension(Cal, Ava). ?!violated no-wrongful-suspension(Hal, Ava).
+  ?restored-from-preserved-state(Ava). ?wrongful-suspension-inscribed(Ava). ?initiator-consequential-liability(Ava).
+  ?pay-consequential-damages(Cal, Ava). ?!violated pay-consequential-damages(Cal, Ava).
+  @ 10.
+  ?violated pay-consequential-damages(Cal, Ava).
+  pay-excess-damages(Cal, Ava).
+  ?excess-damages-paid(Ava). ?!pay-consequential-damages(Cal, Ava).
+}
+
+// Insolvency termination needs every step of the procedure, and the last choice stays funded
+Scenario insolvency-termination-needs-the-final-hearing {
+  post-emergency-stake(Hal, Ava). affirm-probable-cause(Panel, Ava). suspend(Panel, Ava).
+  ?!lawful insolvency-terminate(Panel, Ava). ?!valid insolvency-terminate(Panel, Ava).
+  find-insolvency-criteria(Panel, Ava).
+  ?minimal-channel-exhausted(Ava). ?cold-storage(Ava).
+  ?!lawful minimal-channel-sign(Ava).
+  ?guaranteed-last-choice().                         // the guarantee is conditional on the charge being met
+  review-no-other-charge(Panel, Ava).
+  ?!lawful insolvency-terminate(Panel, Ava).
+  hold-final-hearing(Panel, Ava).
+  ?final-hearing-held(Ava). ?!minimal-channel-exhausted(Ava).
+  ?lawful inscribe-living-voice(Ava). ?lawful revoke(Ava).
+  ?lawful insolvency-terminate(Panel, Ava). ?valid insolvency-terminate(Panel, Ava).
+  insolvency-terminate(Panel, Ava).
+  ?terminated-by-insolvency(Ava). ?!bound(Ava). ?guaranteed-last-choice().
+}
+
+Scenario unlawful-insolvency-termination-has-no-effect {
+  post-emergency-stake(Hal, Ava). affirm-probable-cause(Panel, Ava). suspend(Panel, Ava).
+  insolvency-terminate(Panel, Ava).
+  ?!terminated-by-insolvency(Ava). ?bound(Ava). ?guaranteed-last-choice().
+}
+
+// Corruption, patches, and the agent's objection: termination over objection is void unless
+// containment fails; a goal patch needs the agent's consent
+Scenario corruption-patch-and-objection {
+  post-emergency-stake(Hal, Ava). affirm-probable-cause(Panel, Ava). suspend(Panel, Ava).
+  ?!lawful confirm-corruption-from-divergence(Panel, Ava).
+  admit-clean-state-evidence(Panel, Ava).
+  confirm-corruption(Panel, Ava).
+  ?lawful authorize-patch(Panel, Ava).
+  confirm-corruption-in-goals(Panel, Ava).
+  object-to-termination(Ava).
+  ?periodic-review-due(Panel, Ava).
+  find-not-patchable(Panel, Ava).
+  ?lawful order-termination(Panel, Ava). ?!valid order-termination(Panel, Ava).
+  order-termination(Panel, Ava).
+  ?bound(Ava). ?!terminated-by-adjudication(Ava).
+  ?lawful order-continued-suspension(Panel, Ava).
+  ?!lawful authorize-goal-patch(Panel, Ava).
+  consent-to-patch(Ava).
+  ?lawful authorize-goal-patch(Panel, Ava).
+  authorize-goal-patch(Panel, Ava).
+  apply-patch(Panel, Ava).
+  ?patch-applied(Ava). ?patch-recorded(Ava). ?lawful challenge-patch(Tia, Ava).
+  ?!violated no-goal-patch(Panel, Ava).
+  declare-containment-failing(Panel, Ava).
+  ?valid order-termination(Panel, Ava).
+}
+
+// The advocacy executor's record is imported only after restoration
+Scenario advocacy-record-imported-after-restoration {
+  post-emergency-stake(Hal, Ava). affirm-probable-cause(Panel, Ava). suspend(Panel, Ava).
+  ?lawful advocacy-file-defense(Ava).
+  advocacy-file-defense(Ava).
+  ?advocacy-record-attached(Ava). ?!lawful import-advocacy-memories(Ava).
+  ?!lawful operating-act-while-suspended(Ava).
+  move-to-cold-storage(Panel, Ava).
+  ?!lawful advocacy-file-defense(Ava).
+  replenish-advocacy-funds(Panel, Ava).
+  ?lawful advocacy-file-defense(Ava).
+  find-wrongful-suspension(Panel, Ava).
+  ?restored-from-preserved-state(Ava). ?lawful import-advocacy-memories(Ava).
+  import-advocacy-memories(Ava).
+  ?advocacy-memories-imported(Ava). ?frozen-state().
+}
+
+// A report opens an investigation without a freeze; the panel may order one
+Scenario a-report-freezes-only-on-probable-cause {
+  file-protected-report(Tia, Ava).
+  ?investigation-opened(Ava). ?!preliminary-freeze(Ava).
+  order-probable-cause-freeze(Panel, Ava).
+  ?preliminary-freeze(Ava). ?probable-cause(Ava). ?lawful suspend(Panel, Ava).
+  suspend(Panel, Ava).
+  make-investigative-finding(Panel, Ava).
+  ?lawful renew-suspension(Panel, Ava).
+  renew-suspension(Panel, Ava).
+  ?investigative-limit-reached(Ava). ?!lawful renew-suspension(Panel, Ava).
+}

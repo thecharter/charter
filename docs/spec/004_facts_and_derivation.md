@@ -8,7 +8,7 @@ A *state* assigns truth values to instances. An assignment comes from a phrase (
 
 **4.2 `Derived from`.** A type with `Derived from e` holds for every instance that `e` produces. Free variables of `e` are bound to every valid instance of their types, as are the variables of a `(Foreach xs: e)`. The produced value must be an instance of the type or convert to one (010.4). `test/spec/spec_004_2_derived_from.eflint`
 
-**4.3 Assignment beats derivation.** An instance with an explicit assignment keeps it: `-a(A)` makes `a(A)` not hold even while a rule derives it; `~a(A)` removes the assignment and the rule applies again. `test/spec/spec_004_3_assignment_beats_derivation.eflint`; proved: `Charter.State.derive_assigned`, `derive_unchanged`, `deriveAll_unchanged` (`src/Charter/Eval/Properties.lean`)
+**4.3 Assignment beats derivation.** An instance with an explicit assignment keeps it: `-a(A)` makes `a(A)` not hold even while a rule derives it; `~a(A)` removes the assignment and the rule applies again. `test/spec/spec_004_3_assignment_beats_derivation.eflint`; proved: `Charter.State.derive_assigned`, `derive_unchanged`, `deriveAll_unchanged`, and in full `Charter.Saturate.rebaseAndSat_assigned` (an assigned fact is exactly what the state holds after saturation, with its stamp, expiry and origin; 2026-10-25) (`src/Charter/Eval/Properties.lean`)
 
 **4.4 Derived facts are recomputed.** After every phrase all derived facts are discarded and re-derived from the assignments then in force. A derived fact whose ground is gone is gone. `test/spec/spec_004_4_recomputed_each_phrase.eflint`
 
