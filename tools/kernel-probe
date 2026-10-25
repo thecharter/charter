@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Run one Lean file under hard resource caps. The only sanctioned way to run a
+# kernel-decision experiment (`by decide` on the evaluator, spec 013.4) or any other
+# ad-hoc `lean` invocation that may reduce an unbounded term (AGENTS.md, "Kernel
+# experiments run capped").
+#
+#     tools/kernel-probe FILE.lean [--mem MB] [--time SECONDS]
+#
+# Defaults: 6144 MB of memory (Lean's own `--memory` cap; the process aborts when it
+# is reached), 300 s of wall time (`timeout`), and one probe at a time (a lock under
+# out/): a second probe waits rather than running beside the first. Both caps are
+# printed before the run and the result line names which one, if any, fired.
+# Never run `lake env lean` directly on a file with `decide` over the evaluator, and
+# never run probes in parallel: on 2026-10-24 five uncapped probes took 128 GB and
+# crashed the maintainer's machine.
+set -u
+cd "$(dirname "$0")/.." || exit 2
+mem=6144; secs=300; file=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --mem) mem="$2"; shift 2 ;;
+    --time) secs="$2"; shift 2 ;;
+    *) file="$1"; shift ;;
+  esac
+done
+[ -n "$file" ] || { echo "usage: tools/kernel-probe FILE.lean [--mem MB] [--time SECONDS]"; exit 2; }
+[ "$mem" -le 16384 ] || { echo "kernel-probe: refusing a memory cap above 16384 MB"; exit 2; }
+mkdir -p out
+exec 9>out/kernel-probe.lock
+flock 9 2>/dev/null || true   # flock may be missing on macOS; the mkdir lock below is the real one
+lockdir=out/kernel-probe.running
+until mkdir "$lockdir" 2>/dev/null; do
+  if [ -f "$lockdir/pid" ] && ! kill -0 "$(cat "$lockdir/pid")" 2>/dev/null; then rm -rf "$lockdir"; continue; fi
+  echo "kernel-probe: another probe is running (pid $(cat "$lockdir/pid" 2>/dev/null)); waiting"; sleep 5
+done
+echo $$ > "$lockdir/pid"
+trap 'rm -rf "$lockdir"' EXIT
+echo "kernel-probe: $file  (memory cap ${mem} MB, time cap ${secs} s)"
+# Resident size of a process and every descendant (timeout -> lake -> lean), in KB.
+tree_rss_kb() {
+  local pid=$1 sum kid
+  sum=$(ps -o rss= -p "$pid" 2>/dev/null | awk '{print $1+0}')
+  for kid in $(pgrep -P "$pid" 2>/dev/null); do sum=$(( sum + $(tree_rss_kb "$kid") )); done
+  echo "${sum:-0}"
+}
+kill_tree() { local pid=$1 kid; for kid in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$kid"; done; kill -9 "$pid" 2>/dev/null; }
+start=$(date +%s)
+# Two independent memory caps: Lean's own accounting (`--memory`) and a resident-size
+# watchdog that kills the process tree when RSS passes the cap (mimalloc may hold
+# memory Lean's counter does not see).
+timeout -k 5 "$secs" lake env lean --memory="$mem" "$file" &
+child=$!
+killed_by=""
+while kill -0 "$child" 2>/dev/null; do
+  total_kb=$(tree_rss_kb "$child")
+  if [ "$total_kb" -gt $(( mem * 1024 )) ]; then
+    killed_by="the memory watchdog (RSS $(( total_kb / 1024 )) MB > ${mem} MB)"
+    kill_tree "$child"
+    break
+  fi
+  sleep 0.25
+done
+wait "$child"; st=$?
+end=$(date +%s)
+if [ -n "$killed_by" ]; then echo "kernel-probe: KILLED by $killed_by after $((end-start)) s"; exit 137; fi
+case $st in
+  0)   echo "kernel-probe: ok in $((end-start)) s" ;;
+  124|137) echo "kernel-probe: KILLED by the time cap after $((end-start)) s" ;;
+  *)   echo "kernel-probe: lean exited $st after $((end-start)) s (a memory-cap abort from Lean prints its own message above)" ;;
+esac
+exit $st

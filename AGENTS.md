@@ -288,6 +288,14 @@ trailer, or credit; no `Co-Authored-By` for AI assistance (adopted 2026-10-23).
 - Re-read any file before editing it after ten or more messages; context compaction
   may have destroyed your knowledge of it and the edit will fail or, worse, succeed
   wrongly.
+- **Kernel experiments run capped.** Any ad-hoc `lean` run that may reduce an
+  unbounded term (`by decide` over the evaluator, `#reduce`, a `#eval` that builds a
+  large structure) goes through `tools/kernel-probe FILE.lean [--mem MB] [--time S]`,
+  which caps memory with Lean's own `--memory` (default 6 GB, never above 16 GB), caps
+  wall time with `timeout` (default 300 s), and runs one probe at a time. Never call
+  `lake env lean` on such a file directly, never run probes in parallel, and never
+  raise `maxHeartbeats`/`maxRecDepth` without the cap in place: on 2026-10-24 five
+  uncapped probes in parallel took 128 GB and crashed the maintainer's machine.
 
 ## Repository layout
 
