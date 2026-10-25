@@ -5,6 +5,49 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-10-24 (late night): the create phrase's cost located; it was the elaborator, not the kernel
+
+## Where
+
+- `main`, pushed directly. One commit: spec 013.4's third finding, the checked-in probe
+  `tools/probes/three_phrase_decides.lean`, this section. `tools/battery`: PASS on all ten
+  steps on this tree before the push (numbers in the commit message).
+
+## What was found
+
+Bisected one capped probe at a time through `tools/kernel-probe` (never in parallel):
+
+| probe (plain `by decide` unless marked) | result |
+|---|---|
+| `M.eval 40` on the compiled create term | ok, 1 s |
+| `M.eval M.fuel` (100000) on the same term | ok, under 1 s |
+| `M.evalEffect M.fuel (.cAll [] t)` | ok, under 1 s |
+| `Store.unions` over that effect's stores | ok, under 1 s |
+| `Interp.semPhrase … 5 cp` | killed, 6.2 GB after 6 s |
+| `Interp.semPhrase … 1 cp` | killed, 6.2 GB after 5 s |
+| `Interp.semPhrase … 5 cp` with `decide +kernel` | ok, under 1 s |
+| three-phrase program, `decide +kernel` | ok, under 1 s (was ~200 s with plain `decide`) |
+
+So fuel size, `Store.union` and `DomId` strings were not the cost. Plain `decide`
+evaluates the `Decidable` instance in the elaborator first (`Meta.whnf`), and that
+evaluation blows up on `semPhrase`'s frame; the kernel decides the same term at once.
+`decide +kernel` skips the elaborator's evaluation and is still a kernel-checked proof.
+
+## Consequences
+
+- `Prove.LeanGen` emits `by decide +kernel` for every theorem; items embedded as data.
+- Interning names to `Nat` is deferred: no measured program needs it yet.
+- The probe is checked in as `tools/probes/three_phrase_decides.lean` with the
+  measurements in its header; run it only through `tools/kernel-probe`.
+
+## Next
+
+1. `Prove.LeanGen`: embed items as data, one theorem per invariant and expectation,
+   `decide +kernel`; measure on a lib module before calling it shipped (013.4).
+2. Eric rules B9 and B10; Phase 3's artifact format after B10.
+
+---
+
 # Handoff — 2026-10-24 (night): guardrails for kernel experiments after a crash; the evaluator made structurally recursive, and the first kernel decision of a Charter program
 
 ## Where
