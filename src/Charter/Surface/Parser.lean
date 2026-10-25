@@ -567,6 +567,9 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Created by" =>
     if k != .duty then return none
     advance; return some (.createdBy (← idList))
+  | .kw "Overridden by" =>
+    if k != .duty then return none
+    advance; return some (.overriddenBy (← idList))
   | .kw "Due within" =>
     if k != .duty then return none
     advance; return some (.dueWithin (← expression))

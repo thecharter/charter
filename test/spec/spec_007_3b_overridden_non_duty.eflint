@@ -1,0 +1,5 @@
+// 007.3: `Overridden by` must name duties; anything else is CHR026.
+//! expect-error: CHR026
+Fact actor Identified by Alice
+Act alarm Actor actor.
+Duty quiet Holder actor Claimant actor1 Overridden by alarm.

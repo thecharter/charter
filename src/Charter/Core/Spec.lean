@@ -79,6 +79,9 @@ structure DutySpec where
   terminatingActs : List DomId := []
   creatingActs    : List DomId := []
   violatedWhen    : List Term := []
+  /-- Charter (007.3): duties that take precedence: while an instance of one of them
+  holds sharing this duty's bound components, this duty is not violated. -/
+  overriddenBy    : List DomId := []
   deriving Repr, Inhabited
 
 structure EventSpec where
@@ -130,6 +133,8 @@ inductive ModClause where
   | enforcingActs (as : List DomId)
   | terminatedBy (as : List DomId)
   | createdBy (as : List DomId)
+  /-- Charter (007.3): `Overridden by` on a duty. -/
+  | overriddenBy (ds : List DomId)
   | strings (ss : List String)
   | ints (is : List Int)
   | close
@@ -368,6 +373,9 @@ where
     | .createdBy as => { t with kind := match t.kind with
         | .duty d => .duty { d with creatingActs := as ++ d.creatingActs }
         | k => k }
+    | .overriddenBy ds => { t with kind := match t.kind with
+        | .duty d => .duty { d with overriddenBy := ds ++ d.overriddenBy }
+        | k => k }
     | .strings ss => { t with domain := match t.domain with
         | .anyString => .strings ss
         | .strings ss' => .strings (ss' ++ ss)
@@ -419,7 +427,8 @@ def Kind.mapDom (f : DomId → DomId) : Kind → Kind
       enforcingActs := d.enforcingActs.map f
       terminatingActs := d.terminatingActs.map f
       creatingActs := d.creatingActs.map f
-      violatedWhen := d.violatedWhen.map (Term.mapDom f) }
+      violatedWhen := d.violatedWhen.map (Term.mapDom f)
+      overriddenBy := d.overriddenBy.map f }
   | .event e => .event { e with effects := e.effects.map (Effect.mapDom f), syncs := e.syncs.map (Sync.mapDom f) }
   | .immunity i => .immunity { i with against := i.against.map f, unlessConds := i.unlessConds.map (Term.mapDom f) }
 
@@ -440,6 +449,7 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .enforcingActs as => .enforcingActs (as.map f)
   | .terminatedBy as => .terminatedBy (as.map f)
   | .createdBy as => .createdBy (as.map f)
+  | .overriddenBy ds => .overriddenBy (ds.map f)
   | .validWhen ts => .validWhen (ts.map (Term.mapDom f))
   | .exceptUnder as => .exceptUnder (as.map f)
   | .against as => .against (as.map f)

@@ -528,6 +528,16 @@ def checkActs (what : String) (as : List DomId) : Stc Unit := do
       | k => err "CHR022" s!"`{what}` names {a}, which is {k.lowerName}, not an act"
     | none => err "CHR010" s!"undeclared type {a} in `{what}`"
 
+/-- `Overridden by` names duties (007.3): anything else is CHR026. -/
+def checkDuties (what : String) (ds : List DomId) : Stc Unit := do
+  let spec ← getSpec
+  ds.forM fun a =>
+    match spec.findDecl a with
+    | some t => match t.kind with
+      | .duty _ => pure ()
+      | k => err "CHR026" s!"`{what}` names {a}, which is {k.lowerName}, not a duty"
+    | none => err "CHR010" s!"undeclared type {a} in `{what}`"
+
 def compileKind (d : DomId) (tspec : TypeSpec) : Kind → Stc Kind
   | .act a => do
     let xs := match tspec.domain with | .products xs => xs | _ => []
@@ -547,6 +557,7 @@ def compileKind (d : DomId) (tspec : TypeSpec) : Kind → Stc Kind
     return .event { e with effects, syncs }
   | .duty ds => do
     let vconds ← ds.violatedWhen.mapM (compileViolationCondition d)
+    checkDuties "Overridden by" ds.overriddenBy
     return .duty { ds with violatedWhen := vconds }
   | k => return k
 
@@ -594,6 +605,9 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
           let dv ← compileDerivation xs a (.holdsWhen (.present (.app ty (.named []))))
           return (a, [ModClause.derivation [dv]])
         return (ty, [.terminatedBy as]) :: (posts ++ holds)
+      | .overriddenBy ds =>
+        checkDuties "Overridden by" ds
+        return [(ty, [.overriddenBy ds])]
       | .createdBy as =>
         let posts ← as.mapM fun a => do
           let e ← compileEffect' (fun xs t => .cAll xs t none) xs [] (.app ty (.named []))

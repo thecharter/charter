@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-25 (2) — 007.3 duty precedence: `Duty d … Overridden by d'` (shared components, declared, one level); CHR026. 123 conformance tests.
 - 2026-10-25 — `charter prove` is a checkpointed chain (013.4, ruled by Eric): one kernel theorem per phrase, closed by `kernel_rfl`, memory bounded by a phrase; whole `lib/` tests decide under the default cap. A failing step names the phrase the kernel disagrees about (Law 9). `test/prove/scenario.eflint`.
 - 2026-10-24 (night) — `charter prove` lands as Phase 2's maintainer tool (013.3, 013.4, 018.2): the generator embeds phrases as data, one kernel decision per program with `decide +kernel`, one *decided* claim per theorem, capped; `test/prove/`. The evaluator depends on no axiom. Measured limit recorded in 013.4.
 - 2026-10-24 — D15 (an act whose domain is not enumerable is judged for the instance; CHR025; the `explore-domain` menu) in 004.1, 004.7, 005.5, 013.2, 018; D16 (`Duration * Int`) in 009.2, 010.2. 121 conformance tests.
@@ -32,7 +33,7 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 004 facts and derivation | `004_facts_and_derivation.md` | draft; 13 tests green (D6; origins and `?why`; D15 in 4.1 and 4.7) |
 | 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 11 tests green, `Valid when` (D5) and judged acts (D15) included |
 | 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 6 tests green, `Due within` included |
-| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 4 tests green (`Except under`, `Immunity`); duty precedence pending |
+| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 6 tests green (`Except under`, `Immunity`, `Overridden by`) |
 | 008 events, physical, syncs | `008_events_physical_syncs.md` | draft; 4 tests green |
 | 009 time | `009_time.md` | draft; 14 tests green (D7: the clock, `Time`/`Duration`, stamps, `Held … For`, expiry; D16: `Duration * Int`) |
 | 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |

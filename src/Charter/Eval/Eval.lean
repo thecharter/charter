@@ -316,12 +316,33 @@ def immunityBlocks : Nat → DomId → Tagged → M Bool
     pure (rs.any id)
 termination_by structural n => n
 
+/-- Whether a duty instance's violation condition holds. Charter (007.3): a duty
+`Overridden by d₁, d₂` is not violated while an instance of a named duty holds that shares
+the components the two duties have in common (by name, as `Except under` shares them,
+005.5); its other components range over every instance. Precedence is declared and one
+level deep: the overriding duty's own precedence is not consulted. -/
 def evalViolationCondition : Nat → Tagged → Option (List Term) → M Bool
   | 0, _, _ => err (.fuelExhausted "checking a violation condition")
   | fuel + 1, te, mconds => do
-    let (dom, _) ← getDom te.2
+    let tspec ← getTypeSpec te.2
     let cond := (mconds.getD []).foldr Term.or (.boolLit false)
-    withSubs (Tagged.bindings dom te) (whenBool (eval fuel cond) pure)
+    withSubs (Tagged.bindings tspec.domain te) do
+      let v ← whenBool (eval fuel cond) pure
+      if !v then pure false
+      else
+        match tspec.kind with
+        | .duty ds =>
+          if ds.overriddenBy.isEmpty then pure true
+          else
+            let spec ← getSpec
+            let subs ← getSubs
+            let rs ← ds.overriddenBy.mapM fun d' => do
+              let free := (spec.components d').filter (fun x => !(subs.any (fun p => p.1 == x)))
+              let insts ← results (scopeWith (everyValidSubs fuel) free (whenTagged (eval fuel (.app d' (.named []))) pure))
+              let held ← insts.mapM (isHolds fuel)
+              pure (held.any id)
+            pure (!(rs.any id))
+        | _ => pure true
 termination_by structural n => n
 
 def isViolated : Nat → Tagged → M Bool

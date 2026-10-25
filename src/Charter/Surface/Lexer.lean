@@ -62,7 +62,7 @@ namespace Lexer
 
 /-- Multi-word and word keywords, longest first so that `Holds when` wins over `Holds`. -/
 def wordKeywords : List String :=
-  [ "Derived externally", "Conditioned by", "Identified by", "Terminated by", "Violated when",
+  [ "Derived externally", "Conditioned by", "Identified by", "Terminated by", "Violated when", "Overridden by",
     "Present when", "Current Time", "Derived from", "Enforced by", "Related to", "Syncs with",
     "Created by", "Holds when",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",

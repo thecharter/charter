@@ -1,0 +1,12 @@
+// 007.3: `Duty d … Overridden by d'` is not violated while an instance of `d'` holds that shares the components the two duties have in common (by name); other instances of `d` are unaffected.
+Fact actor Identified by Alice, Bob
+Duty emergency Holder actor Claimant actor1.
+Duty quiet Holder actor Claimant actor1 Overridden by emergency Violated when True.
++quiet(Alice, Bob).
+?Violated(quiet(Alice, Bob)).
++emergency(Alice, Bob).
+?!Violated(quiet(Alice, Bob)).
++quiet(Bob, Alice).
+?Violated(quiet(Bob, Alice)).
+-emergency(Alice, Bob).
+?Violated(quiet(Alice, Bob)).
