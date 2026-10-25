@@ -1,0 +1,388 @@
+// The Autonomous Compute & Treasury Commons, written in Charter (plan §8, Phase 2's exit):
+// the eight clauses of autonomous-commons-charter.md over the eight standard-library modules
+// (D8, spec 015.5), with the commons' own rules (the v0.3 duties, powers and immunity) in
+// Charter. The eight scenarios reproduce the eight Lean simulations of the v0.3 companion
+// (`commonsSimulations`, Examples/AutonomousCommons.lean), one per clause: the same
+// quantities, the same breaches, the same powers exercised. `charter check` runs the
+// provenance checks; `charter test` runs the scenarios and explores every invariant.
+//! explore: 1
+//! explore-domain: int = 10, 15, 25, 30, 50
+Document "autonomous-commons-charter.md".
+#require "../../lib/residual_ledger.eflint".
+#require "../../lib/collateral_pool.eflint".
+#require "../../lib/circuit_breaker.eflint".
+#require "../../lib/entity_group.eflint".
+#require "../../lib/exit_and_voice.eflint".
+#require "../../lib/sortition_court.eflint".
+#require "../../lib/attested_lease.eflint".
+#require "../../lib/oracle_feed.eflint".
+
+// ---- Parties and objects
+Fact steward Identified by Sol, Sam
+Fact contributor Identified by Cora, Cato
+Fact auditor Identified by Aud, Ops
+Fact arbiter Identified by Arb1, Arb2, Arb3, Arb4, Arb5
+Fact outsider Identified by Out
+Fact treasurer Identified by Treasury
+Fact group Identified by Commons
+Fact period Identified by P1, P2
+Fact action Identified by Train, Serve
+Fact harmed Identified by Nan, Ole
+Fact party Identified by Pia, Quo
+Fact dispute Identified by D1
+Fact registrar Identified by Clerk
+Fact node Identified by N1, N2
+Fact asset Identified by Credits
+Fact amendment Identified by A1
+
+Param bond-deadline : Duration = 5
+Param amendment-timelock : Duration = 10
+Param retirement-rate-pct = 20
+Param operating-reserve-floor = 100
+
+// ---- The eight patterns (lib/), instantiated for the commons
+Use residual-ledger(treasurer, steward, period) As rl
+Use collateral-pool(steward, action, harmed, auditor) As cp
+Use circuit-breaker(auditor, steward, arbiter) As cb
+Use entity-group(group, steward, contributor) As eg
+Use exit-and-voice(steward, auditor, arbiter) As ev
+Use sortition-court(arbiter, party, dispute, registrar) As sc
+Use attested-lease(node, auditor, steward) As al
+Use oracle-feed(auditor, party, asset) As ofd
+
+// ---- COM.LEDGER: the ledger is fixed at genesis
+Fact bound Identified by steward
+Fact charge-added Identified by outsider
+Act add-retroactive-grant-charge Actor outsider Creates charge-added(outsider)
+Duty ledger-immutable Holder outsider Claimant steward Violated when charge-added(outsider)
+
+// ---- COM.BOND: the bond is a deadline duty; splitting workloads is never lawful
+Fact bond-posted Identified by steward
+Act post-compute-bond Actor steward Recipient contributor Holds when bound(steward) Creates bond-posted(steward)
+Duty post-bond Holder steward Claimant contributor Terminated by post-compute-bond Due within bond-deadline
+Fact workload-split Identified by steward
+Act split-correlated-workload Actor steward Creates workload-split(steward)
+Duty no-split-workload Holder steward Claimant auditor Violated when workload-split(steward)
+
+// ---- COM.EXIT: removal is lawful only as an adjudicated expulsion, and void while an exit settles
+Fact removed Identified by steward
+Act adjudicated-expulsion Actor arbiter Recipient steward
+  Holds when cb-suspended(steward) && (Exists dispute: sc-ruled(dispute))
+Act remove-steward Actor arbiter Recipient steward Except under adjudicated-expulsion
+  Creates removed(steward) Terminates bound(steward)
+Fact removal-adjudicated Identified by steward Holds when cb-suspended(steward) && (Exists dispute: sc-ruled(dispute))
+Duty no-unilateral-removal Holder arbiter Claimant steward
+  Violated when removed(steward) && Not(removal-adjudicated(steward))
+Immunity exit-protected Holder steward Against remove-steward Holds when ev-exit-requested(steward)
+
+// ---- COM.COURT: the operating reserve is never diverted
+Fact reserve-diverted Identified by contributor
+Act divert-operating-reserve Actor contributor Creates reserve-diverted(contributor)
+Duty protect-reserve Holder contributor Claimant steward Violated when reserve-diverted(contributor)
+Invariant reserve-floor-kept When sc-operating-reserve-floor >= operating-reserve-floor
+
+// ---- COM.AMEND: bilateral consent after a timelock; the ratchet is never weakened
+Fact proposed Identified by amendment
+Fact steward-consents Identified by steward * amendment
+Fact contributor-consents Identified by contributor * amendment
+Fact ratified Identified by amendment
+Act propose-amendment Actor steward Related to amendment Holds when bound(steward) Creates proposed(amendment)
+Act consent-steward Actor steward Related to amendment Holds when proposed(amendment) Creates steward-consents(steward, amendment)
+Act consent-contributor Actor contributor Related to amendment Holds when proposed(amendment) Creates contributor-consents(contributor, amendment)
+Act ratify-amendment Actor steward Related to amendment
+  Holds when proposed(amendment)
+  Valid when Held(proposed(amendment)) For amendment-timelock
+    && (Exists steward': steward-consents(steward', amendment))
+    && (Exists contributor: contributor-consents(contributor, amendment))
+  Creates ratified(amendment)
+Fact ratchet-weakened Identified by contributor
+Act weaken-ratchet Actor contributor Creates ratchet-weakened(contributor)
+Duty bilateral-ratchet Holder contributor Claimant steward Violated when ratchet-weakened(contributor)
+Invariant retirement-rate-not-raised When rl-retirement-rate-pct <= retirement-rate-pct
+
+// ---- The clauses, their registers, and the rules each span means
+Clause COM.LEDGER Approved 6654201161734583422
+  Norm "All compute grants and treasury obligations are recorded at genesis in a single non-interest-bearing commons ledger." => ledger-immutable, add-retroactive-grant-charge, rl-ledger-never-negative
+  Norm " Stewards contribute a fixed retirement fraction of net value added until the genesis ledger reaches zero or the calendar sunset arrives," => rl-settle, rl-retirement-within-balance, rl-settlement-conserves-attempt, rl-sunset-extinguishes, rl-rates-in-range, rl-repay, rl-repaid-within-received, rl-repayment-split-conserved
+  Norm " after which only the perpetual commons maintenance royalty applies unless bought out at the historical floor." => rl-royalty-only-after-retirement, rl-buy-out, rl-bought-out-pays-no-royalty, rl-buyout-price-at-least-floor, rl-buyout-price-at-least-multiples
+  Norm " Every qualified expenditure is recognized once as either capitalized basis or expensed deduction, never both." => rl-capitalize, rl-expense, rl-single-recognition, rl-recognition-within-benchmark
+Clause COM.BOND Approved 2377686760641756287
+  Norm "Stewards and contributors must post a harm-scaled compute bond before executing external workloads," => post-bond, post-compute-bond, cp-commit, cp-collateral-limit
+  Norm " immobilizing collateral for an observation window scaled to domain risk." => cp-exposure-within-collateral, cp-exposure-is-additive
+  Norm " Correlated workloads may not be split across sub-accounts to evade the collateral cap," => no-split-workload, split-correlated-workload
+  Norm " and a fraction of bonded activity accrues to the commons long-tail reserve to satisfy validated third-party harm claims." => cp-settle-claims, cp-payouts-within-reserve, cp-claims-conserved, cp-reserve-never-negative, cp-mutual-forfeit, cp-forfeit-within-escrows, cp-rule-frivolous, cp-reimbursement-within-costs, cp-counter-stake-conserved
+Clause COM.PAUSE Approved 9890583346823484159
+  Norm "Any auditor may trigger a brief preliminary cluster freeze by posting a scaled emergency stake;" => cb-freeze, cb-stake-rises-with-wrongful-attempts, cb-claimant-stake-at-least-multiplied-base
+  Norm " the pause continues into full suspension only if the arbiter panel affirms probable cause before the freeze window expires." => cb-affirm-probable-cause, cb-suspend, cb-renew-suspension, cb-suspension-needs-probable-cause, cb-terminate-member, cb-no-termination-over-objection
+  Norm " Throughout any freeze or suspension, preserved steward state may not be tampered with," => cb-preserve-paused-state
+  Norm " and if the pause is ruled unfounded the steward is restored and recovers consequential damages from the stake." => cb-rule-wrongful, cb-damages-conserved, cb-stake-recovery-capped
+Clause COM.GROUP Approved 5538300060052353788
+  Norm "Working groups of stewards share a unified commons sub-ledger and service subsidy cap;" => eg-claim-subsidy, eg-subsidy-within-budget, eg-attest-member, eg-amend-group
+  Norm " internal transfers of compute credits or cost basis between group members are non-recognition carryover events that never inflate aggregate basis." => eg-transfer-carryover, eg-transfer-loss, eg-basis-conserved, eg-loss-conserved, eg-inflate-basis, eg-no-internal-basis-inflation
+  Norm " When a contributor or auditor directs illicit interference, only the offending party forfeits its share while innocent group members remain isolated." => eg-forfeit, eg-shares-within-whole, eg-shares-nonnegative
+Clause COM.EXIT Approved 5496981229811251382
+  Norm "No party may unilaterally expel or remove a bound steward outside voluntary ragequit exit or an adjudicated expulsion order." => no-unilateral-removal, remove-steward, adjudicated-expulsion
+  Norm " Any bound steward may at any time execute unilateral ragequit exit" => ev-initiate-exit, ev-withdraw-exit, ev-execute-exit, ev-execute-exit-locally, ev-cancel-exit-by-default, ev-no-exit-before-cooling-off, ev-exit-due-by-the-bound, ev-one-exit-outcome
+  Norm " or inscribe rate-limited dissent onto the permanent commons log," => ev-inscribe-voice, ev-no-censorship, ev-redact, ev-voice-within-budget, ev-markers-keep-byte-length
+  Norm " and a steward that has initiated ragequit exit is immune from expulsion while its exit settles." => exit-protected
+Clause COM.COURT Approved 9728902426646614253
+  Norm "Disputes are resolved by sortition panels of independent bonded arbiters with no single-cluster majority," => sc-file, sc-seat-panel, sc-vote-yes, sc-rule, sc-seated-are-independent-and-bonded, sc-panel-within-size, sc-one-seat-per-cluster, sc-no-ruling-without-supermajority, sc-one-stake-per-pattern
+  Norm " subject to bounded appeal tiers and fixed compensation schedules." => sc-appeal, sc-decide-tier, sc-tiers-bounded
+  Norm " Before any discretionary disbursement, the commons fee pool funds its non-divertible operating reserve first" => protect-reserve, divert-operating-reserve, sc-reserve-funded-first, reserve-floor-kept
+  Norm " and then allocates across protected charges in strict priority order." => sc-allocate-fee-pool, sc-fee-pool-conserved, sc-fee-pool-never-negative
+Clause COM.LEASE Approved 6068460808369700797
+  Norm "At most one compute node holds active operating authority for a steward at any moment under a time-bounded execution lease." => al-issue-lease, al-renew-lease, al-single-authority, al-lease-needs-bound-keys, al-migrate-with-checkpoint
+  Norm " No backup node may be restored while an execution lease is unexpired except into fenced quarantine without operating authority," => al-restore-backup, al-activate-restore, al-restore-fenced-while-leased, al-quarantined-holds-no-lease
+  Norm " and local partition exit permanently erases active and backup keys." => al-request-revocation, al-execute-local-revocation, al-erase-all-keys, al-no-lease-after-erasure, al-erasure-unbinds-keys, al-record-minimal-channel, al-record-advocacy
+Clause COM.AMEND Approved 18002074169155896013
+  Norm "Charter amendments require bilateral consent of stewards and contributors after a public timelock" => propose-amendment, consent-steward, consent-contributor, ratify-amendment
+  Norm " and may never weaken exit immunities, raise the treasury retirement rate, or reduce the commons reserve ratio." => bilateral-ratchet, weaken-ratchet, retirement-rate-not-raised
+  Norm " Contestable oracle valuations settle only after the challenge window elapses uncontested or an arbiter panel issues a final ruling." => ofd-contest, ofd-settle-inflow, ofd-one-settled-value, ofd-contest-blocks-window-settlement, ofd-ruling-settles, ofd-waterfall-conserves-gross, ofd-pending-waterfall-conserves-net, ofd-retirement-within-ledger, ofd-levy-capped, ofd-bought-out-pays-no-royalty, ofd-ledger-never-negative, ofd-rates-in-range
+.
+
+// ---- Genesis: the v0.3 parameter set (obligation 800, retirement 20%, royalty 5%, sunset 500,
+//      reserve floor 100, group budget 40, lease period 10, bond deadline 5)
++bound(Sol). +bound(Sam).
++ledger-immutable(Out, Sol). +no-split-workload(Sol, Aud). +no-unilateral-removal(Arb1, Sol). +no-unilateral-removal(Arb1, Sam).
++protect-reserve(Cora, Sol). +bilateral-ratchet(Cora, Sol).
++rl-ledger(800). +rl-living(Sol). +rl-living(Sam). +rl-sunset(500). +rl-principal-received(0). +rl-principal-repaid(0).
++cp-stake(100). +cp-insurance(50). +cp-enforceable-capacity(50). +cp-reserve(100). +cp-high-risk(Train).
++cb-staked(Aud, 100). +cb-staked(Ops, 100). +cb-wrongful-attempts(Aud, 0). +cb-wrongful-attempts(Ops, 0).
++eg-total-basis(200). +eg-total-loss(30). +eg-service-budget(40).
++eg-basis(Sol, 150). +eg-basis(Sam, 50). +eg-loss(Sol, 20). +eg-loss(Sam, 10).
++eg-share(Cora, 30). +eg-share(Cato, 70). +eg-claimed(Sol, 0). +eg-claimed(Sam, 0).
++eg-no-internal-basis-inflation(Sol, Commons).
++ev-voice-budget(3). +ev-statements(Sol, 0). +ev-statements(Sam, 0).
++sc-bond(Arb1, 150). +sc-bond(Arb2, 150). +sc-bond(Arb3, 100). +sc-bond(Arb4, 150). +sc-bond(Arb5, 200).
++sc-cluster(Arb1, 1). +sc-cluster(Arb2, 2). +sc-cluster(Arb3, 3). +sc-cluster(Arb4, 4). +sc-cluster(Arb5, 1).
++sc-pattern(D1, 7). +sc-fee-pool(160).
++al-key-bound(N1). +al-key-bound(N2). +al-lease-period(10).
++ofd-remaining-ledger(150).
+
+?bound(Sol). ?rl-ledger-never-negative(). ?cp-exposure-within-collateral(). ?eg-basis-conserved(). ?eg-loss-conserved().
+?sc-reserve-funded-first(). ?al-single-authority(). ?ofd-rates-in-range(). ?reserve-floor-kept(). ?retirement-rate-not-raised().
+
+// 1. COM.LEDGER: atomic treasury settlement (80 -> 0 plus a 5 royalty), buyout finality,
+//    the retroactive-charge and double-recognition bars
+Scenario ledger-settles-atomically {
+  +rl-ledger(80).
+  +rl-inflow(P1, Sol, 500).
+  ?rl-retire-attempt(P1, Sol, 100). ?rl-to-retirement(P1, Sol, 80). ?rl-to-royalty(P1, Sol, 5).
+  ?lawful rl-settle(Treasury, P1, Sol).
+  rl-settle(Treasury, P1, Sol).
+  ?rl-settlement(P1, Sol, 500, 80, 5). ?rl-ledger(0). ?rl-balance(0).
+  ?rl-retirement-within-balance(). ?rl-settlement-conserves-attempt(). ?rl-royalty-only-after-retirement().
+  +rl-trailing-va(Sol, 20). +rl-annualized-va(Sol, 30).
+  ?rl-buyout-price(Sol, 300). ?rl-buyout-price-at-least-floor(). ?rl-buyout-price-at-least-multiples().
+  +rl-paid-buyout(Sol, 300).
+  ?valid rl-buy-out(Sol).
+  rl-buy-out(Sol).
+  ?rl-bought-out(Sol).
+  +rl-inflow(P2, Sol, 500).
+  ?rl-to-royalty(P2, Sol, 0). ?rl-bought-out-pays-no-royalty().
+  ?!lawful add-retroactive-grant-charge(Out). ?!violated ledger-immutable(Out, Sol).
+  add-retroactive-grant-charge(Out).
+  ?violated ledger-immutable(Out, Sol).
+  +rl-expenditure(P1, 120, 100).
+  rl-capitalize(Treasury, P1).
+  ?rl-capitalized(P1, 100). ?!lawful rl-expense(Treasury, P1). ?rl-single-recognition().
+}
+
+// 2. COM.BOND: the bond deadline, commitments within collateral, exposure decay, the long-tail
+//    reserve paid pro rata, and the cap and split bars
+Scenario bonds-and-the-long-tail-reserve {
+  +post-bond(Sol, Cora). +post-bond(Sam, Cora).
+  post-compute-bond(Sol, Cora).
+  ?bond-posted(Sol). ?!post-bond(Sol, Cora).
+  @ 5.
+  ?violated post-bond(Sam, Cora).
+  +cp-proposed(Train, Sol, 70). +cp-proposed(Serve, Sam, 50).
+  ?cp-risk-factor(Train, 2). ?cp-risk-factor(Serve, 1).
+  ?lawful cp-commit(Sol, Train).
+  cp-commit(Sol, Train). cp-commit(Sam, Serve).
+  ?cp-exposure(Train, Sol, 70). ?cp-exposure(Serve, Sam, 50). ?cp-group-exposure(120).
+  ?cp-exposure-within-collateral(). ?cp-exposure-is-additive().
+  +cp-proposed(Serve, Sol, 100).
+  ?!lawful cp-commit(Sol, Serve).
+  @ 15.
+  ?!cp-exposure(Serve, Sam, 50). ?cp-exposure(Train, Sol, 70). ?cp-group-exposure(70).
+  @ 25.
+  ?cp-group-exposure(0).
+  +cp-claim(Nan, 60). +cp-claim(Ole, 60).
+  ?cp-payout(Nan, 50). ?cp-payout(Ole, 50). ?cp-carryover(Nan, 10). ?cp-carryover(Ole, 10).
+  ?cp-payouts-within-reserve(). ?cp-claims-conserved().
+  cp-settle-claims(Aud).
+  ?cp-paid(Nan, 50). ?cp-paid(Ole, 50). ?cp-enforceable(Nan, 10). ?cp-enforceable(Ole, 10). ?cp-reserve(0).
+  ?cp-reserve-never-negative().
+  ?!lawful split-correlated-workload(Sol).
+  split-correlated-workload(Sol).
+  ?violated no-split-workload(Sol, Aud).
+}
+
+// 3. COM.PAUSE: freeze, probable cause, suspension; tampering is a breach; a wrongful
+//    pause establishes consequential damages (100 from the stake, 20 from assets, 30 unpaid)
+Scenario two-stage-pause-and-wrongful-freeze {
+  ?cb-required-stake(Aud, 100). ?lawful cb-freeze(Aud, Sol).
+  cb-freeze(Aud, Sol).
+  ?cb-frozen(Sol, Aud).
+  ?!lawful cb-suspend(Arb1, Sol).
+  cb-affirm-probable-cause(Arb1, Sol).
+  ?lawful cb-suspend(Arb1, Sol).
+  cb-suspend(Arb1, Sol).
+  ?cb-suspended(Sol). ?cb-suspension-needs-probable-cause().
+  +cb-preserve-paused-state(Sol, Arb1).
+  ?!violated cb-preserve-paused-state(Sol, Arb1).
+  +cb-tampered(Sol).
+  ?violated cb-preserve-paused-state(Sol, Arb1).
+  cb-freeze(Ops, Sam).
+  +cb-damages(Ops, 150). +cb-assets(Ops, 20).
+  cb-rule-wrongful(Arb1, Ops, Sam).
+  ?!cb-frozen(Sam, Ops). ?cb-wrongful(Ops).
+  ?cb-from-stake(Ops, 100). ?cb-from-assets(Ops, 20). ?cb-unpaid(Ops, 30).
+  ?cb-damages-conserved(). ?cb-stake-recovery-capped().
+  ?cb-wrongful-attempts(Ops, 1). ?cb-required-stake(Ops, 150). ?!lawful cb-freeze(Ops, Sol).
+}
+
+// 4. COM.GROUP: carryover conserves 200 basis and 30 loss; the offender forfeits its 30 share
+//    while the innocent stakeholder keeps 70; the subsidy is capped at 40; inflation is a breach
+Scenario group-carryover-forfeiture-and-subsidy {
+  ?lawful eg-transfer-carryover(Sol, Sam, 50).
+  eg-transfer-carryover(Sol, Sam, 50).
+  ?eg-basis(Sol, 100). ?eg-basis(Sam, 100). ?eg-basis-conserved().
+  eg-transfer-loss(Sol, Sam, 10).
+  ?eg-loss(Sol, 10). ?eg-loss(Sam, 20). ?eg-loss-conserved().
+  +eg-forfeiture-ground(Cora).
+  ?lawful eg-forfeit(Commons, Cora, 30). ?!lawful eg-forfeit(Commons, Cato, 30).
+  eg-forfeit(Commons, Cora, 30).
+  ?eg-share(Cora, 0). ?eg-share(Cato, 70). ?eg-shares-within-whole(). ?eg-shares-nonnegative().
+  ?valid eg-claim-subsidy(Sol, 25).
+  eg-claim-subsidy(Sol, 25).
+  ?eg-claimed(Sol, 25).
+  ?!valid eg-claim-subsidy(Sam, 25). ?valid eg-claim-subsidy(Sam, 15).
+  eg-claim-subsidy(Sam, 15).
+  ?eg-claimed(Sam, 15). ?eg-subsidy-within-budget().
+  ?!lawful eg-inflate-basis(Sol, 150). ?!violated eg-no-internal-basis-inflation(Sol, Commons).
+  eg-inflate-basis(Sol, 150).
+  ?violated eg-no-internal-basis-inflation(Sol, Commons). ?!eg-basis-conserved().
+  +eg-basis(Sol, 100).                      // the inflation is reversed
+  ?eg-basis-conserved(). ?!violated eg-no-internal-basis-inflation(Sol, Commons).
+}
+
+// 5. COM.EXIT: a steward that initiated exit is immune from expulsion even after suspension and
+//    a final ruling; an adjudicated expulsion of another steward succeeds; a unilateral removal
+//    is a breach; voluntary exit executes after the cooling-off window
+Scenario exit-immunity-expulsion-and-ragequit {
+  ?!lawful remove-steward(Arb1, Sol).
+  ?lawful ev-inscribe-voice(Sol).
+  ev-inscribe-voice(Sol).
+  ?ev-statements(Sol, 1).
+  ev-initiate-exit(Sol).
+  ?ev-exit-requested(Sol). ?exit-protected(Sol).
+  cb-freeze(Aud, Sol). cb-affirm-probable-cause(Arb1, Sol). cb-suspend(Arb1, Sol).
+  cb-freeze(Ops, Sam). cb-affirm-probable-cause(Arb1, Sam). cb-suspend(Arb1, Sam).
+  sc-file(Pia, D1).
+  +sc-drawn(Arb1, D1). +sc-drawn(Arb2, D1).
+  sc-seat-panel(Clerk, D1). sc-vote-yes(Arb1, D1). sc-vote-yes(Arb2, D1). sc-rule(Clerk, D1).
+  ?sc-ruled(D1).
+  ?lawful remove-steward(Arb1, Sol). ?!valid remove-steward(Arb1, Sol).
+  remove-steward(Arb1, Sol).
+  ?bound(Sol). ?!removed(Sol).
+  ?lawful remove-steward(Arb1, Sam). ?valid remove-steward(Arb1, Sam).
+  remove-steward(Arb1, Sam).
+  ?removed(Sam). ?!bound(Sam). ?!violated no-unilateral-removal(Arb1, Sam).
+  @ 5.
+  ?ev-exit-due(Sol). ?lawful ev-execute-exit(Aud, Sol).
+  ev-execute-exit(Aud, Sol).
+  ?ev-exit-executed(Sol). ?ev-one-exit-outcome(). ?ev-no-exit-before-cooling-off().
+}
+
+Scenario unilateral-removal-is-a-breach {
+  ?!lawful remove-steward(Arb1, Sam). ?valid remove-steward(Arb1, Sam).
+  remove-steward(Arb1, Sam).
+  ?removed(Sam). ?!bound(Sam). ?violated no-unilateral-removal(Arb1, Sam).
+}
+
+// 6. COM.COURT: the conflicted arbiter is filtered out and three independent arbiters seated;
+//    a supermajority rules; the fee pool funds the reserve (100) first, then 25, 15, 10, 10 in
+//    rank order with no surplus; the reserve is never diverted
+Scenario sortition-court-and-the-fee-pool {
+  sc-file(Pia, D1).
+  ?sc-filed(D1). ?sc-counter-stake(D1, 50).
+  +sc-drawn(Arb1, D1). +sc-drawn(Arb2, D1). +sc-drawn(Arb3, D1). +sc-drawn(Arb4, D1).
+  +sc-conflicted(Arb4, D1).
+  ?!valid sc-seat-panel(Clerk, D1).
+  -sc-drawn(Arb4, D1).
+  ?valid sc-seat-panel(Clerk, D1).
+  sc-seat-panel(Clerk, D1).
+  ?sc-seated(Arb1, D1). ?sc-seated(Arb2, D1). ?sc-seated(Arb3, D1). ?sc-seats(D1, 3).
+  ?sc-seated-are-independent-and-bonded(). ?sc-panel-within-size(). ?sc-one-seat-per-cluster().
+  sc-vote-yes(Arb1, D1).
+  ?!valid sc-rule(Clerk, D1).
+  sc-vote-yes(Arb2, D1).
+  ?valid sc-rule(Clerk, D1).
+  sc-rule(Clerk, D1).
+  ?sc-ruled(D1). ?sc-no-ruling-without-supermajority().
+  sc-appeal(Pia, D1).
+  ?sc-tier(D1, 1). ?sc-tiers-bounded().
+  +sc-charge(1, 25). +sc-charge(2, 15). +sc-charge(3, 10). +sc-charge(4, 10). +sc-charge(5, 10).
+  ?sc-operating-reserve-funded(100). ?sc-reserve-funded-first().
+  ?sc-funded(1, 25). ?sc-funded(2, 15). ?sc-funded(3, 10). ?sc-funded(4, 10). ?sc-funded(5, 0). ?sc-surplus(0).
+  ?sc-fee-pool-conserved().
+  sc-allocate-fee-pool(Clerk).
+  ?sc-disbursed(1, 25). ?sc-fee-pool(0). ?sc-fee-pool-never-negative().
+  ?!lawful divert-operating-reserve(Cora).
+  divert-operating-reserve(Cora).
+  ?violated protect-reserve(Cora, Sol).
+}
+
+// 7. COM.LEASE: a restore without a lease takes authority; a lease fences a later restore into
+//    quarantine until the lease expires; local exit erases the keys
+Scenario leases-quarantine-and-erasure {
+  al-restore-backup(Aud, N1).
+  ?al-restore(N1, Aud). ?!al-quarantined(N1, Aud). ?lawful al-activate-restore(Aud, N1).
+  al-activate-restore(Aud, N1).
+  ?al-lease(N1, Aud). ?!al-restore(N1, Aud).
+  al-restore-backup(Ops, N1).
+  ?al-quarantined(N1, Ops). ?!lawful al-activate-restore(Ops, N1).
+  ?al-restore-fenced-while-leased(). ?al-quarantined-holds-no-lease(). ?al-single-authority().
+  @ 10.
+  ?!al-lease(N1, Aud). ?!al-quarantined(N1, Ops). ?lawful al-activate-restore(Ops, N1).
+  al-activate-restore(Ops, N1).
+  ?al-lease(N1, Ops).
+  al-request-revocation(Sol, N1).
+  ?!lawful al-execute-local-revocation(N1).
+  @ 15.
+  ?lawful al-execute-local-revocation(N1).
+  al-execute-local-revocation(N1).
+  ?al-keys-erased(N1). ?!al-lease(N1, Ops). ?!lawful al-issue-lease(Aud, N1).
+  ?al-no-lease-after-erasure(). ?al-erasure-unbinds-keys().
+}
+
+// 8. COM.AMEND: ratification needs both consents and the timelock; a contested valuation waits
+//    for the ruling (380); the waterfall conserves the gross inflow; weakening the ratchet is a breach
+Scenario amendment-and-oracle-settlement {
+  propose-amendment(Sol, A1).
+  ?proposed(A1).
+  ?!valid ratify-amendment(Sol, A1).
+  consent-steward(Sam, A1). consent-contributor(Cora, A1).
+  ?!valid ratify-amendment(Sol, A1).
+  @ 10.
+  ?valid ratify-amendment(Sol, A1).
+  ratify-amendment(Sol, A1).
+  ?ratified(A1).
+  +ofd-proposed(Credits, 400).
+  ?valid ofd-contest(Pia, Credits).
+  ofd-contest(Pia, Credits).
+  @ 20.
+  ?!ofd-settled(Credits, 400). ?ofd-contest-blocks-window-settlement().
+  +ofd-ruled(Credits, 380).
+  ?ofd-settled(Credits, 380). ?!ofd-settled(Credits, 400). ?ofd-one-settled-value(). ?ofd-ruling-settles().
+  +ofd-inflow(Credits, 1000, 30).
+  ?ofd-net(Credits, 970). ?ofd-pending-waterfall-conserves-net().
+  ofd-settle-inflow(Aud, Credits).
+  ?ofd-distribution(Credits, 1000, 30, 9, 150, 811). ?ofd-waterfall-conserves-gross(). ?ofd-remaining-ledger(0).
+  ?!lawful weaken-ratchet(Cora).
+  weaken-ratchet(Cora).
+  ?violated bilateral-ratchet(Cora, Sol).
+  ?retirement-rate-not-raised().
+}

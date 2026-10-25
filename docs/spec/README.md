@@ -7,6 +7,7 @@ This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the 
 
 ## Changelog
 
+- 2026-10-25 (4) — `Examples/AutonomousCommons/commons.eflint` (plan §8, Phase 2's exit): the commons in Charter over the eight `lib/` modules, its eight clauses with every rule's English, the eight Lean simulations reproduced as scenarios by `charter test`; in the battery's `examples` step.
 - 2026-10-25 (3) — `Examples/Tenancy/` (plan §4, §8): the toy program and its document, one clause per Phase 2 addition, six clauses approved, seven scenarios, explored invariants; battery step `examples`.
 - 2026-10-25 (2) — 007.3 duty precedence: `Duty d … Overridden by d'` (shared components, declared, one level); CHR026. 123 conformance tests.
 - 2026-10-25 — `charter prove` is a checkpointed chain (013.4, ruled by Eric): one kernel theorem per phrase, closed by `kernel_rfl`, memory bounded by a phrase; whole `lib/` tests decide under the default cap. A failing step names the phrase the kernel disagrees about (Law 9). `test/prove/scenario.eflint`.
