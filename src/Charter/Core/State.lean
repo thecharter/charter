@@ -71,6 +71,10 @@ def holdsList (s : State) : List Tagged :=
 def notHoldsList (s : State) : List Tagged :=
   s.contents.filterMap fun (te, i) => if i.live s.time then none else some te
 
+/-- Holding instances of a single type `d` (checking `i.value` before `DomId` comparison). -/
+def trueInstances (s : State) (d : DomId) : List Tagged :=
+  s.contents.filterMap fun (te, i) => if i.value && te.2 == d && i.live s.time then some te else none
+
 /-- `(trues, falses)` of a type (eFLINT `assigned_instances`); an expired instance counts as false. -/
 def assignedInstances (s : State) (d : DomId) : List Tagged × List Tagged :=
   (s.contents.filterMap fun (te, i) => if te.2 == d && i.live s.time then some te else none,

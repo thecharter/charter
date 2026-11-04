@@ -8,11 +8,11 @@ Every norm carries its English, and the English leads (Law 8). A program names i
 
 **12.2 Clauses.** `Clause ID [Approved HASH]` declares a clause; `ID` is atoms and identifiers joined by dots (`DEF.01`, `T.2`). Its items are `Text "…"` (the clause's text; when absent, the spans concatenated) and register spans: `Norm "…" => rule, rule`, `Definition "…" [=> ids]`, `Invariant "…" => invariant`, `Acceptance "…"`, `Commentary "…"`. Spans are in document order. Declaring a clause id twice replaces the first. `test/spec/spec_012_1_clauses_resolve.eflint`
 
-**12.3 `From`.** An act, duty, immunity, or invariant may carry `From CLAUSE "span"`: the English it is the meaning of. The clause must be declared and must contain the quoted text. `test/spec/spec_012_1_clauses_resolve.eflint`
+**12.3 `From`.** An act, duty, immunity, invariant, or scenario (D10) may carry `From CLAUSE "span"`: the English it is the meaning of. The clause must be declared and must contain the quoted text. `test/spec/spec_012_1_clauses_resolve.eflint`, `spec_012_3b_invariant_from.eflint`, `spec_012_3c_scenario_from.eflint`
 
 **12.4 Coverage.** A clause's spans, concatenated in order, reproduce its text exactly. `test/spec/spec_012_3_coverage.eflint`
 
-**12.5 Norms are interpreted.** Every `Norm` span names at least one rule, and every id a span names is a declared act, duty, immunity, or invariant; an `Invariant` span names a declared `Invariant`. `test/spec/spec_012_4_norm_needs_rule.eflint`, `spec_012_7_invariant_span.eflint`
+**12.5 Norms are interpreted.** Every `Norm` span names at least one rule, and every id a `Norm` or `Invariant` span names is a declared act, duty, immunity, or invariant; an `Invariant` span names a declared `Invariant`; an `Acceptance`, `Definition`, or `Commentary` span may also name a declared `Scenario` (D10). `test/spec/spec_012_4_norm_needs_rule.eflint`, `spec_012_7_invariant_span.eflint`, `spec_012_3c_scenario_from.eflint`
 
 **12.6 Every rule has its English.** Every declared act, duty, immunity, and invariant is named by some span, in a clause or by its own `From`. A rule with no span is the question and the rule is the answer under review (Law 8). `test/spec/spec_012_5_every_rule_named.eflint`
 

@@ -1,0 +1,23 @@
+// 007.4: an Immunity with `Related to` protects its holder only where the components it shares with the act match.
+Fact agent Identified by Ava
+Fact proposer Identified by Cal
+Fact amendment Identified by Good, Bad
+Fact ratified Identified by amendment
+Fact weakens-floor Identified by amendment
+
+Act ratify Actor proposer Recipient agent Related to amendment
+  Holds when True
+  Creates ratified(amendment)
+
+Immunity ratchet Holder agent Related to amendment
+  Against ratify
+  Holds when weakens-floor(amendment)
+.
+
++weakens-floor(Bad).
+?!valid ratify(Cal, Ava, Bad).
+?valid ratify(Cal, Ava, Good).
+ratify(Cal, Ava, Bad).
+?!ratified(Bad).
+ratify(Cal, Ava, Good).
+?ratified(Good).

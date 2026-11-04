@@ -38,8 +38,8 @@ inductive CPhrase where
   /-- Declarations executed; `init` holds the initial instances of `Param`s (D11). -/
   | onlyDecls (init : Store := [])
   | par (ps : List CPhrase)
-  /-- Charter: a scenario's phrases are resolved when `charter test` runs them. -/
-  | scenario (name : String) (ps : List Phrase)
+  /-- Charter: a scenario's phrases are resolved when `check` or `test` runs them. -/
+  | scenario (name : String) (ps : List Phrase) (spans : List (ClauseId × String) := [])
   /-- Charter: `?lawful`/`?valid`/`?violated` over the instances of `t`, `xs` bound to every instance. -/
   | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
   /-- Charter (D7): `@ t.` and `tick.`, the clock as environment input. -/
@@ -334,7 +334,10 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | .tagged _ => return .present t'
       | _ => convErr ty' ty
     | .tagged d =>
-      if ← matchType ty' (← getDom d) then return .tag t' d else convErr ty' ty
+      let dom ← getDom d
+      if ← matchType ty' dom then return .tag t' d
+      else if ty' == .ints && literalArith t' && (dom == .time || dom == .duration) then return .tag t' d
+      else convErr ty' ty
     | .time =>
       match ty' with
       | .ints => if literalArith t' then return t' else convErr ty' ty
@@ -793,7 +796,11 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
         let fs ← freeVarsChecked t'
         return .why fs t'
       | _ => err "CHR015" s!"?why needs an instance, not {ty}"
-    | .scenario name ps => return .scenario name ps
+    | .scenario name ps spans =>
+      modifySpec (fun s => s.insertScenario name spans)
+      let s ← getSpec
+      withSpec s (ps.forM fun q => do let _ ← compilePhrase fuel q; pure ())
+      return .scenario name ps spans
     | .setTime t => return .setTime (← convertTerm termFuel t .time)
     | .tick => return .tick
     | .expect w neg t =>

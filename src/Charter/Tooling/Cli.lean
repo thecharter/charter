@@ -469,17 +469,25 @@ def usageText (programs : List Program) : String :=
   "program owning the named actor, and eval/sim read the scenario's \"institution\" key.\n" ++
   "When .charter files are given, commands run over exactly those files."
 
+/-- Whether an argument names a Charter program of the eFLINT-superset pipeline
+(`.eflint`, or a `.charter` file that is not in the legacy v0.3 flat format). -/
+def isCoreProgramArg (a : String) : IO Bool := do
+  if a.endsWith ".eflint" then return true
+  if a.endsWith ".charter" then return !(← isLegacyCharterFile (System.FilePath.mk a))
+  return false
+
 /-- Entry point: dispatch `args` over the registered `programs`. -/
 def run (registered : List Program) (args : List String) : IO UInt32 := do
-  -- the eFLINT-core pipeline: `run`, `test`, and `check` on `.eflint` files
+  -- the eFLINT-core pipeline: `run`, `test`, `prove`, `repl`, and `check`/`trace` on `.charter`/`.eflint` files
   match args with
   | "run" :: rest => return (← runCommand rest)
   | "test" :: rest => return (← testCommand rest)
   | "repl" :: rest => return (← replCommand rest)
   | "prove" :: rest => return (← proveCommand rest)
   | "trace" :: cid :: rest =>
-    if rest.any (·.endsWith ".eflint") then return (← traceCommand cid rest) else pure ()
-  | "check" :: rest => if rest.any (·.endsWith ".eflint") then return (← checkCommand rest) else pure ()
+    if (← rest.mapM isCoreProgramArg).any id then return (← traceCommand cid rest) else pure ()
+  | "check" :: rest =>
+    if (← rest.mapM isCoreProgramArg).any id then return (← checkCommand rest) else pure ()
   | _ => pure ()
   let charterFiles := args.filter (·.endsWith ".charter")
   let args := args.filter (fun a => !a.endsWith ".charter")

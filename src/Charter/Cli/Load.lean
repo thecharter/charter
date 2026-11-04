@@ -17,10 +17,46 @@ structure Located where
   file : String
   item : Item
 
+/-- Whether a `.charter` source uses the superseded v0.3 flat `charter <id> "..."` grammar
+(kept only for the two legacy companion files until Phase 3's deletions). -/
+def isLegacyCharterSrc (src : String) : Bool :=
+  let lines := src.splitOn "\n" |>.map String.trim |>.filter (fun l => !l.isEmpty && !l.startsWith "--")
+  match lines with
+  | first :: _ => first.startsWith "charter "
+  | [] => false
+
+/-- Whether `path` is an existing `.charter` file in the superseded v0.3 grammar. -/
+def isLegacyCharterFile (path : System.FilePath) : IO Bool := do
+  if path.extension != some "charter" then return false
+  if !(← path.pathExists) then return false
+  let src ← try IO.FS.readFile path catch _ => pure ""
+  return isLegacyCharterSrc src
+
+/-- Find the Charter installation/repository root from `start` (for `lib/` and `prove`). -/
+partial def findPackageRoot (dir : System.FilePath) : IO (Option System.FilePath) := do
+  let manifest := dir / "lakefile.toml"
+  if ← manifest.pathExists then
+    let txt ← try IO.FS.readFile manifest catch _ => pure ""
+    if (txt.splitOn "name = \"charter\"").length > 1 then return some dir
+  match dir.parent with
+  | some p => if p == dir then return none else findPackageRoot p
+  | none => return none
+
+/-- Locate the Charter root from the working directory or the running binary's path. -/
+def locateCharterRoot : IO (Option System.FilePath) := do
+  let cwd ← IO.currentDir
+  match ← findPackageRoot cwd with
+  | some r => return some r
+  | none =>
+    let app ← try IO.appPath catch _ => pure "."
+    findPackageRoot app
+
 def findIncluded (dirs : List System.FilePath) (name : String) : IO (Option System.FilePath) := do
   for dir in dirs do
     let f := dir / name
     if ← f.pathExists then return some f
+    let fc := System.FilePath.mk (f.toString ++ ".charter")
+    if (← fc.pathExists) && !(← isLegacyCharterFile fc) then return some fc
     let f' := System.FilePath.mk (f.toString ++ ".eflint")
     if ← f'.pathExists then return some f'
   return none
@@ -71,7 +107,10 @@ def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs
 /-- Load a program: its items in order, and the diagnostics of loading. `eflint`
 restricts the keywords to eFLINT's (`--eflint`). -/
 def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Located × List Diagnostic) := do
-  let (its, ds, _, _) ← loadFile eflint path [] ["."] 64
+  let stdDirs ← match ← locateCharterRoot with
+    | some r => pure [r, r / "lib"]
+    | none => pure []
+  let (its, ds, _, _) ← loadFile eflint path [] ("." :: stdDirs) 64
   return (its, ds)
 
 end Charter.Cli

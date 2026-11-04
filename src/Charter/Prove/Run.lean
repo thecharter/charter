@@ -113,9 +113,9 @@ def stepSummary (s : Summary) (p : Phrase) : Summary :=
 def addViolated (s : Summary) : Summary :=
   { s with violated := s.violated ++ (Explore.violatedInvariants s.cfg).filter (fun d => !s.violated.contains d) }
 
-/-- A scenario's name and phrases, when a phrase is one. -/
-def _root_.Charter.Phrase.scenarioParts : Phrase → Option (String × List Phrase)
-  | .scenario name ps => some (name, ps)
+/-- A scenario's name, phrases, and `From` spans, when a phrase is one. -/
+def _root_.Charter.Phrase.scenarioParts : Phrase → Option (String × List Phrase × List (ClauseId × String))
+  | .scenario name ps spans => some (name, ps, spans)
   | _ => none
 
 /-- The record after a scenario: its claims and violations kept, the configuration
@@ -126,7 +126,7 @@ def afterScenario (s s' : Summary) : Summary := { s' with cfg := s.cfg }
 point, its end state is checked for invariants, and the configuration is restored. -/
 def stepPhrase (s : Summary) (p : Phrase) : Summary :=
   match p.scenarioParts with
-  | some (_, ps) => afterScenario s (addViolated (ps.foldl stepSummary s))
+  | some (_, ps, _) => afterScenario s (addViolated (ps.foldl stepSummary s))
   | none => stepSummary s p
 
 /-- One item's effect on the record; directives are ignored (the loader inlined them). -/
@@ -173,9 +173,10 @@ theorem foldl_phrase {s s' : Summary} {pos : Pos} {text : String} {p : Phrase} {
 /-- A scenario advances the chain by its own sub-chain (`h`), the check of its end state
 (`hv`), and the restored configuration (`hc`, by `rfl` in the generated project). -/
 theorem foldl_scenario {s s' s'' s₃ : Summary} {pos : Pos} {text name : String} {ps : List Phrase}
-    {rest : List Item} (h : ps.foldl stepSummary s = s') (hv : addViolated s' = s'')
+    {spans : List (ClauseId × String)} {rest : List Item}
+    (h : ps.foldl stepSummary s = s') (hv : addViolated s' = s'')
     (hc : afterScenario s s'' = s₃) :
-    (⟨pos, text, Sum.inr (.scenario name ps)⟩ :: rest).foldl stepItem s = rest.foldl stepItem s₃ := by
+    (⟨pos, text, Sum.inr (.scenario name ps spans)⟩ :: rest).foldl stepItem s = rest.foldl stepItem s₃ := by
   rw [List.foldl_cons, stepItem_phrase]
   show rest.foldl stepItem (afterScenario s (addViolated (ps.foldl stepSummary s))) = _
   rw [h, hv, hc]
@@ -185,7 +186,7 @@ a scenario's claims carry the scenario's line and name. -/
 def claimLabels (items : List Item) : List (Nat × String) :=
   items.flatMap fun it => match it.val with
     | .inl _ => []
-    | .inr (.scenario name ps) =>
+    | .inr (.scenario name ps _) =>
       (ps.flatMap Phrase.claimTexts).map fun t => (it.pos.line, s!"scenario {name}: {t}")
     | .inr p => p.claimTexts.map fun t => (it.pos.line, if it.text.isEmpty then t else it.text)
 

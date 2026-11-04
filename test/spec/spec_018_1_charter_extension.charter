@@ -1,0 +1,10 @@
+// 018.1 / D4: a `.charter` file is checked and tested by `charter check` and `charter test`.
+Fact party Identified by Alice
+Fact signed Identified by party
+Act sign Actor party Holds when True Creates signed(party)
+  From C.1 "Alice may sign."
+Clause C.1 Approved 4475286793051548550
+  Norm "Alice may sign." => sign
+.
+sign(Alice).
+?signed(Alice).

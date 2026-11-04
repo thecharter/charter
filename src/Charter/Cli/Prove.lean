@@ -59,17 +59,6 @@ def parseProveArgs : List String → ProveOpts → Except String ProveOpts
   | ["--chunk"], _ => .error "--chunk needs a number of phrases"
   | a :: rest, o => parseProveArgs rest { o with files := a :: o.files }
 
-/-- The repository root: the nearest ancestor of the working directory holding the
-build manifest of the Charter package. -/
-partial def findRoot (dir : System.FilePath) : IO (Option System.FilePath) := do
-  let manifest := dir / "lakefile.toml"
-  if ← manifest.pathExists then
-    let txt ← IO.FS.readFile manifest
-    if (txt.splitOn "name = \"charter\"").length > 1 then return some dir
-  match dir.parent with
-  | some p => if p == dir then return none else findRoot p
-  | none => return none
-
 /-- One environment variable as `lake env` sets it, so the checker can be run directly
 (its own process, which the watchdog below can measure) with the repository's toolchain. -/
 def lakeEnvVar (root : System.FilePath) (name : String) : IO (Option String) := do
@@ -91,7 +80,8 @@ def runChecker (root dir file : System.FilePath) (olean : Option System.FilePath
   let some path ← lakeEnvVar root "PATH" | return (none, 0, "the checker's toolchain could not be found")
   let leanPath := dir.toString ++ ":" ++ (← lakeEnvVar root "LEAN_PATH").getD ""
   let memFlag : String := "--memory=" ++ toString memory
-  let args : Array String := #[memFlag, file.toString] ++ (olean.map (fun o => #["-o", o.toString])).getD #[]
+  let rootFlag : String := "--root=" ++ dir.toString
+  let args : Array String := #[memFlag, rootFlag, file.toString] ++ (olean.map (fun o => #["-o", o.toString])).getD #[]
   let env : Array (String × Option String) := #[("PATH", some path), ("LEAN_PATH", some leanPath)]
   let spawnArgs : IO.Process.SpawnArgs :=
     { cmd := "lean", args := args, cwd := some root, stdout := .piped, stderr := .piped, env := env }
@@ -156,7 +146,7 @@ def claimJson (o : Prove.Obligation) (file : String) (result : Bool) (note : Str
     ++ (if note.isEmpty then [] else [("note", Json.str note)]))
 
 /-- Prove one program: returns `(decided, failed)`. -/
-def proveFile (o : ProveOpts) (root : System.FilePath) (path : String) : IO (Nat × Nat) := do
+def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO (Nat × Nat) := do
   let (items, loadDiags) ← loadProgram path o.eflint
   let mut errors := 0
   for d in loadDiags do
@@ -167,7 +157,9 @@ def proveFile (o : ProveOpts) (root : System.FilePath) (path : String) : IO (Nat
     return (0, 1)
   let stem := (System.FilePath.mk path).fileStem.getD "program"
   let dir := match o.dir with
-    | some d => System.FilePath.mk d
+    | some d =>
+      let dp := System.FilePath.mk d
+      if dp.isAbsolute then dp else cwd / dp
     | none => root / ".charter" / "prove" / stem
   IO.FS.createDirAll dir
   let proj := Prove.generate path stem (items.map (·.item)) o.chunk
@@ -253,13 +245,13 @@ def proveCommand (args : List String) : IO UInt32 := do
   | .ok o =>
     if o.files.isEmpty then IO.eprintln usage; return 2
     let cwd ← IO.currentDir
-    let some root ← findRoot cwd
-      | IO.eprintln "charter prove: run it from inside the Charter repository (a maintainer tool until the managed toolchain lands, plan Phase 4)"
+    let some root ← locateCharterRoot
+      | IO.eprintln "charter prove: could not locate the Charter installation root"
         return 2
     let mut decided := 0
     let mut failed := 0
     for f in o.files do
-      let (d, fl) ← proveFile o root f
+      let (d, fl) ← proveFile o root cwd f
       decided := decided + d
       failed := failed + fl
     if o.json then

@@ -119,7 +119,8 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       if !ok then emit o j s!"{where_}: claim failed: {text}"
       else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
     | .timeSet t =>
-      emit o (Json.mkObj [("kind", "clock"), ("time", Json.num t)]) (if o.testMode then "" else s!"  clock: {t}")
+      if o.json || !o.testMode then
+        emit o (Json.mkObj [("kind", "clock"), ("time", Json.num t)]) s!"  clock: {t}"
     | .whyRes lines =>
       if o.json then IO.println (Json.mkObj [("kind", "why"), ("claim", Json.str text), ("instances", Json.arr (lines.map Json.str).toArray)]).compress
       else for l in lines do IO.println s!"  {l}"
@@ -220,7 +221,11 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
     k := k + 1
     let (cfg', outs) := runPhrase cfg p
     stats := { stats with phrases := stats.phrases + 1 }
-    stats ← report o s!"{file} [scenario {name}, phrase {k}]" line s!"scenario {name}, phrase {k}" cfg.state cfg'.state outs stats
+    let label := match p with
+      | .query t => s!"?{t}"
+      | .expect w neg t => s!"?{if neg then "!" else ""}{w.name} {t}"
+      | _ => s!"scenario {name}, phrase {k}"
+    stats ← report o s!"{file} [scenario {name}, phrase {k}]" line label cfg.state cfg'.state outs stats
     cfg := cfg'
   exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats
 
@@ -229,7 +234,8 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
   let it := l.item
   match it.val with
   | .inl _ => return (cfg, stats)
-  | .inr (.scenario name ps) =>
+  | .inr (.scenario name ps spans) =>
+    let cfg := { cfg with spec := cfg.spec.insertScenario name spans }
     if o.json then
       IO.println (Json.mkObj [("kind", "scenario"), ("name", Json.str name), ("file", Json.str l.file),
         ("line", Json.num it.pos.line), ("phrases", Json.num ps.length), ("run", Json.bool o.scenarios)]).compress

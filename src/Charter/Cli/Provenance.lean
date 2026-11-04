@@ -53,11 +53,15 @@ def occursIn (hay needle : String) : Bool := (hay.splitOn needle).length > 1
 `Document` names one and it could be read. -/
 def provenanceReport (spec : Spec) (doc? : Option (Except String String)) : List ProvClaim :=
   let rules := spec.ruleIds
+  let scenarioNames := spec.scenarios.map (·.1)
+  let knownIds := rules ++ scenarioNames
   let invariants := spec.invariants
   let fromSpans : List Span := spec.decls.flatMap fun (p : DomId × TypeSpec) =>
     p.2.spans.map fun sp => ⟨sp.1, sp.2, .norm, [p.1]⟩
   let perClause := spec.clauses.flatMap fun c =>
-    let unknown := (c.spans.flatMap (·.meaning)).filter (fun i => !rules.contains i) |>.eraseDups
+    let unknown := (c.spans.flatMap (fun s =>
+      let allowed := if s.register == .norm || s.register == .invariant then rules else knownIds
+      s.meaning.filter (fun i => !allowed.contains i))).eraseDups
     let badInv := c.spans.filter (fun s => s.register == .invariant && s.meaning.any (fun i => !invariants.contains i))
     [ { ok := c.covered, check := "covered", clause := c.id, text := s!"{c.id}: spans reproduce the clause text exactly" },
       { ok := c.normsInterpreted, check := "interpreted", clause := c.id, text := s!"{c.id}: every Norm span names a rule" },
@@ -70,15 +74,18 @@ def provenanceReport (spec : Spec) (doc? : Option (Except String String)) : List
     { ok := unnamed.isEmpty, check := "named",
       text := if unnamed.isEmpty then "every act, duty, immunity, and invariant is named by some span"
         else s!"rules with no English: {", ".intercalate unnamed} (add a Norm span or a From clause)" }
-  let fromChecks := spec.decls.flatMap fun (p : DomId × TypeSpec) => p.2.spans.map fun sp =>
+  let checkFrom (owner : String) (sp : ClauseId × String) : ProvClaim :=
     let cid := sp.1
     let quoted := sp.2
     match spec.clauses.find? (·.id == cid) with
-    | none => { ok := false, check := "named", clause := cid, text := s!"{p.1}: From {cid} names no declared clause" }
+    | none => { ok := false, check := "named", clause := cid, text := s!"{owner}: From {cid} names no declared clause" }
     | some c =>
       let ok := occursIn c.source quoted
-      let msg := if ok then s!"{p.1}: From {cid} quotes the clause" else s!"{p.1}: From {cid} quotes text that is not in the clause"
+      let msg := if ok then s!"{owner}: From {cid} quotes the clause" else s!"{owner}: From {cid} quotes text that is not in the clause"
       { ok := ok, check := "named", clause := cid, text := msg }
+  let fromChecks :=
+    (spec.decls.flatMap fun (p : DomId × TypeSpec) => p.2.spans.map (checkFrom p.1)) ++
+    (spec.scenarios.flatMap fun (name, sps) => sps.map (checkFrom s!"Scenario {name}"))
   let verbatim := match spec.document, doc? with
     | none, _ => []
     | some path, none => [{ ok := true, warn := true, check := "verbatim", text := s!"{path} was not read; verbatim check skipped" }]

@@ -173,10 +173,11 @@ def everyValidSubs : Nat → Var → M Tagged
       withSubs (Tagged.bindings dom te) (checkTrue (eval fuel filter))
       pure te
     else
-      let (trues, falses) := state.assignedInstances d
       match spec.closedType d with
-      | some false => if trues.isEmpty && falses.isEmpty then err (.missingInput (.instances d)) else nd trues
-      | _ => nd trues
+      | some false =>
+        let (trues, falses) := state.assignedInstances d
+        if trues.isEmpty && falses.isEmpty then err (.missingInput (.instances d)) else nd trues
+      | _ => nd (state.trueInstances d)
 termination_by structural n => n
 
 /-- Whether an instance is well-formed: in its domain and passing the constraint. -/
@@ -224,10 +225,10 @@ def isHolds : Nat → Tagged → M Bool
       match state.lookup te with
       | some i => pure (i.live state.time)
       | none =>
-        match spec.judgedAct te.2 with
+        match spec.judgedRule te.2 with
         | some clauses =>
-          -- D15 (brief B11): an act whose domain is not enumerable is judged for the
-          -- instance asked about; its `Holds when` is read with the components bound,
+          -- D15 (brief B11): an act or immunity whose domain is not enumerable is judged
+          -- for the instance asked about; its `Holds when` is read with the components bound,
           -- as saturation would have read it had the domain been finite (004.1, 005.5).
           let tspec ← getTypeSpec te.2
           withSubs (Tagged.bindings tspec.domain te) do
@@ -283,19 +284,24 @@ def isValid : Nat → Tagged → M Bool
       let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
       if !(conds.all id) then pure false
       else
-        match te.1, a.hasRecipient with
-        | .prod (_ :: recipient :: _), true => do
-          let blocked ← immunityBlocks fuel te.2 recipient
+        match tspec.domain, te.1, a.hasRecipient with
+        | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
+          let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
           pure (!blocked)
-        | _, _ => pure true
+        | _, .prod (_ :: recipient :: _), true => do
+          let blocked ← immunityBlocks fuel te.2 recipient []
+          pure (!blocked)
+        | _, _, _ => pure true
     | _ => pure true
 termination_by structural n => n
 
 /-- Whether some immunity instance that holds protects `party` against the act `act`:
-its holder is `party`, `act` is in its `Against`, and none of its `Unless` conditions hold. -/
-def immunityBlocks : Nat → DomId → Tagged → M Bool
-  | 0, _, _ => err (.fuelExhausted "checking immunities")
-  | fuel + 1, act, party => do
+its holder is `party`, `act` is in its `Against`, any `Related to` components shared
+with the act match `actRel` (007.4, as 007.2 and 007.3 share components), and none of
+its `Unless` conditions hold. -/
+def immunityBlocks : Nat → DomId → Tagged → List (Var × Tagged) → M Bool
+  | 0, _, _, _ => err (.fuelExhausted "checking immunities")
+  | fuel + 1, act, party, actRel => do
     let spec ← getSpec
     let state ← getState
     let same (a b : Tagged) : Bool := spec.chaseAlias a.2 == spec.chaseAlias b.2 && Elem.beq a.1 b.1
@@ -303,16 +309,40 @@ def immunityBlocks : Nat → DomId → Tagged → M Bool
       let d := entry.1
       let tspec := entry.2.1
       let i := entry.2.2
-      let held := state.holdsList.filter (fun im => im.2 == d)
-      let bs ← held.mapM fun im => do
-        match im.1 with
-        | .prod (holder :: _) =>
-          if same holder party then
+      match tspec.domain with
+      | .products (holderVar :: imRelVars) =>
+        if spec.chaseAlias holderVar.dom != spec.chaseAlias party.2 then pure false
+        else
+          let shared := actRel.filter (fun p => imRelVars.contains p.1)
+          let initSubs := (holderVar, party) :: shared
+          let free := imRelVars.filter (fun x => !(initSubs.any (fun p => p.1 == x)))
+          let activeUnlessFalse (im : Tagged) : M Bool := do
             let us ← withSubs (Tagged.bindings tspec.domain im) (i.unlessConds.mapM (fun c => whenBool (eval fuel c) pure))
             pure (!(us.any id))
-          else pure false
-        | _ => pure false
-      pure (bs.any id)
+          if free.isEmpty then
+            withSubs initSubs do
+              let insts ← results (whenTagged (eval fuel (.app d (.named []))) pure)
+              let bs ← insts.mapM fun im => do
+                if ← isHolds fuel im then activeUnlessFalse im else pure false
+              pure (bs.any id)
+          else
+            let held := state.holdsList.filter (fun im => im.2 == d)
+            let fromHeld ← held.mapM fun im => do
+              let ibinds := Tagged.bindings tspec.domain im
+              let matchesInit := initSubs.all fun (v, target) =>
+                match ibinds.find? (·.1 == v) with
+                | some (_, actual) => same actual target
+                | none => false
+              if matchesInit then activeUnlessFalse im else pure false
+            if fromHeld.any id then pure true
+            else if spec.enumerable (.products free) then
+              withSubs initSubs do
+                let insts ← results (scopeWith (everyValidSubs fuel) free (whenTagged (eval fuel (.app d (.named []))) pure))
+                let bs ← insts.mapM fun im => do
+                  if ← isHolds fuel im then activeUnlessFalse im else pure false
+                pure (bs.any id)
+            else pure false
+      | _ => pure false
     pure (rs.any id)
 termination_by structural n => n
 

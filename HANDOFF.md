@@ -5,6 +5,23 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-04: Pure-Charter PSA separation (`~/psa/psa.charter`) and language fixes
+
+## Where
+
+- `main`, pushed directly alongside standalone protocol repository `thecharter/psa` (`~/psa`: `psa.md`, `psa.charter`, `README.md`). `tools/battery`: PASS (all 12 steps green; `spec-conformance` 129/129).
+- `~/psa/psa.charter` formalizes the full Protocol of Sovereign Agency (78 clauses, Laws 1–7, 14 `Invariant`s, 17 `Scenario`s covering all 16 Adversarial Tests + Law 7 governance) in pure Charter with zero Lean shadow models; `charter check ~/psa/psa.charter` and `charter test ~/psa/psa.charter` both pass with 0 errors and 0 failed claims.
+
+## What landed in `~/charter`
+
+- **`.charter` source support & external-workspace CLI discovery** (`Cli/Load.lean`, `Cli/Test.lean`, `Cli/Prove.lean`, `Tooling/Cli.lean`, `docs/spec/018_toolchain_and_cli.md`, `test/spec/spec_018_1_charter_extension.charter`): eFLINT-superset `.charter` files work across `check`, `run`, `test`, `trace`, `prove`, and `repl` (keeping a header guard for the two legacy v0.3 `.charter` files); `locateCharterRoot` falls back to `IO.appPath` when invoked outside `~/charter`; `charter prove` passes `--root` to `lean` for external workspaces.
+- **Verbatim `From` provenance on `Invariant`, `Predicate`, and `Scenario`** (`Surface/Ast.lean`, `Surface/Parser.lean`, `Resolve/Static.lean`, `Core/Spec.lean`, `Prove/Run.lean`, `Prove/LeanGen.lean`, `Cli/Provenance.lean`, `docs/spec/011_phrases_and_scenarios.md`, `docs/spec/012_clauses_and_provenance.md`, `test/spec/spec_012_3b_invariant_from.eflint`, `test/spec/spec_012_3c_scenario_from.eflint`): `Invariant`/`Predicate` declarations and `Scenario` headers accept `From CLAUSE "span"` checked verbatim against `Clause` `Invariant`/`Acceptance` spans, and `check` resolves `Scenario` bodies inside `withSpec`.
+- **`Immunity ... Related to` scoping & judged non-enumerable immunities** (`Core/Spec.lean`, `Eval/Eval.lean`, `docs/spec/007_immunities_and_exceptions.md`, `test/spec/spec_007_4d_immunity_related_to.eflint`): `Spec.judgedRule` judges `Holds when` per instance for non-enumerable `Act`s and `Immunity`s without materializing infinite domains, and `immunityBlocks` matches shared `Related to` components between the immunity and the act.
+- **Integer literal coercion for `Time`/`Duration` product components** (`Resolve/Static.lean`, `docs/spec/009_time.md`, `test/spec/spec_009_2h_product_time_literal.eflint`): `convertTerm` coerces integer literals to `.time`/`.duration`-backed domain wrappers inside product constructors (e.g. `lineage-sunset(Lin1, 100)`).
+- **Interpreter & state lookup fast-paths** (`Core/State.lean`, `Eval/Eval.lean`, `Eval/Interpreter.lean`, `Cli/Run.lean`): `State.trueInstances` avoids dual-list filtering on closed non-enumerable domains; `runPhrase` skips `Stratify.strata` on non-declaration phrases and skips `Saturate.rebaseAndSat` on pure read/query phrases while still checking invariants; `testMode` suppresses clock-set noise and labels failed scenario queries clearly.
+
+---
+
 # Handoff — 2026-10-25 (2): Phase 2's exit criteria; Phase 1's remaining proofs
 
 ## Where

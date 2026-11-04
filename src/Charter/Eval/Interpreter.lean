@@ -314,7 +314,7 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
     let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state⟩ []
     match p with
     | .onlyDecls init => (some init, [])
-    | .scenario _ _ => (some [], [])
+    | .scenario .. => (some [], [])
     | .why xs t =>
       match run (foreach M.fuel xs (whenTagged (eval M.fuel t) pure)) with
       | .error e => (none, [diagOf e])
@@ -414,14 +414,28 @@ def newContext (cfg : Config) (spec : Spec) (strata : List (List DomId)) (state1
 
 end Interp
 
+mutual
+/-- Whether a phrase introduces or extends declarations (so `spec` and `strata` change). -/
+def Phrase.hasDecls : Phrase → Bool
+  | .decls _ => true
+  | .par ps => Phrase.listHasDecls ps
+  | _ => false
+def Phrase.listHasDecls : List Phrase → Bool
+  | [] => false
+  | p :: ps => p.hasDecls || Phrase.listHasDecls ps
+end
+
 /-- Run one phrase: resolve it against the configuration, evaluate, apply, saturate,
 report. On failure the configuration is returned unchanged. -/
 def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
+  let declChanged := p.hasDecls
   match resolvePhrase cfg.spec p with
   | .error ds => (cfg, ds.map .diag)
   | .ok (spec', cp, warnings) =>
     let warnOuts := warnings.map Output.diag
-    match Stratify.strata spec' with
+    let strataRes : Except (List DomId) (List (List DomId)) :=
+      if declChanged then Stratify.strata spec' else .ok cfg.strata
+    match strataRes with
     | .error cycle =>
       (cfg, warnOuts ++ [.diag (Diagnostic.error "CHR020"
         s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
@@ -448,11 +462,26 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       match store? with
       | none => (cfg, warnOuts ++ outs)
       | some store =>
-        let state1 := State.makeAssignments spec' store state0
-        let (cfg'?, outs2) := Interp.newContext cfg spec' strata state1
-        match cfg'? with
-        | none => (cfg, warnOuts ++ outs ++ outs2)
-        | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
+        if !declChanged && newTime.isNone && store.isEmpty then
+          -- No declaration, clock, or assignment changed: `state0` is already at its
+          -- stratified fixpoint and `cfg.violatedDuties` is unchanged; check invariants (013.1).
+          let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec', state0⟩ []
+          let invs : Except RuntimeError (List DomId) :=
+            spec'.invariants.filterMapM fun d => do
+              let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
+              let r ← run (M.ignoreMissingInput (M.checkFalse (M.eval M.fuel term)))
+              pure (if r.isEmpty then none else some d)
+          match invs with
+          | .error e => (cfg, warnOuts ++ outs ++ [Interp.diagOf e])
+          | .ok invViol =>
+            let outs2 := invViol.map (fun d => Output.violation (.invariant d))
+            ({ cfg with spec := spec', state := state0 }, warnOuts ++ outs ++ outs2)
+        else
+          let state1 := State.makeAssignments spec' store state0
+          let (cfg'?, outs2) := Interp.newContext cfg spec' strata state1
+          match cfg'? with
+          | none => (cfg, warnOuts ++ outs ++ outs2)
+          | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
 
 /-! ## Exploration (plan §2.2.7): bounded search over acts from a state -/
 

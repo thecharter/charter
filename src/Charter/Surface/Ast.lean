@@ -41,9 +41,9 @@ inductive Phrase where
   | decls (ds : List Decl)
   /-- `{ p₁. p₂. … }`: phrases evaluated against the same state, effects merged. -/
   | par (ps : List Phrase)
-  /-- Charter: `Scenario name { phrases }`, a named test run by `charter test` from the
-  configuration at this point, leaving it unchanged. -/
-  | scenario (name : String) (ps : List Phrase)
+  /-- Charter: `Scenario name [From CLAUSE "span" ...] { phrases }`, a named test run by
+  `charter test` from the configuration at this point, leaving it unchanged. -/
+  | scenario (name : String) (ps : List Phrase) (spans : List (ClauseId × String) := [])
   /-- Charter: `?lawful e`, `?valid e`, `?violated e`, and their `?!` negations: a claim
   about an act or duty instance. -/
   | expect (what : Expect) (negated : Bool) (t : Term)

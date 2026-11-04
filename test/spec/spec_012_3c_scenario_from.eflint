@@ -1,0 +1,13 @@
+// 012.3 / 011.11 / D10: a Scenario may carry `From CLAUSE "span"`, verified against the clause, and an Acceptance span may name a declared Scenario.
+Fact actor Identified by Ada
+Fact done Identified by actor
+Act work Actor actor Holds when True Creates done(actor)
+Clause C.1 Approved 7469476751065637338
+  Norm "Ada may work." => work
+  Commentary " "
+  Acceptance "Test: Ada works and finishes." => ada-works
+.
+Scenario ada-works From C.1 "Test: Ada works and finishes." {
+  work(Ada).
+  ?done(Ada).
+}

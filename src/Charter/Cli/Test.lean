@@ -43,12 +43,17 @@ def walkEflint (p : System.FilePath) : Nat → IO (List System.FilePath)
   | 0 => return []
   | depth + 1 => do
     if ← p.isDir then
+      let base := p.fileName.getD ""
+      if base == ".git" || base == ".lake" || base == ".charter" || base == ".reference" then
+        return []
       let entries ← p.readDir
       let sorted := entries.qsort (fun a b => a.path.toString < b.path.toString)
       let mut acc := []
       for e in sorted do acc := acc ++ (← walkEflint e.path depth)
       return acc
     else if p.extension == some "eflint" then return [p]
+    else if p.extension == some "charter" then
+      if ← isLegacyCharterFile p then return [] else return [p]
     else return []
 
 structure TestOpts where

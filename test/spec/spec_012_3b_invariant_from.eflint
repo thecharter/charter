@@ -1,0 +1,13 @@
+// 012.3: an Invariant declaration may carry `From CLAUSE "span"` directly, without an `Extend Fact` workaround.
+Fact item Identified by A
+Fact held Identified by item
+Act take Actor item Holds when True Creates held(item)
+  From C.1 "Items may be taken."
+Invariant always-ok When True
+  From C.1 "The invariant holds."
+Clause C.1 Approved 1822899397225697098
+  Norm "Items may be taken." => take
+  Commentary " "
+  Invariant "The invariant holds." => always-ok
+.
+?always-ok().

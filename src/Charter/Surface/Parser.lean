@@ -598,6 +598,18 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     | some ds => return some (.derivation ds)
     | none => return none
 
+/-- Zero or more `From CLAUSE "span"` clauses on an `Invariant`, `Predicate`, or `Scenario`. -/
+def fromClauses : Nat → P (List (ClauseId × String))
+  | 0 => return []
+  | fuel + 1 => do
+    if ← isKw "From" then
+      advance
+      let cid ← clauseId
+      match ← peek with
+      | .str text => advance; return (cid, text) :: (← fromClauses fuel)
+      | kk => fail "CHR003" s!"expected the span text in double quotes after `From {cid}` but found {kk.describe}"
+    else return []
+
 def clauses (k : FrameKind) : Nat → P (List ModClause)
   | 0 => return []
   | fuel + 1 => do
@@ -678,7 +690,9 @@ def frame : Nat → P (List Decl)
     | .kw "When" | .kw "Where" => advance
     | _ => unexpected "`When` after the predicate name"
     let t ← expression
-    return mkFact inv false true none d (.products []) (.boolLit true) [.derivation [.holdsWhen t]]
+    let fs ← fromClauses 100
+    return mkFact inv false true none d (.products []) (.boolLit true)
+      (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s))
   | .kw "Act" =>
     advance
     let d ← ident
@@ -912,9 +926,10 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
         | .atom s => advance; return s
         | .str s => advance; return s
         | k => fail "CHR003" s!"expected a scenario name but found {k.describe}")
+      let fs ← fromClauses 100
       expectKw "{"
       let ps ← scenarioBody 10000
-      return ⟨p, lineOf p, .inr (.scenario name ps)⟩ :: (← items lineOf fuel)
+      return ⟨p, lineOf p, .inr (.scenario name ps fs)⟩ :: (← items lineOf fuel)
     else
       let ph ← phrase
       match ← peek with

@@ -1,6 +1,6 @@
 # 018 — Toolchain and CLI
 
-**Status:** draft (2026-10-23). Fixed by D1 and D9; wording awaits Eric. Implementation: the commands marked *today* exist for `.eflint` programs; the rest are the plan's (§6) and pending. The `.charter` extension still runs the v0.3 harness until the grammar moves (README).
+**Status:** draft (2026-10-23; updated 2026-11-04 for `.charter` and external workspaces). Fixed by D1 and D9; wording awaits Eric. Implementation: the commands marked *today* run on `.charter` and `.eflint` programs, from inside or outside the Charter repository (`test/spec/spec_018_1_charter_extension.charter`). Legacy v0.3 flat `charter <id> "..."` files stay routed to the v0.3 harness until their deletion.
 
 **18.1 One binary (D1).** `charter` is one native executable that parses, checks, runs, tests, and projects programs itself. No diagnostic, path, flag, or help text names the engine (Law 11; the gate `test/gates/law11-no-engine-in-output.sh`).
 

@@ -199,6 +199,8 @@ structure Spec where
   document : Option String := none
   /-- Charter (D4): the clauses with their register spans. -/
   clauses  : List Clause := []
+  /-- Charter (D10, Law 8): declared scenarios, by name, with their `From` spans. -/
+  scenarios : List (String × List (ClauseId × String)) := []
   /-- Charter (D8): declared modules, by name: their parameters and body. -/
   modules  : List (DomId × List DomId × List Decl) := []
   deriving Repr, Inhabited
@@ -220,6 +222,10 @@ def insertAlias (s : Spec) (f t : DomId) : Spec :=
 /-- Insert a clause, replacing one with the same id; clauses keep declaration order. -/
 def insertClause (s : Spec) (c : Clause) : Spec :=
   { s with clauses := s.clauses.filter (·.id != c.id) ++ [c] }
+
+/-- Record a scenario and its `From` spans in declaration order. -/
+def insertScenario (s : Spec) (name : String) (spans : List (ClauseId × String)) : Spec :=
+  { s with scenarios := s.scenarios.filter (·.1 != name) ++ [(name, spans)] }
 
 /-- The rules a provenance check must account for: acts, duties, immunities, and invariants. -/
 def ruleIds (s : Spec) : List DomId :=
@@ -279,6 +285,20 @@ def judgedAct (s : Spec) (d : DomId) : Option (List Term) :=
     | _ => none
   | none => none
 
+/-- The `Holds when` clauses of an act or immunity whose domain is not enumerable,
+judged for the instance asked about with its components bound. -/
+def judgedRule (s : Spec) (d : DomId) : Option (List Term) :=
+  match s.findDecl d with
+  | some t =>
+    match t.kind with
+    | .act _ | .immunity _ =>
+      if s.enumerable t.domain then none
+      else
+        let clauses := t.derivation.filterMap fun | .holdsWhen c => some c | _ => none
+        if clauses.isEmpty then none else some clauses
+    | _ => none
+  | none => none
+
 def kindOf (s : Spec) (d : DomId) : Option Kind := (s.findDecl d).map (·.kind)
 
 def triggerable (s : Spec) (d : DomId) : Bool :=
@@ -312,7 +332,10 @@ def immunitiesAgainst (s : Spec) (a : DomId) : List (DomId × TypeSpec × Immuni
     | _ => none
 
 def derivedTypes (s : Spec) : List DomId :=
-  s.decls.filterMap fun (p : DomId × TypeSpec) => if p.2.derivation.isEmpty then none else some p.1
+  s.decls.filterMap fun (p : DomId × TypeSpec) =>
+    if p.2.derivation.isEmpty then none
+    else if (s.judgedRule p.1).isSome && p.2.derivation.all (fun | .holdsWhen _ => true | _ => false) then none
+    else some p.1
 
 /-- The component variables an instance of `d` binds: its product components, or
 the undecorated type itself for a primitive domain. -/

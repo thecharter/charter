@@ -179,7 +179,7 @@ def Gen.item (g : Gen) (k : Nat) (it : Item) : Gen :=
       let (g, pName, _) := g.checkpoint (toString k) p it.pos.line "phrase"
       { g with chain := g.chain.push s!"Charter.Prove.foldl_phrase step_{k} rfl",
                items := g.items.push s!"{pos} {pName}⟩" }
-    | some (name, ps) => Id.run do
+    | some (name, ps, spans) => Id.run do
       -- the sub-chain forks from the current record and configuration
       let forkName := g.curName
       let forkCfg := g.cfgName
@@ -211,10 +211,11 @@ def Gen.item (g : Gen) (k : Nat) (it : Item) : Gen :=
         s!"def {sName} : Charter.Prove.Summary := {summarySource forkCfg after}",
         s!"theorem after_{k} : Charter.Prove.afterScenario {forkName} {vName} = {sName} := rfl",
         "" ]
+      let spansS := if spans.isEmpty then "" else s!" {reprStr spans}"
       g := { g with cur := after, curName := sName, cfgName := forkCfg,
                     steps := g.steps.push ({ name := s!"viol_{k}", about := "scenario", line := it.pos.line }, start),
                     chain := g.chain.push s!"Charter.Prove.foldl_scenario {scen} viol_{k} after_{k}",
-                    items := g.items.push s!"{pos} (Charter.Phrase.scenario {String.quote name} [{", ".intercalate pNames.toList}])⟩" }
+                    items := g.items.push s!"{pos} (Charter.Phrase.scenario {String.quote name} [{", ".intercalate pNames.toList}]{spansS})⟩" }
       return g
 
 /-- Generate the project for a loaded program. `program` names it in the file's

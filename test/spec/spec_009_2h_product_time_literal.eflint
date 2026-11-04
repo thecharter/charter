@@ -1,0 +1,11 @@
+// 009.2 / 010.4: an integer literal coerces to a Time or Duration component of a product type; an integer fact still does not.
+Fact item Identified by A
+Fact instant Identified by Time
+Fact window Identified by Duration
+Fact sunset Identified by item * instant
+Fact hold-time Identified by item * window.
+
++sunset(A, 100).
++hold-time(A, 15).
+?sunset(A, 100).
+?hold-time(A, 15).
