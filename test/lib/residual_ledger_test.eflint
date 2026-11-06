@@ -1,6 +1,6 @@
 // lib/residual_ledger used by a small program: a steward, two members, three periods.
 //! explore: 1
-#require "../../lib/residual_ledger.eflint".
+#require "../../lib/residual_ledger.charter".
 
 Fact steward Identified by Stew
 Fact founder Identified by Ava, Bo

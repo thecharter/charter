@@ -1,6 +1,6 @@
 // lib/exit_and_voice used by a small program: two members, an operator, a panel.
 //! explore: 1
-#require "../../lib/exit_and_voice.eflint".
+#require "../../lib/exit_and_voice.charter".
 
 Fact citizen Identified by Kim, Lee
 Fact host Identified by Host

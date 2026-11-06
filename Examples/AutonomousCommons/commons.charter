@@ -8,14 +8,14 @@
 //! explore: 1
 //! explore-domain: int = 10, 15, 25, 30, 50
 Document "autonomous-commons-charter.md".
-#require "../../lib/residual_ledger.eflint".
-#require "../../lib/collateral_pool.eflint".
-#require "../../lib/circuit_breaker.eflint".
-#require "../../lib/entity_group.eflint".
-#require "../../lib/exit_and_voice.eflint".
-#require "../../lib/sortition_court.eflint".
-#require "../../lib/attested_lease.eflint".
-#require "../../lib/oracle_feed.eflint".
+#require "../../lib/residual_ledger.charter".
+#require "../../lib/collateral_pool.charter".
+#require "../../lib/circuit_breaker.charter".
+#require "../../lib/entity_group.charter".
+#require "../../lib/exit_and_voice.charter".
+#require "../../lib/sortition_court.charter".
+#require "../../lib/attested_lease.charter".
+#require "../../lib/oracle_feed.charter".
 
 // ---- Parties and objects
 Fact steward Identified by Sol, Sam

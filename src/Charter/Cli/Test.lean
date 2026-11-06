@@ -51,9 +51,7 @@ def walkEflint (p : System.FilePath) : Nat → IO (List System.FilePath)
       let mut acc := []
       for e in sorted do acc := acc ++ (← walkEflint e.path depth)
       return acc
-    else if p.extension == some "eflint" then return [p]
-    else if p.extension == some "charter" then
-      if ← isLegacyCharterFile p then return [] else return [p]
+    else if p.extension == some "eflint" || p.extension == some "charter" then return [p]
     else return []
 
 structure TestOpts where

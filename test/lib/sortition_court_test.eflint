@@ -1,6 +1,6 @@
 // lib/sortition_court used by a small program: five arbiters, three parties, two disputes, a registrar.
 //! explore: 1
-#require "../../lib/sortition_court.eflint".
+#require "../../lib/sortition_court.charter".
 
 Fact judge Identified by Ana, Bea, Cal, Dev, Eli
 Fact litigant Identified by Pia, Quo, Rex

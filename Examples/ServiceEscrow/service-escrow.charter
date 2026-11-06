@@ -1,0 +1,187 @@
+// Neutral commercial hosting & emergency-freeze SLA exercising Clauses/Provenance (012),
+// `Except under` (007.2), `Immunity ... Unless` (007.4), `Creates ... For` expiry (009.3),
+// `Held ... For` notice windows (009.3), `Due within` deadlines (006.7), multi-binder
+// `Foreach` escalation over a `Function` fact (005.4), and bounded exploration (013.2).
+//! explore: 1
+//! explore-domain: int = 100, 200
+Document "service-escrow.md".
+
+Clause SE.1 Approved 7703960817762942137
+  Text "A provider hosts a client workload under an active hosting agreement. The provider may suspend a hosted node after giving seven days advance notice, or immediately under a staked emergency freeze. Suspending a hosted node without advance notice or an active emergency freeze breaches the provider's continuity duty."
+  Definition "A provider hosts a client workload under an active hosting agreement."
+  Norm " The provider may suspend a hosted node after giving seven days advance notice, or immediately under a staked emergency freeze." => give-suspension-notice, suspend-after-notice, suspend-under-freeze
+  Norm " Suspending a hosted node without advance notice or an active emergency freeze breaches the provider's continuity duty." => suspend-node
+.
+
+Clause SE.2 Approved 7536071962609593123
+  Text "An auditor may initiate a temporary emergency freeze for at most three days by posting an audit stake at least equal to the required stake for that auditor's prior unfounded freeze count. If the arbiter dismisses the freeze as unfounded, the freeze ends immediately, the auditor's unfounded freeze count increases by one, and the provider must restore the node within two days."
+  Norm "An auditor may initiate a temporary emergency freeze for at most three days by posting an audit stake at least equal to the required stake for that auditor's prior unfounded freeze count." => initiate-emergency-freeze
+  Norm " If the arbiter dismisses the freeze as unfounded, the freeze ends immediately, the auditor's unfounded freeze count increases by one, and the provider must restore the node within two days." => dismiss-freeze, restore-node, restore-node-duty
+.
+
+Clause SE.3 Approved 5204590416264555757
+  Text "The arbiter may terminate an account only when a confirmed breach remains uncured. While the client disputes termination in good faith, the account is immune from termination unless an uncured confirmed breach holds."
+  Norm "The arbiter may terminate an account only when a confirmed breach remains uncured." => terminate-account
+  Norm " While the client disputes termination in good faith, the account is immune from termination unless an uncured confirmed breach holds." => disputed-termination-immunity
+.
+
+Clause SE.4 Approved 7015705533775461168
+  Text "No node remains under an emergency freeze after the freeze window expires without arbiter confirmation. An unfounded freeze increments the initiator's unfounded count and triggers a restoration deadline."
+  Invariant "No node remains under an emergency freeze after the freeze window expires without arbiter confirmation." => no-unbacked-freeze
+  Acceptance " An unfounded freeze increments the initiator's unfounded count and triggers a restoration deadline."
+.
+
+// ---- Parties, parameters, and state
+Fact provider Identified by CloudCo
+Fact client Identified by Acme
+Fact auditor Identified by SecAudit
+Fact arbiter Identified by NeutralArb
+
+Param notice-period : Duration = 7
+Param freeze-window : Duration = 3
+Param restore-deadline : Duration = 2
+Param base-stake = 100
+
+Fact hosting-active Identified by client
+Fact notice-given Identified by client
+Fact emergency-frozen Identified by client
+Fact freeze-stake-backed Identified by client
+Fact freeze-initiator Identified by auditor * client
+Function unfounded-count Identified by auditor * int
+Fact node-suspended Identified by client
+Fact confirmed-uncured-breach Identified by client
+Fact disputes-in-good-faith Identified by client
+Fact account-terminated Identified by client
+
+// ---- SE.1: Hosting continuity and advance notice
+Act give-suspension-notice Actor provider Recipient client
+  From SE.1 "The provider may suspend a hosted node after giving seven days advance notice, or immediately under a staked emergency freeze."
+  Holds when hosting-active(client)
+  Creates notice-given(client)
+
+Act suspend-after-notice Actor provider Recipient client
+  From SE.1 "The provider may suspend a hosted node after giving seven days advance notice, or immediately under a staked emergency freeze."
+  Holds when hosting-active(client) && Held(notice-given(client)) For notice-period
+  Creates node-suspended(client)
+
+Act suspend-under-freeze Actor provider Recipient client
+  From SE.1 "The provider may suspend a hosted node after giving seven days advance notice, or immediately under a staked emergency freeze."
+  Holds when hosting-active(client) && emergency-frozen(client)
+  Creates node-suspended(client)
+
+Act suspend-node Actor provider Recipient client
+  From SE.1 "Suspending a hosted node without advance notice or an active emergency freeze breaches the provider's continuity duty."
+  Except under suspend-after-notice, suspend-under-freeze
+  Creates node-suspended(client)
+
+// ---- SE.2: Staked emergency freeze and escalation
+Act initiate-emergency-freeze Actor auditor Recipient client Related to int
+  From SE.2 "An auditor may initiate a temporary emergency freeze for at most three days by posting an audit stake at least equal to the required stake for that auditor's prior unfounded freeze count."
+  Holds when hosting-active(client)
+    && (Exists unfounded-count: unfounded-count.auditor == auditor
+          && int >= base-stake * (unfounded-count.int + 1))
+  Valid when hosting-active(client)
+    && (Exists unfounded-count: unfounded-count.auditor == auditor
+          && int >= base-stake * (unfounded-count.int + 1))
+  Creates emergency-frozen(client) For freeze-window,
+          freeze-stake-backed(client) For freeze-window,
+          freeze-initiator(auditor, client)
+
+Act restore-node Actor provider Recipient client
+  From SE.2 "If the arbiter dismisses the freeze as unfounded, the freeze ends immediately, the auditor's unfounded freeze count increases by one, and the provider must restore the node within two days."
+  Holds when hosting-active(client)
+  Terminates node-suspended(client)
+
+Duty restore-node-duty Holder provider Claimant client
+  From SE.2 "If the arbiter dismisses the freeze as unfounded, the freeze ends immediately, the auditor's unfounded freeze count increases by one, and the provider must restore the node within two days."
+  Terminated by restore-node
+  Due within restore-deadline
+
+Act dismiss-freeze Actor arbiter Recipient client
+  From SE.2 "If the arbiter dismisses the freeze as unfounded, the freeze ends immediately, the auditor's unfounded freeze count increases by one, and the provider must restore the node within two days."
+  Holds when emergency-frozen(client)
+  Valid when emergency-frozen(client)
+  Creates restore-node-duty(CloudCo, client),
+          (Foreach freeze-initiator, unfounded-count:
+             unfounded-count(freeze-initiator.auditor, unfounded-count.int + 1)
+             When freeze-initiator.client == client && unfounded-count.auditor == freeze-initiator.auditor)
+  Terminates emergency-frozen(client), freeze-stake-backed(client),
+             (Foreach freeze-initiator: freeze-initiator When freeze-initiator.client == client)
+
+// ---- SE.3: Account termination protection
+Act terminate-account Actor arbiter Recipient client
+  From SE.3 "The arbiter may terminate an account only when a confirmed breach remains uncured."
+  Holds when confirmed-uncured-breach(client)
+  Valid when confirmed-uncured-breach(client)
+  Creates account-terminated(client)
+  Terminates hosting-active(client)
+
+Immunity disputed-termination-immunity
+  Holder client
+  Against terminate-account
+  Holds when disputes-in-good-faith(client)
+  Unless confirmed-uncured-breach(client)
+  From SE.3 "While the client disputes termination in good faith, the account is immune from termination unless an uncured confirmed breach holds."
+
+Invariant no-unbacked-freeze
+  When (Forall client: emergency-frozen(client) == freeze-stake-backed(client))
+  From SE.4 "No node remains under an emergency freeze after the freeze window expires without arbiter confirmation."
+.
+
+// ---- Initial state
++hosting-active(Acme).
++disputes-in-good-faith(Acme).
++unfounded-count(SecAudit, 0).
+
+Scenario unfounded-freeze-escalation-and-deadline
+  From SE.4 "An unfounded freeze increments the initiator's unfounded count and triggers a restoration deadline."
+{
+  // Unlawful suspension without notice or freeze occurs physically but is not lawful
+  ?!lawful suspend-node(CloudCo, Acme).
+  suspend-node(CloudCo, Acme).
+  ?node-suspended(Acme).
+  restore-node(CloudCo, Acme).
+  ?!node-suspended(Acme).
+
+  // Staked emergency freeze succeeds with 100 >= 100 * (0 + 1)
+  ?lawful initiate-emergency-freeze(SecAudit, Acme, 100).
+  initiate-emergency-freeze(SecAudit, Acme, 100).
+  ?emergency-frozen(Acme).
+  ?lawful suspend-node(CloudCo, Acme).
+  suspend-node(CloudCo, Acme).
+
+  // Arbiter dismisses freeze: unfounded count increments to 1, restoration duty starts
+  dismiss-freeze(NeutralArb, Acme).
+  ?!emergency-frozen(Acme).
+  ?unfounded-count(SecAudit, 1).
+  ?restore-node-duty(CloudCo, Acme).
+
+  // Next freeze now requires stake >= 200; 100 is void
+  ?!valid initiate-emergency-freeze(SecAudit, Acme, 100).
+  initiate-emergency-freeze(SecAudit, Acme, 100).
+  ?!emergency-frozen(Acme).
+
+  // Missing the 2-day restoration window breaches restore-node-duty
+  @ 2.
+  ?violated restore-node-duty(CloudCo, Acme).
+  restore-node(CloudCo, Acme).
+  ?!restore-node-duty(CloudCo, Acme).
+}
+
+Scenario freeze-expiry-and-termination-immunity
+  From SE.4 "No node remains under an emergency freeze after the freeze window expires without arbiter confirmation."
+{
+  // Termination blocked by immunity while disputing without confirmed uncured breach
+  ?!valid terminate-account(NeutralArb, Acme).
+  terminate-account(NeutralArb, Acme).
+  ?!account-terminated(Acme).
+  ?hosting-active(Acme).
+
+  // Freeze expires automatically at t = 3 (half-open [0, 3))
+  initiate-emergency-freeze(SecAudit, Acme, 100).
+  @ 2.
+  ?emergency-frozen(Acme).
+  @ 3.
+  ?!emergency-frozen(Acme).
+  ?!freeze-stake-backed(Acme).
+}

@@ -1,6 +1,6 @@
 // lib/attested_lease used by a small program: two instances, two operators, a member.
 //! explore: 1
-#require "../../lib/attested_lease.eflint".
+#require "../../lib/attested_lease.charter".
 
 Fact node Identified by N1, N2
 Fact host Identified by Alpha, Beta

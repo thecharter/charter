@@ -10,20 +10,21 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 printf 'this is not a program\n' > "$tmp/bad.charter"
 printf 'Fact x Identified by Int\n?x(1\n' > "$tmp/bad.eflint"
-PSA=Examples/SovereignAgency/protocol-of-sovereign-agency.charter
-COM=Examples/AutonomousCommons/autonomous-commons.charter
+TEN=Examples/Tenancy/tenancy.charter
+COM=Examples/AutonomousCommons/commons.charter
+ESC=Examples/ServiceEscrow/service-escrow.charter
 {
   "$B" help
-  "$B" check "$PSA" "$COM"
+  "$B" version
+  "$B" check "$TEN" "$COM" "$ESC"
   "$B" check
-  "$B" verify
-  "$B" sim
-  "$B" dsl "$COM"
-  "$B" views --law commons
-  "$B" explain steward enter
+  "$B" trace T.1 "$TEN"
+  "$B" trace SE.2 "$ESC"
+  "$B" trace NO_SUCH_CLAUSE "$TEN"
+  "$B" run "$TEN"
   "$B" no-such-command
-  "$B" dsl "$tmp/missing.charter"
-  "$B" dsl "$tmp/bad.charter"
+  "$B" check "$tmp/missing.charter"
+  "$B" check "$tmp/bad.charter"
   "$B" run "$tmp/bad.eflint"
   "$B" test "$tmp/bad.eflint"
 } > "$tmp/out.txt" 2>&1

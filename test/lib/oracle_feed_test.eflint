@@ -1,6 +1,6 @@
 // lib/oracle_feed used by a small program: one feed, two traders, two vaults.
 //! explore: 2
-#require "../../lib/oracle_feed.eflint".
+#require "../../lib/oracle_feed.charter".
 
 Fact feed Identified by Feed
 Fact trader Identified by Tam, Uma

@@ -341,15 +341,18 @@ def runCommand (args : List String) : IO UInt32 := do
     else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
     return (if stats.ok then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--scenario <name>] [--explore <depth>] [--explore-domain \"type = values\"]"
+    IO.eprintln "usage: charter run <file.charter> [--out json] [--eflint] [--scenario <name>] [--explore <depth>] [--explore-domain \"type = values\"]"
     return 2
 
-/-- `charter check <file.eflint> ... [--out json] [--eflint]`: resolve every phrase in
+/-- `charter check <file.charter> ... [--out json] [--eflint]`: resolve every phrase in
 order without evaluating anything; report the diagnostics. -/
 def checkCommand (args : List String) : IO UInt32 := do
   let fl ← match takeFlags args with
     | .error e => IO.eprintln s!"charter check: {e}"; return 2
     | .ok r => pure r
+  if fl.rest.isEmpty then
+    IO.eprintln "usage: charter check <file.charter> ... [--out json] [--eflint]"
+    return 2
   let o : RunOpts := { json := fl.json, eflint := fl.eflint }
   let mut status : UInt32 := 0
   for f in fl.rest do
@@ -405,6 +408,6 @@ def traceCommand (cid : String) (args : List String) : IO UInt32 := do
     match spec.clauses.find? (·.id == cid) with
     | some c => IO.println (traceTable c); return 0
     | none => IO.println s!"no clause {cid}; known: {", ".intercalate (spec.clauses.map (·.id))}"; return 1
-  | _ => IO.eprintln "usage: charter trace <clause-id> <file.eflint>"; return 2
+  | _ => IO.eprintln "usage: charter trace <clause-id> <file.charter>"; return 2
 
 end Charter.Cli

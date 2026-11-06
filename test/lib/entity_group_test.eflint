@@ -1,7 +1,7 @@
 // lib/entity_group used by a small program: a coop with three members and two stakeholders.
 //! explore: 1
 //! explore-domain: int = 0..12
-#require "../../lib/entity_group.eflint".
+#require "../../lib/entity_group.charter".
 
 Fact coop Identified by Coop
 Fact worker Identified by Ann, Ben, Cy

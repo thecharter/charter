@@ -1,6 +1,6 @@
 // lib/collateral_pool used by a small program: two bonded entities, three actions, two claimants, an operator.
 //! explore: 1
-#require "../../lib/collateral_pool.eflint".
+#require "../../lib/collateral_pool.charter".
 
 Fact firm Identified by Acme, Bolt
 Fact job Identified by Dig, Spray, Launch

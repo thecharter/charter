@@ -1,11 +1,10 @@
 # lib/ — the standard library
 
-The eight institutional patterns of `src/Charter/Modules/` as Charter modules (D8, spec
-015.5). A program includes one with `#require "lib/<name>.eflint"` and instantiates it with
+The eight institutional patterns as Charter modules (D8, spec 015.5). A program includes
+one with `#require "lib/<name>.charter"` (or `#require "<name>"`) and instantiates it with
 `Use <module>(<type arguments>) As <prefix>`; every name the module declares then appears as
-`<prefix>-<name>`. Each module's header says what its parameters are and where it deviates
-from the Lean original. The files are `.eflint` until the `.charter` extension moves to this
-grammar (spec 011.10).
+`<prefix>-<name>`. Each module's header says what its parameters are and what properties its
+`Invariant`s enforce.
 
 | Module | Pattern | Parameters |
 |---|---|---|

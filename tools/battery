@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR-tier battery (AGENTS.md "Rebuild and verify"; plan §5.4). Run from anywhere:
+# PR-tier battery (AGENTS.md "Rebuild and verify"). Run from anywhere:
 #
 #     tools/battery            full PR tier
 #     tools/battery --no-build skip the lake build (the binary must be current)
@@ -38,26 +38,16 @@ for g in test/gates/*.sh; do
   step "$name" $st "$(tail -1 "$OUT/$name.log")"
 done
 
-# 3. charter check on both example programs: zero FAIL, zero STALE
-PSA=Examples/SovereignAgency/protocol-of-sovereign-agency.charter
-COM=Examples/AutonomousCommons/autonomous-commons.charter
-"$B" check "$PSA" "$COM" > "$OUT/check-files.log" 2>&1; st=$?
+# 3. charter check on all neutral in-tree example programs: zero FAIL, zero STALE
+EX1=Examples/Tenancy/tenancy.charter
+EX2=Examples/AutonomousCommons/commons.charter
+EX3=Examples/ServiceEscrow/service-escrow.charter
+"$B" check "$EX1" "$EX2" "$EX3" > "$OUT/check-files.log" 2>&1; st=$?
 bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-files.log")
 ok=$(grep -c '^ok' "$OUT/check-files.log")
-step check-charter-files $(( st != 0 || bad != 0 )) "$ok ok, $bad FAIL/STALE"
+step check-examples $(( st != 0 || bad != 0 )) "$ok ok, $bad FAIL/STALE"
 
-# 4. charter check on the linked companions
-"$B" check > "$OUT/check-linked.log" 2>&1; st=$?
-bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-linked.log")
-step check-linked $(( st != 0 || bad != 0 )) "$bad FAIL/STALE"
-
-# 5. charter sim: 16/16 and 8/8
-"$B" sim > "$OUT/sim.log" 2>&1; st=$?
-s16=$(grep -c '(16/16 scenarios passed)' "$OUT/sim.log")
-s8=$(grep -c '(8/8 scenarios passed)' "$OUT/sim.log")
-step sim $(( st != 0 || s16 != 1 || s8 != 1 )) "psa 16/16: $s16, commons 8/8: $s8"
-
-# 6. the eFLINT corpus (D2): every file must agree with eFLINT's recorded outcome,
+# 4. the eFLINT corpus (D2): every file must agree with eFLINT's recorded outcome,
 #    except the tolerated differences, which must differ
 BASE=test/eflint-corpus/eflint-outcomes.txt
 TOL=test/eflint-corpus/tolerances.md
@@ -68,25 +58,24 @@ else
 fi
 step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 
-# 7. the spec's conformance tests (plan §5.3)
+# 5. the spec's conformance tests (plan §5.3)
 "$B" test test/spec > "$OUT/spec.log" 2>&1; st=$?
 step spec-conformance $st "$(tail -1 "$OUT/spec.log")"
 
-# 8. the standard library (D8, spec 015.5): each lib/ module used by a program, with
+# 6. the standard library (D8, spec 015.5): each lib/ module used by a program, with
 #    its invariants checked after every phrase and explored from every end state
 "$B" test test/lib > "$OUT/lib.log" 2>&1; st=$?
 step standard-library $st "$(tail -1 "$OUT/lib.log")"
 
-# 9. charter prove on the kernel fixtures (spec 013.4): every claim and invariant decided
+# 7. charter prove on the kernel fixtures (spec 013.4): every claim and invariant decided
 #    by the kernel, the false claims reported as failed; programs that decide in seconds
 tools/prove-check test/prove > "$OUT/prove.log" 2>&1; st=$?
 step prove $st "$(tail -1 "$OUT/prove.log")"
 
-# 10. the example programs written in Charter (plan §8, Phase 2's exit): the tenancy toy, the
-#     commons over the eight lib/ modules (its eight Lean simulations as scenarios), and PSA
-#     Law 3 with INV.8 and INV.9; `test` runs their scenarios, explores their invariants, and
-#     runs the provenance checks
-"$B" test Examples/Tenancy Examples/AutonomousCommons/commons.eflint Examples/SovereignAgency/law3.eflint > "$OUT/examples.log" 2>&1; st=$?
+# 8. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
+#    modules), and service-escrow; `test` runs their scenarios, explores their invariants,
+#    and verifies all Law 8 provenance checks
+"$B" test "$EX1" "$EX2" "$EX3" > "$OUT/examples.log" 2>&1; st=$?
 step examples $st "$(tail -1 "$OUT/examples.log")"
 
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi

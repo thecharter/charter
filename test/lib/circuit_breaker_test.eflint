@@ -1,6 +1,6 @@
 // lib/circuit_breaker used by a small program: two initiators (one a claimant), two members, a court.
 //! explore: 1
-#require "../../lib/circuit_breaker.eflint".
+#require "../../lib/circuit_breaker.charter".
 
 Fact watcher Identified by Ida, Jo
 Fact node Identified by Mo, Nia

@@ -17,21 +17,6 @@ structure Located where
   file : String
   item : Item
 
-/-- Whether a `.charter` source uses the superseded v0.3 flat `charter <id> "..."` grammar
-(kept only for the two legacy companion files until Phase 3's deletions). -/
-def isLegacyCharterSrc (src : String) : Bool :=
-  let lines := src.splitOn "\n" |>.map String.trim |>.filter (fun l => !l.isEmpty && !l.startsWith "--")
-  match lines with
-  | first :: _ => first.startsWith "charter "
-  | [] => false
-
-/-- Whether `path` is an existing `.charter` file in the superseded v0.3 grammar. -/
-def isLegacyCharterFile (path : System.FilePath) : IO Bool := do
-  if path.extension != some "charter" then return false
-  if !(← path.pathExists) then return false
-  let src ← try IO.FS.readFile path catch _ => pure ""
-  return isLegacyCharterSrc src
-
 /-- Find the Charter installation/repository root from `start` (for `lib/` and `prove`). -/
 partial def findPackageRoot (dir : System.FilePath) : IO (Option System.FilePath) := do
   let manifest := dir / "lakefile.toml"
@@ -56,9 +41,12 @@ def findIncluded (dirs : List System.FilePath) (name : String) : IO (Option Syst
     let f := dir / name
     if ← f.pathExists then return some f
     let fc := System.FilePath.mk (f.toString ++ ".charter")
-    if (← fc.pathExists) && !(← isLegacyCharterFile fc) then return some fc
+    if ← fc.pathExists then return some fc
     let f' := System.FilePath.mk (f.toString ++ ".eflint")
     if ← f'.pathExists then return some f'
+    if name.endsWith ".eflint" then
+      let fSwap := f.withExtension "charter"
+      if ← fSwap.pathExists then return some fSwap
   return none
 
 /-- Load a file and expand its directives. `seen` holds every file loaded so far

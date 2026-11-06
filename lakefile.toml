@@ -1,19 +1,15 @@
 name = "charter"
-version = "0.3.0"
-defaultTargets = ["Charter", "Examples", "charter"]
+version = "0.4.0"
+defaultTargets = ["Charter", "charter"]
 
-# The Charter language: compiler, semantics, standard library, projections, and CLI (plan §4: src/Charter/).
+# The Charter language: compiler, semantics, standard library, projections, and CLI (src/Charter/).
 [[lean_lib]]
 name = "Charter"
 srcDir = "src"
 # Charter.Prove.Kernel imports the elaborator; the generated project imports it, the executable never does.
 roots = ["Charter", "Charter.Prove.Kernel"]
 
-# Lean companions of the example programs (import Charter, never the reverse).
-[[lean_lib]]
-name = "Examples"
-
-# The `charter` executable: src/Main.lean over Charter.Cli plus the registered examples.
+# Standalone `charter` executable (zero linked application companions).
 [[lean_exe]]
 name = "charter"
 root = "Main"
