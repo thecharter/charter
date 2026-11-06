@@ -236,6 +236,26 @@ where
     | .error err => (none, [diagOf err])
     | .ok stores => (some (Store.unions stores), [])
 
+/-- Check all declared invariants on `state` (`013.1`). -/
+def checkInvariants (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Except RuntimeError (List DomId) :=
+  let ctx := Ctx.ofIdx spec specIdx state
+  spec.invariants.filterMapM fun d => do
+    let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
+    let r ← (ignoreMissingInput (checkFalse (eval M.fuel term))).run ctx []
+    pure (if r.isEmpty then none else some d)
+
+/-- Evaluate an environment clock phrase (`@ t` or `tick`, `009.1`). -/
+def evalClockStep (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (cp : CPhrase) :
+    Except RuntimeError (Option Int) :=
+  match cp with
+  | .tick => .ok (some (state.time + 1))
+  | .setTime t =>
+    match (eval M.fuel t).run (Ctx.ofIdx spec specIdx state) [] with
+    | .error e => .error e
+    | .ok [.int t'] => if t' < state.time then .error (.timeBackwards state.time t') else .ok (some t')
+    | .ok _ => .error (.fuelExhausted "reading the clock")
+  | _ => .ok none
+
 /-- Apply a store, saturate, and find the violations (eFLINT `new_context`). `state1`
 is the state after the phrase's assignments (and any clock change). -/
 def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state1 : State) :
@@ -256,12 +276,7 @@ def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata :
     | .error e => (none, [diagOf e])
     | .ok violated =>
       let newDuty := violated.filter (fun te => !cfg.violatedDuties.contains te)
-      let invs : Except RuntimeError (List DomId) :=
-        spec.invariants.filterMapM fun d => do
-          let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
-          let r ← run (ignoreMissingInput (checkFalse (eval M.fuel term)))
-          pure (if r.isEmpty then none else some d)
-      match invs with
+      match checkInvariants spec specIdx state' with
       | .error e => (none, [diagOf e])
       | .ok invViol =>
         let outs := newDuty.map (fun te => Output.violation (.duty te)) ++ invViol.map (fun d => Output.violation (.invariant d))
@@ -296,16 +311,7 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
         s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
     | .ok strata =>
       let specIdx := spec'.buildIndex
-      -- the clock (D7): environment input applied before saturation, never a transition
-      let clock : Except RuntimeError (Option Int) := match cp with
-        | .tick => .ok (some (cfg.state.time + 1))
-        | .setTime t =>
-          match (M.eval M.fuel t).run (Ctx.ofIdx spec' specIdx cfg.state) [] with
-          | .error e => .error e
-          | .ok [.int t] => if t < cfg.state.time then .error (.timeBackwards cfg.state.time t) else .ok (some t)
-          | .ok _ => .error (.fuelExhausted "reading the clock")
-        | _ => .ok none
-      match clock with
+      match Interp.evalClockStep spec' specIdx cfg.state cp with
       | .error e => (cfg, warnOuts ++ [Interp.diagOf e])
       | .ok newTime =>
       let state0 := match newTime with
@@ -319,16 +325,7 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       | none => (cfg, warnOuts ++ outs)
       | some store =>
         if !declChanged && newTime.isNone && store.isEmpty then
-          -- No declaration, clock, or assignment changed: `state0` is already at its
-          -- stratified fixpoint and `cfg.violatedDuties` is unchanged; check invariants (013.1).
-          let ctx0 := Ctx.ofIdx spec' specIdx state0
-          let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx0 []
-          let invs : Except RuntimeError (List DomId) :=
-            spec'.invariants.filterMapM fun d => do
-              let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
-              let r ← run (M.ignoreMissingInput (M.checkFalse (M.eval M.fuel term)))
-              pure (if r.isEmpty then none else some d)
-          match invs with
+          match Interp.checkInvariants spec' specIdx state0 with
           | .error e => (cfg, warnOuts ++ outs ++ [Interp.diagOf e])
           | .ok invViol =>
             let outs2 := invViol.map (fun d => Output.violation (.invariant d))

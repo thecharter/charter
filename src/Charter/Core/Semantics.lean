@@ -35,7 +35,7 @@ def LegalState.has (ls : LegalState σ) (f : σ.Fact) : Bool :=
 def LegalState.activeAt (ls : LegalState σ) (now : Time) (f : σ.Fact) : Bool :=
   ls.any fun p => p.1 == f && match p.2.2 with
     | none => true
-    | some exp => decide (now ≤ exp)
+    | some exp => decide (now < exp)
 
 theorem LegalState.has_of_activeAt {ls : LegalState σ} {now : Time} {f : σ.Fact}
     (h : ls.activeAt now f = true) : ls.has f = true := by
@@ -54,7 +54,7 @@ def Who.mem (w : Who σ) (a : σ.Actor) (ls : LegalState σ := []) (now : Time :
 def LegalState.since (ls : LegalState σ) (now : Time) (f : σ.Fact) : Option Time :=
   (ls.filter fun p => p.1 == f && match p.2.2 with
     | none => true
-    | some exp => decide (now ≤ exp)).foldl (fun acc p => match acc with
+    | some exp => decide (now < exp)).foldl (fun acc p => match acc with
     | none => some p.2.1
     | some t => some (max t p.2.1)) none
 

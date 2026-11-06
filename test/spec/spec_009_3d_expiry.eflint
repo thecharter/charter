@@ -1,4 +1,5 @@
-// `Creates e For d` stamps the created instances with the expiry `now + d`; from that time they no longer hold.
+// 009.3 / T25: `Creates e For d` stamps created instances with half-open `[now, now + d)`
+// (`now < expiry`): live at `end - 1`, expired at exact boundary `end`, and expired at `end + 1`.
 Fact p Identified by P
 Event grant Creates p(P) For 2.
 grant().
@@ -6,4 +7,6 @@ grant().
 @ 1.
 ?p(P).
 @ 2.
+?!p(P).
+@ 3.
 ?!p(P).

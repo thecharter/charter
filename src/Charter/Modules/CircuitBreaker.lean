@@ -186,19 +186,19 @@ theorem circuit_breaker_claimant_multiplier_ge (P : ASParams) (k : Nat)
     Nat.mul_le_mul_left _ hm
   omega
 
-/-- Preliminary freeze expires automatically after `t0 + w` for any signature `σ`
-and any `freezeFact : σ.Fact`. -/
+/-- Preliminary freeze expires automatically from `t0 + w` onward (half-open `[t0, t0 + w)`)
+for any signature `σ` and any `freezeFact : σ.Fact`. -/
 theorem circuit_breaker_preliminary_freeze_expires {σ : Sig} (freezeFact : σ.Fact)
-    (t0 w now : Time) (h : t0 + w < now) :
+    (t0 w now : Time) (h : t0 + w ≤ now) :
     LegalState.activeAt (σ := σ) [(freezeFact, t0, some (t0 + w))] now freezeFact = false := by
-  simp [LegalState.activeAt, Nat.not_le.mpr h]
+  simp [LegalState.activeAt, Nat.not_lt.mpr h]
 
 /-- An unconfirmed temporary suspension entry stamped at `t0` with duration
-`limit` expires for all `now > t0 + limit` for any signature `σ` and `pausedFact : σ.Fact`. -/
+`limit` expires for all `now ≥ t0 + limit` (half-open `[t0, t0 + limit)`). -/
 theorem circuit_breaker_unconfirmed_suspension_time_bounded {σ : Sig} (pausedFact : σ.Fact)
-    (t0 limit now : Time) (h : t0 + limit < now) :
+    (t0 limit now : Time) (h : t0 + limit ≤ now) :
     LegalState.activeAt (σ := σ) [(pausedFact, t0, some (t0 + limit))] now pausedFact = false := by
-  simp [LegalState.activeAt, Nat.not_le.mpr h]
+  simp [LegalState.activeAt, Nat.not_lt.mpr h]
 
 /-- Wrongful-suspension consequential damages accounting conserves total damages
 (`totalCollectedNow + unpaidEnforceableDeficit = actualDamages + delayDamages`)

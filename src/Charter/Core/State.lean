@@ -175,34 +175,39 @@ def unions (sts : List Store) : Store := sts.foldr union []
 
 end Store
 
+/-- Apply one assignment to a state at phrase step `stepNum`. -/
+def State.applyAssignment (spec : Spec) (stepNum : Nat) (entry : Tagged × Assignment) (s : State) : State :=
+  let (te, a) := entry
+  let originOf (by_ : Option Tagged) : Origin := match by_ with
+    | some act => .byAct act stepNum
+    | none => if spec.closedType te.2 == some false then .environment stepNum else .asserted stepNum
+  match a with
+  | .holdsTrue expiry by_ =>
+    let origin := originOf by_
+    match spec.restrictionOf te.2 with
+    | some .var =>
+      let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
+        if q.1.2 == te.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q }
+      s.create te expiry origin
+    | some .function =>
+      match te.1 with
+      | .prod [f, _] =>
+        let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
+          match q.1.1 with
+          | .prod [f', _] => if q.1.2 == te.2 && Elem.beq f.1 f'.1 && f.2 == f'.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q
+          | _ => q }
+        s.create te expiry origin
+      | _ => s
+    | none => s.create te expiry origin
+  | .holdsFalse by_ => s.insert te ⟨false, false, s.time, none, originOf by_⟩
+  | .unknown => s.erase te
+
 /-- Apply a store to a state (eFLINT `make_assignments`), honouring `Var` and
 `Function` restrictions: a new true instance of a `Var` type falsifies every other
 instance of the type; of a `Function` type, every instance with the same first
 component. -/
 def State.makeAssignments (spec : Spec) (st : Store) (s : State) : State :=
-  let originOf (te : Tagged) (by_ : Option Tagged) : Origin := match by_ with
-    | some a => .byAct a s.step
-    | none => if spec.closedType te.2 == some false then .environment s.step else .asserted s.step
-  st.foldr (fun (te, a) s => match a with
-    | .holdsTrue expiry by_ =>
-      let origin := originOf te by_
-      match spec.restrictionOf te.2 with
-      | some .var =>
-        let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
-          if q.1.2 == te.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q }
-        s.create te expiry origin
-      | some .function =>
-        match te.1 with
-        | .prod [f, _] =>
-          let s := { s with contents := s.contents.map fun (q : Tagged × Info) =>
-            match q.1.1 with
-            | .prod [f', _] => if q.1.2 == te.2 && Elem.beq f.1 f'.1 && f.2 == f'.2 then (q.1, ⟨false, false, s.time, none, origin⟩) else q
-            | _ => q }
-          s.create te expiry origin
-        | _ => s
-      | none => s.create te expiry origin
-    | .holdsFalse by_ => s.insert te ⟨false, false, s.time, none, originOf te by_⟩
-    | .unknown => s.erase te) s
+  st.foldr (State.applyAssignment spec s.step) s
 
 /-- What one trigger did (eFLINT `TransInfo`). -/
 inductive TransInfo where

@@ -1,0 +1,62 @@
+// 005.9 / 007.4 / T01-T03: all four (lawful, valid) quadrants on occurred actions remain distinct:
+// 1. T01 (unlawful, valid): host physically cuts service without permission; breach + state change occur.
+// 2. T02 (unlawful, void): panel attempts termination without competence; no state change.
+// 3. T03 (lawful, void): authorized power defeated by active Immunity; no state change.
+// 4. (lawful, valid): authorized and unblocked exercise takes full institutional effect.
+Fact party Identified by Host, Panel, Agent.
+Fact service-cut Identified by party.
+Fact terminated Identified by party.
+Fact authorized-panel Identified by party.
+Fact probable-cause Identified by party.
+Fact objects Identified by party.
+
+// T01: physical/unlawful act with default Valid when True
+Act cut-service Actor party Recipient party'
+  Holds when False
+  Creates service-cut(party').
+Duty service-continuity Holder party Claimant party'
+  Violated when service-cut(party').
+
+// T02 & T03: institutional power with explicit Valid when + Immunity
+Act order-termination Actor party Recipient party'
+  Holds when authorized-panel(party) && probable-cause(party')
+  Valid when authorized-panel(party) && probable-cause(party')
+  Creates terminated(party').
+
+Immunity objection-shield Holder party Against order-termination
+  Holds when objects(party).
+
++authorized-panel(Panel).
++service-continuity(Host, Agent).
+
+Scenario quadrant-unlawful-but-effective {
+  ?!lawful cut-service(Host, Agent).
+  ?valid cut-service(Host, Agent).
+  cut-service(Host, Agent).
+  ?service-cut(Agent).
+  ?violated service-continuity(Host, Agent).
+}
+
+Scenario quadrant-unlawful-and-void {
+  ?!lawful order-termination(Panel, Agent).
+  ?!valid order-termination(Panel, Agent).
+  order-termination(Panel, Agent).
+  ?!terminated(Agent).
+}
+
+Scenario quadrant-lawful-but-void-by-immunity {
+  +probable-cause(Agent).
+  +objects(Agent).
+  ?lawful order-termination(Panel, Agent).
+  ?!valid order-termination(Panel, Agent).
+  order-termination(Panel, Agent).
+  ?!terminated(Agent).
+}
+
+Scenario quadrant-lawful-and-valid {
+  +probable-cause(Agent).
+  ?lawful order-termination(Panel, Agent).
+  ?valid order-termination(Panel, Agent).
+  order-termination(Panel, Agent).
+  ?terminated(Agent).
+}

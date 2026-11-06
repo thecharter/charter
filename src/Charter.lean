@@ -40,6 +40,7 @@ import Charter.Resolve.AssuranceGates
 import Charter.Artifact.Format
 import Charter.Eval.Eval
 import Charter.Eval.Interpreter
+import Charter.Core.Transition
 import Charter.Eval.Properties
 import Charter.Prove.Run
 import Charter.Prove.LeanGen

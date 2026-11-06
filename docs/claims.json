@@ -51,6 +51,62 @@
       "summary": "State.buildIndex 8-bit DomMap radix buckets preserve exact entry order and agree identically with State.lookup even under hash collisions."
     },
     {
+      "id": "eval.phrase_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "evalPhrase_sound",
+      "summary": "Every live runPhrase step satisfies the declarative DeclPhraseStep specification, preserving state on errors (Law 9, G1.4)."
+    },
+    {
+      "id": "eval.phrase_complete",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "evalPhrase_complete",
+      "summary": "Every valid DeclPhraseStep derivation is computed identically by runPhrase (Law 9, G1.4)."
+    },
+    {
+      "id": "eval.replay_deterministic",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "replay_trace_deterministic",
+      "summary": "Single-step and multi-step phrase traces over identical initial state and spec produce identical configurations and outputs (G1.4)."
+    },
+    {
+      "id": "eval.frame_preservation",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "frame_preservation_unrestricted",
+      "summary": "State.makeAssignments preserves value, since-stamp, expiry, and origin of unrelated types and untouched unrestricted instances (G1.4)."
+    },
+    {
+      "id": "eval.expiry_half_open_boundary",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "expiry_half_open_boundary",
+      "summary": "Half-open [t0, t0 + d) creations hold at t0 + d - 1 and expire at t0 + d and t0 + d + 1 (T25)."
+    },
+    {
+      "id": "eval.clock_never_decreases",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "clock_never_decreases",
+      "summary": "No transition (successful or failed) ever moves state.time backwards (009.1, G1.4)."
+    },
+    {
+      "id": "eval.three_answers_independent",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Transition.lean",
+      "symbol": "three_answers_independent",
+      "summary": "Lawfulness and institutional validity are orthogonal on occurred transitions across all four (lawful, valid) quadrants (Law 2, T01-T03)."
+    },
+    {
       "id": "eval.elem_structural_beq",
       "assurance": "proved",
       "scope": "live-evaluator",

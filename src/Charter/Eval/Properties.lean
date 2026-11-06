@@ -1,4 +1,4 @@
-import Charter.Eval.Interpreter
+import Charter.Core.Transition
 
 /-!
 # Charter.Eval.Properties — What the evaluator is proved to do
@@ -911,6 +911,649 @@ theorem saturateStratum_least_prefixpoint (spec : Spec) (specIdx : Spec.SpecInde
 
 end Saturate
 
+/-! ## G1.4 — Half-open expiry (`T25`), Frame Preservation, and Live Evaluator Correspondence (`Law 9`)
+
+Proves:
+1. `expiry_half_open_boundary` (`T25`): `[t0, t0 + d)` holds at `t0 + d - 1` and expires at `t0 + d` and `t0 + d + 1`.
+2. `frame_preservation_other_type` & `frame_preservation_unrestricted`: `State.makeAssignments` leaves unrelated types and untouched unrestricted instances identical (value, `since`, `expiry`, `origin`).
+3. `evalPhrase_sound` & `evalPhrase_complete`: `runPhrase` is sound and complete with respect to `DeclPhraseStep`.
+4. `replay_deterministic` & `replay_trace_deterministic`: single-step and multi-step transitions are deterministic.
+5. `clock_never_decreases`: no transition (successful or failed) ever moves `state.time` backwards (`009.1`). -/
+
+/-- `T25` (`009.3`): an instance created at `t0` for positive duration `d` is live at
+`t0` and `t0 + d - 1`, and expired at `t0 + d` and `t0 + d + 1`. -/
+theorem expiry_half_open_boundary (t0 d : Int) (orig : Origin) (hd : 0 < d) :
+    let i : Info := ⟨true, false, t0, some (t0 + d), orig⟩
+    i.live t0 = true ∧
+    i.live (t0 + d - 1) = true ∧
+    i.live (t0 + d) = false ∧
+    i.live (t0 + d + 1) = false := by
+  simp only [Info.live, Bool.true_and, decide_eq_true_eq, decide_eq_false_iff_not]
+  omega
+
+namespace State
+
+theorem find?_filter_not_beq_ne (te' te : Tagged) (hne : te' ≠ te) :
+    ∀ (xs : List (Tagged × Info)),
+      (xs.filter (fun p => !(p.1 == te'))).find? (·.1 == te) = xs.find? (·.1 == te)
+  | [] => rfl
+  | p :: rest => by
+    simp only [List.filter]
+    cases hp : (p.1 == te')
+    · simp only [Bool.not_false, List.find?_cons]
+      cases (p.1 == te)
+      · exact find?_filter_not_beq_ne te' te hne rest
+      · rfl
+    · have peq : p.1 = te' := (Tagged.beq_iff p.1 te').mp hp
+      have hpte : (p.1 == te) = false := by
+        rw [peq]
+        exact Tagged.beq_eq_false_of_ne hne
+      simp only [Bool.not_true, List.find?_cons, hpte]
+      exact find?_filter_not_beq_ne te' te hne rest
+
+theorem insert_lookup_ne (s : State) (te' te : Tagged) (i : Info) (hne : te' ≠ te) :
+    (s.insert te' i).lookup te = s.lookup te := by
+  unfold insert lookup
+  simp only [List.find?_cons, Tagged.beq_eq_false_of_ne hne]
+  rw [find?_filter_not_beq_ne te' te hne s.contents]
+
+theorem erase_lookup_ne (s : State) (te' te : Tagged) (hne : te' ≠ te) :
+    (s.erase te').lookup te = s.lookup te := by
+  unfold erase lookup
+  rw [find?_filter_not_beq_ne te' te hne s.contents]
+
+theorem create_lookup_ne (s : State) (te' te : Tagged) (exp : Option Int) (orig : Origin) (hne : te' ≠ te) :
+    (s.create te' exp orig).lookup te = s.lookup te := by
+  unfold create
+  exact insert_lookup_ne s te' te _ hne
+
+theorem find?_map_preserve_at (te : Tagged) (f : (Tagged × Info) → (Tagged × Info))
+    (hf1 : ∀ p, (f p).1 = p.1)
+    (hfte : ∀ p, p.1 = te → f p = p) :
+    ∀ (xs : List (Tagged × Info)), (xs.map f).find? (·.1 == te) = xs.find? (·.1 == te)
+  | [] => rfl
+  | p :: rest => by
+    simp only [List.map_cons, List.find?_cons, hf1 p]
+    cases hp : (p.1 == te)
+    · exact find?_map_preserve_at te f hf1 hfte rest
+    · rw [hfte p ((Tagged.beq_iff p.1 te).mp hp)]
+
+/-- Single-entry frame lemma for an assignment whose type differs from `te.2`. -/
+theorem applyAssignment_other_type (spec : Spec) (stepNum : Nat) (p : Tagged × Assignment)
+    (s : State) (te : Tagged) (hdom : p.1.2 ≠ te.2) :
+    (applyAssignment spec stepNum p s).lookup te = s.lookup te := by
+  rcases p with ⟨te', a⟩
+  dsimp only at hdom
+  have hne : te' ≠ te := by intro heq; apply hdom; rw [heq]
+  unfold applyAssignment
+  dsimp only
+  cases a with
+  | holdsFalse by_ => exact insert_lookup_ne s te' te _ hne
+  | unknown => exact erase_lookup_ne s te' te hne
+  | holdsTrue expiry by_ =>
+    dsimp only
+    cases hrest : spec.restrictionOf te'.2 with
+    | none => exact create_lookup_ne s te' te _ _ hne
+    | some r =>
+      cases r with
+      | var =>
+        dsimp only
+        rw [create_lookup_ne _ te' te _ _ hne]
+        unfold lookup
+        rw [find?_map_preserve_at te _
+          (fun q => by cases (q.1.2 == te'.2) <;> rfl)
+          (fun q hq => by
+            have hneDom : (q.1.2 == te'.2) = false := by
+              rw [hq]
+              cases hb : (te.2 == te'.2)
+              · rfl
+              · exact absurd (beq_iff_eq.mp hb).symm hdom
+            simp [hneDom])]
+      | function =>
+        dsimp only
+        cases te'.1 with
+        | str _ => rfl
+        | int _ => rfl
+        | prod args =>
+          cases args with
+          | nil => rfl
+          | cons f restArgs =>
+            cases restArgs with
+            | nil => rfl
+            | cons g more =>
+              cases more with
+              | cons _ _ => rfl
+              | nil =>
+                dsimp only
+                rw [create_lookup_ne _ te' te _ _ hne]
+                unfold lookup
+                rw [find?_map_preserve_at te _
+                  (fun q => by
+                    cases q.1.1 with
+                    | str _ => rfl
+                    | int _ => rfl
+                    | prod qargs =>
+                      cases qargs with
+                      | nil => rfl
+                      | cons f' qr =>
+                        cases qr with
+                        | nil => rfl
+                        | cons g' qm =>
+                          cases qm with
+                          | cons _ _ => rfl
+                          | nil =>
+                            dsimp only
+                            cases (q.1.2 == te'.2 && Elem.beq f.1 f'.1 && f.2 == f'.2) <;> rfl)
+                  (fun q hq => by
+                    have hneDom : (q.1.2 == te'.2) = false := by
+                      rw [hq]
+                      cases hb : (te.2 == te'.2)
+                      · rfl
+                      · exact absurd (beq_iff_eq.mp hb).symm hdom
+                    cases q.1.1 with
+                    | str _ => rfl
+                    | int _ => rfl
+                    | prod qargs =>
+                      cases qargs with
+                      | nil => rfl
+                      | cons f' qr =>
+                        cases qr with
+                        | nil => rfl
+                        | cons g' qm =>
+                          cases qm with
+                          | cons _ _ => rfl
+                          | nil => simp [hneDom])]
+
+theorem foldr_applyAssignment_other_type (spec : Spec) (stepNum : Nat) :
+    ∀ (st : Store) (s : State) (te : Tagged),
+      (∀ p ∈ st, p.1.2 ≠ te.2) →
+      (st.foldr (applyAssignment spec stepNum) s).lookup te = s.lookup te
+  | [], _, _, _ => rfl
+  | p :: st, s, te, hall => by
+    simp only [List.foldr_cons]
+    rw [applyAssignment_other_type spec stepNum p _ te (hall p (List.mem_cons_self ..)),
+        foldr_applyAssignment_other_type spec stepNum st s te (fun q hq => hall q (List.mem_cons_of_mem p hq))]
+
+/-- Frame preservation across types: an assignment batch touching no instance of `te.2`
+leaves `s.lookup te` (value, `fromSat`, `since`, `expiry`, and `origin`) unchanged. -/
+theorem frame_preservation_other_type (spec : Spec) (st : Store) (s : State) (te : Tagged)
+    (hall : ∀ p ∈ st, p.1.2 ≠ te.2) :
+    (makeAssignments spec st s).lookup te = s.lookup te :=
+  foldr_applyAssignment_other_type spec s.step st s te hall
+
+theorem foldr_applyAssignment_unrestricted (spec : Spec) (stepNum : Nat) :
+    ∀ (st : Store) (s : State) (te : Tagged),
+      spec.restrictionOf te.2 = none →
+      (∀ p ∈ st, p.1 ≠ te) →
+      (st.foldr (applyAssignment spec stepNum) s).lookup te = s.lookup te
+  | [], _, _, _, _ => rfl
+  | p :: st, s, te, hrest, hall => by
+    simp only [List.foldr_cons]
+    have htail := foldr_applyAssignment_unrestricted spec stepNum st s te hrest
+      (fun q hq => hall q (List.mem_cons_of_mem p hq))
+    by_cases hdom : p.1.2 = te.2
+    · rcases p with ⟨te', a⟩
+      dsimp only at hdom
+      have hne : te' ≠ te := hall (te', a) (List.mem_cons_self ..)
+      unfold applyAssignment
+      dsimp only
+      cases a with
+      | holdsFalse _ => rw [insert_lookup_ne _ te' te _ hne]; exact htail
+      | unknown => rw [erase_lookup_ne _ te' te hne]; exact htail
+      | holdsTrue exp by_ =>
+        dsimp only
+        rw [hdom, hrest]
+        dsimp only
+        rw [create_lookup_ne _ te' te _ _ hne]
+        exact htail
+    · rw [applyAssignment_other_type spec stepNum p _ te hdom, htail]
+
+/-- Frame preservation on unrestricted types (`Fact`, `Duty`, `Act`, `Immunity` without
+`Var`/`Function`): any assignment batch that does not mention `te` leaves `s.lookup te` unchanged. -/
+theorem frame_preservation_unrestricted (spec : Spec) (st : Store) (s : State) (te : Tagged)
+    (hrest : spec.restrictionOf te.2 = none)
+    (hall : ∀ p ∈ st, p.1 ≠ te) :
+    (makeAssignments spec st s).lookup te = s.lookup te :=
+  foldr_applyAssignment_unrestricted spec s.step st s te hrest hall
+
+theorem applyAssignment_time (spec : Spec) (stepNum : Nat) (p : Tagged × Assignment) (s : State) :
+    (applyAssignment spec stepNum p s).time = s.time := by
+  rcases p with ⟨te, a⟩
+  unfold applyAssignment
+  dsimp only
+  cases a with
+  | holdsFalse _ => rfl
+  | unknown => rfl
+  | holdsTrue exp by_ =>
+    dsimp only
+    cases spec.restrictionOf te.2 with
+    | none => rfl
+    | some r =>
+      cases r with
+      | var => rfl
+      | function =>
+        dsimp only
+        cases te.1 with
+        | str _ => rfl
+        | int _ => rfl
+        | prod args =>
+          cases args with
+          | nil => rfl
+          | cons _ r1 =>
+            cases r1 with
+            | nil => rfl
+            | cons _ r2 =>
+              cases r2 with
+              | nil => rfl
+              | cons _ _ => rfl
+
+theorem foldr_applyAssignment_time (spec : Spec) (stepNum : Nat) :
+    ∀ (st : Store) (s : State), (st.foldr (applyAssignment spec stepNum) s).time = s.time
+  | [], _ => rfl
+  | p :: st, s => by
+    simp only [List.foldr_cons]
+    rw [applyAssignment_time, foldr_applyAssignment_time spec stepNum st s]
+
+theorem makeAssignments_time (spec : Spec) (st : Store) (s : State) :
+    (makeAssignments spec st s).time = s.time :=
+  foldr_applyAssignment_time spec s.step st s
+
+end State
+
+/-! ### Soundness, completeness, determinism, and clock monotonicity of `runPhrase` -/
+
+theorem declClock_sound (spec : Spec) (specIdx : Spec.SpecIndex) (s : State) (cp : CPhrase) :
+    DeclClock spec specIdx s cp (Interp.evalClockStep spec specIdx s cp) := by
+  cases cp with
+  | tick => exact .tick
+  | setTime t =>
+    simp only [Interp.evalClockStep]
+    cases hr : (M.eval M.fuel t).run (Ctx.ofIdx spec specIdx s) [] with
+    | error e => exact .setTimeEvalErr t e hr
+    | ok vs =>
+      cases vs with
+      | nil => exact .setTimeBadShape t [] hr (fun _ h => nomatch h)
+      | cons v rest =>
+        cases v with
+        | bool _ => exact .setTimeBadShape t _ hr (fun _ h => by injection h with h1; cases h1)
+        | str _ => exact .setTimeBadShape t _ hr (fun _ h => by injection h with h1; cases h1)
+        | tagged _ => exact .setTimeBadShape t _ hr (fun _ h => by injection h with h1; cases h1)
+        | int t' =>
+          cases rest with
+          | cons _ _ => exact .setTimeBadShape t _ hr (fun _ h => by injection h with _ h2; cases h2)
+          | nil =>
+            dsimp only
+            by_cases hlt : t' < s.time
+            · rw [if_pos hlt]; exact .setTimeBackwards t t' hr hlt
+            · rw [if_neg hlt]; exact .setTimeOk t t' hr (by omega)
+  | trigger _ _ | create _ _ | terminate _ _ | obfuscate _ _ | query _ | instQuery _ _ _
+  | onlyDecls _ | par _ | scenario _ _ _ | expect _ _ _ | why _ _ =>
+    exact .nonClock _ (fun h => nomatch h) (fun _ h => nomatch h)
+
+theorem declClock_complete {spec : Spec} {specIdx : Spec.SpecIndex} {s : State}
+    {cp : CPhrase} {res : Except RuntimeError (Option Int)}
+    (h : DeclClock spec specIdx s cp res) :
+    Interp.evalClockStep spec specIdx s cp = res := by
+  cases h with
+  | tick => rfl
+  | setTimeOk t t' hr hle =>
+    simp only [Interp.evalClockStep, hr, Int.not_lt.mpr hle, ↓reduceIte]
+  | setTimeBackwards t t' hr hlt =>
+    simp only [Interp.evalClockStep, hr, hlt, ↓reduceIte]
+  | setTimeEvalErr t e hr =>
+    simp only [Interp.evalClockStep, hr]
+  | setTimeBadShape t vs hr hshape =>
+    cases vs with
+    | nil => simp only [Interp.evalClockStep, hr]
+    | cons v rest =>
+      cases v with
+      | bool _ | str _ | tagged _ => simp only [Interp.evalClockStep, hr]
+      | int t' =>
+        cases rest with
+        | nil => exact absurd rfl (hshape t')
+        | cons _ _ => simp only [Interp.evalClockStep, hr]
+  | nonClock cp hnt hns =>
+    cases cp with
+    | tick => exact absurd rfl hnt
+    | setTime t => exact absurd rfl (hns t)
+    | _ => rfl
+
+theorem declClock_monotone {spec : Spec} {specIdx : Spec.SpecIndex} {s : State}
+    {cp : CPhrase} {t' : Int}
+    (h : DeclClock spec specIdx s cp (.ok (some t'))) :
+    s.time ≤ t' := by
+  cases h with
+  | tick => omega
+  | setTimeOk _ _ _ hle => exact hle
+
+/-- Live evaluator soundness (`Law 9`, `G1.4`): every transition produced by `runPhrase`
+satisfies `DeclPhraseStep`. -/
+theorem evalPhrase_sound (cfg : Config) (p : Phrase) :
+    DeclPhraseStep cfg p (runPhrase cfg p).1 (runPhrase cfg p).2 := by
+  unfold runPhrase
+  cases hres : resolvePhrase cfg.spec p with
+  | error ds =>
+    dsimp only
+    exact .resolveError ds hres
+  | ok triple =>
+    rcases triple with ⟨spec', cp, ws⟩
+    dsimp only
+    cases hstr : (if p.hasDecls then Stratify.strata spec' else .ok cfg.strata) with
+    | error cycle =>
+      dsimp only
+      by_cases hdecl : p.hasDecls = true
+      · rw [if_pos hdecl] at hstr
+        exact .stratifyError spec' cp ws cycle hres hdecl hstr
+      · have hdeclF : p.hasDecls = false := Bool.eq_false_iff.mpr hdecl
+        rw [hdeclF] at hstr
+        cases hstr
+    | ok strata =>
+      dsimp only
+      have hclk : DeclClock spec' spec'.buildIndex cfg.state cp
+          (Interp.evalClockStep spec' spec'.buildIndex cfg.state cp) :=
+        declClock_sound spec' spec'.buildIndex cfg.state cp
+      cases hce : Interp.evalClockStep spec' spec'.buildIndex cfg.state cp with
+      | error e =>
+        rw [hce] at hclk
+        dsimp only
+        exact .clockError spec' cp ws strata e hres hstr hclk
+      | ok newTime =>
+        rw [hce] at hclk
+        cases newTime with
+        | some t =>
+          dsimp only
+          rcases hsem : Interp.semPhrase spec' spec'.buildIndex { cfg.state with time := t, step := cfg.state.step + 1 } 1000 cp with ⟨store?, outs⟩
+          cases store? with
+          | none =>
+            exact .semError spec' cp ws strata (some t) _ outs hres hstr hclk rfl hsem
+          | some store =>
+            dsimp only
+            have hpureF : (!p.hasDecls && (some t).isNone && store.isEmpty) = false := by simp
+            simp only [hpureF, Bool.false_eq_true, ↓reduceIte]
+            have hmut' : p.hasDecls = true ∨ (some t).isSome = true ∨ store ≠ [] := Or.inr (Or.inl rfl)
+            rcases hnc : Interp.newContext cfg spec' spec'.buildIndex strata
+              (State.makeAssignments spec' store { cfg.state with time := t, step := cfg.state.step + 1 }) with ⟨cfg'?, outs2⟩
+            cases cfg'? with
+            | none =>
+              exact .mutatingError spec' cp ws strata (some t) _ store outs outs2
+                hres hstr hclk hmut' rfl hsem hnc
+            | some cfg' =>
+              exact .mutatingOk cfg' spec' cp ws strata (some t) _ store outs outs2
+                hres hstr hclk hmut' rfl hsem hnc
+        | none =>
+          dsimp only
+          rcases hsem : Interp.semPhrase spec' spec'.buildIndex { cfg.state with step := cfg.state.step + 1 } 1000 cp with ⟨store?, outs⟩
+          cases store? with
+          | none =>
+            exact .semError spec' cp ws strata none _ outs hres hstr hclk rfl hsem
+          | some store =>
+            dsimp only
+            by_cases hpure : (!p.hasDecls && (none : Option Int).isNone && store.isEmpty) = true
+            · rw [if_pos hpure]
+              simp only [Bool.and_eq_true, Bool.not_eq_true', Option.isNone_none, List.isEmpty_iff, and_true] at hpure
+              rcases hpure with ⟨hdeclF, hstoreE⟩
+              subst hstoreE
+              cases hinv : Interp.checkInvariants spec' spec'.buildIndex { cfg.state with step := cfg.state.step + 1 } with
+              | error e =>
+                exact .pureReadError spec' cp ws strata _ outs e hres hstr hclk hdeclF rfl hsem hinv
+              | ok invViol =>
+                exact .pureReadOk spec' cp ws strata _ outs invViol hres hstr hclk hdeclF rfl hsem hinv
+            · rw [if_neg hpure]
+              have hmut' : p.hasDecls = true ∨ (none : Option Int).isSome = true ∨ store ≠ [] := by
+                cases hd : p.hasDecls
+                · cases store with
+                  | nil => simp [hd] at hpure
+                  | cons _ _ => right; right; intro h; cases h
+                · left; rfl
+              rcases hnc : Interp.newContext cfg spec' spec'.buildIndex strata
+                (State.makeAssignments spec' store { cfg.state with step := cfg.state.step + 1 }) with ⟨cfg'?, outs2⟩
+              cases cfg'? with
+              | none =>
+                exact .mutatingError spec' cp ws strata none _ store outs outs2
+                  hres hstr hclk hmut' rfl hsem hnc
+              | some cfg' =>
+                exact .mutatingOk cfg' spec' cp ws strata none _ store outs outs2
+                  hres hstr hclk hmut' rfl hsem hnc
+
+/-- Live evaluator completeness (`Law 9`, `G1.4`): every valid `DeclPhraseStep` derivation
+is computed identically by `runPhrase`. -/
+theorem evalPhrase_complete {cfg cfg' : Config} {p : Phrase} {outsTotal : List Output}
+    (h : DeclPhraseStep cfg p cfg' outsTotal) :
+    runPhrase cfg p = (cfg', outsTotal) := by
+  unfold runPhrase
+  cases h with
+  | resolveError ds hres =>
+    rw [hres]
+  | stratifyError spec' cp ws cycle hres hdecl hstr =>
+    rw [hres]; dsimp only
+    rw [if_pos hdecl, hstr]
+  | clockError spec' cp ws strata e hres hstr hclk =>
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]
+  | semError spec' cp ws strata newTime state0 outs hres hstr hclk hst0 hsem =>
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]
+    cases newTime <;> (dsimp only at hst0 ⊢; subst hst0; rw [hsem])
+  | pureReadError spec' cp ws strata state0 outs e hres hstr hclk hdeclF hst0 hsem hinv =>
+    subst hst0
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]; dsimp only
+    rw [hsem]; dsimp only
+    have hpure : (!p.hasDecls && (none : Option Int).isNone && ([] : Store).isEmpty) = true := by
+      simp [hdeclF]
+    rw [if_pos hpure, hinv]
+  | pureReadOk spec' cp ws strata state0 outs invViol hres hstr hclk hdeclF hst0 hsem hinv =>
+    subst hst0
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]; dsimp only
+    rw [hsem]; dsimp only
+    have hpure : (!p.hasDecls && (none : Option Int).isNone && ([] : Store).isEmpty) = true := by
+      simp [hdeclF]
+    rw [if_pos hpure, hinv]
+  | mutatingError spec' cp ws strata newTime state0 store outs outs2 hres hstr hclk hmut hst0 hsem hnc =>
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]
+    have hpureF : (!p.hasDecls && newTime.isNone && store.isEmpty) = false := by
+      rcases hmut with hd | ht | hs
+      · simp [hd]
+      · cases newTime <;> simp at ht ⊢
+      · cases store with
+        | nil => exact absurd rfl hs
+        | cons _ _ => simp
+    cases newTime <;> (dsimp only at hst0 hpureF ⊢; subst hst0; rw [hsem]; simp only [hpureF, Bool.false_eq_true, ↓reduceIte]; rw [hnc])
+  | mutatingOk cfg' spec' cp ws strata newTime state0 store outs outs2 hres hstr hclk hmut hst0 hsem hnc =>
+    rw [hres]; dsimp only
+    rw [hstr]; dsimp only
+    rw [declClock_complete hclk]
+    have hpureF : (!p.hasDecls && newTime.isNone && store.isEmpty) = false := by
+      rcases hmut with hd | ht | hs
+      · simp [hd]
+      · cases newTime <;> simp at ht ⊢
+      · cases store with
+        | nil => exact absurd rfl hs
+        | cons _ _ => simp
+    cases newTime <;> (dsimp only at hst0 hpureF ⊢; subst hst0; rw [hsem]; simp only [hpureF, Bool.false_eq_true, ↓reduceIte]; rw [hnc])
+
+/-- Single-step replay determinism (`docs/rfc.md` §3.4): identical configuration and phrase
+yield identical post-configuration and outputs. -/
+theorem replay_deterministic {cfg cfg₁ cfg₂ : Config} {p : Phrase} {outs₁ outs₂ : List Output}
+    (h₁ : DeclPhraseStep cfg p cfg₁ outs₁)
+    (h₂ : DeclPhraseStep cfg p cfg₂ outs₂) :
+    cfg₁ = cfg₂ ∧ outs₁ = outs₂ := by
+  have e₁ := evalPhrase_complete h₁
+  have e₂ := evalPhrase_complete h₂
+  rw [e₁] at e₂
+  injection e₂ with hc ho
+  exact ⟨hc, ho⟩
+
+/-- Multi-step trace replay determinism (`docs/rfc.md` §3.4). -/
+theorem replay_trace_deterministic :
+    ∀ {ps : List Phrase} {cfg cfg₁ cfg₂ : Config} {os₁ os₂ : List (List Output)},
+      DeclTraceStep cfg ps cfg₁ os₁ →
+      DeclTraceStep cfg ps cfg₂ os₂ →
+      cfg₁ = cfg₂ ∧ os₁ = os₂
+  | [], _, _, _, _, _, .nil _, .nil _ => ⟨rfl, rfl⟩
+  | _ :: _, _, _, _, _, _, .cons s₁ t₁, .cons s₂ t₂ => by
+    obtain ⟨hc, ho⟩ := replay_deterministic s₁ s₂
+    subst hc ho
+    obtain ⟨hc', hos⟩ := replay_trace_deterministic t₁ t₂
+    exact ⟨hc', congrArg _ hos⟩
+
+namespace Saturate
+
+theorem deriveAll_time (prev : List (Tagged × Info)) :
+    ∀ (tes : List Tagged) (s : State), (State.deriveAll prev s tes).1.time = s.time
+  | [], _ => rfl
+  | te :: tes, s => by
+    simp only [State.deriveAll]
+    rcases h1 : s.derive (State.stampFrom prev s.time te) te with ⟨s1, _⟩
+    have ht1 : s1.time = s.time := by
+      have := derive_time s (State.stampFrom prev s.time te) te
+      rw [h1] at this; exact this
+    rcases h2 : State.deriveAll prev s1 tes with ⟨s2, _⟩
+    have ht2 := deriveAll_time prev tes s1
+    rw [h2] at ht2
+    exact ht2.trans ht1
+
+theorem passType_time (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info))
+    (d : DomId) (tspec : TypeSpec) :
+    ∀ (cs : List Derivation) (s s2 : State) (ch : Bool),
+      passType spec specIdx prev d tspec cs s = .ok (s2, ch) → s2.time = s.time
+  | [], s, s2, _, hp => by
+    simp only [passType, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1]
+  | c :: cs, s, s2, ch, hp => by
+    simp only [passType] at hp
+    split at hp
+    · cases hp
+    · next ress _ =>
+      rcases h1 : State.deriveAll prev s ress.flatten with ⟨s1, ch1⟩
+      rw [h1] at hp
+      have ht1 : s1.time = s.time := by
+        have := deriveAll_time prev ress.flatten s
+        rw [h1] at this; exact this
+      split at hp
+      · cases hp
+      · next s2' ch2 h2 =>
+        simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+        rw [← hp.1, passType_time spec specIdx prev d tspec cs s1 s2' ch2 h2, ht1]
+
+theorem pass_time (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) :
+    ∀ (types : List DomId) (s s2 : State) (ch : Bool),
+      pass spec specIdx prev types s = .ok (s2, ch) → s2.time = s.time
+  | [], s, s2, _, hp => by
+    simp only [pass, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1]
+  | d :: ds, s, s2, ch, hp => by
+    unfold pass at hp
+    cases hlook : (specIdx.lookup d).map (·.1) with
+    | none =>
+      rw [hlook] at hp; dsimp only at hp
+      exact pass_time spec specIdx prev ds s s2 ch hp
+    | some tspec =>
+      rw [hlook] at hp; dsimp only at hp
+      split at hp
+      · cases hp
+      · next s1 ch1 h1 =>
+        split at hp
+        · cases hp
+        · next s2' ch2 h2 =>
+          simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+          rw [← hp.1, pass_time spec specIdx prev ds s1 s2' ch2 h2,
+              passType_time spec specIdx prev d tspec tspec.derivation s s1 ch1 h1]
+
+theorem saturateStratum_time (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info))
+    (types : List DomId) :
+    ∀ (fuel : Nat) (s s' : State),
+      saturateStratum spec specIdx prev types fuel s = .ok s' → s'.time = s.time
+  | 0, _, _, hs => by simp [saturateStratum] at hs
+  | fuel + 1, s, s', hs => by
+    simp only [saturateStratum] at hs
+    split at hs
+    · cases hs
+    · next s1 changed heq =>
+      have ht1 := pass_time spec specIdx prev types s s1 changed heq
+      split at hs
+      · rw [saturateStratum_time spec specIdx prev types fuel s1 s' hs, ht1]
+      · simp only [Except.ok.injEq] at hs; rw [← hs, ht1]
+
+theorem rebaseAndSatWithIdx_time (spec : Spec) (specIdx : Spec.SpecIndex)
+    (strata : List (List DomId)) (s s' : State)
+    (h : rebaseAndSatWithIdx spec specIdx strata s = .ok s') :
+    s'.time = s.time := by
+  unfold rebaseAndSatWithIdx at h
+  have hfold : ∀ (layers : List (List DomId)) (st st' : State),
+      layers.foldlM (fun acc layer => saturateStratum spec specIdx s.derivedFacts layer 100000 acc) st = .ok st' →
+      st'.time = st.time := by
+    intro layers
+    induction layers with
+    | nil =>
+      intro st st' hf
+      simp only [List.foldlM, pure, Except.pure, Except.ok.injEq] at hf
+      rw [← hf]
+    | cons layer rest ih =>
+      intro st st' hf
+      simp only [List.foldlM, bind, Except.bind] at hf
+      split at hf
+      · cases hf
+      · next st1 h1 =>
+        rw [ih st1 st' hf, saturateStratum_time spec specIdx s.derivedFacts layer 100000 st st1 h1]
+  exact hfold strata s.rebase s' h
+
+end Saturate
+
+theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIndex}
+    {strata : List (List DomId)} {state1 : State} {outs : List Output}
+    (h : Interp.newContext cfg spec specIdx strata state1 = (some cfg', outs)) :
+    cfg'.state.time = state1.time := by
+  unfold Interp.newContext at h
+  cases hrs : Saturate.rebaseAndSatWithIdx spec specIdx strata state1 with
+  | error _ => rw [hrs] at h; cases h
+  | ok state' =>
+    rw [hrs] at h
+    dsimp only at h
+    split at h
+    · cases h
+    · split at h
+      · cases h
+      · simp only [Prod.mk.injEq, Option.some.injEq] at h
+        rw [← h.1]
+        exact Saturate.rebaseAndSatWithIdx_time spec specIdx strata state1 state' hrs
+
+/-- Clock monotonicity (`009.1`): no transition ever moves `state.time` backwards. -/
+theorem clock_never_decreases {cfg cfg' : Config} {p : Phrase} {outs : List Output}
+    (h : DeclPhraseStep cfg p cfg' outs) :
+    cfg.state.time ≤ cfg'.state.time := by
+  cases h with
+  | resolveError _ _ => exact Int.le_refl _
+  | stratifyError _ _ _ _ _ _ _ => exact Int.le_refl _
+  | clockError _ _ _ _ _ _ _ _ => exact Int.le_refl _
+  | semError _ _ _ _ _ _ _ _ _ _ _ _ => exact Int.le_refl _
+  | pureReadError _ _ _ _ _ _ _ _ _ _ _ _ _ _ => exact Int.le_refl _
+  | pureReadOk _ _ _ _ state0 _ _ _ _ _ _ hst0 _ _ =>
+    rw [hst0]; exact Int.le_refl _
+  | mutatingError _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ => exact Int.le_refl _
+  | mutatingOk _ spec' _ _ strata newTime state0 store _ _ _ _ hclk _ hst0 _ hnc =>
+    rw [newContext_time hnc, State.makeAssignments_time]
+    cases newTime with
+    | none => rw [hst0]; exact Int.le_refl _
+    | some t' =>
+      rw [hst0]
+      exact declClock_monotone hclk
+
+#print axioms evalPhrase_sound
+#print axioms evalPhrase_complete
+#print axioms replay_deterministic
+#print axioms replay_trace_deterministic
+#print axioms clock_never_decreases
+#print axioms expiry_half_open_boundary
+#print axioms State.frame_preservation_other_type
+#print axioms State.frame_preservation_unrestricted
 #print axioms Saturate.saturateStratum_fixpoint
 #print axioms Saturate.saturateStratum_closed
 #print axioms Saturate.saturateStratum_least_prefixpoint
