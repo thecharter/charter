@@ -18,6 +18,7 @@ ESC=Examples/ServiceEscrow/service-escrow.charter
   "$B" version
   "$B" check "$TEN" "$COM" "$ESC"
   "$B" build "$ESC" -o "$tmp/escrow.artifact"
+  "$B" explore --mode adversarial --depth 2 test/verify/safe_fenced_lease.charter
   "$B" check
   "$B" trace T.1 "$TEN"
   "$B" trace SE.2 "$ESC"

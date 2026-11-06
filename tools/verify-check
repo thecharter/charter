@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Verification suite runner for Gate G2 (`Verify/Explorer`, `Verify/Reduction`, T28, T29).
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+[ -x "$B" ] || { echo "FAIL verify-check: $B is not built"; exit 2; }
+fail=0; pass=0
+
+check_case() { # label, expected_exit, pattern, cmd...
+  local label="$1"; local want_st="$2"; local pat="$3"; shift 3
+  local out; out=$("$@" 2>&1); local st=$?
+  if [ "$st" -eq "$want_st" ] && printf '%s\n' "$out" | grep -qE "$pat"; then
+    echo "ok   $label (exit $st)"
+    pass=$((pass+1))
+  else
+    echo "FAIL $label (expected exit $want_st matching '$pat'; got exit $st)"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    fail=$((fail+1))
+  fi
+}
+
+# 1. T28: lawful-only explorer sees no counterexample, while adversarial & mixed find 2-step exploit
+check_case "t28-lawful-only-safe" 0 "^ok " \
+  "$B" explore --mode lawful --depth 3 test/verify/t28_adversarial_unlawful.charter
+
+check_case "t28-adversarial-finds-unlawful-trace" 1 "invariant no-tampered-payout violated in 2 step" \
+  "$B" explore --mode adversarial --depth 3 test/verify/t28_adversarial_unlawful.charter
+
+check_case "t28-mixed-adversary-finds-trace" 1 "invariant no-tampered-payout violated in 2 step" \
+  "$B" explore --mode mixed --adversary MalHost --depth 3 test/verify/t28_adversarial_unlawful.charter
+
+# 2. T29: open infinite Int parameter on unlawful act without menu returns exit 3 INCONCLUSIVE
+check_case "t29-adversarial-missing-menu-inconclusive" 3 "^INCONCLUSIVE" \
+  "$B" explore --mode adversarial --depth 2 test/verify/t29_missing_menu_inconclusive.charter
+
+# 3. Safe fenced lease under full adversarial + clock steps passes with exit 0
+check_case "safe-fenced-lease-adversarial-complete" 0 "^ok " \
+  "$B" explore --mode adversarial --depth 3 test/verify/safe_fenced_lease.charter
+
+# 4. Seeded random strategy is deterministic and also finds T28
+check_case "t28-seeded-random-finds-trace" 1 "invariant no-tampered-payout violated" \
+  "$B" explore --mode adversarial --strategy random --seed 42 --depth 3 test/verify/t28_adversarial_unlawful.charter
+
+echo "$pass passed, $fail failed, $((pass+fail)) total"
+[ $fail -eq 0 ]

@@ -1,0 +1,11 @@
+// T29 (RFC §7.5): an unlawful act with an unbounded `Int` parameter and no `explore-domain`
+// menu must return INCONCLUSIVE (exit 3) under `--mode adversarial`, never green pass.
+Fact actor_t Identified by Eve.
+Fact drained Identified by int.
+
+// No `Holds when` (always unlawful), parameterized by `int` with no menu:
+Act unauthorized-drain Actor actor_t Related to int
+  Creates drained(int).
+
+Invariant vault-intact
+  When !(Exists drained: drained.int > 9999).

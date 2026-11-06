@@ -1,0 +1,20 @@
+// Safe finite protocol verified complete under both `--mode lawful` and `--mode adversarial`:
+// even if `MalHost` performs unlawful `cut-link`, `Valid when` prevents double-lease activation.
+//! explore-domain: duration = 1, 3
+Fact node Identified by N1.
+Fact host Identified by H1, H2.
+Fact active-lease Identified by node * host.
+Fact link-cut Identified by host.
+
+Act grant-lease Actor host Related to node
+  Holds when !(Exists host': active-lease(node, host'))
+  Valid when !(Exists host': active-lease(node, host'))
+  Creates active-lease(node, host) For 3.
+
+Act unlawful-cut-link Actor host
+  Holds when False
+  Creates link-cut(host).
+
+Invariant single-active-lease
+  When (Forall node, host, host':
+          !(active-lease(node, host) && active-lease(node, host') && host != host')).

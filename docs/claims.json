@@ -123,6 +123,14 @@
       "summary": "Monotonic SymbolTable interning resolves every newly or previously interned string back to its exact spelling while preserving prior IDs (G1.5, T42)."
     },
     {
+      "id": "verify.disjoint_store_commutativity",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Verify/Reduction.lean",
+      "symbol": "makeAssignments_comm_lookup_disjoint",
+      "summary": "Assignment batches writing to disjoint DomId sets commute observationally on State.lookup across all instances (G2.2 partial-order reduction)."
+    },
+    {
       "id": "eval.elem_structural_beq",
       "assurance": "proved",
       "scope": "live-evaluator",

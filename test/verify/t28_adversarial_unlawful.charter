@@ -1,0 +1,26 @@
+// T28 (RFC §7.5): an invariant that holds across ALL lawful actions (`--mode lawful` passes),
+// while an unlawful physical host action followed by an unguarded payout violates conservation
+// (`--mode adversarial` and `--mode mixed --adversary MalHost` discover & shrink the 2-step trace).
+Fact host Identified by GoodHost, MalHost.
+Fact vault-locked Identified by host.
+Fact paid-out Identified by host.
+Fact tampered Identified by host.
+
+Act lawful-heartbeat Actor host Holds when True.
+
+// Unlawful physical act (`Holds when False`, default `Valid when True`):
+Act unlawful-tamper Actor host
+  Holds when False
+  Creates tampered(host)
+  Terminates vault-locked(host).
+
+// Buggy release rule forgot `Valid when !tampered(host)`:
+Act release-payout Actor host
+  Holds when !vault-locked(host)
+  Creates paid-out(host).
+
+Invariant no-tampered-payout
+  When (Forall host: !(tampered(host) && paid-out(host))).
+
++vault-locked(GoodHost).
++vault-locked(MalHost).

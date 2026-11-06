@@ -72,7 +72,11 @@ step standard-library $st "$(tail -1 "$OUT/lib.log")"
 tools/prove-check test/prove > "$OUT/prove.log" 2>&1; st=$?
 step prove $st "$(tail -1 "$OUT/prove.log")"
 
-# 8. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
+# 8. Gate G2 verification suite (lawful vs. adversarial vs. mixed exploration, T28, T29)
+tools/verify-check > "$OUT/verify.log" 2>&1; st=$?
+step verify $st "$(tail -1 "$OUT/verify.log")"
+
+# 9. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
 #    modules), and service-escrow; `test` runs their scenarios, explores their invariants,
 #    and verifies all Law 8 provenance and completeness gates
 "$B" test --require-provenance --forbid-midstream-decls --require-complete-explore --deny-warnings "$EX1" "$EX2" "$EX3" > "$OUT/examples.log" 2>&1; st=$?

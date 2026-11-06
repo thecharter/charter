@@ -3,6 +3,7 @@ import Charter.Cli.Prove
 import Charter.Cli.Repl
 import Charter.Cli.Fmt
 import Charter.Cli.Build
+import Charter.Cli.Explore
 
 /-!
 # Charter.Cli.Main — Standalone Command-Line Dispatcher
@@ -23,6 +24,7 @@ def helpText : String :=
   "  fmt     [--check] <file.charter> ...    format source canonically with round-trip AST verification\n" ++
   "  run     <file.charter>                  run top-level phrases and report transitions\n" ++
   "  test    <file.charter | dir> ...        run scenarios, provenance checks, and invariant exploration\n" ++
+  "  explore [flags] <file.charter> ...      explore lawful, adversarial, or mixed state spaces\n" ++
   "  trace   <clause-id> <file.charter>      print the verbatim span table for a clause\n" ++
   "  prove   <file.charter> ...              decide claims and invariants in the proof kernel (see --show-checker)\n" ++
   "  repl    [file.charter]                  interactive institutional session\n" ++
@@ -45,6 +47,7 @@ def main (args : List String) : IO UInt32 := do
   | "fmt" :: rest => fmtCommand rest
   | "run" :: rest => runCommand rest
   | "test" :: rest => testCommand rest
+  | "explore" :: rest => exploreCommand rest
   | "trace" :: cid :: rest => traceCommand cid rest
   | ["trace"] =>
     IO.eprintln "usage: charter trace <clause-id> <file.charter>"
