@@ -1,0 +1,19 @@
+// 018.2: multiple named Scenario blocks execute cleanly from top-level genesis state
+// and remain individually selectable via `--scenario <name>`.
+
+Fact item Identified by A, B
+Fact active Identified by item
+.
+
++active(A).
+
+Scenario alpha {
+  +active(B).
+  ?active(A).
+  ?active(B).
+}
+
+Scenario beta {
+  ?active(A).
+  ?!active(B).
+}

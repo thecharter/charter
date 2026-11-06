@@ -144,7 +144,7 @@ def testCommand (args : List String) : IO UInt32 := do
     | .ok o => pure o
     | .error e => IO.eprintln s!"charter test: {e}"; return 2
   if opts.paths.isEmpty then
-    IO.eprintln "usage: charter test <file.eflint | directory> ... [--expect <outcomes>] [--tolerate <tolerances.md>] [--out json] [--eflint]"
+    IO.eprintln "usage: charter test <file.eflint | directory> ... [--scenario <name>] [--expect <outcomes>] [--tolerate <tolerances.md>] [--out json] [--eflint]"
     return 2
   let expected ← match opts.expect with
     | some f => readExpected f
@@ -168,7 +168,7 @@ def testCommand (args : List String) : IO UInt32 := do
     for e in d.menuErrors do
       IO.eprintln s!"{f}: error CHR001: {e}"
     let menu := d.exploreMenu ++ fl.exploreMenu
-    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, explore := depth, exploreMenu := menu } f
+    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, scenarioFilter := fl.scenarios, explore := depth, exploreMenu := menu } f
     let stats := if d.menuErrors.isEmpty then stats else { stats with errors := stats.errors + d.menuErrors.length }
     let (outcome, why) := verdict d stats
     let fS := f.toString

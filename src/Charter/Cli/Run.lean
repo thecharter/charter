@@ -28,8 +28,10 @@ structure RunOpts where
   testMode  : Bool := false
   json      : Bool := false
   eflint    : Bool := false
-  /-- Run `Scenario` blocks (test mode) instead of only noting them. -/
+  /-- Run `Scenario` blocks (test mode, or when `--scenario` selects one) instead of only noting them. -/
   scenarios : Bool := false
+  /-- Optional `--scenario <name>` filter; empty runs every scenario when `scenarios` is set. -/
+  scenarioFilter : List String := []
   /-- Explore enabled acts from the end state up to this depth (0 = off); plan §2.2.7. -/
   explore   : Nat := 0
   /-- D15: candidate values per type for the components of judged acts (`explore-domain`). -/
@@ -236,12 +238,13 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
   | .inl _ => return (cfg, stats)
   | .inr (.scenario name ps spans) =>
     let cfg := { cfg with spec := cfg.spec.insertScenario name spans }
+    let shouldRun := o.scenarios && (o.scenarioFilter.isEmpty || o.scenarioFilter.contains name)
     if o.json then
       IO.println (Json.mkObj [("kind", "scenario"), ("name", Json.str name), ("file", Json.str l.file),
-        ("line", Json.num it.pos.line), ("phrases", Json.num ps.length), ("run", Json.bool o.scenarios)]).compress
+        ("line", Json.num it.pos.line), ("phrases", Json.num ps.length), ("run", Json.bool shouldRun)]).compress
     else if !o.testMode then
-      IO.println s!"{l.file}:{it.pos.line}: Scenario {name} ({ps.length} phrases{if o.scenarios then "" else "; charter test runs it"})"
-    if o.scenarios then
+      IO.println s!"{l.file}:{it.pos.line}: Scenario {name} ({ps.length} phrases{if shouldRun then "" else "; skipped"})"
+    if shouldRun then
       let stats ← runScenario o l.file it.pos.line name cfg ps stats
       return (cfg, stats)
     else return (cfg, stats)
@@ -282,16 +285,25 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     let (cfg', stats') ← stepItem o cfg stats l
     cfg := cfg'
     stats := stats'
-  stats ← exploreFrom o s!"{path}" cfg stats
+  let declaredScens := cfg.spec.scenarios.map (·.1)
+  for wanted in o.scenarioFilter do
+    if !declaredScens.contains wanted then
+      let avail := if declaredScens.isEmpty then "(none)" else ", ".intercalate declaredScens
+      let d := (Diagnostic.error "CHR003" s!"unknown scenario `{wanted}` (declared scenarios: {avail})").withFile path.toString
+      emit o (diagJson d) d.render (toErr := true)
+      stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
+  if o.scenarioFilter.isEmpty then
+    stats ← exploreFrom o s!"{path}" cfg stats
   let failedProv ← reportProvenance o cfg.spec (path.parent.getD ".")
   return { stats with failedQueries := stats.failedQueries + failedProv }
 
-/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`. -/
+/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`, `--scenario <name>`. -/
 structure RunFlags where
   json    : Bool := false
   eflint  : Bool := false
   explore : Nat := 0
   exploreMenu : Explore.Menu := []
+  scenarios : List String := []
   rest    : List String := []
 
 def takeFlags (args : List String) : Except String RunFlags :=
@@ -302,6 +314,8 @@ def takeFlags (args : List String) : Except String RunFlags :=
     | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
     | ["--out"], _ => .error "--out needs json or text"
     | "--eflint" :: rest, f => go rest { f with eflint := true }
+    | "--scenario" :: s :: rest, f => go rest { f with scenarios := f.scenarios ++ [s] }
+    | ["--scenario"], _ => .error "--scenario needs a scenario name"
     | "--explore" :: n :: rest, f => match n.toNat? with
       | some k => go rest { f with explore := k }
       | none => .error s!"--explore needs a depth, not {n}"
@@ -317,17 +331,17 @@ def summaryJson (stats : RunStats) : Json :=
   Json.mkObj [("kind", "summary"), ("phrases", Json.num stats.phrases), ("errors", Json.num stats.errors),
     ("warnings", Json.num stats.warnings), ("failedQueries", Json.num stats.failedQueries), ("ok", Json.bool stats.ok)]
 
-/-- `charter run <file.eflint> [--out json] [--eflint]` -/
+/-- `charter run <file.eflint> [--out json] [--eflint] [--scenario <name>]` -/
 def runCommand (args : List String) : IO UInt32 := do
   match takeFlags args with
   | .error e => IO.eprintln s!"charter run: {e}"; return 2
-  | .ok { json, eflint, explore, exploreMenu, rest := [f] } =>
-    let stats ← runProgram { json, eflint, explore, exploreMenu } f
+  | .ok { json, eflint, explore, exploreMenu, scenarios, rest := [f] } =>
+    let stats ← runProgram { json, eflint, explore, exploreMenu, scenarios := !scenarios.isEmpty, scenarioFilter := scenarios } f
     if json then IO.println (summaryJson stats).compress
     else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
     return (if stats.ok then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--explore <depth>] [--explore-domain \"type = values\"]"
+    IO.eprintln "usage: charter run <file.eflint> [--out json] [--eflint] [--scenario <name>] [--explore <depth>] [--explore-domain \"type = values\"]"
     return 2
 
 /-- `charter check <file.eflint> ... [--out json] [--eflint]`: resolve every phrase in
