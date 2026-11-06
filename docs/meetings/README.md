@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D26 — Verified standard-library legal ontologies (`contract_lifecycle`, `agency_mandate`, `monetary_estate`, `jurisdiction`) outside `Core` TCB (`D8`, `T09`, `T12`–`T20`, `T24`, `T45`)](2026-11-06-D26-standard-library-legal-ontologies.md)
 - [D25 — Rule-level `Amend` acts, reflexive `Immunity` entrenchment, `Regime` overlays, and 3-view `charter diff` (`D11`, `T23`, `T24`, `T38`)](2026-11-06-D25-rule-amendment-reflexive-ratchet-and-semantic-diff.md)
 - [D24 — Static dimensional `Money(CUR, SCALE)` and `Quantity(UNIT)` over exact `Int` with `MulDivRound` (`T10`, `T11`)](2026-11-06-D24-dimensional-money-quantity-and-rounding.md)
 - [D23 — Stratified `Default` / `Exception` / `Priority` calculus and typed `Conflict` (`T21`, `T22`)](2026-11-06-D23-defeasible-defaults-exceptions-and-conflict.md)

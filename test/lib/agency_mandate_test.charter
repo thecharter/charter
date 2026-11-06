@@ -1,0 +1,54 @@
+// test/lib/agency_mandate_test.charter — Exercises T15, T16, T17 with invariant exploration.
+//! explore: 1
+//! explore-domain: int = 40, 100, 150
+#require "../../lib/agency_mandate.charter".
+
+Fact mand Identified by M1.
+Fact corp Identified by Acme.
+Fact acct Identified by CPA1.
+Fact desk Identified by Broker1.
+Fact deal Identified by Tr1, Tr2.
+
+Use agency-mandate(mand, corp, acct, desk, deal) As am.
+
+am-grant-mandate(Acme, CPA1, M1, 100).
+
+Scenario out-of-scope-delegate-act {
+  // CPA1 executes trade of 150 (> cap 100): physical act occurs, principal recognition is void!
+  am-execute-delegate-trade(CPA1, Tr1, M1, Broker1, 150).
+  ?am-observed-delegate-trade(Tr1, M1, CPA1, Broker1, 150).
+  ?!valid am-recognize-on-principal(Broker1, Tr1, M1, Acme, CPA1, 150).
+  am-recognize-on-principal(Broker1, Tr1, M1, Acme, CPA1, 150).
+  ?!am-principal-bound-trade(Tr1, Acme, Broker1, 150).
+  // Independent misconduct is NOT imputed to Acme without direction:
+  ?!am-principal-circumvention-imputed(Tr1, Acme).
+  // Undo reporting duty before scenario end so exploration starts clean:
+  am-submit-trade-confirmation(CPA1, Tr1, M1).
+}
+
+Scenario missing-report-breaches-without-invented-theft {
+  am-execute-delegate-trade(CPA1, Tr1, M1, Broker1, 40).
+  ?am-report-trade(CPA1, Acme, Tr1, M1).
+  ?!violated am-report-trade(CPA1, Acme, Tr1, M1).
+  @ 2.
+  ?violated am-report-trade(CPA1, Acme, Tr1, M1).
+  ?!am-principal-circumvention-imputed(Tr1, Acme).
+  am-submit-trade-confirmation(CPA1, Tr1, M1).
+}
+
+Scenario revocation-and-apparent-authority-notice {
+  +am-apparent-authority-enabled(M1).
+  am-revoke-mandate(Acme, M1).
+  // Before Broker1 receives revocation notice, apparent authority protects within-cap trade:
+  am-execute-delegate-trade(CPA1, Tr1, M1, Broker1, 40).
+  ?valid am-recognize-on-principal(Broker1, Tr1, M1, Acme, CPA1, 40).
+  am-recognize-on-principal(Broker1, Tr1, M1, Acme, CPA1, 40).
+  ?am-principal-bound-trade(Tr1, Acme, Broker1, 40).
+  am-submit-trade-confirmation(CPA1, Tr1, M1).
+
+  // Once Broker1 receives revocation notice, subsequent trade is no longer valid on principal:
+  am-deliver-revocation-notice(Acme, Broker1, M1).
+  am-execute-delegate-trade(CPA1, Tr2, M1, Broker1, 40).
+  ?!valid am-recognize-on-principal(Broker1, Tr2, M1, Acme, CPA1, 40).
+  am-submit-trade-confirmation(CPA1, Tr2, M1).
+}

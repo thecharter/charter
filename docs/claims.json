@@ -275,6 +275,30 @@
       "summary": "Across any valid CIR Amend trajectory under active reflexive Immunity entrenchment, the entrenchment immunity itself, all Protected rules, and all Entrenched Invariants remain preserved (D11, D25, G3.5, T24)."
     },
     {
+      "id": "lib.reservation_lock_prevents_overdraw",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Modules/LegalOntologies.lean",
+      "symbol": "reservation_lock_prevents_overdraw",
+      "summary": "Serializable reservation locks keep aggregate account reservations bounded by balance (D26, G3.6, T09)."
+    },
+    {
+      "id": "lib.consolidated_eliminates_double_count",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Modules/LegalOntologies.lean",
+      "symbol": "consolidated_eliminates_double_count",
+      "summary": "Consolidation subtracting intercompany subsidiary equity counts subsidiary underlying assets once rather than twice (D26, G3.6, T14)."
+    },
+    {
+      "id": "lib.partial_performance_conserves_obligation",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Modules/LegalOntologies.lean",
+      "symbol": "partial_performance_conserves_obligation",
+      "summary": "Partial performance preserves non-negative remaining debt and exact total obligation sum (D26, G3.6, T19)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

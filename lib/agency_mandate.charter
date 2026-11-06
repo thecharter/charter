@@ -1,0 +1,95 @@
+// lib/agency_mandate — Delegated agency, express authority bounds, apparent authority,
+// revocation notice, reporting duties, and attribution (`docs/rfc.md` §4.3, D26, T15, T16, T17):
+// - Express mandate grants capped authority (`mandate-cap`); delegate physical/attempted acts
+//   always occur (`Mission Law 1`), while principal-binding recognition (`recognize-on-principal`)
+//   is a `Power` valid iff within express cap OR covered by an active apparent-authority rule
+//   prior to counterparty revocation notice (`T15`, `T17`).
+// - Reporting duty (`report-trade`) breaches after `reporting-window` (`T16`) without inventing
+//   principal concealment or delegate theft facts (`Mission Law 3`, `Mission Law 6`).
+// - Independent delegate misconduct is NOT imputed to principal unless `principal-directed`
+//   (anti-circumvention attribution).
+// Parameters: `mandate`, `principal`, `delegate`, `counterparty`, `trade`.
+
+Module agency-mandate(mandate, principal, delegate, counterparty, trade) {
+
+  Param reporting-window : Duration = 2
+
+  Fact mandate-holder Identified by mandate * principal * delegate
+  Function mandate-cap Identified by mandate * int
+  Function mandate-used Identified by mandate * int
+  Fact mandate-active Identified by mandate
+  Fact mandate-revoked Identified by mandate
+  Fact revocation-notice-received Identified by mandate * counterparty
+  Fact apparent-authority-enabled Identified by mandate
+
+  Fact observed-delegate-trade Identified by trade * mandate * delegate * counterparty * int
+  Fact trade-confirmed Identified by trade * mandate
+  Fact principal-bound-trade Identified by trade * principal * counterparty * int
+  Fact principal-directed Identified by trade * principal
+  Fact principal-circumvention-imputed Identified by trade * principal
+    Holds when (Exists mandate, delegate, counterparty, int:
+      observed-delegate-trade(trade, mandate, delegate, counterparty, int) && principal-directed(trade, principal))
+
+  // ---- Grant and revoke mandate (`T17`)
+  Power grant-mandate Actor principal Recipient delegate Related to mandate, int
+    Holds when int >= 0 && !mandate-active(mandate) && !mandate-revoked(mandate)
+    Valid when int >= 0 && !mandate-active(mandate) && !mandate-revoked(mandate)
+    Creates mandate-holder(mandate, principal, delegate)
+          , mandate-cap(mandate, int)
+          , mandate-used(mandate, 0)
+          , mandate-active(mandate)
+
+  Power revoke-mandate Actor principal Related to mandate
+    Holds when (Exists delegate: mandate-holder(mandate, principal, delegate)) && mandate-active(mandate)
+    Valid when (Exists delegate: mandate-holder(mandate, principal, delegate)) && mandate-active(mandate)
+    Creates mandate-revoked(mandate)
+    Terminates mandate-active(mandate)
+
+  Act deliver-revocation-notice Actor principal Recipient counterparty Related to mandate
+    Holds when mandate-revoked(mandate)
+    Creates revocation-notice-received(mandate, counterparty)
+
+  // ---- Reporting duty (`T16`): created when a delegate trade occurs, terminated by confirmation
+  Duty report-trade Holder delegate Claimant principal Related to trade, mandate
+    Due within reporting-window
+
+  // ---- Physical/external trade attempt (`T15`): ALWAYS occurs even if unauthorized or above cap!
+  Physical execute-delegate-trade Actor delegate Related to trade, mandate, counterparty, int
+    Creates observed-delegate-trade(trade, mandate, delegate, counterparty, int)
+          , (Foreach principal: report-trade(delegate, principal, trade, mandate)
+               When mandate-holder(mandate, principal, delegate))
+
+  Act submit-trade-confirmation Actor delegate Related to trade, mandate
+    Holds when (Exists counterparty, int: observed-delegate-trade(trade, mandate, delegate, counterparty, int))
+    Creates trade-confirmed(trade, mandate)
+    Terminates (Foreach principal: report-trade(delegate, principal, trade, mandate)
+                  When mandate-holder(mandate, principal, delegate))
+
+  // ---- Principal-binding institutional competence (`T15`, `T17`)
+  Power recognize-on-principal Actor counterparty Related to trade, mandate, principal, delegate, int
+    Holds when observed-delegate-trade(trade, mandate, delegate, counterparty, int)
+      && mandate-holder(mandate, principal, delegate)
+    Valid when observed-delegate-trade(trade, mandate, delegate, counterparty, int)
+      && mandate-holder(mandate, principal, delegate)
+      && ((mandate-active(mandate)
+            && (Exists mandate-used, mandate-cap:
+                  mandate-used.mandate == mandate && mandate-cap.mandate == mandate
+                  && mandate-used.int + int <= mandate-cap.int))
+          || (apparent-authority-enabled(mandate)
+               && !revocation-notice-received(mandate, counterparty)
+               && (Exists mandate-used, mandate-cap:
+                     mandate-used.mandate == mandate && mandate-cap.mandate == mandate
+                     && mandate-used.int + int <= mandate-cap.int)))
+    Creates principal-bound-trade(trade, principal, counterparty, int)
+          , (Foreach mandate-used: mandate-used(mandate, mandate-used.int + int)
+               When mandate-used.mandate == mandate)
+
+  // ---- Module Invariants (`D8`)
+  Invariant bound-within-mandate-cap When (Forall mandate-used, mandate-cap:
+      mandate-used.int <= mandate-cap.int When mandate-used.mandate == mandate-cap.mandate)
+  Invariant revoked-notified-never-binds-after When (Forall mandate:
+      !(mandate-active(mandate) && mandate-revoked(mandate)))
+  Invariant imputation-requires-direction When (Forall principal-circumvention-imputed:
+      principal-directed(principal-circumvention-imputed.trade, principal-circumvention-imputed.principal)
+      When principal-circumvention-imputed)
+}

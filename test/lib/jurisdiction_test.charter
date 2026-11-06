@@ -1,0 +1,33 @@
+// test/lib/jurisdiction_test.charter — Exercises T24, nexus, and contested jurisdiction.
+//! explore: 1
+#require "../../lib/jurisdiction.charter".
+
+Fact authority Identified by Federal, Municipal, StateA, StateB.
+Fact actor-subj Identified by Citizen1.
+Fact topic Identified by FreeExit, LocalTax.
+
+Use jurisdiction(authority, actor-subj, topic) As jur.
+
++jur-subordinate-to(Municipal, Federal).
++jur-superior-entrenched(Federal, FreeExit).
++jur-nexus(Federal, Citizen1).
++jur-nexus(Municipal, Citizen1).
++jur-nexus(StateA, Citizen1).
++jur-nexus(StateB, Citizen1).
+
+Scenario subordinate-cannot-weaken-superior-entrenched-right {
+  // Municipal has nexus over Citizen1, so LocalTax is valid, while FreeExit is blocked by Federal entrenchment:
+  ?valid jur-enact-mandate(Municipal, Citizen1, LocalTax).
+  jur-enact-mandate(Municipal, Citizen1, LocalTax).
+  ?jur-active-mandate(Municipal, Citizen1, LocalTax).
+
+  ?!valid jur-enact-prohibition(Municipal, Citizen1, FreeExit).
+  jur-enact-prohibition(Municipal, Citizen1, FreeExit).
+  ?!jur-active-prohibition(Municipal, Citizen1, FreeExit).
+}
+
+Scenario unranked-polities-yield-contested-jurisdiction {
+  jur-enact-mandate(StateA, Citizen1, LocalTax).
+  jur-enact-prohibition(StateB, Citizen1, LocalTax).
+  ?jur-contested-jurisdiction(Citizen1, LocalTax).
+}

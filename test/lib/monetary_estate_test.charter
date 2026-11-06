@@ -1,0 +1,48 @@
+// test/lib/monetary_estate_test.charter — Exercises T09, T12, T13, T14 with exploration.
+//! explore: 1
+//! explore-domain: int = 60, 100
+#require "../../lib/monetary_estate.charter".
+
+Fact acct Identified by Vault1.
+Fact desk Identified by DeskA, DeskB.
+Fact invoice Identified by Inv1, BondCollat.
+Fact firm Identified by HoldCo, SubCo.
+
+Use monetary-estate(acct, desk, invoice, firm) As me.
+
++me-balance(Vault1, 100).
++me-collateral-value(BondCollat, 100).
++me-standalone-assets(HoldCo, 500).
++me-standalone-assets(SubCo, 300).
++me-controls-subsidiary(HoldCo, SubCo).
++me-intercompany-equity(SubCo, 200).
+
+Scenario concurrent-draws-serialized-by-reservation {
+  // DeskA reserves 60 out of 100 -> succeeds; DeskB simultaneously requesting 60 -> void!
+  ?valid me-reserve-draw(DeskA, Vault1, 60).
+  me-reserve-draw(DeskA, Vault1, 60).
+  ?me-reserved-total(Vault1, 60).
+  ?!valid me-reserve-draw(DeskB, Vault1, 60).
+  me-reserve-draw(DeskB, Vault1, 60).
+  ?me-reserved-total(Vault1, 60).
+  me-settle-reservation(DeskA, Vault1, 60).
+  ?me-balance(Vault1, 40).
+  ?me-reserved-total(Vault1, 0).
+}
+
+Scenario accounting-and-consolidation {
+  // T12: Inv1 capitalized -> second recognition as expense is invalid!
+  me-recognize-capital(DeskA, Inv1).
+  ?me-capitalized(Inv1).
+  ?!valid me-recognize-expense(DeskB, Inv1).
+  me-recognize-expense(DeskB, Inv1).
+  ?!me-expensed(Inv1).
+
+  // T13: BondCollat value 100 -> DeskA pledges 60, DeskB cannot pledge another 60!
+  me-pledge-collateral(DeskA, BondCollat, 60).
+  ?!valid me-pledge-collateral(DeskB, BondCollat, 60).
+  ?me-pledged-total(BondCollat, 60).
+
+  // T14: HoldCo (500 incl. 200 equity in SubCo) + SubCo (300) - 200 intercompany = 600 (not 800!):
+  ?me-consolidated-net-assets(HoldCo, SubCo, 600).
+}

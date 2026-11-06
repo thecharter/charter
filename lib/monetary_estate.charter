@@ -1,0 +1,98 @@
+// lib/monetary_estate — Reservation locks, two-tier allowance fees, single expense recognition,
+// collateral pledge bounds, and consolidated net-asset elimination (`docs/rfc.md` §6.3–§6.4,
+// D26, T09, T10, T11, T12, T13, T14):
+// - Reservation locks (`T09`): concurrent/sequential draws lock against `balance - reserved-total`
+//   so aggregate reservations and settlements never exceed `balance`.
+// - `no-double-recognition` (`T12`): an outlay item recognized as `capitalized` cannot also be
+//   recognized as `expensed` (and vice versa).
+// - `no-double-pledge` (`T13`): total pledged encumbrances on an asset item never exceed its
+//   `collateral-value`.
+// - `consolidated-no-double-count` (`T14`): consolidating a parent and controlled subsidiary
+//   deducts `intercompany-equity` so subsidiary assets are counted once, never twice.
+// Parameters: `account`, `party`, `item`, `entity`.
+
+Module monetary-estate(account, party, item, entity) {
+
+  Function balance Identified by account * int
+  Fact reservation Identified by account * party * int
+  Fact reserved-total Identified by account * int
+    Derived from (Foreach balance: reserved-total(balance.account,
+      Sum(Foreach reservation: reservation.int When reservation.account == balance.account)))
+
+  // ---- Serializable reservation & settlement (`T09`)
+  Power reserve-draw Actor party Related to account, int
+    Holds when int > 0
+      && !(Exists int': reservation(account, party, int'))
+      && (Exists balance, reserved-total:
+            balance.account == account && reserved-total.account == account
+            && reserved-total.int + int <= balance.int)
+    Valid when int > 0
+      && !(Exists int': reservation(account, party, int'))
+      && (Exists balance, reserved-total:
+            balance.account == account && reserved-total.account == account
+            && reserved-total.int + int <= balance.int)
+    Creates reservation(account, party, int)
+
+  Power settle-reservation Actor party Related to account, int
+    Holds when reservation(account, party, int)
+    Valid when reservation(account, party, int)
+    Creates (Foreach balance: balance(account, balance.int - int) When balance.account == account)
+    Terminates reservation(account, party, int)
+
+  // ---- Single expense / capital recognition (`T12`)
+  Fact capitalized Identified by item
+  Fact expensed Identified by item
+
+  Power recognize-capital Actor party Related to item
+    Holds when !capitalized(item) && !expensed(item)
+    Valid when !capitalized(item) && !expensed(item)
+    Creates capitalized(item)
+
+  Power recognize-expense Actor party Related to item
+    Holds when !capitalized(item) && !expensed(item)
+    Valid when !capitalized(item) && !expensed(item)
+    Creates expensed(item)
+
+  // ---- Collateral pledge capacity (`T13`)
+  Function collateral-value Identified by item * int
+  Fact pledge Identified by item * party * int
+  Fact pledged-total Identified by item * int
+    Derived from (Foreach collateral-value: pledged-total(collateral-value.item,
+      Sum(Foreach pledge: pledge.int When pledge.item == collateral-value.item)))
+
+  Power pledge-collateral Actor party Related to item, int
+    Holds when int > 0
+      && !(Exists int': pledge(item, party, int'))
+      && (Exists collateral-value, pledged-total:
+            collateral-value.item == item && pledged-total.item == item
+            && pledged-total.int + int <= collateral-value.int)
+    Valid when int > 0
+      && !(Exists int': pledge(item, party, int'))
+      && (Exists collateral-value, pledged-total:
+            collateral-value.item == item && pledged-total.item == item
+            && pledged-total.int + int <= collateral-value.int)
+    Creates pledge(item, party, int)
+
+  // ---- Consolidated entity accounting eliminating intercompany equity (`T14`)
+  Function standalone-assets Identified by entity * int
+  Fact controls-subsidiary Identified by entity * entity'
+  Function intercompany-equity Identified by entity * int
+  Fact consolidated-net-assets Identified by entity * entity' * int
+    Derived from (Foreach standalone-assets, standalone-assets', intercompany-equity:
+      consolidated-net-assets(standalone-assets.entity, standalone-assets'.entity,
+        standalone-assets.int + standalone-assets'.int - intercompany-equity.int)
+      When controls-subsidiary(standalone-assets.entity, standalone-assets'.entity)
+        && intercompany-equity.entity == standalone-assets'.entity)
+
+  // ---- Module Invariants (`D8`)
+  Invariant reservations-within-balance When (Forall balance, reserved-total:
+      reserved-total.int <= balance.int When reserved-total.account == balance.account)
+  Invariant no-double-recognition When (Forall item: !(capitalized(item) && expensed(item)))
+  Invariant no-double-pledge When (Forall collateral-value, pledged-total:
+      pledged-total.int <= collateral-value.int When pledged-total.item == collateral-value.item)
+  Invariant consolidated-no-double-count When (Forall consolidated-net-assets, standalone-assets, standalone-assets', intercompany-equity:
+      consolidated-net-assets.int == standalone-assets.int + standalone-assets'.int - intercompany-equity.int
+      When standalone-assets.entity == consolidated-net-assets.entity
+        && standalone-assets'.entity == consolidated-net-assets.entity'
+        && intercompany-equity.entity == consolidated-net-assets.entity')
+}

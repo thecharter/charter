@@ -1,0 +1,59 @@
+// lib/jurisdiction — Institutional hierarchy, nexus requirement, reserved subjects,
+// superior entrenched rights, and contested-jurisdiction outcomes (`docs/rfc.md` §4.6,
+// D26, T24):
+// - No implicit universal jurisdiction: a polity may apply a norm to a subject only when
+//   `nexus(polity, subject)` holds.
+// - Superior protection (`T24`): a subordinate polity (`subordinate-to(polity, polity')`)
+//   cannot validly enact or enforce a norm that weakens a `superior-entrenched(polity', norm)`
+//   or touches a `reserved-subject(polity', norm)` without superior `saving-consent`.
+// - Explicit `contested-jurisdiction`: when two unranked polities both hold `nexus` over a
+//   subject and issue incompatible orders (`mandates` vs. `prohibits`), `contested-jurisdiction`
+//   is derived rather than silently picking one polity.
+// Parameters: `polity`, `subject`, `norm`.
+
+Module jurisdiction(polity, subject, norm) {
+
+  Fact subordinate-to Identified by polity * polity'
+  Fact nexus Identified by polity * subject
+  Fact superior-entrenched Identified by polity * norm
+  Fact reserved-subject Identified by polity * norm
+  Fact saving-consent Identified by polity * polity' * norm
+
+  Fact active-mandate Identified by polity * subject * norm
+  Fact active-prohibition Identified by polity * subject * norm
+
+  // ---- Subordinate enactment blocked when weakening superior entrenched right (`T24`)
+  Power enact-mandate Actor polity Related to subject, norm
+    Holds when nexus(polity, subject)
+    Valid when nexus(polity, subject)
+      && !(Exists polity': subordinate-to(polity, polity')
+             && (superior-entrenched(polity', norm) || reserved-subject(polity', norm))
+             && !saving-consent(polity', polity, norm))
+    Creates active-mandate(polity, subject, norm)
+
+  Power enact-prohibition Actor polity Related to subject, norm
+    Holds when nexus(polity, subject)
+    Valid when nexus(polity, subject)
+      && !(Exists polity': subordinate-to(polity, polity')
+             && (superior-entrenched(polity', norm) || reserved-subject(polity', norm))
+             && !saving-consent(polity', polity, norm))
+    Creates active-prohibition(polity, subject, norm)
+
+  // ---- Unranked competing polities yield explicit `contested-jurisdiction`
+  Fact contested-jurisdiction Identified by subject * norm
+    Holds when (Exists polity, polity':
+      polity != polity'
+      && active-mandate(polity, subject, norm)
+      && active-prohibition(polity', subject, norm)
+      && !subordinate-to(polity, polity')
+      && !subordinate-to(polity', polity))
+
+  // ---- Module Invariants (`D8`)
+  Invariant no-enactment-without-nexus When (Forall active-mandate:
+      nexus(active-mandate.polity, active-mandate.subject) When active-mandate)
+  Invariant subordinate-respects-superior-rights When (Forall active-mandate:
+      !(Exists polity': subordinate-to(active-mandate.polity, polity')
+          && superior-entrenched(polity', active-mandate.norm)
+          && !saving-consent(polity', active-mandate.polity, active-mandate.norm))
+      When active-mandate)
+}

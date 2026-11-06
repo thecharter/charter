@@ -16,6 +16,10 @@ one with `#require "lib/<name>.charter"` (or `#require "<name>"`) and instantiat
 | `exit_and_voice` | unilateral exit with cooling-off, stay, tolling and censorship default; rate-limited voice; redaction | `member, operator, panel` |
 | `sortition_court` | validated sortition panels, supermajority, bounded appeals, finality, consolidation, fee-pool waterfall | `arbiter, party, dispute, registrar` |
 | `attested_lease` | single-authority leases, quarantined restores, fenced migration, revocation and erasure | `instance, operator, member` |
+| `contract_lifecycle` | Symboleo-grade contract/obligation lifecycle, partial performance, breach survival, subcontracting vs. assignment vs. novation (`T18`–`T20`, `T45`) | `contract, party, obligation` |
+| `agency_mandate` | delegated mandates, express caps, apparent authority, revocation notice, reporting duties, non-imputation & anti-circumvention (`T15`–`T17`) | `mandate, principal, delegate, counterparty, trade` |
+| `monetary_estate` | reservation locks (`T09`), tiered fees (`T10`–`T11`), `no-double-recognition` (`T12`), `no-double-pledge` (`T13`), consolidated elimination (`T14`) | `account, party, item, entity` |
+| `jurisdiction` | superior/subordinate rank, nexus requirement, reserved subjects, entrenched-right preservation, contested jurisdiction (`T24`) | `polity, subject, norm` |
 
 ## Conventions
 

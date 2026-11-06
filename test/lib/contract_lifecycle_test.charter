@@ -1,0 +1,66 @@
+// test/lib/contract_lifecycle_test.charter — Exercises T18, T19, T20, T45 with exploration.
+//! explore: 1
+//! explore-domain: int = 50, 100
+#require "../../lib/contract_lifecycle.charter".
+
+Fact agreement Identified by C1.
+Fact firm Identified by Buyer, Seller, Sub1, Factor1, NewSeller.
+Fact debt Identified by D1.
+
+Use contract-lifecycle(agreement, firm, debt) As cl.
+
++cl-contract-status(C1, Draft).
++cl-contract-of(D1, C1).
++cl-obligor-of(D1, Seller).
++cl-claimant-of(D1, Buyer).
++cl-remaining-debt(D1, 100).
++cl-performed-total(D1, 0).
+
+Scenario lifecycle-and-partial-performance {
+  cl-offer-contract(Seller, C1).
+  cl-accept-contract(Buyer, C1).
+  cl-activate-contract(Seller, C1).
+  ?cl-contract-status(C1, InForce).
+
+  // T18 & T19: Seller appoints Sub1 as subcontractor; Seller stays obligor; Sub1 performs half (50):
+  cl-appoint-subcontractor(Seller, Sub1, D1).
+  ?cl-obligor-of(D1, Seller).
+  cl-perform-obligation(Sub1, D1, 50).
+  ?cl-remaining-debt(D1, 50).
+  ?cl-performed-total(D1, 50).
+  ?!cl-obligation-satisfied(D1).
+}
+
+Scenario breach-in-force-and-remedy-survival {
+  cl-offer-contract(Seller, C1).
+  cl-accept-contract(Buyer, C1).
+  cl-activate-contract(Seller, C1).
+  // T20: breach recorded while contract stays InForce; remedy survives subsequent termination:
+  cl-record-breach(Buyer, D1).
+  ?cl-obligation-breached(D1).
+  ?cl-accrued-remedy(D1, Seller).
+  ?cl-contract-status(C1, InForce).
+  cl-terminate-for-breach(Buyer, C1, D1).
+  ?cl-contract-status(C1, Terminated).
+  ?cl-accrued-remedy(D1, Seller).
+}
+
+Scenario subcontract-vs-assignment-vs-novation {
+  // T18 & T45: Claim assignment requires permission; novation requires claimant consent:
+  ?!valid cl-assign-claim(Buyer, Factor1, D1).
+  +cl-assignment-permitted(D1).
+  ?valid cl-assign-claim(Buyer, Factor1, D1).
+  cl-assign-claim(Buyer, Factor1, D1).
+  ?cl-claimant-of(D1, Factor1).
+  ?!cl-claimant-of(D1, Buyer).
+
+  // Novation without new claimant Factor1's consent is void; Seller remains obligor:
+  ?!valid cl-novate-obligation(Seller, NewSeller, D1).
+  cl-novate-obligation(Seller, NewSeller, D1).
+  ?cl-obligor-of(D1, Seller).
+  +cl-novation-consent(D1, Factor1).
+  ?valid cl-novate-obligation(Seller, NewSeller, D1).
+  cl-novate-obligation(Seller, NewSeller, D1).
+  ?cl-obligor-of(D1, NewSeller).
+  ?!cl-obligor-of(D1, Seller).
+}

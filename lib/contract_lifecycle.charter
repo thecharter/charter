@@ -1,0 +1,108 @@
+// lib/contract_lifecycle — Symboleo-grade contract and obligation lifecycle (`docs/rfc.md` §4.2,
+// D26, T18, T19, T20, T45):
+// - Configurable contract lifecycle: Draft -> Offered -> Accepted -> InForce -> {Completed,
+//   Expired, Rescinded, Terminated, Frustrated, Void} plus procedural Disputed overlay.
+// - Partial performance (`T19`): partial satisfaction reduces remaining debt without discharging
+//   the obligation until remaining debt reaches 0.
+// - Breach while in force (`T20`): breach records accrued remedies while keeping InForce intact
+//   absent an explicit termination act, and accrued remedies survive termination.
+// - Distinct subcontracting vs. claim assignment vs. novation (`T18`, `T45`):
+//   1. Subcontracting authorizes a delegate to perform while the original obligor stays bound;
+//   2. Claim assignment transfers `claimant-of` when assignment is permitted;
+//   3. Novation replaces `obligor-of` and discharges the prior obligor ONLY with claimant consent.
+// Parameters: `contract`, `party`, `obligation`.
+
+Module contract-lifecycle(contract, party, obligation) {
+
+  Fact status-kind Identified by Draft, Offered, Accepted, InForce, Completed, Expired, Rescinded, Terminated, Frustrated, Void
+  Function contract-status Identified by contract * status-kind
+  Fact disputed Identified by contract
+
+  Function obligor-of Identified by obligation * party
+  Function claimant-of Identified by obligation * party
+  Function contract-of Identified by obligation * contract
+  Function remaining-debt Identified by obligation * int
+  Function performed-total Identified by obligation * int
+
+  Fact subcontractor-for Identified by obligation * party
+  Fact assignment-permitted Identified by obligation
+  Fact novation-consent Identified by obligation * party
+  Fact obligation-breached Identified by obligation
+  Fact accrued-remedy Identified by obligation * party
+
+  // ---- Contract lifecycle transitions
+  Power offer-contract Actor party Related to contract
+    Holds when contract-status(contract, Draft)
+    Valid when contract-status(contract, Draft)
+    Creates contract-status(contract, Offered)
+
+  Power accept-contract Actor party Related to contract
+    Holds when contract-status(contract, Offered)
+    Valid when contract-status(contract, Offered)
+    Creates contract-status(contract, Accepted)
+
+  Power activate-contract Actor party Related to contract
+    Holds when contract-status(contract, Accepted)
+    Valid when contract-status(contract, Accepted)
+    Creates contract-status(contract, InForce)
+
+  Power open-dispute Actor party Related to contract
+    Holds when contract-status(contract, InForce)
+    Valid when contract-status(contract, InForce)
+    Creates disputed(contract)
+
+  Power terminate-for-breach Actor party Related to contract, obligation
+    Holds when contract-status(contract, InForce) && contract-of(obligation, contract) && obligation-breached(obligation)
+    Valid when contract-status(contract, InForce) && contract-of(obligation, contract) && obligation-breached(obligation)
+    Creates contract-status(contract, Terminated)
+
+  // ---- Partial and full performance (`T19`): obligor or authorized subcontractor performs `int`
+  Power perform-obligation Actor party Related to obligation, int
+    Holds when int > 0
+      && (obligor-of(obligation, party) || subcontractor-for(obligation, party))
+      && (Exists remaining-debt: remaining-debt.obligation == obligation && int <= remaining-debt.int)
+    Valid when int > 0
+      && (obligor-of(obligation, party) || subcontractor-for(obligation, party))
+      && (Exists remaining-debt: remaining-debt.obligation == obligation && int <= remaining-debt.int)
+    Creates (Foreach remaining-debt: remaining-debt(obligation, remaining-debt.int - int)
+               When remaining-debt.obligation == obligation)
+          , (Foreach performed-total: performed-total(obligation, performed-total.int + int)
+               When performed-total.obligation == obligation)
+
+  Fact obligation-satisfied Identified by obligation
+    Holds when remaining-debt(obligation, 0)
+
+  // ---- Breach while InForce (`T20`): records breach + remedy without ending InForce!
+  Act record-breach Actor party Related to obligation
+    Holds when (Exists contract: contract-of(obligation, contract) && contract-status(contract, InForce))
+      && claimant-of(obligation, party)
+      && (Exists remaining-debt: remaining-debt.obligation == obligation && remaining-debt.int > 0)
+    Creates obligation-breached(obligation)
+          , (Foreach party': accrued-remedy(obligation, party') When obligor-of(obligation, party'))
+
+  // ---- 1. Subcontracting (`T18`): adds performer, never changes `obligor-of`!
+  Power appoint-subcontractor Actor party Recipient party' Related to obligation
+    Holds when obligor-of(obligation, party) && party != party'
+    Valid when obligor-of(obligation, party) && party != party'
+    Creates subcontractor-for(obligation, party')
+
+  // ---- 2. Claim assignment (`T18`, `T45`): transfers `claimant-of` only when permitted
+  Power assign-claim Actor party Recipient party' Related to obligation
+    Holds when claimant-of(obligation, party) && assignment-permitted(obligation)
+    Valid when claimant-of(obligation, party) && assignment-permitted(obligation)
+    Creates claimant-of(obligation, party')
+
+  // ---- 3. Novation (`T18`): replaces `obligor-of` only when claimant consented
+  Power novate-obligation Actor party Recipient party' Related to obligation
+    Holds when obligor-of(obligation, party)
+      && (Exists party'': claimant-of(obligation, party'') && novation-consent(obligation, party''))
+    Valid when obligor-of(obligation, party)
+      && (Exists party'': claimant-of(obligation, party'') && novation-consent(obligation, party''))
+    Creates obligor-of(obligation, party')
+
+  // ---- Module Invariants (`D8`)
+  Invariant remaining-non-negative When (Forall remaining-debt: remaining-debt.int >= 0)
+  Invariant performed-non-negative When (Forall performed-total: performed-total.int >= 0)
+  Invariant remedy-survives-termination When (Forall accrued-remedy:
+      obligation-breached(accrued-remedy.obligation) When accrued-remedy)
+}

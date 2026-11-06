@@ -19,6 +19,7 @@ import Charter.Modules.ExitAndVoice
 import Charter.Modules.SortitionCourt
 import Charter.Modules.AttestedLease
 import Charter.Modules.OracleFeed
+import Charter.Modules.LegalOntologies
 import Charter.Projection.Veil
 import Charter.Projection.Prompt
 import Charter.Projection.ContractABI
