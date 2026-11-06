@@ -149,6 +149,12 @@ def lookupEvidenceStatus (te : Tagged) : M EvidenceStatus := ⟨fun c _ =>
     .ok [State.evidenceStatusFromBuckets c.state.time te direct? posB negB supB rebB]
   else .ok [c.state.evidenceStatus te]⟩
 
+def lookupNormativeConflict (te : Tagged) : M (Option (String × String)) := ⟨fun c _ =>
+  if c.indexed then
+    let bucket := (c.stateIdx.lookup defConflictDom).getD []
+    .ok [State.conflictFromBucket c.state.time te bucket]
+  else .ok [c.state.conflictOf te]⟩
+
 def candidatesFromEvidenceOf (d : DomId) : M (List Tagged) := ⟨fun c _ =>
   let now := c.state.time
   let extract (bucket : List (Tagged × Info)) : List Tagged :=
@@ -349,7 +355,7 @@ def isEnabled : Nat → Tagged → M Bool
               if ← isEnabled fuel inst then isValid fuel inst else pure false
             pure (oks.any id)
           pure (rs.any id)
-      else if spec.hasEvidencedFacts then
+      else if spec.hasEpistemicOrDefeasible then
         let (lTri, _, _) ← evalActTri fuel te
         pure (lTri == .yes)
       else if !(← isHolds fuel te) then pure false
@@ -373,7 +379,7 @@ def isValid : Nat → Tagged → M Bool
     let tspec ← getTypeSpec te.2
     match tspec.kind with
     | .act a =>
-      if spec.hasEvidencedFacts then
+      if spec.hasEpistemicOrDefeasible then
         let (_, vTri, _) ← evalActTri fuel te
         pure (vTri == .yes)
       else
@@ -507,17 +513,21 @@ def evalTermTri : Nat → Term → M (TriBool × List (Tagged × EvidenceStatus)
         else pure (.undetermined, dedupUnmet (ua ++ ub))
     | .present inner =>
       whenTagged (eval fuel inner) fun te => do
-        let tspec ← getTypeSpec te.2
-        if tspec.isEvidencedFact then
-          if !(← isValidInstance fuel te) then pure (.no, [])
-          else
-            let st ← lookupEvidenceStatus te
-            match TriBool.ofEvidenceStatus st with
-            | .undetermined => pure (.undetermined, [(te, st)])
-            | v => pure (v, [])
+        let conf? ← lookupNormativeConflict te
+        if conf?.isSome then
+          pure (.undetermined, [(te, .conflicted)])
         else
-          let b ← isHolds fuel te
-          pure (TriBool.ofBool b, [])
+          let tspec ← getTypeSpec te.2
+          if tspec.isEvidencedFact then
+            if !(← isValidInstance fuel te) then pure (.no, [])
+            else
+              let st ← lookupEvidenceStatus te
+              match TriBool.ofEvidenceStatus st with
+              | .undetermined => pure (.undetermined, [(te, st)])
+              | v => pure (v, [])
+          else
+            let b ← isHolds fuel te
+            pure (TriBool.ofBool b, [])
     | .exists_ xs body => do
       let pairs ← results (scopeWith (everyValidSubs fuel) xs (evalTermTri fuel body))
       if pairs.any (fun p => p.1 == .yes) then pure (.yes, [])
@@ -626,7 +636,7 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
       | .duty _ => empty
       | .immunity _ => empty
       | .act a => do
-        if spec.hasEvidencedFacts then
+        if spec.hasEpistemicOrDefeasible then
           let (lTri, vTri, unmet) ← evalActTri fuel te
           let enabled := lTri == .yes
           let valid := vTri == .yes
@@ -770,6 +780,9 @@ def eval : Nat → Term → M Value
     | .evStatus want t => whenTagged (eval fuel t) (fun te => do
         let st ← lookupEvidenceStatus te
         pure (.bool (st == want)))
+    | .hasConflict t => whenTagged (eval fuel t) (fun te => do
+        let conf? ← lookupNormativeConflict te
+        pure (.bool conf?.isSome))
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

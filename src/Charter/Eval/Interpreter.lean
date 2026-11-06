@@ -49,6 +49,59 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
       else dyn xs (.when (.app d (.named [])) t)
     | _ => dyn [⟨d, ""⟩] (.when (.ref ⟨d, ""⟩) t)
   | .dv xs t => dyn xs t
+  | .defeasibleDAG dag rules =>
+    let evalActiveRules : M (List (String × DefeasibleVal)) := do
+      let pairs ← rules.mapM fun r => do
+        let bs ← results (whenBool (eval M.fuel r.cond) pure)
+        if !(bs.any id) then pure none
+        else
+          match r.conseq with
+          | .holdsBool b => pure (some (r.id, DefeasibleVal.boolOut b))
+          | .yieldsVal vt =>
+            let vs ← results (whenTagged (eval M.fuel vt) pure)
+            match vs with
+            | vTe :: _ => pure (some (r.id, DefeasibleVal.elemOut vTe))
+            | [] => pure none
+      pure (pairs.filterMap id)
+    let lookupAct (active : List (String × DefeasibleVal)) (id : String) : Option DefeasibleVal :=
+      match active.find? (fun (p : String × DefeasibleVal) => p.1 == id) with
+      | some p => some p.2
+      | none   => none
+    let mkConflictTag (targetTe : Tagged) (r1 r2 : String) : Tagged :=
+      (.prod [targetTe, (.str d, "string"), (.str r1, "string"), (.str r2, "string")], defConflictDom)
+    match tspec.restriction, tspec.domain with
+    | some .function, .products [kVar, _] =>
+      foreach M.fuel [kVar] do
+        let kTe ← substituteVar kVar
+        let active ← evalActiveRules
+        match Defeasible.evalCompiledDAG dag (lookupAct active) with
+        | .determined _ (.elemOut vTe) => checkSat (pure (.prod [kTe, vTe], d))
+        | .conflict r1 r2 => pure (mkConflictTag kTe r1 r2)
+        | _ => empty
+    | some .var, _ =>
+      results do
+        let active ← evalActiveRules
+        match Defeasible.evalCompiledDAG dag (lookupAct active) with
+        | .determined _ (.elemOut vTe) => checkSat (pure vTe)
+        | .conflict r1 r2 => pure (mkConflictTag (.str d, "string") r1 r2)
+        | _ => empty
+    | _, .products xs =>
+      foreach M.fuel xs do
+        let te ← whenTagged (eval M.fuel (.app d (.named []))) pure
+        let active ← withSubs (Tagged.bindings tspec.domain te) evalActiveRules
+        match Defeasible.evalCompiledDAG dag (lookupAct active) with
+        | .determined _ (.boolOut true) => checkSat (pure te)
+        | .conflict r1 r2 => pure (mkConflictTag te r1 r2)
+        | _ => empty
+    | _, _ =>
+      let x : Var := ⟨d, ""⟩
+      foreach M.fuel [x] do
+        let te ← substituteVar x
+        let active ← withSubs (Tagged.bindings tspec.domain te) evalActiveRules
+        match Defeasible.evalCompiledDAG dag (lookupAct active) with
+        | .determined _ (.boolOut true) => checkSat (pure te)
+        | .conflict r1 r2 => pure (mkConflictTag te r1 r2)
+        | _ => empty
 
 def runM {α} (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (m : M α) : Except RuntimeError (List α) :=
   m.run (Ctx.ofIdx spec specIdx state) []
@@ -146,6 +199,7 @@ def ruleText (spec : Spec) (i : Info) : String :=
       let rules := t.derivation.map fun
         | .holdsWhen c => s!"Holds when {c}"
         | .dv xs c => s!"Derived from (Foreach {", ".intercalate (xs.map toString)}: {c})"
+        | .defeasibleDAG _ rs => s!"Defeasible DAG ({", ".intercalate (rs.map (·.id))})"
       s!"; rules: {"; ".intercalate rules}"
     | none => ""
   | _ => ""
@@ -212,6 +266,9 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
         | .undetermined => do
           let (lTri, vTri, _) ← evalActTri M.fuel te
           pure (lTri == .undetermined || vTri == .undetermined)
+        | .conflict => do
+          let conf? ← lookupNormativeConflict te
+          pure conf?.isSome
       match run (foreach M.fuel xs (whenTagged (eval M.fuel t) ask)) with
       | .error e => (none, [diagOf e])
       | .ok bss => (some [], [.expectRes w neg (bss.flatten.all (fun b => b != neg))])

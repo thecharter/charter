@@ -67,7 +67,7 @@ Single-word uppercase Charter additions (`Immunity`, `Clause`, `Document`, `Scen
 lexes as `.ident "tick"`, matched contextually by `Parser` / `Resolve` (D17). -/
 def wordKeywords : List String :=
   [ "Derived externally", "Conditioned by", "Identified by", "Terminated by", "Violated when", "Overridden by",
-    "Present when", "Current Time", "Derived from", "Except under", "Enforced by", "Related to", "Syncs with",
+    "Present when", "Current Time", "Derived from", "Except under", "Rejects when", "Enforced by", "Related to", "Syncs with",
     "Valid when", "Created by", "Due within", "Holds when",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",
     "Physical", "Claimant", "Function", "Violated", "Enabled", "Creates", "Current", "Derived",
@@ -80,7 +80,8 @@ def wordKeywords : List String :=
 non-terminator token, so `?valid(5)` and `?valid .` still query a fact named `valid` while
 `?valid do(x)` is the claim (D17). -/
 def claimKeywords : List String :=
-  [ "?!undetermined", "?undetermined", "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
+  [ "?!undetermined", "?undetermined", "?!conflict", "?conflict",
+    "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
 
 /-- Symbol keywords, longest first. -/
 def symbolKeywords : List String :=

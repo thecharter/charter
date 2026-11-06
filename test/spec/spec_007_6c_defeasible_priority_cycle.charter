@@ -1,0 +1,7 @@
+// 004.12, 007.6: a cycle in defeasible `Overrides` / `Priority` edges is rejected with `CHR034`.
+//! expect-error: CHR034
+Fact person Identified by Alice.
+Fact status Identified by person
+  Default r1 Holds when True
+  Exception r2 Overrides r1 Rejects when True
+  Priority r1 Over r2.

@@ -158,7 +158,7 @@ def readDirectives (src : String) : Directives :=
 mutual
 def termStrConsts : Term → List String
   | .stringLit s => [s]
-  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a =>
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .project a _ | .tag a _ | .untag a =>
     termStrConsts a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
@@ -183,7 +183,9 @@ end
 
 def specRuleConstants (spec : Spec) : List String :=
   spec.decls.flatMap fun (_, t) =>
-    let dC := t.derivation.flatMap fun | .dv _ tm | .holdsWhen tm => termStrConsts tm
+    let dC := t.derivation.flatMap fun
+      | .dv _ tm | .holdsWhen tm => termStrConsts tm
+      | .defeasibleDAG _ rs => rs.flatMap fun r => termStrConsts r.cond ++ (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => termStrConsts vt)
     let cC := t.conditions.flatMap termStrConsts
     let fC := termStrConsts t.domainConstraint
     let kC := match t.kind with
@@ -221,6 +223,7 @@ def permuteTerm (perm : List (String × String)) : Term → Term
   | .violated a => .violated (permuteTerm perm a)
   | .enabled a => .enabled (permuteTerm perm a)
   | .evStatus w a => .evStatus w (permuteTerm perm a)
+  | .hasConflict a => .hasConflict (permuteTerm perm a)
   | .project a x => .project (permuteTerm perm a) x
   | .tag a d => .tag (permuteTerm perm a) d
   | .untag a => .untag (permuteTerm perm a)

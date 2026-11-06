@@ -51,7 +51,12 @@ def actReadTypes (spec : Spec) (d : DomId) : List DomId :=
     let cDeps := Stratify.depsList spec 500 xs .pos tspec.conditions
     let dDeps := (tspec.derivation.flatMap fun
       | .dv ys t => Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 ys .pos t
-      | .holdsWhen t => Stratify.binderDeps spec xs .pos ++ Stratify.deps spec 500 xs .pos t)
+      | .holdsWhen t => Stratify.binderDeps spec xs .pos ++ Stratify.deps spec 500 xs .pos t
+      | .defeasibleDAG _ rs =>
+        Stratify.binderDeps spec xs .neg ++
+        rs.flatMap fun r =>
+          Stratify.deps spec 500 xs .neg r.cond ++
+          (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => Stratify.deps spec 500 xs .neg vt))
     let kDeps := match tspec.kind with
       | .act actSpec =>
         Stratify.depsList spec 500 xs .pos actSpec.validWhen ++

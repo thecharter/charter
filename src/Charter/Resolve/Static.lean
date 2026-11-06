@@ -129,7 +129,7 @@ def freeVars (spec : Spec) : Term → List Var
         union (diff xs named) (freeVarsArgs spec args)
       | _ => freeVarsArgs spec args
     | none => freeVarsArgs spec args
-  | .not t | .present t | .violated t | .enabled t | .evStatus _ t | .project t _ | .tag t _ | .untag t => freeVars spec t
+  | .not t | .present t | .violated t | .enabled t | .evStatus _ t | .hasConflict t | .project t _ | .tag t _ | .untag t => freeVars spec t
   | .heldFor t d => union (freeVars spec t) (freeVars spec d)
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
   | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b => union (freeVars spec a) (freeVars spec b)
@@ -334,6 +334,11 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
           else err "CHR033" s!"{want.kwName}({t}) targets `{d}`, which is not declared `Evidenced`"
         | none => err "CHR010" s!"undeclared type `{d}`"
       | _ => err "CHR015" s!"{want.kwName}({t}) needs an `Evidenced` fact instance, not {ty}"
+    | .hasConflict t => do
+      let (t', ty) ← compileTerm fuel t
+      match ty with
+      | .tagged _ => return (.hasConflict t', .bool)
+      | _ => err "CHR015" s!"Conflict({t}) needs a fact or function instance, not {ty}"
     | .exists_ xs t => do
       warnJudgedBinders xs
       let t' ← convertTerm fuel t .bool
@@ -580,6 +585,33 @@ def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Deriva
     let fs ← freeVarsChecked t'
     warnJudgedBinders (xs ++ diff fs xs)
     return .dv (xs ++ diff fs xs) t'
+  | .defeasibleDAG dag rs => return .defeasibleDAG dag rs
+
+def compileDefeasibleRule (ty : DomId) (tspec : TypeSpec) (r : DefeasibleRule) : Stc DefeasibleRule := do
+  let spec ← getSpec
+  let boundVars : List Var := match tspec.restriction, tspec.domain with
+    | some .function, .products [kVar, _] => [kVar]
+    | some .var, _ => []
+    | _, .products xs => xs
+    | _, _ => [⟨ty, ""⟩]
+  let c' ← convertTerm termFuel r.cond .bool
+  let cfs ← freeVarsChecked c'
+  let unbound := diff cfs boundVars
+  let condCompiled := if unbound.isEmpty then c' else .exists_ unbound c'
+  let conseq' ← match r.conseq, tspec.restriction, tspec.domain with
+    | .holdsBool b, none, _ => pure (.holdsBool b)
+    | .holdsBool _, some _, _ =>
+      err "CHR012" s!"{ty}: `Function` / `Var` defeasible rule `{r.id}` must use `Yields <expr> When <cond>`"
+    | .yieldsVal vt, some .function, .products [_, vVar] => do
+      let vDom := spec.removeDecoration vVar
+      let vt' ← convertTerm termFuel vt (.tagged vDom)
+      pure (.yieldsVal vt')
+    | .yieldsVal vt, some .var, _ => do
+      let vt' ← convertTerm termFuel vt (.tagged ty)
+      pure (.yieldsVal vt')
+    | .yieldsVal _, _, _ =>
+      err "CHR012" s!"{ty}: `Yields` applies to a `Function` or `Var`, not an unrestricted `Fact`"
+  return { r with cond := condCompiled, conseq := conseq' }
 
 /-- Every name in `as` must be a declared act (Charter's `Except under` and `Against`). -/
 def checkActs (what : String) (as : List DomId) : Stc Unit := do
@@ -724,6 +756,11 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
           let _ ← checkEvidencedTarget opLabel tm
           compileEffect' (fun ys u => .evOp op ys u ty) xs fxs tm
         return [(ty, [.postCond effs])]
+      | .defeasibleRule r =>
+        let r' ← compileDefeasibleRule ty tspec r
+        return [(ty, [.defeasibleRule r'])]
+      | .priorityEdge hi los =>
+        return [(ty, [.priorityEdge hi los])]
       | .dueWithin d =>
         -- a requirement duty: violated once it has been held for `d` (006.7)
         match tspec.kind with
@@ -856,6 +893,22 @@ def executeDecls (ds : List Decl) : Stc Store := do
           err "CHR032" s!"{kw} {ty}: an institutional `{kw}` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
       | _ => pure ()
     | _ => pure ()
+  -- 5. validate defeasible rule IDs, override targets, and priority acyclicity (`CHR034`, 004.12, 007.6)
+  finalSpec.decls.forM fun (ty, ts) => do
+    if !ts.defeasibleRules.isEmpty then
+      let rids := ts.defeasibleRules.map (·.id)
+      if rids.eraseDups.length != rids.length then
+        err "CHR034" s!"{ty}: duplicate defeasible rule identifier in {", ".intercalate rids}"
+      let allEdges := (ts.defeasibleRules.flatMap fun r => r.overrides.map (r.id, ·)) ++ ts.priorityEdges
+      allEdges.forM fun (hi, lo) => do
+        if !rids.contains hi then
+          err "CHR010" s!"{ty}: undeclared defeasible rule `{hi}` in priority edge"
+        if !rids.contains lo then
+          err "CHR010" s!"{ty}: undeclared defeasible rule `{lo}` in `Overrides` / `Over`"
+      match Defeasible.findPriorityCycle rids allEdges with
+      | some cyc =>
+        err "CHR034" s!"{ty}: priority cycle among defeasible rules: {", ".intercalate cyc}"
+      | none => pure ()
   return init
 
 /-- Compile a transition phrase's term and bind its free variables (eFLINT

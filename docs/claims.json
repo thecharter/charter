@@ -227,6 +227,30 @@
       "summary": "Extralegal advisory Note annotations on trigger phrases never alter post-state Config or emitted transition judgments (D22, T04)."
     },
     {
+      "id": "defeasible.compiled_dag_eq_spec",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Defeasible.lean",
+      "symbol": "evalCompiledDAG_eq_spec",
+      "summary": "Single-pass topological decision-DAG evaluation agrees identically with the declarative undefeated-rule specification across all outcomes and conflicts (D23, G3.3)."
+    },
+    {
+      "id": "defeasible.unranked_disagreement_conflict",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Defeasible.lean",
+      "symbol": "unranked_disagreement_yields_conflict",
+      "summary": "Two unranked active defeasible rules prescribing distinct outcomes return explicit Conflict rather than last-rule-wins (D23, T21)."
+    },
+    {
+      "id": "defeasible.exception_to_exception",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Defeasible.lean",
+      "symbol": "exception_to_exception_resolves",
+      "summary": "Multi-level Catala exception-to-exception chains resolve deterministically across base, first-tier exception, and second-tier exception states (D23, T22)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

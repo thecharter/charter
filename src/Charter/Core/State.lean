@@ -185,6 +185,24 @@ def evidenceSources (s : State) (te : Tagged) : List (String × String × Nat) :
   collect evSupportDom "support" ++
   collect evRebutDom "rebut"
 
+/-- Check whether `bucket` (entries of `defConflictDom`) contains a live normative conflict `(r1, r2)` for `te`. -/
+def conflictFromBucket (now : Int) (te : Tagged) : List (Tagged × Info) → Option (String × String)
+  | [] => none
+  | (entryTe, i) :: rest =>
+    if i.live now then
+      match entryTe.1 with
+      | .prod [targetTe, (.str domName, _), (.str r1, _), (.str r2, _)] =>
+        let directMatch := targetTe == te
+        let funcKeyMatch := domName == te.2 && (match te.1 with | .prod (kTe :: _) => targetTe == kTe | _ => false)
+        if directMatch || funcKeyMatch then some (r1, r2)
+        else conflictFromBucket now te rest
+      | _ => conflictFromBucket now te rest
+    else conflictFromBucket now te rest
+
+/-- Lookup any active normative rule conflict `(r1, r2)` on `te` (`004.12`, `T21`). -/
+def conflictOf (s : State) (te : Tagged) : Option (String × String) :=
+  conflictFromBucket s.time te (s.contents.filter fun (q, _) => q.2 == defConflictDom)
+
 end State
 
 /-- The truth value an effect assigns; a creation may carry an expiry (D7); an

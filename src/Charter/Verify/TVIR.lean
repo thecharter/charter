@@ -15,7 +15,7 @@ namespace Charter.Verify.TVIR
 mutual
 def termIntConsts : Term → List Int
   | .intLit n => [n]
-  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a => termIntConsts a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .project a _ | .tag a _ | .untag a => termIntConsts a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => termIntConsts a ++ termIntConsts b
@@ -39,7 +39,7 @@ end
 mutual
 def hasSymbolicVar : Term → Bool
   | .ref _ | .untag _ | .project _ _ => true
-  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .tag a _ => hasSymbolicVar a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .tag a _ => hasSymbolicVar a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasSymbolicVar a || hasSymbolicVar b
@@ -65,7 +65,7 @@ def hasComplexArith : Term → Bool
   | .mult a b | .div a b | .mod a b => hasSymbolicVar a && hasSymbolicVar b
   | .add a b | .sub a b => hasSymbolicVar a && hasSymbolicVar b
   | .sum _ _ | .count _ _ => true
-  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a => hasComplexArith a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .project a _ | .tag a _ | .untag a => hasComplexArith a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasComplexArith a || hasComplexArith b
   | .exists_ _ t | .forall_ _ t | .max _ t | .min _ t => hasComplexArith t
@@ -89,7 +89,9 @@ end
 (plus `0, 1`), forming an exact equivalence-class witness set for single-variable interval guards. -/
 def specThresholdWitnesses (spec : Spec) (stateInts : List Int) : List Int :=
   let fromSpec : List Int := spec.decls.flatMap fun (_, t) =>
-    let dInts := t.derivation.flatMap fun | .dv _ tm | .holdsWhen tm => termIntConsts tm
+    let dInts := t.derivation.flatMap fun
+      | .dv _ tm | .holdsWhen tm => termIntConsts tm
+      | .defeasibleDAG _ rs => rs.flatMap fun r => termIntConsts r.cond ++ (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => termIntConsts vt)
     let cInts := t.conditions.flatMap termIntConsts
     let fInts := termIntConsts t.domainConstraint
     let kInts := match t.kind with
@@ -110,7 +112,9 @@ def specThresholdWitnesses (spec : Spec) (stateInts : List Int) : List Int :=
 fragment (no `x + y`, `x * y`, or `Sum` over symbolic variables). -/
 def isSingleThresholdFragment (spec : Spec) : Bool :=
   spec.decls.all fun (_, t) =>
-    let dOk := t.derivation.all fun | .dv _ tm | .holdsWhen tm => !hasComplexArith tm
+    let dOk := t.derivation.all fun
+      | .dv _ tm | .holdsWhen tm => !hasComplexArith tm
+      | .defeasibleDAG _ rs => rs.all fun r => !hasComplexArith r.cond && (match r.conseq with | .holdsBool _ => true | .yieldsVal vt => !hasComplexArith vt)
     let cOk := t.conditions.all (!hasComplexArith ·)
     let fOk := !hasComplexArith t.domainConstraint
     let kOk := match t.kind with

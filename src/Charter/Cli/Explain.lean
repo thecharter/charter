@@ -46,7 +46,7 @@ def parseExplainArgs : List String → ExplainOpts → Except String ExplainOpts
 mutual
 def collectTermApps : Term → List (DomId × Args)
   | .app d args => (d, args) :: collectArgsApps args
-  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a =>
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .project a _ | .tag a _ | .untag a =>
     collectTermApps a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
@@ -130,19 +130,31 @@ def buildReasonGraph (spec : Spec) (state : State) (te : Tagged) : ReasonGraph :
                   detail := srcDetail
                 }
               else
-                let h := state.holds pTe
-                let orig := match state.lookup pTe with
-                  | some i => i.origin.render
-                  | none => "unassigned closed fact"
-                some {
-                  id := pTe.pp
-                  kind := "premise"
-                  status := if h then "yes" else "no"
-                  spans := pts.spans
-                  confidential := fs.confidential
-                  allowedAudiences := fs.audiences
-                  detail := orig
-                }
+                match state.conflictOf pTe with
+                | some (r1, r2) =>
+                  some {
+                    id := pTe.pp
+                    kind := "conflict"
+                    status := "conflicted"
+                    spans := pts.spans
+                    confidential := fs.confidential
+                    allowedAudiences := fs.audiences
+                    detail := s!"normative conflict between unranked rules `{r1}` and `{r2}`"
+                  }
+                | none =>
+                  let h := state.holds pTe
+                  let orig := match state.lookup pTe with
+                    | some i => i.origin.render
+                    | none => "unassigned closed fact"
+                  some {
+                    id := pTe.pp
+                    kind := "premise"
+                    status := if h then "yes" else "no"
+                    spans := pts.spans
+                    confidential := fs.confidential
+                    allowedAudiences := fs.audiences
+                    detail := orig
+                  }
             | _ => none
       -- Inspect immunities (active blocks vs. `Unless`-defeated immunities)
       let (immNodes, defeated) : List ReasonNode × List String :=

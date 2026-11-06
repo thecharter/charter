@@ -161,6 +161,8 @@ inductive Term where
   | heldFor (t : Term) (d : Term)
   /-- Charter (D22, G3.2): `Established(e)` / `Refuted(e)` / `Unresolved(e)` / `Conflicted(e)`. -/
   | evStatus (want : EvidenceStatus) (t : Term)
+  /-- Charter (D23, G3.3): `Conflict(e)` tests normative conflict among unranked defeasible rules. -/
+  | hasConflict (t : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -248,6 +250,7 @@ def Term.pp : Term → String
   | .currentTime => "Current Time"
   | .heldFor t d => "Held(" ++ t.pp ++ ") For " ++ d.pp
   | .evStatus want t => want.kwName ++ "(" ++ t.pp ++ ")"
+  | .hasConflict t => "Conflict(" ++ t.pp ++ ")"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -302,6 +305,7 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .currentTime => .currentTime
   | .heldFor t d => .heldFor (t.mapDom f) (d.mapDom f)
   | .evStatus want t => .evStatus want (t.mapDom f)
+  | .hasConflict t => .hasConflict (t.mapDom f)
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)

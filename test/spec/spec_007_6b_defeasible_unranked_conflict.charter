@@ -1,0 +1,45 @@
+// 004.12, 007.6 (T21): two overlapping applicable defeasible rules with no priority
+// produce an explicit normative `Conflict` rather than last-rule-wins; neither outcome
+// holds, dependent `Power` guards become `undetermined`, and `Extend Fact ... Priority`
+// resolves the conflict deterministically.
+Fact applicant Identified by App1.
+Fact officer Identified by Off1.
+Fact rural Identified by applicant.
+Fact veteran Identified by applicant.
+Fact high-income Identified by applicant.
+Fact grant-disbursed Identified by applicant.
+
+Fact subsidy-eligible Identified by applicant
+  Default base-ineligible Rejects when True
+  Exception ex-veteran Overrides base-ineligible Holds when veteran(applicant)
+  Exception ex-income-cap Overrides base-ineligible Rejects when high-income(applicant).
+
+Power disburse-grant Actor officer Related to applicant
+  Holds when subsidy-eligible(applicant)
+  Valid when subsidy-eligible(applicant)
+  Creates grant-disbursed(applicant).
+
+Scenario unranked-conflict-detected {
+  +veteran(App1).
+  +high-income(App1).
+  // Both ex-veteran (Holds) and ex-income-cap (Rejects) override base-ineligible with no priority:
+  ?Conflict(subsidy-eligible(App1)).
+  ?conflict subsidy-eligible(App1).
+  ?!subsidy-eligible(App1).
+  ?undetermined disburse-grant(Off1, App1).
+  ?!valid disburse-grant(Off1, App1).
+  disburse-grant(Off1, App1).
+  ?!grant-disbursed(App1).
+}
+
+Scenario explicit-priority-resolves-conflict {
+  +veteran(App1).
+  +high-income(App1).
+  Extend Fact subsidy-eligible Priority ex-veteran Over ex-income-cap.
+  ?!Conflict(subsidy-eligible(App1)).
+  ?!conflict subsidy-eligible(App1).
+  ?subsidy-eligible(App1).
+  ?valid disburse-grant(Off1, App1).
+  disburse-grant(Off1, App1).
+  ?grant-disbursed(App1).
+}

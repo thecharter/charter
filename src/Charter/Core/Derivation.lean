@@ -70,6 +70,8 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .evStatus want t =>
       let pol := if want == .established then p else .neg
       (typeOf spec t).toList.map (·, pol) ++ deps spec fuel bound pol t
+    | .hasConflict t =>
+      (typeOf spec t).toList.map (·, .neg) ++ deps spec fuel bound .neg t
     | .exists_ xs t => binderDeps spec xs p ++ deps spec fuel (bound ++ xs) p t
     | .forall_ xs t | .count xs t | .sum xs t | .max xs t | .min xs t =>
       binderDeps spec xs .neg ++ deps spec fuel (bound ++ xs) .neg t
@@ -120,6 +122,11 @@ def typeDeps (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Dep :=
   let fromDerivations := tspec.derivation.flatMap fun
     | .dv ys t => binderDeps spec ys .pos ++ deps spec fuel ys .pos t
     | .holdsWhen t => binderDeps spec xs .pos ++ deps spec fuel xs .pos t
+    | .defeasibleDAG _ rules =>
+      binderDeps spec xs .neg ++
+      (rules.flatMap fun r =>
+        deps spec fuel xs .neg r.cond ++
+        (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => deps spec fuel xs .neg vt))
   let fromConds := depsList spec fuel xs .pos tspec.conditions
   let fromFilter := deps spec fuel xs .pos tspec.domainConstraint
   fromDerivations ++ fromConds ++ fromFilter

@@ -18,10 +18,12 @@ inductive Expect
   | valid
   | violated
   | undetermined
+  | conflict
   deriving Repr, DecidableEq, Inhabited
 
 def Expect.name : Expect → String
-  | .lawful => "lawful" | .valid => "valid" | .violated => "violated" | .undetermined => "undetermined"
+  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
+  | .undetermined => "undetermined" | .conflict => "conflict"
 
 /-- One phrase (eFLINT `Phrase`, plus Charter's scenarios, expectations, and epistemic evidence). Binders of
 `Foreach` forms are the `xs` lists. -/

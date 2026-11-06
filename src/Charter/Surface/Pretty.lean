@@ -74,6 +74,7 @@ def fmtTerm : Term → String
   | .currentTime => "Current Time"
   | .heldFor t d => "(Held(" ++ fmtTerm t ++ ") For (" ++ fmtTerm d ++ "))"
   | .evStatus want t => want.kwName ++ "(" ++ fmtTerm t ++ ")"
+  | .hasConflict t => "Conflict(" ++ fmtTerm t ++ ")"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -112,6 +113,7 @@ def fmtDomain : Domain → String
 def fmtDerivation : Derivation → String
   | .dv xs t => "Derived from " ++ fmtOptForeach xs t
   | .holdsWhen t => "Holds when " ++ fmtTerm t
+  | .defeasibleDAG _ _ => ""
 
 def fmtEffect : Effect → String
   | .cAll xs t none => "Creates " ++ fmtOptForeach xs t
@@ -131,11 +133,14 @@ def fmtModClause : ModClause → String
   | .derivation ds@(.dv _ _ :: _) =>
     "Derived from " ++ ", ".intercalate (ds.map fun
       | .dv xs t => fmtOptForeach xs t
-      | .holdsWhen t => fmtTerm t)
+      | .holdsWhen t => fmtTerm t
+      | .defeasibleDAG _ _ => "")
   | .derivation ds@(.holdsWhen _ :: _) =>
     "Holds when " ++ ", ".intercalate (ds.map fun
       | .holdsWhen t => fmtTerm t
-      | .dv xs t => fmtOptForeach xs t)
+      | .dv xs t => fmtOptForeach xs t
+      | .defeasibleDAG _ _ => "")
+  | .derivation (.defeasibleDAG _ _ :: _) => ""
   | .postCond [] => ""
   | .postCond effs@(.cAll .. :: _) =>
     "Creates " ++ ", ".intercalate (effs.map fun
@@ -180,6 +185,15 @@ def fmtModClause : ModClause → String
   | .evEffect .support ts => "Supports " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
   | .evEffect .rebut ts => "Rebuts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
   | .evEffect .retract ts => "Retracts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
+  | .defeasibleRule r =>
+    let head := if r.isDefault then s!"Default {r.id}"
+      else s!"Exception {r.id} Overrides {", ".intercalate r.overrides}"
+    let body := match r.conseq with
+      | .holdsBool true => "Holds when " ++ fmtTerm r.cond
+      | .holdsBool false => "Rejects when " ++ fmtTerm r.cond
+      | .yieldsVal v => "Yields (" ++ fmtTerm v ++ ") When " ++ fmtTerm r.cond
+    head ++ " " ++ body
+  | .priorityEdge hi los => s!"Priority {hi} Over {", ".intercalate los}"
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
   let rendered := (cls.map fmtModClause).filter (!·.isEmpty)

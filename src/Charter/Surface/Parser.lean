@@ -264,6 +264,14 @@ def unary : Nat → P Term
         expectKw ")"
         return .evStatus want t
       else postfixExpr fuel
+    | .atom "Conflict" =>
+      if (← peekAt 1) == .kw "(" then
+        advance
+        expectKw "("
+        let t ← expr fuel
+        expectKw ")"
+        return .hasConflict t
+      else postfixExpr fuel
     | _ => postfixExpr fuel
 
 def postfixExpr : Nat → P Term
@@ -583,6 +591,42 @@ def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span)
         | _ => return (none, [])
       | none => return (none, [])
 
+/-- Parse a defeasible rule identifier (`r-base`, `r1`, or `R1`). -/
+def ruleId : P String := do
+  match ← peek with
+  | .atom s => advance; return s
+  | _ => toString <$> var
+
+/-- Parse `(Holds when | Rejects when) <expr>` or `Yields <val> When <cond>` for a `Default` / `Exception` rule (`D23`). -/
+def defeasibleBody : P (Term × DefeasibleConseq) := do
+  match ← peek with
+  | .kw "Holds when" | .kw "Present when" =>
+    advance
+    let c ← expression
+    return (c, .holdsBool true)
+  | .kw "Holds" | .kw "Present" =>
+    advance; expectKw "When"
+    let c ← expression
+    return (c, .holdsBool true)
+  | .kw "Rejects when" =>
+    advance
+    let c ← expression
+    return (c, .holdsBool false)
+  | .atom "Rejects" =>
+    advance; expectKw "When"
+    let c ← expression
+    return (c, .holdsBool false)
+  | .atom "Yields" =>
+    advance
+    let valTerm ← orExpr 1000
+    match ← peek with
+    | .kw "When" | .kw "Where" => advance
+    | k => fail "CHR003" s!"expected `When` after `Yields <expr>` but found {k.describe}"
+    let condTerm ← expression
+    return (condTerm, .yieldsVal valTerm)
+  | k =>
+    fail "CHR003" s!"expected `Holds when`, `Rejects when`, or `Yields <expr> When` in defeasible rule, found {k.describe}"
+
 /-- One clause of a frame of the given kind, or `none` when the next token is not one. -/
 def clause (k : FrameKind) : P (Option ModClause) := do
   match ← peek with
@@ -658,6 +702,34 @@ def clause (k : FrameKind) : P (Option ModClause) := do
         | kk => fail "CHR003" s!"expected audience identifier after `Confidential To` but found {kk.describe}") "," 100
       return some (.confidential auds)
     else return some (.confidential [])
+  | .atom "Default" =>
+    if k != .fact then return none
+    if !(match ← peekAt 1 with | .ident _ | .atom _ => true | _ => false) then return none
+    advance
+    let rid ← ruleId
+    let (cond, conseq) ← defeasibleBody
+    return some (.defeasibleRule { id := rid, isDefault := true, overrides := [], cond, conseq })
+  | .atom "Exception" =>
+    if k != .fact then return none
+    if !(match ← peekAt 1 with | .ident _ | .atom _ => true | _ => false) then return none
+    advance
+    let rid ← ruleId
+    if !(← isCtxAtom "Overrides") then
+      fail "CHR003" s!"expected `Overrides <rule-id>` after `Exception {rid}`"
+    advance
+    let ovs ← sepBy1 ruleId "," 1000
+    let (cond, conseq) ← defeasibleBody
+    return some (.defeasibleRule { id := rid, isDefault := false, overrides := ovs, cond, conseq })
+  | .atom "Priority" =>
+    if k != .fact then return none
+    if !(match ← peekAt 1 with | .ident _ | .atom _ => true | _ => false) then return none
+    advance
+    let hi ← ruleId
+    if !(← isCtxAtom "Over") then
+      fail "CHR003" s!"expected `Over <rule-id>` after `Priority {hi}`"
+    advance
+    let los ← sepBy1 ruleId "," 1000
+    return some (.priorityEdge hi los)
   | .atom "Resolves" =>
     if k != .act then return none
     advance
@@ -1046,10 +1118,12 @@ def phrase : P Phrase := do
   | .kw "?valid" => advance; return .expect .valid false (← expression)
   | .kw "?violated" => advance; return .expect .violated false (← expression)
   | .kw "?undetermined" => advance; return .expect .undetermined false (← expression)
+  | .kw "?conflict" => advance; return .expect .conflict false (← expression)
   | .kw "?!lawful" => advance; return .expect .lawful true (← expression)
   | .kw "?!valid" => advance; return .expect .valid true (← expression)
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
   | .kw "?!undetermined" => advance; return .expect .undetermined true (← expression)
+  | .kw "?!conflict" => advance; return .expect .conflict true (← expression)
   | .kw "@" => advance; return .setTime (← expression)
   | .atom "SubmitEvidence" =>
     let t1 ← peekAt 1

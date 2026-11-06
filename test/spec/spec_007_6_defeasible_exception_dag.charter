@@ -1,0 +1,44 @@
+// 004.12, 007.6 (T22): Catala-style multi-level exception-to-exception DAG over both
+// boolean `Fact`s (replacing `archetypes.eflint`'s self-negating default idiom without
+// cyclic negation) and quantitative `Function` definitions, plus unquoted atom compatibility.
+Fact legacy-defeasible-atoms Identified by Default, Exception, Overrides, Priority, Over, Rejects, Yields, Conflict.
+
+Fact person Identified by Alice, Bob, Cara.
+Fact resident Identified by person.
+Fact student Identified by person.
+Fact employed Identified by person.
+
+Fact owes-levy Identified by person
+  Default r-resident Holds when resident(person)
+  Exception r-student Overrides r-resident Rejects when resident(person) && student(person)
+  Exception r-working-student Overrides r-student Holds when resident(person) && student(person) && employed(person).
+
+Function tax-rate Identified by person * int
+  Default rate-base Yields 20 When resident(person)
+  Exception rate-student Overrides rate-base Yields 0 When resident(person) && student(person)
+  Exception rate-working Overrides rate-student Yields 10 When resident(person) && student(person) && employed(person).
+
+Scenario catala-exception-to-exception {
+  +resident(Alice).
+  +resident(Bob).
+  +student(Bob).
+  +resident(Cara).
+  +student(Cara).
+  +employed(Cara).
+
+  // Alice: base default applies -> owes-levy, rate 20
+  ?owes-levy(Alice).
+  ?tax-rate(Alice, 20).
+  ?!conflict owes-levy(Alice).
+
+  // Bob: student exception overrides base -> !owes-levy, rate 0
+  ?!owes-levy(Bob).
+  ?tax-rate(Bob, 0).
+  ?!tax-rate(Bob, 20).
+
+  // Cara: working-student exception overrides student exception -> owes-levy, rate 10
+  ?owes-levy(Cara).
+  ?tax-rate(Cara, 10).
+  ?!tax-rate(Cara, 0).
+  ?!tax-rate(Cara, 20).
+}
