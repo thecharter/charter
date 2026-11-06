@@ -1,11 +1,12 @@
-import Charter.Core.Spec
+import Charter.Core.State
 
 /-!
-# Charter.Core.Derivation — Topological Stratification (`D6`)
+# Charter.Core.Derivation — Topological Stratification (`D6`) & State Fixpoint Ordering (`G1.3`)
 
-Computes polarity-tracked dependency edges across derived types and partitions derived
-types into topological strata (`Stratify.strata`), rejecting any cycle containing a
-non-monotone (`Not`, `Forall`, `Count`, `Sum`, `Max`, `Min`) edge (`CHR020`).
+Computes polarity-tracked dependency edges across derived types, partitions derived types
+into topological strata (`Stratify.strata`), and defines the state-extension preorders
+(`PreservesAssigned`, `HoldsSubstate`) used by the least-fixpoint proofs in
+`Charter.Eval.Properties`.
 -/
 
 namespace Charter
@@ -158,5 +159,17 @@ def strata (spec : Spec) : Except (List DomId) (List (List DomId)) :=
     .ok (layers (derived.length + 1) derived [] [])
 
 end Stratify
+
+namespace State
+
+/-- `s₂` preserves the clock and every entry present in `s₁`. -/
+def ExtendsEntries (s₁ s₂ : State) : Prop :=
+  s₂.time = s₁.time ∧ ∀ te i, s₁.lookup te = some i → s₂.lookup te = some i
+
+/-- Every instance that holds in `s₁` also holds in `s₂`. -/
+def HoldsSubstate (s₁ s₂ : State) : Prop :=
+  ∀ te, s₁.holds te = true → s₂.holds te = true
+
+end State
 
 end Charter

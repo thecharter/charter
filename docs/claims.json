@@ -24,7 +24,31 @@
       "scope": "live-evaluator",
       "artifact": "src/Charter/Eval/Properties.lean",
       "symbol": "saturateStratum_fixpoint",
-      "summary": "When saturateStratum converges on a state, an additional derivation pass over the stratum produces no new facts (spec 004.5; leastness pending G1.3)."
+      "summary": "When saturateStratum converges on a state, an additional derivation pass over the stratum produces no new facts (spec 004.5)."
+    },
+    {
+      "id": "eval.saturate_stratum_closed",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "saturateStratum_closed",
+      "summary": "At the state returned by saturateStratum, every consequence derivable from that state by the stratum's rules is already present (spec 004.5)."
+    },
+    {
+      "id": "eval.saturate_stratum_least_prefixpoint",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "saturateStratum_least_prefixpoint",
+      "summary": "For any monotone stratum, saturateStratum computes the unique Tarski least pre-fixpoint above the pre-stratum state (spec 004.5)."
+    },
+    {
+      "id": "eval.dommap_radix_index_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "buildIndex_lookup_eq",
+      "summary": "State.buildIndex 8-bit DomMap radix buckets preserve exact entry order and agree identically with State.lookup even under hash collisions."
     },
     {
       "id": "eval.elem_structural_beq",
