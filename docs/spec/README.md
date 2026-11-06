@@ -48,9 +48,9 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |
 | 017 projections | `017_projections.md` | unwritten |
-| 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: today's commands, flags, exit status; `prove`, `init`, `lsp`, the projections, and `charter-server` pending |
-| 019 eFLINT compatibility | `019_eflint_compatibility.md` | unwritten; the tolerances live in `test/eflint-corpus/tolerances.md` until this chapter exists |
-| 020 grammar | `020_grammar.md` | unwritten |
+| 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: `check`, `fmt`, `run`, `test`, `trace`, `prove`, `repl`, `version`, `help`, assurance gates; `init`, `lsp`, `doc`, projections, and `charter-server` pending |
+| 019 eFLINT compatibility | `019_eflint_compatibility.md` | draft (`D2`, `D6`, `D12`–`D15`, `D17`; 196-file corpus + `tolerances.json`) |
+| 020 grammar | `020_grammar.md` | draft (`test/gates/spec-inventory.sh`, `charter fmt` round-trip) |
 
 ## Cheat sheet
 

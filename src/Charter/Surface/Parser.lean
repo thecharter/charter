@@ -793,11 +793,11 @@ def frame : Nat → P (List Decl)
   | .kw "Extend" =>
     advance
     match ← peek with
-    | .atom "Immunity" | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000)]
-    | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000)]
-    | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000)]
-    | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000)]
-    | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000)]
+    | .atom "Immunity" | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000) "Immunity"]
+    | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000) "Fact"]
+    | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Act"]
+    | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000) "Event"]
+    | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000) "Duty"]
     | k => fail "CHR003" s!"expected `Fact`, `Act`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
   | .kw "Placeholder" =>
     advance

@@ -774,7 +774,7 @@ def executeDecls (ds : List Decl) : Stc Store := do
   -- 3. extensions, in order
   exts.forM fun d => do
     match d with
-    | .typeExt ty clauses =>
+    | .typeExt ty clauses _ =>
       let parts ← compileExt ty clauses
       parts.forM fun part => executeExt part.1 part.2
     | _ => pure ()

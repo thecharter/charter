@@ -28,6 +28,7 @@ import Charter.Surface.Diagnostics
 import Charter.Surface.Lexer
 import Charter.Surface.Ast
 import Charter.Surface.Parser
+import Charter.Surface.Pretty
 import Charter.Core.Term
 import Charter.Core.Spec
 import Charter.Core.State
@@ -43,6 +44,7 @@ import Charter.Cli.Run
 import Charter.Cli.Test
 import Charter.Cli.Repl
 import Charter.Cli.Prove
+import Charter.Cli.Fmt
 import Charter.Cli.Main
 
 /-!

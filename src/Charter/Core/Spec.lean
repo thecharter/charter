@@ -210,7 +210,7 @@ inductive ModClause where
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
 inductive Decl where
   | typeDecl (d : DomId) (t : TypeSpec)
-  | typeExt (d : DomId) (clauses : List ModClause)
+  | typeExt (d : DomId) (clauses : List ModClause) (extKind : String := "Fact")
   | placeholder (f t : DomId)
   /-- Charter (D4): a clause of the authoritative document with its register spans. -/
   | clause (c : Clause)
@@ -236,7 +236,7 @@ def Decl.isInitial : Decl → Bool
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
-  | .typeExt d _ => d
+  | .typeExt d _ _ => d
   | .placeholder f _ => f
   | .clause c => c.id
   | .document p => p
@@ -572,7 +572,7 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
 a module body are renamed in their arguments only. -/
 def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .typeDecl d t => .typeDecl (f d) (t.mapDom f)
-  | .typeExt d cs => .typeExt (f d) (cs.map (ModClause.mapDom f))
+  | .typeExt d cs k => .typeExt (f d) (cs.map (ModClause.mapDom f)) k
   | .placeholder a b => .placeholder (f a) (f b)
   | .param n dom v => .param (f n) dom v
   | .use n args pre => .use n (args.map f) pre

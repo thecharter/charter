@@ -1,6 +1,7 @@
 import Charter.Cli.Test
 import Charter.Cli.Prove
 import Charter.Cli.Repl
+import Charter.Cli.Fmt
 
 /-!
 # Charter.Cli.Main — Standalone Command-Line Dispatcher
@@ -17,6 +18,7 @@ def versionString : String := "charter 0.4.0"
 def helpText : String :=
   "usage: charter <command> [args] [file.charter ...]\n" ++
   "  check   <file.charter> ...              resolve phrases and verify clause provenance\n" ++
+  "  fmt     [--check] <file.charter> ...    format source canonically with round-trip AST verification\n" ++
   "  run     <file.charter>                  run top-level phrases and report transitions\n" ++
   "  test    <file.charter | dir> ...        run scenarios, provenance checks, and invariant exploration\n" ++
   "  trace   <clause-id> <file.charter>      print the verbatim span table for a clause\n" ++
@@ -37,6 +39,7 @@ def main (args : List String) : IO UInt32 := do
     IO.println versionString
     return 0
   | "check" :: rest => checkCommand rest
+  | "fmt" :: rest => fmtCommand rest
   | "run" :: rest => runCommand rest
   | "test" :: rest => testCommand rest
   | "trace" :: cid :: rest => traceCommand cid rest

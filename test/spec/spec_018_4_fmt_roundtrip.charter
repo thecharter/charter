@@ -1,0 +1,23 @@
+// 018.2 / 020: canonical formatting preserves behavior across modules, clauses,
+// parameters, durations, immunities, and scenarios.
+Param lock-window : Duration = 3.
+Fact party Identified by Alice, Bob.
+Fact locked Identified by party.
+
+Module guard(actor_t) {
+  Act engage Actor actor_t Recipient actor_t Holds when True Creates locked(actor_t) For lock-window.
+  Act release Actor actor_t Recipient actor_t Holds when Held(locked(actor_t)) For 1 Terminates locked(actor_t).
+  Immunity hold-shield Holder actor_t Against release Holds when locked(actor_t) Unless False.
+}.
+
+Use guard(party) As g.
+
+Scenario roundtrip-check {
+  g-engage(Alice, Alice).
+  ?locked(Alice).
+  @ 1.
+  ?lawful g-release(Alice, Alice).
+  ?!valid g-release(Alice, Alice).
+  @ 3.
+  ?!locked(Alice).
+}

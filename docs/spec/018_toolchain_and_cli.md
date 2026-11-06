@@ -8,8 +8,9 @@
 
 | Command | Does |
 |---|---|
-| `charter check <file.eflint> …` | resolve every phrase in order without evaluating; report diagnostics and, for a program with `Document`/`Clause`s, the Law 8 provenance checks (012) |
-| `charter run <file.eflint>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
+| `charter check <file.charter> …` | resolve every phrase in order without evaluating; report diagnostics and, for a program with `Document`/`Clause`s, the Law 8 provenance checks (012) |
+| `charter fmt [--check] [--stdout] <file.charter> …` | format files canonically while preserving `//!` directives and verifying round-trip AST equality (`020`, `test/spec/spec_018_4_fmt_roundtrip.charter`) |
+| `charter run <file.charter>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
 | `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`, `explore-domain`) |
 | `charter repl [file.eflint]` | load the file, then run phrases typed at `charter> ` (`:display`, `:help`, `:quit`) |
 | `charter trace <clause> <file.eflint>` | a clause's span table (012.9) |
