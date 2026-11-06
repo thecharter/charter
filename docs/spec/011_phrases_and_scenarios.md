@@ -22,7 +22,7 @@ A file is a sequence of phrases and directives. Each phrase is a step: it is res
 
 **11.9 Failure.** A phrase that produces an error diagnostic leaves the configuration unchanged; later phrases run against the state before it. `test/spec/spec_011_9_failed_phrase_leaves_state.eflint`
 
-**11.10 Test mode.** `charter test` passes a file that produces no error diagnostic and whose every claim holds (eFLINT's `--test-mode` criterion); `//!` directives may instead expect a diagnostic or declare a known issue (`src/Charter/Cli/Test.lean`). `--eflint` restricts the keywords to eFLINT's, so a corpus file may use `Valid`, `Against`, or `Scenario` as atoms (002.3). `test/spec/spec_002_9_eflint_mode.eflint`
+**11.10 Test mode.** `charter test` passes a file that produces no error diagnostic and whose every claim holds (eFLINT's `--test-mode` criterion); `//!` directives may instead expect a diagnostic or declare a known issue (`src/Charter/Cli/Test.lean`). Under the unified contextual grammar (002.9, D17), `.eflint` and `.charter` files share one parser without needing `--eflint`. `test/spec/spec_002_9_eflint_mode.eflint`
 
 **11.13 `?why`.** `?why e` reports the origin of each instance of `e` (004.10); it is a report, not a claim, and never fails a test.
 

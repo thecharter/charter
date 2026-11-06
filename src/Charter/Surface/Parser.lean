@@ -68,8 +68,17 @@ def advance : P Unit := fun s => .ok ((), { s with i := s.i + 1 })
 
 def isKw (k : String) : P Bool := do return (← peek) == .kw k
 
+/-- Match a contextual uppercase Charter keyword (lexed as `.atom k`, D17). -/
+def isCtxAtom (k : String) : P Bool := do
+  let t ← peek
+  return t == .atom k || t == .kw k
+
 def expectKw (k : String) : P Unit := do
   if ← isKw k then advance
+  else fail "CHR003" s!"expected `{k}` but found {(← peek).describe}"
+
+def expectCtxAtom (k : String) : P Unit := do
+  if ← isCtxAtom k then advance
   else fail "CHR003" s!"expected `{k}` but found {(← peek).describe}"
 
 def optKw (k : String) : P Bool := do
@@ -232,14 +241,16 @@ def unary : Nat → P Term
     | .kw "Holds" => advance; return .present (← unary fuel)
     | .kw "Violated" => advance; return .violated (← unary fuel)
     | .kw "Enabled" => advance; return .enabled (← unary fuel)
-    | .kw "Held" =>
-      advance
-      expectKw "("
-      let t ← expr fuel
-      expectKw ")"
-      expectKw "For"
-      let d ← addExpr fuel
-      return .heldFor t d
+    | .atom "Held" | .kw "Held" =>
+      if (← peekAt 1) == .kw "(" then
+        advance
+        expectKw "("
+        let t ← expr fuel
+        expectKw ")"
+        expectKw "For"
+        let d ← addExpr fuel
+        return .heldFor t d
+      else postfixExpr fuel
     | _ => postfixExpr fuel
 
 def postfixExpr : Nat → P Term
@@ -354,7 +365,14 @@ def typeExpr : P Domain := do
   | .kw "String" | .kw "Atom" => advance; return .anyString
   | .kw "Int" => advance; return .anyInt
   | .kw "Time" => advance; return .time
-  | .kw "Duration" => advance; return .duration
+  | .atom "Duration" | .kw "Duration" =>
+    let n ← peekAt 1
+    if n == .kw "," || n == .kw "+" then
+      let a ← atom
+      let rest ← moreAtoms
+      return .strings (a :: rest)
+    else
+      advance; return .duration
   | .int lo =>
     advance
     if ← isKw ".." then advance; let hi ← intLit; return .ints (intsFromRange lo hi)
@@ -492,23 +510,41 @@ def clauseId : P String := do
   more first 32
 
 def registerOf : TokKind → Option Register
-  | .kw "Norm" => some .norm
-  | .kw "Definition" => some .definition
+  | .atom "Norm" | .kw "Norm" => some .norm
+  | .atom "Definition" | .kw "Definition" => some .definition
   | .kw "Invariant" => some .invariant
-  | .kw "Acceptance" => some .acceptance
-  | .kw "Commentary" => some .commentary
+  | .atom "Acceptance" | .kw "Acceptance" => some .acceptance
+  | .atom "Commentary" | .kw "Commentary" => some .commentary
   | _ => none
+
+/-- Whether tokens starting at `idx` begin a declaration frame (D17 contextual check). -/
+def isFrameHeadAt (idx : Nat) : P Bool := do
+  match ← peekAt idx with
+  | .kw s =>
+    return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
+            "Event", "Duty", "Extend", "Placeholder"].contains s
+  | .atom s =>
+    if ["Immunity", "Module", "Use", "Param"].contains s then
+      return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
+    else if s == "Document" then
+      return (match ← peekAt (idx + 1) with | .str _ => true | _ => false)
+    else if s == "Clause" then
+      return (match ← peekAt (idx + 1) with | .atom _ | .ident _ | .int _ => true | _ => false)
+    else return false
+  | _ => return false
 
 /-- The items of a `Clause` frame: `Text "…"` and register spans `Norm "…" => ids`. -/
 def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span)
   | 0 => return (none, [])
   | fuel + 1 => do
     match ← peek with
-    | .kw "Text" =>
-      advance
-      match ← peek with
-      | .str t => advance; let (_, spans) ← clauseItems cid fuel; return (some t, spans)
-      | k => fail "CHR003" s!"expected the clause text in double quotes after `Text` but found {k.describe}"
+    | .atom "Text" | .kw "Text" =>
+      if (match ← peekAt 1 with | .str _ => true | _ => false) then
+        advance
+        match ← peek with
+        | .str t => advance; let (_, spans) ← clauseItems cid fuel; return (some t, spans)
+        | k => fail "CHR003" s!"expected the clause text in double quotes after `Text` but found {k.describe}"
+      else return (none, [])
     | k =>
       match registerOf k with
       | some reg =>
@@ -533,12 +569,11 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     | _ => return some (.conditionedBy (← exprList))
   | .kw "Closed" | .kw "Open" =>
     -- `Open Fact x` after a declaration starts the next frame; a bare `Open`/`Closed` is a clause
-    match ← peekAt 1 with
-    | .kw s => if ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                   "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param", "Module", "Use"].contains s
-               then return none
-               else (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
-    | _ => (do let isClosed := (← peek) == .kw "Closed"; advance; return some (if isClosed then .close else .open))
+    if ← isFrameHeadAt 1 then return none
+    else
+      let isClosed := (← peek) == .kw "Closed"
+      advance
+      return some (if isClosed then .close else .open)
   | .kw "Identified by" | .kw "Domain" =>
     if k == .fact then advance; return some (← extendDomainClause) else return none
   | .kw "Creates" =>
@@ -573,9 +608,10 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Due within" =>
     if k != .duty then return none
     advance; return some (.dueWithin (← expression))
-  | .kw "From" =>
+  | .atom "From" | .kw "From" =>
     -- `From CLAUSE "span"` on an act, duty, immunity, or fact (an Invariant)
     if k == .event then return none
+    if !(match ← peekAt 1 with | .atom _ | .ident _ | .int _ => true | _ => false) then return none
     advance
     let cid ← clauseId
     match ← peek with
@@ -587,10 +623,10 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Except under" =>
     if k != .act then return none
     advance; return some (.exceptUnder (← idList))
-  | .kw "Against" =>
+  | .atom "Against" | .kw "Against" =>
     if k != .immunity then return none
     advance; return some (.against (← idList))
-  | .kw "Unless" =>
+  | .atom "Unless" | .kw "Unless" =>
     if k != .immunity then return none
     advance; return some (.unlessCond (← exprList))
   | _ =>
@@ -602,7 +638,7 @@ def clause (k : FrameKind) : P (Option ModClause) := do
 def fromClauses : Nat → P (List (ClauseId × String))
   | 0 => return []
   | fuel + 1 => do
-    if ← isKw "From" then
+    if ← isCtxAtom "From" then
       advance
       let cid ← clauseId
       match ← peek with
@@ -645,7 +681,7 @@ def paramDomain : P Domain := do
     match ← peek with
     | .kw "Int" => advance; return Domain.anyInt
     | .kw "Time" => advance; return Domain.time
-    | .kw "Duration" => advance; return Domain.duration
+    | .atom "Duration" | .kw "Duration" => advance; return Domain.duration
     | k => fail "CHR003" s!"expected Int, Time, or Duration after `:` but found {k.describe}"
   else return Domain.anyInt
 
@@ -742,7 +778,7 @@ def frame : Nat → P (List Decl)
     return [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
-  | .kw "Immunity" =>
+  | .atom "Immunity" | .kw "Immunity" =>
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -757,7 +793,7 @@ def frame : Nat → P (List Decl)
   | .kw "Extend" =>
     advance
     match ← peek with
-    | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000)]
+    | .atom "Immunity" | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000)]
     | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000)]
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000)]
     | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000)]
@@ -769,7 +805,7 @@ def frame : Nat → P (List Decl)
     expectKw "For"
     let t ← ident
     return [.placeholder f t]
-  | .kw "Module" =>
+  | .atom "Module" | .kw "Module" =>
     advance
     let name ← ident
     expectKw "("
@@ -778,15 +814,15 @@ def frame : Nat → P (List Decl)
     expectKw "{"
     let body ← moduleBody fuel
     return [.module name params body]
-  | .kw "Use" =>
+  | .atom "Use" | .kw "Use" =>
     advance
     let name ← ident
     expectKw "("
     let args ← (do if ← isKw ")" then return [] else sepBy1 ident "," 1000)
     expectKw ")"
-    let pre ← (do if ← isKw "As" then advance; return some (← ident) else return none)
+    let pre ← (do if ← isCtxAtom "As" then advance; return some (← ident) else return none)
     return [.use name args pre]
-  | .kw "Param" =>
+  | .atom "Param" | .kw "Param" =>
     advance
     let name ← ident
     let dom ← paramDomain
@@ -795,15 +831,15 @@ def frame : Nat → P (List Decl)
     let n ← intLit
     let value : Int := if neg then -n else n
     return [.param name dom value]
-  | .kw "Document" =>
+  | .atom "Document" | .kw "Document" =>
     advance
     match ← peek with
     | .str p => advance; return [.document p]
     | k => fail "CHR003" s!"expected the document path in double quotes after `Document` but found {k.describe}"
-  | .kw "Clause" =>
+  | .atom "Clause" | .kw "Clause" =>
     advance
     let cid ← clauseId
-    let approved ← (do if ← isKw "Approved" then advance; let n ← intLit; return n.toNat.toUInt64 else return (0 : UInt64))
+    let approved ← (do if ← isCtxAtom "Approved" then advance; let n ← intLit; return n.toNat.toUInt64 else return (0 : UInt64))
     let (txt, spans) ← clauseItems cid 1000
     let source := match txt with
       | some t => t
@@ -813,16 +849,11 @@ def frame : Nat → P (List Decl)
 
 end
 
-/-- Whether the upcoming tokens begin a frame. -/
+/-- Whether the upcoming tokens begin a frame (D17). -/
 def startsFrame : P Bool := do
-  let k ← peek
-  let isFrameKw : TokKind → Bool
-    | .kw s => ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
-                "Event", "Duty", "Extend", "Placeholder", "Immunity", "Clause", "Document", "Param", "Module", "Use"].contains s
-    | _ => false
-  match k with
-  | .kw "Open" | .kw "Closed" => return isFrameKw (← peekAt 1)
-  | _ => return isFrameKw k
+  match ← peek with
+  | .kw "Open" | .kw "Closed" => isFrameHeadAt 1
+  | _ => isFrameHeadAt 0
 
 def declarations : Nat → P (List Decl)
   | 0 => return []
@@ -849,7 +880,12 @@ def phrase : P Phrase := do
   | .kw "?!valid" => advance; return .expect .valid true (← expression)
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
   | .kw "@" => advance; return .setTime (← expression)
-  | .kw "tick" => advance; return .tick
+  | .ident "tick" | .kw "tick" =>
+    let next ← peekAt 1
+    if next == .kw "." || next == .kw "}" || next == .eof then
+      advance; return .tick
+    else
+      let (xs, t) ← optForeach; return .trigger xs t
   | .kw "?why" => advance; return .why (← expression)
   | .kw "!" => advance; let (xs, t) ← optForeach; return .trigger xs t
   | _ => let (xs, t) ← optForeach; return .trigger xs t
@@ -919,7 +955,7 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
       advance
       let ps ← parBlock 10000
       return ⟨p, lineOf p, .inr (.par ps)⟩ :: (← items lineOf fuel)
-    else if ← isKw "Scenario" then
+    else if (← isCtxAtom "Scenario") && (match ← peekAt 1 with | .ident _ | .atom _ | .str _ => true | _ => false) then
       advance
       let name ← (do match ← peek with
         | .ident s => advance; return s

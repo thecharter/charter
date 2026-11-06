@@ -60,11 +60,15 @@ where
 
 namespace Lexer
 
-/-- Multi-word and word keywords, longest first so that `Holds when` wins over `Holds`. -/
+/-- Multi-word and word keywords, longest first so that `Holds when` wins over `Holds`.
+Single-word uppercase Charter additions (`Immunity`, `Clause`, `Document`, `Scenario`,
+`From`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Approved`,
+`Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`) lex as `.atom` tokens and `tick`
+lexes as `.ident "tick"`, matched contextually by `Parser` / `Resolve` (D17). -/
 def wordKeywords : List String :=
   [ "Derived externally", "Conditioned by", "Identified by", "Terminated by", "Violated when", "Overridden by",
-    "Present when", "Current Time", "Derived from", "Enforced by", "Related to", "Syncs with",
-    "Created by", "Holds when",
+    "Present when", "Current Time", "Derived from", "Except under", "Enforced by", "Related to", "Syncs with",
+    "Valid when", "Created by", "Due within", "Holds when",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",
     "Physical", "Claimant", "Function", "Violated", "Enabled", "Creates", "Current", "Derived",
     "Present", "Foreach", "Exists", "Forall", "Extend", "Closed", "Domain", "Holder", "String",
@@ -72,24 +76,15 @@ def wordKeywords : List String :=
     "Duty", "Fact", "Open", "Time", "True", "When", "With", "Act", "For", "Int", "Max", "Min",
     "Not", "Sum", "Var", "Do" ]
 
-/-- Charter's additions to the keyword set (plan §2.2); not keywords in `--eflint` mode,
-where they are atoms, as eFLINT reads them. -/
-def charterWordKeywords : List String :=
-  [ "Except under", "Valid when", "Due within", "Commentary", "Acceptance", "Definition",
-    "Immunity", "Duration", "Scenario", "Approved", "Document", "Against", "Clause", "Unless",
-    "Module", "Param", "Held", "Norm", "Text", "From", "Use", "As", "tick" ]
-
-/-- The claim phrases. Each is a keyword only when followed by whitespace, so that
-`?valid(5)` still queries a fact named `valid` and `?valid do(x)` is the claim. -/
-def charterSymbolKeywords : List String :=
+/-- The claim phrases. Each is a keyword only when followed by whitespace and a
+non-terminator token, so `?valid(5)` and `?valid .` still query a fact named `valid` while
+`?valid do(x)` is the claim (D17). -/
+def claimKeywords : List String :=
   [ "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
-
-/-- Charter symbols that need no whitespace after them. -/
-def charterPlainSymbols : List String := [ "=>" ]
 
 /-- Symbol keywords, longest first. -/
 def symbolKeywords : List String :=
-  [ "#include", "#require", "####", "###", "##", "?--", "?-", "!?", "||", "&&", "<=", ">=", "..",
+  [ "#include", "#require", "####", "###", "##", "?--", "?-", "!?", "||", "&&", "=>", "<=", ">=", "..",
     "==", "!=", "#" ]
 
 def keyChars : List Char :=
@@ -218,25 +213,27 @@ def lexString (s : St) (p : Pos) : Except Diagnostic St :=
       | some c => go s.advance (acc.push c) k
   go (s.advance) "" (s.cs.size + 1)
 
+def csNotTerminator (c : Char) : Bool := c != '.' && c != '}'
+
 def step (s : St) : Except Diagnostic St := do
   let p := s.pos
   match s.peek with
   | none => return s.push .eof p
   | some c =>
     let claimKw (k : String) : Bool :=
-      startsWithAt s.cs s.i k && (match s.peek k.length with | some c' => c'.isWhitespace | none => false)
-    let claim := if s.charter then charterSymbolKeywords.find? claimKw else none
-    match claim with
+      if startsWithAt s.cs s.i k && (match s.peek k.length with | some c' => c'.isWhitespace | none => false) then
+        let j := takeWhileFrom s.cs (s.i + k.length) Char.isWhitespace
+        if h : j < s.cs.size then csNotTerminator s.cs[j] else false
+      else false
+    match claimKeywords.find? claimKw with
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
-    let symbols := if s.charter then charterPlainSymbols ++ symbolKeywords else symbolKeywords
-    let words := if s.charter then charterWordKeywords ++ wordKeywords else wordKeywords
     -- symbol keywords
-    match symbols.find? (startsWithAt s.cs s.i) with
+    match symbolKeywords.find? (startsWithAt s.cs s.i) with
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
     -- word keywords at a boundary
-    match words.find? (fun k => startsWithAt s.cs s.i k && boundaryAt s.cs (s.i + k.length)) with
+    match wordKeywords.find? (fun k => startsWithAt s.cs s.i k && boundaryAt s.cs (s.i + k.length)) with
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
     if c == '"' then lexString s p

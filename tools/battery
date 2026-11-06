@@ -47,14 +47,14 @@ bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-files.log")
 ok=$(grep -c '^ok' "$OUT/check-files.log")
 step check-examples $(( st != 0 || bad != 0 )) "$ok ok, $bad FAIL/STALE"
 
-# 4. the eFLINT corpus (D2): every file must agree with eFLINT's recorded outcome,
-#    except the tolerated differences, which must differ
+# 4. the eFLINT corpus (D2, D17): run under the unified Charter parser (no --eflint mode!),
+#    verifying every file agrees with eFLINT's recorded outcome except tolerances.json
 BASE=test/eflint-corpus/eflint-outcomes.txt
-TOL=test/eflint-corpus/tolerances.md
+TOL=test/eflint-corpus/tolerances.json
 if [ -f "$BASE" ]; then
-  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --eflint --expect "$BASE" --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --expect "$BASE" --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 else
-  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --eflint --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
+  "$B" test test/eflint-corpus/tests test/eflint-corpus/examples --tolerate "$TOL" > "$OUT/corpus.log" 2>&1; st=$?
 fi
 step eflint-corpus $st "$(tail -1 "$OUT/corpus.log")"
 

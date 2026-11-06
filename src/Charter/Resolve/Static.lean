@@ -829,7 +829,12 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       withSpec s (ps.forM fun q => do let _ ← compilePhrase fuel q; pure ())
       return .scenario name ps spans
     | .setTime t => return .setTime (← convertTerm termFuel t .time)
-    | .tick => return .tick
+    | .tick =>
+      let s ← getSpec
+      if (s.findDecl "tick").isSome then
+        compilePhrase fuel (.trigger [] (.ref ⟨"tick", ""⟩))
+      else
+        return .tick
     | .expect w neg t =>
       let (t', ty) ← compileTerm termFuel t
       match ty with

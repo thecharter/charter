@@ -1,4 +1,33 @@
-// In `--eflint` mode Charter's keywords are not keywords, so an eFLINT program may use them as atoms; this file is run in Charter mode and so avoids them, while `Valid` as an atom is tested by the corpus baseline run.
-Fact mode Identified by Charter, EFLINT.
-+mode(Charter).
-?mode(Charter).
+// 002.9 (D17): One unified contextual grammar accepts Charter's single-word uppercase
+// words as unquoted atoms AND `tick` as an Event/Act identifier, alongside Charter
+// declarations (`Param`, `Immunity`, `Held(...) For ...`, `Scenario`) with no `--eflint` flag.
+Fact label Identified by Valid, Except, Due, Immunity, Against, Unless, Scenario, Document, Clause, Approved, Text, Norm, From, Module, Use, As, Param, Held.
+Fact party Identified by Alice.
+Param wait-time : Duration = 2.
+Fact stamp Identified by party.
+Act mark Actor party Holds when True Creates stamp(party).
+Act revoke-mark Actor party Recipient party Holds when Held(stamp(party)) For wait-time Terminates stamp(party).
+Immunity protect-mark Holder party Against revoke-mark Holds when label(Against) Unless label(Unless).
+
++label(Valid).
++label(Text).
++label(From).
++label(Against).
++label(Held).
+?label(Valid).
+?label(Text).
+?label(From).
+?label == Valid || label == Text || label == From || label == Against || label == Held.
+
+mark(Alice).
+@ 2.
+?!valid revoke-mark(Alice, Alice).
+
+Scenario event-tick-and-atoms {
+  Event tick Creates label(Scenario).
+  tick().
+  ?label(Scenario).
+  -label(Scenario).
+  tick.
+  ?label(Scenario).
+}

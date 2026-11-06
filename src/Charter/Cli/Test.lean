@@ -77,14 +77,38 @@ def readExpected (file : System.FilePath) : IO (List (String × Bool)) := do
     | "FAIL" :: p :: _ => some (p.takeWhile (· != ':'), false)
     | _ => none
 
-/-- Every backticked token ending in `.eflint`. -/
-def readTolerated (file : System.FilePath) : IO (List String) := do
+/-- Every backticked token ending in `.eflint` in a Markdown tolerance file. -/
+def readToleratedMd (file : System.FilePath) : IO (List String) := do
   let txt ← IO.FS.readFile file
   let parts := txt.splitOn "`"
   let rec pick : List String → Bool → List String
     | [], _ => []
     | s :: rest, inside => (if inside && s.endsWith ".eflint" then [s] else []) ++ pick rest (!inside)
   return pick parts false
+
+/-- Parse a machine-readable `tolerances.json` manifest (validating required schema keys)
+and verify parity with sibling `tolerances.md` when present, or read `tolerances.md` directly. -/
+def readTolerated (file : System.FilePath) : IO (List String) := do
+  if file.extension == some "json" then
+    let txt ← IO.FS.readFile file
+    let j ← IO.ofExcept (Json.parse txt)
+    let arr ← IO.ofExcept (j.getObjValAs? (Array Json) "tolerances")
+    let mut paths : List String := []
+    for entry in arr do
+      let fix ← IO.ofExcept (entry.getObjValAs? String "fixture")
+      let _ ← IO.ofExcept (entry.getObjValAs? String "decision")
+      let _ ← IO.ofExcept (entry.getObjValAs? String "eflintOutcome")
+      let _ ← IO.ofExcept (entry.getObjValAs? String "charterOutcome")
+      let _ ← IO.ofExcept (entry.getObjValAs? String "reason")
+      paths := paths ++ [fix]
+    let mdSibling := file.withExtension "md"
+    if ← mdSibling.pathExists then
+      let mdPaths := (← readToleratedMd mdSibling).filter (·.startsWith "test/")
+      if paths.any (fun p => !mdPaths.contains p) || mdPaths.any (fun p => !paths.contains p) then
+        throw (IO.userError s!"tolerance drift between {file} ({paths.length} entries) and {mdSibling} ({mdPaths.length} entries)")
+    return paths
+  else
+    readToleratedMd file
 
 def endsWithPath (full : String) (suffix : String) : Bool :=
   full == suffix || full.endsWith ("/" ++ suffix) || suffix.endsWith ("/" ++ full)

@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "upstreamVersion": "eflint-4.1.0.1",
+  "tolerances": [
+    {
+      "fixture": "test/eflint-corpus/tests/derivation-rules/deriv_sum1a.eflint",
+      "decision": "D6(a)",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Upstream Saturation.hs evaluates types in alphabetical order before dependencies saturate; Charter stratifies."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/derivation-rules/deriv_sum1b.eflint",
+      "decision": "D6(a)",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Upstream Saturation.hs evaluates types in alphabetical order before dependencies saturate; Charter stratifies."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/derivation-rules/from_not_enabled2.eflint",
+      "decision": "D6(a)",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Upstream Saturation.hs reads Enabled(read()) before read is derived; Charter stratifies."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/domain.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_Data_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_code_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_code_and_data_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_compute_to_data.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_infra_as_service.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_private.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_reproducible_science.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_sharing_code.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_sharing_data.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_sharing_results.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Scenarios/scenario_soft_as_ser.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/code_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/code_and_data_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/compute_to_data.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/data_TTP.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/infra_as_service.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/private_operation.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/reproducible_science.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/sharing_code.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/sharing_data.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/sharing_results.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/Templates/software_as_service.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Includes archetypes.eflint cyclic self-negation; rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-archetypes/archetypes.eflint",
+      "decision": "D6(b)",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Self-negating default rule rejected statically with CHR020."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/placeholders/with2.eflint",
+      "decision": "D13",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Upstream placeholder creation tags with alias instead of base type; Charter canonicalizes."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/homework-benchmark/caretaker_contract/template.eflint",
+      "decision": "D14",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Upstream GLL parser misparses When precedence over arithmetic comparison; Charter gives When lowest precedence."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/homework-benchmark/caretaker_contract/contract1.eflint",
+      "decision": "D14",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Includes caretaker_contract/template.eflint."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/homework-benchmark/caretaker_contract/test1.eflint",
+      "decision": "D14",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Includes caretaker_contract/template.eflint."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/homework-benchmark/caretaker_contract/test_homework.eflint",
+      "decision": "D14",
+      "eflintOutcome": "fails",
+      "charterOutcome": "passes",
+      "reason": "Includes caretaker_contract/template.eflint."
+    }
+  ]
+}
