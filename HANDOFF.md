@@ -5,6 +5,20 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-06: Kernel-unfoldable radix indexing (`DomMap`), `--scenario` filtering, and `CHR028`
+
+## Where
+
+- `main`, pushed directly alongside `thecharter/psa` (`~/psa`: 98 clauses, 765 declared types, 16 `Invariant`s, 24 `Scenario`s). `tools/battery`: PASS (all 12 steps green; `spec-conformance` 131/131).
+
+## What landed in `~/charter`
+
+- **Pure-structural 8-bit radix indexing (`DomMap`) & saturation fast-paths** (`Core/Spec.lean`, `Core/State.lean`, `Eval/Eval.lean`, `Eval/Interpreter.lean`, `Eval/Properties.lean`): replaces linear scans of `Spec.decls` and `State.entries` in `Eval` and `Saturate` with transient structural radix tries (`SpecIndex` / `StateIndex`) inside `Eval.Ctx` (leaving `Spec` and `State` `Repr` output unchanged for `Prove.LeanGen`), linearizes `M.bind` via `mapM` + `List.flatten`, skips `withSubs` on `True` domain constraints and empty `conditions`, and evaluates `.holdsWhen` guards before constructing product tuples on unconstrained domains. Cuts full `charter test ~/psa/psa.charter` runtime from 222.6s to 75.7s (3.0x speedup) with zero new axioms in `Eval/Properties.lean`.
+- **`--scenario <name>` filter on `charter run` and `charter test`** (`Cli/Run.lean`, `Cli/Test.lean`, `docs/spec/018_toolchain_and_cli.md`, `test/spec/spec_018_2_scenario_filter.charter`): repeatable `--scenario <name>` executes top-level declarations/genesis plus only the named scenario(s) (~3.8s on `psa.charter`), failing loudly with `CHR003` on unknown scenario names.
+- **`CHR028` warning on vacuous enumerable quantifiers** (`Resolve/Static.lean`, `docs/spec/010_expressions.md`, `docs/spec/diagnostics.md`, `test/spec/spec_010_6b_vacuous_enumerable_exists.eflint`): warns when `(Exists x: True/False)` or `(Forall x: True/False)` binds an enumerable type, catching the Cartesian-domain vs. holding-instance trap (`Exists f: f`) statically.
+
+---
+
 # Handoff — 2026-11-04: Pure-Charter PSA separation (`~/psa/psa.charter`) and language fixes
 
 ## Where

@@ -14,7 +14,7 @@ An expression denotes zero or more values: a term with free variables takes ever
 
 **10.5 `When`.** `e When c` is `e` where `c` holds and no value otherwise. `When`/`Where` has the lowest precedence and associates to the left (D14). `test/spec/spec_010_5_when.eflint`
 
-**10.6 Quantifiers.** `(Exists xs: e)` holds if some binding of `xs` makes `e` true; `(Forall xs: e)` if every binding does. `test/spec/spec_010_6_exists_forall.eflint`
+**10.6 Quantifiers.** `(Exists xs: e)` holds if some binding of `xs` makes `e` true; `(Forall xs: e)` if every binding does. When a binder ranges over an enumerable type and `e` is a constant boolean literal (`True` or `False`), resolution warns with CHR028 because the quantifier tests only whether the domain is non-empty rather than whether an instance holds (`Exists f: f`). `test/spec/spec_010_6_exists_forall.eflint`, `spec_010_6b_vacuous_enumerable_exists.eflint`
 
 **10.7 Aggregates.** `Count(Foreach xs: e)` is the number of values of `e`; `Sum`, `Max`, `Min` of integer values; `Max` and `Min` of no values are 0. `test/spec/spec_010_7_aggregates.eflint`
 

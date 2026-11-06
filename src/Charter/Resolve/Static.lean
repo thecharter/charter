@@ -217,6 +217,25 @@ def warnJudgedBinders (xs : List Var) : Stc Unit := do
     | some _ => warn "CHR025" s!"a binder over {d} sees only its assigned instances: the domain of {d} is not enumerable and its Holds when is judged per instance, never materialised (D15)"
     | none => pure ()
 
+/-- An `Exists` or `Forall` whose body is a constant `True`/`False` over an enumerable
+type ignores whether any instance holds and tests only whether the domain is non-empty;
+authors writing `Exists f: True` by analogy with non-enumerable `Fact`s almost always
+meant `Exists f: f`. CHR028 warns without changing eFLINT's meaning. -/
+def warnVacuousQuantifier (kw : String) (xs : List Var) (body : Term) : Stc Unit := do
+  match body with
+  | .boolLit b =>
+    let spec ← getSpec
+    xs.forM fun x => do
+      let d := spec.removeDecoration x
+      match spec.findDecl d with
+      | some t =>
+        if spec.enumerable t.domain then
+          let lit := if b then "True" else "False"
+          warn "CHR028" s!"`({kw} {x}: {lit})` ranges over every domain element of enumerable type {d}, ignoring whether {x} holds; write `({kw} {x}: {x})` to test holding instances"
+        else pure ()
+      | none => pure ()
+  | _ => pure ()
+
 mutual
 
 /-- Infer the type of a term and rewrite it into checked form (eFLINT `compile_term`). -/
@@ -300,8 +319,16 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       match ty with
       | .tagged _ => return (.enabled t', .bool)
       | _ => err "CHR015" s!"Enabled({t}) needs an instance, not {ty}"
-    | .exists_ xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .bool; return (.exists_ xs t', .bool)
-    | .forall_ xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .bool; return (.forall_ xs t', .bool)
+    | .exists_ xs t => do
+      warnJudgedBinders xs
+      let t' ← convertTerm fuel t .bool
+      warnVacuousQuantifier "Exists" xs t'
+      return (.exists_ xs t', .bool)
+    | .forall_ xs t => do
+      warnJudgedBinders xs
+      let t' ← convertTerm fuel t .bool
+      warnVacuousQuantifier "Forall" xs t'
+      return (.forall_ xs t', .bool)
     | .project t x => do
       let (t', ty) ← compileTerm fuel t
       match ty with

@@ -1,0 +1,11 @@
+// 010.6: `Exists f: True` over an enumerable type warns with CHR028 because it ranges
+// over every domain element rather than testing whether an instance of `f` holds.
+//! expect-warning: CHR028
+
+Fact member Identified by Alice, Bob
+Fact flagged Identified by member
+Predicate check-vacuous When (Exists flagged: True)
+.
+
+?check-vacuous().
+?!flagged(Alice).
