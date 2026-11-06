@@ -26,4 +26,4 @@
 
 **3.12 Static types.** Resolution gives every term one of: string, integer, boolean, or instance of a named type, and inserts the conversions of 010.4. A value where another type is needed, with no conversion, is CHR012.
 
-*Phase 2 still to come:* `Param` as a `Var` fact (D11).
+**3.13 `Evidenced` facts and confidentiality (`D22`, `G3.2`).** `Evidenced Fact x … [Confidential [To r₁, r₂]]` declares an open external-world fact tracked over the four-valued epistemic lattice (`Established`, `Refuted`, `Unresolved`, `Conflicted`, 004.11) rather than halting with `CHR100` when unassigned (`T06`, `T07`). Optional `Confidential [To r₁, …]` marks evidentiary nodes for `x` confidential in `ReasonGraph` explanations for callers outside `[r₁, …]` without altering any legal verdict (`T43`). `test/spec/spec_003_13_evidenced_unresolved.charter`, `spec_003_13b_evidence_non_evidenced_error.charter`, `spec_003_13c_evidenced_conflict_and_finding.charter`

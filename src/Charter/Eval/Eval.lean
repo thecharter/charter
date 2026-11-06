@@ -139,6 +139,37 @@ def assignedInstancesOf (d : DomId) : M (List Tagged × List Tagged) := ⟨fun c
           bucket.filterMap fun (te, i) => if !(i.live now) then some te else none)]
   else .ok [c.state.assignedInstances d]⟩
 
+def lookupEvidenceStatus (te : Tagged) : M EvidenceStatus := ⟨fun c _ =>
+  if c.indexed then
+    let direct? := ((c.stateIdx.lookup te.2).getD []).find? (·.1 == te) |>.map (·.2)
+    let posB := (c.stateIdx.lookup evFindingPosDom).getD []
+    let negB := (c.stateIdx.lookup evFindingNegDom).getD []
+    let supB := (c.stateIdx.lookup evSupportDom).getD []
+    let rebB := (c.stateIdx.lookup evRebutDom).getD []
+    .ok [State.evidenceStatusFromBuckets c.state.time te direct? posB negB supB rebB]
+  else .ok [c.state.evidenceStatus te]⟩
+
+def candidatesFromEvidenceOf (d : DomId) : M (List Tagged) := ⟨fun c _ =>
+  let now := c.state.time
+  let extract (bucket : List (Tagged × Info)) : List Tagged :=
+    bucket.filterMap fun (entryTe, i) =>
+      if i.live now then
+        match entryTe.1 with
+        | .prod [targetTe, _] => if targetTe.2 == d then some targetTe else none
+        | _ => none
+      else none
+  let posB := if c.indexed then (c.stateIdx.lookup evFindingPosDom).getD [] else c.state.contents.filter (·.1.2 == evFindingPosDom)
+  let supB := if c.indexed then (c.stateIdx.lookup evSupportDom).getD [] else c.state.contents.filter (·.1.2 == evSupportDom)
+  let direct := if c.indexed then
+    ((c.stateIdx.lookup d).getD []).filterMap fun (te, i) => if i.live now then some te else none
+  else c.state.trueInstances d
+  let raw := direct ++ extract posB ++ extract supB
+  let dedup := raw.foldl (fun acc te => if acc.any (· == te) then acc else acc ++ [te]) []
+  .ok [dedup]⟩
+
+def dedupUnmet (xs : List (Tagged × EvidenceStatus)) : List (Tagged × EvidenceStatus) :=
+  xs.foldl (fun acc p => if acc.any (fun q => q.1 == p.1 && q.2 == p.2) then acc else acc ++ [p]) []
+
 def substituteVar (x : Var) : M Tagged := do
   let spec ← getSpec
   match (← getSubs).find? (fun p => p.1 == x) with
@@ -217,7 +248,13 @@ def everyValidSubs : Nat → Var → M Tagged
         withSubs (Tagged.bindings dom te) (checkTrue (eval fuel filter))
         pure te
     else
-      if !tspec.isClosed then
+      if tspec.isEvidencedFact then
+        let cands ← candidatesFromEvidenceOf d
+        let est ← cands.filterM fun te => do
+          let st ← lookupEvidenceStatus te
+          pure (st == .established)
+        nd est
+      else if !tspec.isClosed then
         let (trues, falses) ← assignedInstancesOf d
         if trues.isEmpty && falses.isEmpty then err (.missingInput (.instances d)) else nd trues
       else
@@ -269,22 +306,26 @@ def isHolds : Nat → Tagged → M Bool
   | fuel + 1, te => do
     if !(← isValidInstance fuel te) then pure false
     else
-      let now ← getTime
-      match ← lookupState te with
-      | some i => pure (i.live now)
-      | none =>
-        let (tspec, _, judged) ← getTypeEntry te.2
-        match judged with
-        | some clauses =>
-          -- D15 (brief B11): an act or immunity whose domain is not enumerable is judged
-          -- for the instance asked about; its `Holds when` is read with the components bound,
-          -- as saturation would have read it had the domain been finite (004.1, 005.5).
-          withSubs (Tagged.bindings tspec.domain te) do
-            let rs ← results (do let c ← nd clauses; whenBool (eval fuel c) pure)
-            if rs.any id then satConditions fuel te else pure false
+      let (tspec, _, judged) ← getTypeEntry te.2
+      if tspec.isEvidencedFact then
+        let st ← lookupEvidenceStatus te
+        pure (st == .established)
+      else
+        let now ← getTime
+        match ← lookupState te with
+        | some i => pure (i.live now)
         | none =>
-          if !tspec.isClosed then err (.missingInput (.assignments [te]))
-          else pure false
+          match judged with
+          | some clauses =>
+            -- D15 (brief B11): an act or immunity whose domain is not enumerable is judged
+            -- for the instance asked about; its `Holds when` is read with the components bound,
+            -- as saturation would have read it had the domain been finite (004.1, 005.5).
+            withSubs (Tagged.bindings tspec.domain te) do
+              let rs ← results (do let c ← nd clauses; whenBool (eval fuel c) pure)
+              if rs.any id then satConditions fuel te else pure false
+          | none =>
+            if !tspec.isClosed then err (.missingInput (.assignments [te]))
+            else pure false
 termination_by structural n => n
 
 /-- Whether an act or event instance is enabled: it holds, its conditions hold,
@@ -294,11 +335,11 @@ instance of a named act sharing its bound components is enabled and valid. -/
 def isEnabled : Nat → Tagged → M Bool
   | 0, _ => err (.fuelExhausted "deciding whether an act is enabled")
   | fuel + 1, te => do
+    let spec ← getSpec
     let tspec ← getTypeSpec te.2
     match tspec.kind with
     | .act a =>
       if !a.exceptUnder.isEmpty then
-        let spec ← getSpec
         withSubs (Tagged.bindings tspec.domain te) do
           let subs ← getSubs
           let rs ← a.exceptUnder.mapM fun d' => do
@@ -308,6 +349,9 @@ def isEnabled : Nat → Tagged → M Bool
               if ← isEnabled fuel inst then isValid fuel inst else pure false
             pure (oks.any id)
           pure (rs.any id)
+      else if spec.hasEvidencedFacts then
+        let (lTri, _, _) ← evalActTri fuel te
+        pure (lTri == .yes)
       else if !(← isHolds fuel te) then pure false
       else if !(← satConditions fuel te) then pure false
       else
@@ -325,20 +369,25 @@ event or an act without `Valid when` is valid unless an immunity applies. -/
 def isValid : Nat → Tagged → M Bool
   | 0, _ => err (.fuelExhausted "deciding whether an act is valid")
   | fuel + 1, te => do
+    let spec ← getSpec
     let tspec ← getTypeSpec te.2
     match tspec.kind with
     | .act a =>
-      let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
-      if !(conds.all id) then pure false
+      if spec.hasEvidencedFacts then
+        let (_, vTri, _) ← evalActTri fuel te
+        pure (vTri == .yes)
       else
-        match tspec.domain, te.1, a.hasRecipient with
-        | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
-          let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
-          pure (!blocked)
-        | _, .prod (_ :: recipient :: _), true => do
-          let blocked ← immunityBlocks fuel te.2 recipient []
-          pure (!blocked)
-        | _, _, _ => pure true
+        let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
+        if !(conds.all id) then pure false
+        else
+          match tspec.domain, te.1, a.hasRecipient with
+          | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
+            let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
+            pure (!blocked)
+          | _, .prod (_ :: recipient :: _), true => do
+            let blocked ← immunityBlocks fuel te.2 recipient []
+            pure (!blocked)
+          | _, _, _ => pure true
     | _ => pure true
 termination_by structural n => n
 
@@ -429,6 +478,121 @@ def isViolated : Nat → Tagged → M Bool
     else evalViolationCondition fuel te ((← getSpec).findViolationCond te.2)
 termination_by structural n => n
 
+/-- Three-valued Kleene guard evaluation (`D22`, `G3.2`): propagates `undetermined` and
+collects `unmetEvidence` whenever an `Unresolved` or `Conflicted` `Evidenced` premise can
+influence the guard outcome (`T06`, `T07`). -/
+def evalTermTri : Nat → Term → M (TriBool × List (Tagged × EvidenceStatus))
+  | 0, _ => err (.fuelExhausted "evaluating three-valued guard")
+  | fuel + 1, t0 => do
+    match t0 with
+    | .boolLit b => pure (TriBool.ofBool b, [])
+    | .not a => do
+      let (va, ua) ← evalTermTri fuel a
+      pure (va.not, ua)
+    | .and a b => do
+      let (va, ua) ← evalTermTri fuel a
+      if va == .no then pure (.no, [])
+      else
+        let (vb, ub) ← evalTermTri fuel b
+        if vb == .no then pure (.no, [])
+        else if va == .yes && vb == .yes then pure (.yes, [])
+        else pure (.undetermined, dedupUnmet (ua ++ ub))
+    | .or a b => do
+      let (va, ua) ← evalTermTri fuel a
+      if va == .yes then pure (.yes, [])
+      else
+        let (vb, ub) ← evalTermTri fuel b
+        if vb == .yes then pure (.yes, [])
+        else if va == .no && vb == .no then pure (.no, [])
+        else pure (.undetermined, dedupUnmet (ua ++ ub))
+    | .present inner =>
+      whenTagged (eval fuel inner) fun te => do
+        let tspec ← getTypeSpec te.2
+        if tspec.isEvidencedFact then
+          if !(← isValidInstance fuel te) then pure (.no, [])
+          else
+            let st ← lookupEvidenceStatus te
+            match TriBool.ofEvidenceStatus st with
+            | .undetermined => pure (.undetermined, [(te, st)])
+            | v => pure (v, [])
+        else
+          let b ← isHolds fuel te
+          pure (TriBool.ofBool b, [])
+    | .exists_ xs body => do
+      let pairs ← results (scopeWith (everyValidSubs fuel) xs (evalTermTri fuel body))
+      if pairs.any (fun p => p.1 == .yes) then pure (.yes, [])
+      else if pairs.all (fun p => p.1 == .no) then pure (.no, [])
+      else pure (.undetermined, dedupUnmet (pairs.flatMap fun p => if p.1 == .undetermined then p.2 else []))
+    | .forall_ xs body => do
+      let pairs ← results (scopeWith (everyValidSubs fuel) xs (evalTermTri fuel body))
+      if pairs.any (fun p => p.1 == .no) then pure (.no, [])
+      else if pairs.all (fun p => p.1 == .yes) then pure (.yes, [])
+      else pure (.undetermined, dedupUnmet (pairs.flatMap fun p => if p.1 == .undetermined then p.2 else []))
+    | other =>
+      whenBool (eval fuel other) fun b => pure (TriBool.ofBool b, [])
+termination_by structural n => n
+
+/-- Three-valued `(lawfulTri, validTri, unmetEvidence)` judgment for an act instance (`D22`). -/
+def evalActTri : Nat → Tagged → M (TriBool × TriBool × List (Tagged × EvidenceStatus))
+  | 0, _ => err (.fuelExhausted "evaluating epistemic act judgment")
+  | fuel + 1, te => do
+    let tspec ← getTypeSpec te.2
+    match tspec.kind with
+    | .act a =>
+      let (vTri, vUnmet) ← withSubs (Tagged.bindings tspec.domain te) do
+        let ps ← a.validWhen.mapM (evalTermTri fuel)
+        let folded := ps.foldl (fun (accV, accU) (v, u) =>
+          let nv := TriBool.and accV v
+          (nv, if nv == .no then [] else accU ++ u)) (TriBool.yes, ([] : List (Tagged × EvidenceStatus)))
+        let immBlocked ← match tspec.domain, te.1, a.hasRecipient with
+          | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true =>
+            immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
+          | _, .prod (_ :: recipient :: _), true =>
+            immunityBlocks fuel te.2 recipient []
+          | _, _, _ => pure false
+        if immBlocked then pure (TriBool.no, []) else pure folded
+      let (lTri, lUnmet) ← (do
+        if !a.exceptUnder.isEmpty then
+          let b ← isEnabled fuel te
+          pure (TriBool.ofBool b, [])
+        else
+          let now ← getTime
+          match ← lookupState te with
+          | some i =>
+            if !(i.live now) then pure (TriBool.no, [])
+            else
+              let sc ← satConditions fuel te
+              pure (TriBool.ofBool sc, [])
+          | none =>
+            let hwTerms : List Term := tspec.derivation.filterMap fun
+              | .holdsWhen c => some c
+              | _ => none
+            if hwTerms.isEmpty then
+              let h ← isHolds fuel te
+              let sc ← if h then satConditions fuel te else pure false
+              pure (TriBool.ofBool (h && sc), [])
+            else
+              withSubs (Tagged.bindings tspec.domain te) do
+                let hps ← hwTerms.mapM (evalTermTri fuel)
+                let (hV, hU) := hps.foldl (fun (accV, accU) (v, u) =>
+                  let nv := TriBool.or accV v
+                  (nv, if nv == .yes then [] else accU ++ u)) (TriBool.no, ([] : List (Tagged × EvidenceStatus)))
+                if hV == .no then pure (TriBool.no, [])
+                else
+                  let cps ← tspec.conditions.mapM (evalTermTri fuel)
+                  let (cV, cU) := cps.foldl (fun (accV, accU) (v, u) =>
+                    let nv := TriBool.and accV v
+                    (nv, if nv == .no then [] else accU ++ u)) (hV, hU)
+                  let infos ← a.syncs.mapM (evalSync fuel [])
+                  if infos.flatten.any (·.forced) then pure (TriBool.no, [])
+                  else pure (cV, cU))
+      pure (lTri, vTri, dedupUnmet (lUnmet ++ vUnmet))
+    | _ =>
+      let en ← isEnabled fuel te
+      let vl ← isValid fuel te
+      pure (TriBool.ofBool en, TriBool.ofBool vl, [])
+termination_by structural n => n
+
 /-- What triggering an act or event instance does (eFLINT `instantiate_trans'`),
 with `done` guarding sync cycles. -/
 def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
@@ -436,12 +600,14 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
   | fuel + 1, done, te => do
     if done.contains te then empty
     else
+      let spec ← getSpec
       let tspec ← getTypeSpec te.2
-      let enabled ← isEnabled fuel te
       let actor : Option Tagged := match te.1 with
         | .prod (a :: _) => some a
         | _ => none
-      let doTransition (mActor : Option Tagged) (valid : Bool) (effects : List Effect) (ss : List Sync) (physical : Bool) : M TransInfo :=
+      let doTransition (mActor : Option Tagged) (enabled valid : Bool)
+          (lTri vTri : TriBool) (unmet : List (Tagged × EvidenceStatus))
+          (effects : List Effect) (ss : List Sync) (physical : Bool) : M TransInfo :=
         withSubs (Tagged.bindings tspec.domain te) do
           let syncInfos ← ss.mapM (evalSync fuel (te :: done))
           let syncInfos := syncInfos.flatten
@@ -452,16 +618,28 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
           let own : Store := (Store.unions stores).map fun (x, a) => (x, a.byAct te)
           let ass := Store.union own ssAss
           let disabled := anyF || !enabled
-          let forced := anyF || (!enabled && !physical)
-          pure (.mk te ass forced disabled valid mActor syncInfos)
+          let forced := anyF || (lTri == .no && !physical)
+          let finalLTri := if anyF then .no else lTri
+          pure (.mk te ass forced disabled valid mActor syncInfos finalLTri vTri unmet)
       match tspec.kind with
       | .fact _ => empty
       | .duty _ => empty
       | .immunity _ => empty
       | .act a => do
-        let valid ← isValid fuel te
-        doTransition actor valid a.effects a.syncs a.physical
-      | .event e => doTransition none true e.effects e.syncs true
+        if spec.hasEvidencedFacts then
+          let (lTri, vTri, unmet) ← evalActTri fuel te
+          let enabled := lTri == .yes
+          let valid := vTri == .yes
+          doTransition actor enabled valid lTri vTri unmet a.effects a.syncs a.physical
+        else
+          let enabled ← isEnabled fuel te
+          let valid ← isValid fuel te
+          let lTri := TriBool.ofBool enabled
+          let vTri := TriBool.ofBool valid
+          doTransition actor enabled valid lTri vTri [] a.effects a.syncs a.physical
+      | .event e => do
+        let enabled ← isEnabled fuel te
+        doTransition none enabled true (TriBool.ofBool enabled) .yes [] e.effects e.syncs true
 termination_by structural n => n
 
 def evalSync : Nat → List Tagged → Sync → M (List TransInfo)
@@ -481,6 +659,41 @@ def evalEffect : Nat → Effect → M Store
       pure (pairs.map fun (te, u) => (te, .holdsTrue (some u) none))
     | .tAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse none))
     | .oAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
+    | .evOp .support xs t src => do
+      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map fun te => ((.prod [te, (.str src, "string")], evSupportDom), .holdsTrue none none))
+    | .evOp .rebut xs t src => do
+      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map fun te => ((.prod [te, (.str src, "string")], evRebutDom), .holdsTrue none none))
+    | .evOp .retract xs t src => do
+      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
+      let state ← getState
+      let entries := tes.flatMap fun te =>
+        if !src.isEmpty then
+          [ ((.prod [te, (.str src, "string")], evSupportDom), Assignment.holdsFalse none),
+            ((.prod [te, (.str src, "string")], evRebutDom), Assignment.holdsFalse none) ]
+        else
+          state.contents.filterMap fun (entryTe, i) =>
+            if (entryTe.2 == evSupportDom || entryTe.2 == evRebutDom) && i.live state.time then
+              match entryTe.1 with
+              | .prod [targetTe, _] => if targetTe == te then some (entryTe, Assignment.holdsFalse none) else none
+              | _ => none
+            else none
+      pure entries
+    | .findingOp pol xs t std => do
+      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
+      let state ← getState
+      let posDom := if pol then evFindingPosDom else evFindingNegDom
+      let oppDom := if pol then evFindingNegDom else evFindingPosDom
+      let entries := tes.flatMap fun te =>
+        let clearOpp := state.contents.filterMap fun (entryTe, i) =>
+          if entryTe.2 == oppDom && i.live state.time then
+            match entryTe.1 with
+            | .prod [targetTe, _] => if targetTe == te then some (entryTe, Assignment.holdsFalse none) else none
+            | _ => none
+          else none
+        ((.prod [te, (.str std, "string")], posDom), Assignment.holdsTrue none none) :: clearOpp
+      pure entries
 termination_by structural n => n
 
 /-- Evaluate a checked term to its values (eFLINT `eval`). -/
@@ -554,6 +767,9 @@ def eval : Nat → Term → M Value
           | none => pure (.bool false)))
     | .violated t => whenTagged (eval fuel t) (fun te => .bool <$> isViolated fuel te)
     | .enabled t => whenTagged (eval fuel t) (fun te => .bool <$> isEnabled fuel te)
+    | .evStatus want t => whenTagged (eval fuel t) (fun te => do
+        let st ← lookupEvidenceStatus te
+        pure (.bool (st == want)))
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

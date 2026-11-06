@@ -1,0 +1,32 @@
+// 003.13, 004.11, 011.14 (T06): an unassigned `Evidenced` fact starts `Unresolved`,
+// never halts evaluation with `CHR100`, propagates 3-valued `undetermined` to a guarded
+// `Power` (`?undetermined`), and supports explicit fallback rules over `Unresolved(...)`.
+// Also verifies all new G3.2 contextual words remain usable as unquoted eFLINT atoms (`D17`).
+Fact legacy-atom-compat Identified by Evidenced, Finding, Established, Refuted, Unresolved, Conflicted, SubmitEvidence, RetractEvidence, Note, Confidential, Standard, Resolves.
+Fact officer Identified by Off1.
+Fact applicant Identified by App1.
+Evidenced Fact related-party Identified by applicant.
+Fact review-required Identified by applicant
+  Holds when Unresolved(related-party(applicant)).
+Fact loan-approved Identified by applicant.
+
+Power approve-loan Actor officer Related to applicant
+  Holds when !related-party(applicant)
+  Valid when !related-party(applicant)
+  Creates loan-approved(applicant).
+
+Scenario unresolved-related-party {
+  ?Unresolved(related-party(App1)).
+  ?review-required(App1).
+  ?undetermined approve-loan(Off1, App1).
+  ?!valid approve-loan(Off1, App1).
+  approve-loan(Off1, App1).
+  ?!loan-approved(App1).
+  SubmitEvidence !related-party(App1) By "registry-cert".
+  ?Refuted(related-party(App1)).
+  ?!review-required(App1).
+  ?!undetermined approve-loan(Off1, App1).
+  ?valid approve-loan(Off1, App1).
+  approve-loan(Off1, App1).
+  ?loan-approved(App1).
+}

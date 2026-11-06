@@ -61,5 +61,21 @@ check_case "t31-unbounded-liveness-requires-fairness" 3 "^INCONCLUSIVE.*T31" \
 check_case "t31b-weak-until-holds" 0 "^ok " \
   "$B" verify --backend finite --mode lawful --depth 3 test/verify/t31b_temporal_valid.charter
 
+# 8. T43 (G3.2): Audience-scoped ReasonGraph redaction hides confidential evidence without changing verdict
+pub_out=$("$B" explain "release-wire(Off1, Acc1)" test/spec/spec_004_12_reasongraph_redaction.charter --audience public 2>&1); pub_st=$?
+if [ "$pub_st" -eq 0 ] && printf '%s\n' "$pub_out" | grep -qE 'lawful=yes.*valid=yes.*redacted=1' \
+   && printf '%s\n' "$pub_out" | grep -q '\[REDACTED:' \
+   && ! printf '%s\n' "$pub_out" | grep -q 'secret-escrow-bank-ref-991'; then
+  echo "ok   t43-explain-public-redacts-confidential-source (exit 0)"
+  pass=$((pass+1))
+else
+  echo "FAIL t43-explain-public-redacts-confidential-source"
+  printf '%s\n' "$pub_out" | sed 's/^/     /'
+  fail=$((fail+1))
+fi
+
+check_case "t43-explain-auditor-authorized-reveals-source" 0 'secret-escrow-bank-ref-991' \
+  "$B" explain "release-wire(Off1, Acc1)" test/spec/spec_004_12_reasongraph_redaction.charter --audience auditor
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

@@ -251,6 +251,19 @@ def unary : Nat → P Term
         let d ← addExpr fuel
         return .heldFor t d
       else postfixExpr fuel
+    | .atom "Established" | .atom "Refuted" | .atom "Unresolved" | .atom "Conflicted" =>
+      if (← peekAt 1) == .kw "(" then
+        let want : EvidenceStatus := match ← peek with
+          | .atom "Established" => .established
+          | .atom "Refuted"     => .refuted
+          | .atom "Unresolved"  => .unresolved
+          | _                   => .conflicted
+        advance
+        expectKw "("
+        let t ← expr fuel
+        expectKw ")"
+        return .evStatus want t
+      else postfixExpr fuel
     | _ => postfixExpr fuel
 
 def postfixExpr : Nat → P Term
@@ -524,8 +537,15 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Module", "Use", "Param", "Property", "Power"].contains s then
+    if ["Immunity", "Module", "Use", "Param", "Property", "Power", "Finding"].contains s then
       return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
+    else if s == "Evidenced" then
+      let t1 ← peekAt (idx + 1)
+      let t2 ← peekAt (idx + 2)
+      return (match t1, t2 with
+        | .kw "Fact", _ | .kw "Var", _ | .kw "Function", _ | .kw "Bool", _ => true
+        | .kw "Open", .kw "Fact" | .kw "Open", .kw "Var" | .kw "Open", .kw "Function" | .kw "Open", .kw "Bool" => true
+        | _, _ => false)
     else if s == "Document" then
       let t1 ← peekAt (idx + 1)
       let t2 ← peekAt (idx + 2)
@@ -628,6 +648,37 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Except under" =>
     if k != .act then return none
     advance; return some (.exceptUnder (← idList))
+  | .atom "Confidential" =>
+    if k != .fact then return none
+    advance
+    if ← isCtxAtom "To" then
+      advance
+      let auds ← sepBy1 (do match ← peek with
+        | .ident s | .atom s | .str s => advance; return s
+        | kk => fail "CHR003" s!"expected audience identifier after `Confidential To` but found {kk.describe}") "," 100
+      return some (.confidential auds)
+    else return some (.confidential [])
+  | .atom "Resolves" =>
+    if k != .act then return none
+    advance
+    let neg ← optKw "!"
+    let target ← expression
+    return some (.resolves (!neg) target)
+  | .atom "Standard" =>
+    if k != .act then return none
+    advance
+    match ← peek with
+    | .ident s | .atom s | .str s => advance; return some (.standard s)
+    | kk => fail "CHR003" s!"expected standard name after `Standard` but found {kk.describe}"
+  | .atom "Supports" | .atom "Rebuts" | .atom "Retracts" =>
+    if k != .act then return none
+    let op : EvidenceOp := match ← peek with
+      | .atom "Supports" => .support
+      | .atom "Rebuts"   => .rebut
+      | _                => .retract
+    advance
+    let ts ← sepBy1 optForeach "," 1000
+    return some (.evEffect op ts)
   | .atom "Against" | .kw "Against" =>
     if k != .immunity then return none
     advance; return some (.against (← idList))
@@ -658,11 +709,18 @@ def clauses (k : FrameKind) : Nat → P (List ModClause)
     | some c => return c :: (← clauses k fuel)
     | none => return []
 
-def openness : P Bool := do
+def openness : P (Bool × Bool) := do
   match ← peek with
-  | .kw "Closed" => advance; return true
-  | .kw "Open" => advance; return false
-  | _ => return true
+  | .kw "Closed" => advance; return (true, false)
+  | .kw "Open" =>
+    advance
+    if ← isCtxAtom "Evidenced" then advance; return (false, true)
+    else return (false, false)
+  | .atom "Evidenced" =>
+    advance
+    let _ ← optKw "Open"
+    return (false, true)
+  | _ => return (true, false)
 
 def domainConstraint : P Term := do
   match ← peek with
@@ -673,10 +731,10 @@ def relatedTo : P (List Var) := do
   if ← isKw "Related to" then advance; vars else return []
 
 def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId) (dom : Domain)
-    (filter : Term) (cls : List ModClause) : List Decl :=
-  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor }, domain := dom,
+    (filter : Term) (cls : List ModClause) (isEv : Bool := false) : List Decl :=
+  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor, evidenced := isEv }, domain := dom,
                   domainConstraint := filter, restriction := restr, derivation := [],
-                  closed := if isClosed then none else some false, conditions := [] },
+                  closed := if isClosed && !isEv then none else some false, conditions := [] },
     .typeExt d cls ]
 
 /-- `: Int | Time | Duration` after a `Param` name; `Int` when absent. -/
@@ -742,7 +800,7 @@ def moduleBody : Nat → P (List Decl)
 def frame : Nat → P (List Decl)
   | 0 => fail "CHR003" "declarations nest too deeply"
   | fuel + 1 => do
-  let isClosed ← openness
+  let (isClosed, isEv) ← openness
   match ← peek with
   | .kw "Fact" | .kw "Var" | .kw "Function" =>
     let restr : Option Restriction ← (do match ← peek with
@@ -753,12 +811,12 @@ def frame : Nat → P (List Decl)
     let dom ← (do if ← isKw "Identified by" then advance; typeExpr else return .anyString)
     let filter ← domainConstraint
     let cls ← clauses .fact 1000
-    return mkFact false false isClosed restr d dom filter cls
+    return mkFact false false isClosed restr d dom filter cls isEv
   | .kw "Bool" =>
     advance
     let d ← ident
     let cls ← clauses .fact 1000
-    return mkFact false false isClosed none d (.products []) (.boolLit true) cls
+    return mkFact false false isClosed none d (.products []) (.boolLit true) cls isEv
   | .kw "Predicate" | .kw "Invariant" =>
     let inv := (← peek) == .kw "Invariant"
     advance
@@ -770,8 +828,10 @@ def frame : Nat → P (List Decl)
     let fs ← fromClauses 100
     return mkFact inv false true none d (.products []) (.boolLit true)
       (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s))
-  | .kw "Act" | .atom "Power" | .kw "Power" =>
-    let isPow := (← peek) != .kw "Act"
+  | .kw "Act" | .atom "Power" | .kw "Power" | .atom "Finding" | .kw "Finding" =>
+    let cur ← peek
+    let isFind := cur == .atom "Finding" || cur == .kw "Finding"
+    let isPow := isFind || cur != .kw "Act"
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -781,7 +841,7 @@ def frame : Nat → P (List Decl)
     let filter ← domainConstraint
     let cls ← clauses .act 1000
     let actorV := actor.getD ⟨"actor", ""⟩
-    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow },
+    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind },
                            domain := .products (actorV :: (recip.toList ++ objs)),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
@@ -840,9 +900,10 @@ def frame : Nat → P (List Decl)
     | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000) "Fact"]
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Act"]
     | .atom "Power" | .kw "Power" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Power"]
+    | .atom "Finding" | .kw "Finding" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Finding"]
     | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000) "Event"]
     | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000) "Duty"]
-    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Power`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
+    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Power`, `Finding`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
   | .kw "Placeholder" =>
     advance
     let f ← ident
@@ -945,6 +1006,7 @@ end
 def startsFrame : P Bool := do
   match ← peek with
   | .kw "Open" | .kw "Closed" => isFrameHeadAt 1
+  | .atom "Evidenced" => isFrameHeadAt 0
   | _ => isFrameHeadAt 0
 
 def declarations : Nat → P (List Decl)
@@ -954,6 +1016,21 @@ def declarations : Nat → P (List Decl)
     if ← startsFrame then return ds ++ (← declarations fuel) else return ds
 
 /-! ## Phrases -/
+
+def optBySource : P String := do
+  if ← isCtxAtom "By" then
+    advance
+    match ← peek with
+    | .str s | .atom s | .ident s => advance; return s
+    | k => fail "CHR003" s!"expected evidence source after `By` but found {k.describe}"
+  else return ""
+
+def optTriggerNote : P (Option String) := do
+  if ← isCtxAtom "Note" then
+    match ← peekAt 1 with
+    | .str s => advance; advance; return some s
+    | _ => return none
+  else return none
 
 def phrase : P Phrase := do
   if ← startsFrame then return .decls (← declarations 10000)
@@ -968,19 +1045,40 @@ def phrase : P Phrase := do
   | .kw "?lawful" => advance; return .expect .lawful false (← expression)
   | .kw "?valid" => advance; return .expect .valid false (← expression)
   | .kw "?violated" => advance; return .expect .violated false (← expression)
+  | .kw "?undetermined" => advance; return .expect .undetermined false (← expression)
   | .kw "?!lawful" => advance; return .expect .lawful true (← expression)
   | .kw "?!valid" => advance; return .expect .valid true (← expression)
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
+  | .kw "?!undetermined" => advance; return .expect .undetermined true (← expression)
   | .kw "@" => advance; return .setTime (← expression)
+  | .atom "SubmitEvidence" =>
+    let t1 ← peekAt 1
+    if (match t1 with | .kw "!" | .ident _ | .kw "(" => true | _ => false) then
+      advance
+      let neg ← optKw "!"
+      let t ← expression
+      let src ← optBySource
+      return .submitEvidence (!neg) t src
+    else
+      let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
+  | .atom "RetractEvidence" =>
+    let t1 ← peekAt 1
+    if (match t1 with | .ident _ | .kw "(" => true | _ => false) then
+      advance
+      let t ← expression
+      let src ← optBySource
+      return .retractEvidence t src
+    else
+      let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
   | .ident "tick" | .kw "tick" =>
     let next ← peekAt 1
     if next == .kw "." || next == .kw "}" || next == .eof then
       advance; return .tick
     else
-      let (xs, t) ← optForeach; return .trigger xs t
+      let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
   | .kw "?why" => advance; return .why (← expression)
-  | .kw "!" => advance; let (xs, t) ← optForeach; return .trigger xs t
-  | _ => let (xs, t) ← optForeach; return .trigger xs t
+  | .kw "!" => advance; let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
+  | _ => let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
 
 /-- The body of `Scenario name { … }`: phrases and parallel blocks, as at top level. -/
 def scenarioBody : Nat → P (List Phrase)

@@ -195,6 +195,38 @@
       "summary": "Every institutional Power declaration in a WellFormed CIR Spec carries a non-empty Valid when competence condition (005.10, D21, G3.1)."
     },
     {
+      "id": "evidence.tribool_conservative",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Evidence.lean",
+      "symbol": "triBool_classical_conservative",
+      "summary": "Strong Kleene three-valued guard evaluation (yes, no, undetermined) is a strict conservative extension of classical two-valued Bool with De Morgan duality (D22, G3.2)."
+    },
+    {
+      "id": "evidence.finding_resolves_conflict",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Evidence.lean",
+      "symbol": "finding_resolves_conflict",
+      "summary": "A valid institutional Finding resolves prior Conflicted supporting and rebutting evidence to Established (Mission Law 3, D22, T07)."
+    },
+    {
+      "id": "evidence.reasongraph_redaction_preserves_verdict",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Evidence.lean",
+      "symbol": "redactForAudience_preserves_verdict",
+      "summary": "Audience-scoped confidential evidence redaction in ReasonGraph never alters lawful or valid verdicts (D22, T43)."
+    },
+    {
+      "id": "eval.advisory_note_irrelevant",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Transition.lean",
+      "symbol": "advisory_note_irrelevant",
+      "summary": "Extralegal advisory Note annotations on trigger phrases never alter post-state Config or emitted transition judgments (D22, T04)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

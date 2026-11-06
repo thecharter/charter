@@ -5,6 +5,7 @@ import Charter.Cli.Fmt
 import Charter.Cli.Build
 import Charter.Cli.Explore
 import Charter.Cli.Verify
+import Charter.Cli.Explain
 
 /-!
 # Charter.Cli.Main — Standalone Command-Line Dispatcher
@@ -27,6 +28,7 @@ def helpText : String :=
   "  test    <file.charter | dir> ...        run scenarios, provenance checks, and invariant exploration\n" ++
   "  explore [flags] <file.charter> ...      explore lawful, adversarial, or mixed state spaces\n" ++
   "  verify  [flags] <file.charter> ...      verify invariants & temporal properties (finite, smt, inductive)\n" ++
+  "  explain <expr> <file.charter> [flags]   emit audience-scoped ReasonGraph with counterfactuals\n" ++
   "  trace   <clause-id> <file.charter>      print the verbatim span table for a clause\n" ++
   "  prove   <file.charter> ...              decide claims and invariants in the proof kernel (see --show-checker)\n" ++
   "  repl    [file.charter]                  interactive institutional session\n" ++
@@ -51,6 +53,7 @@ def main (args : List String) : IO UInt32 := do
   | "test" :: rest => testCommand rest
   | "explore" :: rest => exploreCommand rest
   | "verify" :: rest => verifyCommand rest
+  | "explain" :: rest => explainCommand rest
   | "trace" :: cid :: rest => traceCommand cid rest
   | ["trace"] =>
     IO.eprintln "usage: charter trace <clause-id> <file.charter>"

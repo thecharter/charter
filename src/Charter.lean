@@ -29,6 +29,7 @@ import Charter.Surface.Lexer
 import Charter.Surface.Ast
 import Charter.Surface.Parser
 import Charter.Surface.Pretty
+import Charter.Core.Evidence
 import Charter.Core.Term
 import Charter.Core.Intern
 import Charter.Core.Spec
@@ -60,6 +61,7 @@ import Charter.Cli.Fmt
 import Charter.Cli.Build
 import Charter.Cli.Explore
 import Charter.Cli.Verify
+import Charter.Cli.Explain
 import Charter.Cli.Main
 
 /-!

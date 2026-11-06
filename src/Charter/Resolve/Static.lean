@@ -40,13 +40,17 @@ inductive CPhrase where
   | par (ps : List CPhrase)
   /-- Charter: a scenario's phrases are resolved when `check` or `test` runs them. -/
   | scenario (name : String) (ps : List Phrase) (spans : List (ClauseId × String) := [])
-  /-- Charter: `?lawful`/`?valid`/`?violated` over the instances of `t`, `xs` bound to every instance. -/
+  /-- Charter: `?lawful`/`?valid`/`?violated`/`?undetermined` over the instances of `t`, `xs` bound to every instance. -/
   | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
   /-- Charter (D7): `@ t.` and `tick.`, the clock as environment input. -/
   | setTime (t : Term)
   | tick
   /-- Charter (Law 6): `?why e`, `xs` bound to every instance. -/
   | why (xs : List Var) (t : Term)
+  /-- Charter (D22, G3.2): `SubmitEvidence [!]e [By src].` -/
+  | submitEvidence (polarity : Bool) (xs : List Var) (t : Term) (src : String := "")
+  /-- Charter (D22, G3.2): `RetractEvidence e [By src].` -/
+  | retractEvidence (xs : List Var) (t : Term) (src : String := "")
   deriving Repr, Inhabited
 
 namespace Resolve
@@ -125,7 +129,7 @@ def freeVars (spec : Spec) : Term → List Var
         union (diff xs named) (freeVarsArgs spec args)
       | _ => freeVarsArgs spec args
     | none => freeVarsArgs spec args
-  | .not t | .present t | .violated t | .enabled t | .project t _ | .tag t _ | .untag t => freeVars spec t
+  | .not t | .present t | .violated t | .enabled t | .evStatus _ t | .project t _ | .tag t _ | .untag t => freeVars spec t
   | .heldFor t d => union (freeVars spec t) (freeVars spec d)
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
   | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b => union (freeVars spec a) (freeVars spec b)
@@ -319,6 +323,17 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       match ty with
       | .tagged _ => return (.enabled t', .bool)
       | _ => err "CHR015" s!"Enabled({t}) needs an instance, not {ty}"
+    | .evStatus want t => do
+      let (t', ty) ← compileTerm fuel t
+      match ty with
+      | .tagged d =>
+        let spec ← getSpec
+        match spec.findDecl d with
+        | some ts =>
+          if ts.isEvidencedFact then return (.evStatus want t', .bool)
+          else err "CHR033" s!"{want.kwName}({t}) targets `{d}`, which is not declared `Evidenced`"
+        | none => err "CHR010" s!"undeclared type `{d}`"
+      | _ => err "CHR015" s!"{want.kwName}({t}) needs an `Evidenced` fact instance, not {ty}"
     | .exists_ xs t => do
       warnJudgedBinders xs
       let t' ← convertTerm fuel t .bool
@@ -525,6 +540,18 @@ def compileEffect' (mk : List Var → Term → Effect) (bound xs : List Var) (t 
   warnJudgedBinders (xs ++ diff fs (bound ++ xs))
   return mk (xs ++ diff fs (bound ++ xs)) t'
 
+def checkEvidencedTarget (what : String) (t : Term) : Stc Term := do
+  let (t', ty) ← compileTerm termFuel t
+  match ty with
+  | .tagged d =>
+    let spec ← getSpec
+    match spec.findDecl d with
+    | some ts =>
+      if ts.isEvidencedFact then return t'
+      else err "CHR033" s!"`{what}` targets `{d}`, which is not declared `Evidenced`"
+    | none => err "CHR010" s!"undeclared type `{d}` in `{what}`"
+  | _ => err "CHR015" s!"`{what}` needs an `Evidenced` fact instance, not {ty}"
+
 def compileEffect (bound : List Var) : Effect → Stc Effect
   | .cAll xs t none => compileEffect' (fun xs t => .cAll xs t none) bound xs t
   | .cAll xs t (some d) => do
@@ -534,6 +561,12 @@ def compileEffect (bound : List Var) : Effect → Stc Effect
     compileEffect' (fun ys t => .cAll (ys ++ diff dfs (bound ++ ys)) t (some d')) bound xs t
   | .tAll xs t => compileEffect' .tAll bound xs t
   | .oAll xs t => compileEffect' .oAll bound xs t
+  | .evOp op xs t src => do
+    let _ ← checkEvidencedTarget "Supports/Rebuts/Retracts" t
+    compileEffect' (fun ys u => .evOp op ys u src) bound xs t
+  | .findingOp pol xs t std => do
+    let _ ← checkEvidencedTarget "Resolves" t
+    compileEffect' (fun ys u => .findingOp pol ys u std) bound xs t
 
 def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Derivation
   | .holdsWhen t => do
@@ -677,6 +710,20 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .against as => checkActs "Against" as; return [(ty, [.against as])]
       | .unlessCond ts => return [(ty, [.unlessCond (← ts.mapM (convertPrecon ty tspec))])]
       | .fromSpan c text => return [(ty, [.fromSpan c text])]
+      | .evidenced => return [(ty, [.evidenced])]
+      | .confidential auds => return [(ty, [.confidential auds])]
+      | .resolves pol target =>
+        let t' ← checkEvidencedTarget "Resolves" target
+        let std := (clauses.findSome? fun | .standard s => some s | _ => none).getD "default"
+        let eff ← compileEffect' (fun ys u => .findingOp pol ys u std) xs [] target
+        return [(ty, [.resolves pol t', .postCond [eff]])]
+      | .standard s => return [(ty, [.standard s])]
+      | .evEffect op ts =>
+        let opLabel := match op with | .support => "Supports" | .rebut => "Rebuts" | .retract => "Retracts"
+        let effs ← ts.mapM fun (fxs, tm) => do
+          let _ ← checkEvidencedTarget opLabel tm
+          compileEffect' (fun ys u => .evOp op ys u ty) xs fxs tm
+        return [(ty, [.postCond effs])]
       | .dueWithin d =>
         -- a requirement duty: violated once it has been held for `d` (006.7)
         match tspec.kind with
@@ -805,7 +852,8 @@ def executeDecls (ds : List Decl) : Stc Store := do
       match finalSpec.lookupDecl ty with
       | some { kind := .act a, .. } =>
         if a.validWhen.isEmpty then
-          err "CHR032" s!"Power {ty}: an institutional `Power` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
+          let kw := if a.isFinding then "Finding" else "Power"
+          err "CHR032" s!"{kw} {ty}: an institutional `{kw}` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
       | _ => pure ()
     | _ => pure ()
   return init
@@ -835,7 +883,7 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
   | 0, _ => err "CHR003" "phrase too deeply nested"
   | fuel + 1, p => do
     match p with
-    | .trigger xs t => let (xs', t') ← compileTransTerm xs t; return .trigger xs' t'
+    | .trigger xs t _ => let (xs', t') ← compileTransTerm xs t; return .trigger xs' t'
     | .create xs t => let (xs', t') ← compileTransTerm xs t; return .create xs' t'
     | .terminate xs t => let (xs', t') ← compileTransTerm xs t; return .terminate xs' t'
     | .obfuscate xs t => let (xs', t') ← compileTransTerm xs t; return .obfuscate xs' t'
@@ -853,6 +901,14 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
         let fs ← freeVarsChecked t'
         return .why fs t'
       | _ => err "CHR015" s!"?why needs an instance, not {ty}"
+    | .submitEvidence pol t src =>
+      let t' ← checkEvidencedTarget "SubmitEvidence" t
+      let fs ← freeVarsChecked t'
+      return .submitEvidence pol fs t' src
+    | .retractEvidence t src =>
+      let t' ← checkEvidencedTarget "RetractEvidence" t
+      let fs ← freeVarsChecked t'
+      return .retractEvidence fs t' src
     | .scenario name ps spans =>
       modifySpec (fun s => s.insertScenario name spans)
       let s ← getSpec

@@ -54,23 +54,34 @@ def RunStats.ok (s : RunStats) (denyWarnings : Bool := false) : Bool :=
 
 def yesNo (b : Bool) : String := if b then "yes" else "no"
 
-/-- Render a transition tree as eFLINT's `showTriggerTree` does, with the three answers. -/
+/-- Render a transition tree as eFLINT's `showTriggerTree` does, with the three answers
+(including three-valued `undetermined` and `unmetEvidence` when `Evidenced` facts apply, `D22`). -/
 def renderTrans (info : TransInfo) (indent : String) (fuel : Nat) : List String :=
   match fuel with
   | 0 => []
   | fuel + 1 =>
     let kind := if info.isAction then "act" else "event"
-    let lawful := if info.isAction then s!"   lawful: {yesNo (!info.disabled)}" else ""
-    let head := s!"{indent}occurred {kind} {info.tagged}{lawful}   valid: {yesNo info.valid}"
+    let lawfulStr := if info.lawfulTri == .undetermined then "undetermined" else yesNo (!info.disabled)
+    let validStr := if info.validTri == .undetermined then "undetermined" else yesNo info.valid
+    let lawful := if info.isAction then s!"   lawful: {lawfulStr}" else ""
+    let unmet := if info.unmetEvidence.isEmpty then ""
+      else "   unmet-evidence: " ++ ", ".intercalate (info.unmetEvidence.map fun (te, st) => s!"{te.pp} ({st.asString})")
+    let head := s!"{indent}occurred {kind} {info.tagged}{lawful}   valid: {validStr}{unmet}"
     head :: info.syncs.flatMap (renderTrans · (indent ++ "  ") fuel)
 
 def transJson (info : TransInfo) (fuel : Nat) : Json :=
   match fuel with
   | 0 => Json.null
   | fuel + 1 =>
+    let unmetPart := if info.unmetEvidence.isEmpty && info.lawfulTri != .undetermined && info.validTri != .undetermined then []
+      else [("lawfulStatus", Json.str info.lawfulTri.asString),
+            ("validStatus", Json.str info.validTri.asString),
+            ("unmetEvidence", Json.arr (info.unmetEvidence.map fun (te, st) =>
+              Json.mkObj [("fact", Json.str te.pp), ("status", Json.str st.asString)]).toArray)]
     Json.mkObj ([("act", Json.str info.tagged.pp), ("kind", Json.str (if info.isAction then "act" else "event")),
       ("occurred", Json.bool true), ("valid", Json.bool info.valid)] ++
       (if info.isAction then [("lawful", Json.bool (!info.disabled))] else []) ++
+      unmetPart ++
       [("syncs", Json.arr (info.syncs.map (transJson · fuel)).toArray)])
 
 def renderViolation : Violation → String

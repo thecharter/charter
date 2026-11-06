@@ -1,0 +1,52 @@
+// 003.13, 005.11 (T07): supporting + contrary evidence produces `Conflicted`; a void
+// `Finding` leaves `Conflicted` unchanged; a valid `Finding ... Resolves ... Standard ...`
+// resolves `Conflicted` to `Established` and unlocks dependent institutional competence.
+Fact custodian Identified by Cust1.
+Fact accountant Identified by Acct1.
+Fact court Identified by Judge1.
+Fact account Identified by Acc1.
+Fact party Identified by Alice.
+Fact court-quorum Identified by court.
+Evidenced Fact beneficial-owner Identified by account * party.
+Fact payout-cleared Identified by account * party.
+
+Act report-owner Actor custodian Related to account, party
+  Holds when True
+  Supports beneficial-owner(account, party).
+
+Act dispute-owner Actor accountant Related to account, party
+  Holds when True
+  Rebuts beneficial-owner(account, party).
+
+Finding adjudicate-owner Actor court Related to account, party
+  Resolves beneficial-owner(account, party)
+  Standard preponderance
+  Holds when Conflicted(beneficial-owner(account, party))
+  Valid when court-quorum(court).
+
+Power release-payout Actor custodian Related to account, party
+  Holds when beneficial-owner(account, party)
+  Valid when beneficial-owner(account, party)
+  Creates payout-cleared(account, party).
+
+Scenario conflict-escalated-to-finding {
+  report-owner(Cust1, Acc1, Alice).
+  ?Established(beneficial-owner(Acc1, Alice)).
+  dispute-owner(Acct1, Acc1, Alice).
+  ?Conflicted(beneficial-owner(Acc1, Alice)).
+  ?undetermined release-payout(Cust1, Acc1, Alice).
+  ?!valid release-payout(Cust1, Acc1, Alice).
+  // Void finding (no quorum) must NOT resolve the conflict:
+  ?!valid adjudicate-owner(Judge1, Acc1, Alice).
+  adjudicate-owner(Judge1, Acc1, Alice).
+  ?Conflicted(beneficial-owner(Acc1, Alice)).
+  // Quorum established -> valid Finding resolves under `preponderance`:
+  +court-quorum(Judge1).
+  ?valid adjudicate-owner(Judge1, Acc1, Alice).
+  adjudicate-owner(Judge1, Acc1, Alice).
+  ?Established(beneficial-owner(Acc1, Alice)).
+  ?!undetermined release-payout(Cust1, Acc1, Alice).
+  ?valid release-payout(Cust1, Acc1, Alice).
+  release-payout(Cust1, Acc1, Alice).
+  ?payout-cleared(Acc1, Alice).
+}

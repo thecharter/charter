@@ -1,3 +1,5 @@
+import Charter.Core.Evidence
+
 /-!
 # Charter.Core.Term — Values, domains, and the term language of the eFLINT core
 
@@ -157,6 +159,8 @@ inductive Term where
   | currentTime
   /-- Charter (D7): `Held(e) For d`: `e` holds and has held for at least the duration `d`. -/
   | heldFor (t : Term) (d : Term)
+  /-- Charter (D22, G3.2): `Established(e)` / `Refuted(e)` / `Unresolved(e)` / `Conflicted(e)`. -/
+  | evStatus (want : EvidenceStatus) (t : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -243,6 +247,7 @@ def Term.pp : Term → String
   | .app d args => d ++ "(" ++ args.pp ++ ")"
   | .currentTime => "Current Time"
   | .heldFor t d => "Held(" ++ t.pp ++ ") For " ++ d.pp
+  | .evStatus want t => want.kwName ++ "(" ++ t.pp ++ ")"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -296,6 +301,7 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .app d args => .app (f d) (args.mapDom f)
   | .currentTime => .currentTime
   | .heldFor t d => .heldFor (t.mapDom f) (d.mapDom f)
+  | .evStatus want t => .evStatus want (t.mapDom f)
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)

@@ -1,0 +1,22 @@
+// 003.13, 004.11, 018.2 (T43): `Confidential To auditor` marks an `Evidenced` fact for
+// audience-scoped `ReasonGraph` redaction without altering `(lawful, valid)` verdicts.
+Fact officer Identified by Off1.
+Fact account Identified by Acc1.
+Evidenced Fact kyc-dossier Identified by account
+  Confidential To auditor, regulator.
+Fact wire-released Identified by account.
+
+Power release-wire Actor officer Related to account
+  Holds when kyc-dossier(account)
+  Valid when kyc-dossier(account)
+  Creates wire-released(account).
+
+SubmitEvidence kyc-dossier(Acc1) By "secret-escrow-bank-ref-991".
+
+Scenario confidential-wire {
+  ?Established(kyc-dossier(Acc1)).
+  ?lawful release-wire(Off1, Acc1).
+  ?valid release-wire(Off1, Acc1).
+  release-wire(Off1, Acc1).
+  ?wire-released(Acc1).
+}

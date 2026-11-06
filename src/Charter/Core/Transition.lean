@@ -32,11 +32,28 @@ theorem three_answers_independent (te actor : Tagged) :
       iLV.judgment = ⟨true, true, false⟩ ∧
       iUL.judgment = ⟨true, false, true⟩ ∧
       iUV.judgment = ⟨true, false, false⟩ :=
-  ⟨ .mk te [] false false true (some actor) [],
-    .mk te [] false false false (some actor) [],
-    .mk te [] true true true (some actor) [],
-    .mk te [] true true false (some actor) [],
+  ⟨ .mk te [] false false true (some actor) [] .yes .yes [],
+    .mk te [] false false false (some actor) [] .yes .no [],
+    .mk te [] true true true (some actor) [] .no .yes [],
+    .mk te [] true true false (some actor) [] .no .no [],
     rfl, rfl, rfl, rfl ⟩
+
+/-- `T04` (extralegal advisory annotation irrelevance, `docs/rfc.md` §14): any trailing
+advisory `Note "..."` on a trigger phrase is erased at `CIR` elaboration and produces the
+exact same `Config` and `Output`s. -/
+theorem resolvePhrase_trigger_note (spec : Spec) (xs : List Var) (t : Term) (n₁ n₂ : Option String) :
+    resolvePhrase spec (.trigger xs t n₁) = resolvePhrase spec (.trigger xs t n₂) := by
+  unfold resolvePhrase
+  have h10000 : (10000 : Nat) = 9999 + 1 := rfl
+  rw [h10000]
+  rfl
+
+theorem advisory_note_irrelevant (cfg : Config) (xs : List Var) (t : Term) (n₁ n₂ : Option String) :
+    runPhrase cfg (.trigger xs t n₁) = runPhrase cfg (.trigger xs t n₂) := by
+  unfold runPhrase
+  have hd₁ : Phrase.hasDecls (.trigger xs t n₁) = false := rfl
+  have hd₂ : Phrase.hasDecls (.trigger xs t n₂) = false := rfl
+  rw [hd₁, hd₂, resolvePhrase_trigger_note cfg.spec xs t n₁ n₂]
 
 /-- Declarative specification of environment clock evaluation on a compiled phrase (`009.1`). -/
 inductive DeclClock (spec : Spec) (specIdx : Spec.SpecIndex) (s : State) :

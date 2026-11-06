@@ -29,6 +29,9 @@ def Origin.render : Origin → String
   | .byAct a n => s!"by the act {a} at phrase {n}"
   | .derived d n => s!"derived by the rules of {d} at phrase {n}"
 
+def Origin.stepNum : Origin → Nat
+  | .asserted n | .environment n | .byAct _ n | .derived _ n => n
+
 structure Info where
   value   : Bool
   fromSat : Bool
@@ -130,6 +133,58 @@ abbrev StateIndex := DomMap (List (Tagged × Info))
 def buildIndex (s : State) : StateIndex :=
   s.contents.foldr (fun p m => m.prepend p.1.2 p) .empty
 
+/-- Maximum phrase step among live evidence/finding records in `bucket` targeting `te`. -/
+def maxMatchingEvStep (now : Int) (te : Tagged) : List (Tagged × Info) → Option Nat
+  | [] => none
+  | (entryTe, i) :: rest =>
+    let tail := maxMatchingEvStep now te rest
+    if i.live now then
+      match entryTe.1 with
+      | .prod [(e', d'), _] =>
+        if d' == te.2 && Elem.beq e' te.1 then
+          let st := i.origin.stepNum
+          match tail with
+          | some m => some (if m ≤ st then st else m)
+          | none   => some st
+        else tail
+      | _ => tail
+    else tail
+
+/-- Compute four-valued `EvidenceStatus` for `te` from pre-fetched buckets (`D22`, `G3.2`). -/
+def evidenceStatusFromBuckets (now : Int) (te : Tagged) (direct? : Option Info)
+    (posB negB supB rebB : List (Tagged × Info)) : EvidenceStatus :=
+  let posF := maxMatchingEvStep now te posB
+  let negF := maxMatchingEvStep now te negB
+  let supM := maxMatchingEvStep now te supB
+  let rebM := maxMatchingEvStep now te rebB
+  let explicitVal : Option Bool := match direct? with
+    | some i => if i.live now then some true else if !i.value then some false else none
+    | none   => none
+  computeEvidenceStatus posF negF explicitVal supM rebM
+
+/-- Compute four-valued `EvidenceStatus` for `te` directly from `s` (`004.11`). -/
+def evidenceStatus (s : State) (te : Tagged) : EvidenceStatus :=
+  let bucketOf (dom : String) : List (Tagged × Info) :=
+    s.contents.filter fun (q, _) => q.2 == dom
+  evidenceStatusFromBuckets s.time te (s.lookup te)
+    (bucketOf evFindingPosDom) (bucketOf evFindingNegDom)
+    (bucketOf evSupportDom) (bucketOf evRebutDom)
+
+/-- Active evidence and finding records `(kindLabel, sourceOrStandard, step)` for `te` (`?why` / `ReasonGraph`). -/
+def evidenceSources (s : State) (te : Tagged) : List (String × String × Nat) :=
+  let collect (dom label : String) : List (String × String × Nat) :=
+    s.contents.filterMap fun (entryTe, i) =>
+      if entryTe.2 == dom && i.live s.time then
+        match entryTe.1 with
+        | .prod [(e', d'), (.str metaStr, _)] =>
+          if d' == te.2 && Elem.beq e' te.1 then some (label, metaStr, i.origin.stepNum) else none
+        | _ => none
+      else none
+  collect evFindingPosDom "finding(+)" ++
+  collect evFindingNegDom "finding(-)" ++
+  collect evSupportDom "support" ++
+  collect evRebutDom "rebut"
+
 end State
 
 /-- The truth value an effect assigns; a creation may carry an expiry (D7); an
@@ -209,21 +264,26 @@ component. -/
 def State.makeAssignments (spec : Spec) (st : Store) (s : State) : State :=
   st.foldr (State.applyAssignment spec s.step) s
 
-/-- What one trigger did (eFLINT `TransInfo`). -/
+/-- What one trigger did (eFLINT `TransInfo`, extended with three-valued epistemic status, `D22`). -/
 inductive TransInfo where
   | mk (tagged : Tagged) (assignments : Store) (forced : Bool) (disabled : Bool) (valid : Bool)
        (actor : Option Tagged) (syncs : List TransInfo)
+       (lawfulTri : TriBool) (validTri : TriBool)
+       (unmetEvidence : List (Tagged × EvidenceStatus))
   deriving Inhabited
 
 namespace TransInfo
-def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ _ => t
-def assignments : TransInfo → Store | .mk _ a _ _ _ _ _ => a
-def forced : TransInfo → Bool | .mk _ _ f _ _ _ _ => f
-def disabled : TransInfo → Bool | .mk _ _ _ d _ _ _ => d
+def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ _ _ _ _ => t
+def assignments : TransInfo → Store | .mk _ a _ _ _ _ _ _ _ _ => a
+def forced : TransInfo → Bool | .mk _ _ f _ _ _ _ _ _ _ => f
+def disabled : TransInfo → Bool | .mk _ _ _ d _ _ _ _ _ _ => d
 /-- Charter (D5): whether the transition had institutional effect. -/
-def valid : TransInfo → Bool | .mk _ _ _ _ v _ _ => v
-def actor : TransInfo → Option Tagged | .mk _ _ _ _ _ a _ => a
-def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ _ s => s
+def valid : TransInfo → Bool | .mk _ _ _ _ v _ _ _ _ _ => v
+def actor : TransInfo → Option Tagged | .mk _ _ _ _ _ a _ _ _ _ => a
+def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ _ s _ _ _ => s
+def lawfulTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ l _ _ => l
+def validTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ _ v _ => v
+def unmetEvidence : TransInfo → List (Tagged × EvidenceStatus) | .mk _ _ _ _ _ _ _ _ _ u => u
 def isAction (t : TransInfo) : Bool := t.actor.isSome
 end TransInfo
 

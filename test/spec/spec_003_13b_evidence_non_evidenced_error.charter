@@ -1,0 +1,5 @@
+// 003.13, 011.14: `SubmitEvidence` on a fact not declared `Evidenced` fails with `CHR033`.
+//! expect-error: CHR033
+Fact party Identified by Alice.
+Fact ordinary-fact Identified by party.
+SubmitEvidence ordinary-fact(Alice) By "witness".

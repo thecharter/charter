@@ -22,10 +22,10 @@ Reserved multi-word and word keywords (`wordKeywords`):
 `Derived externally`, `Conditioned by`, `Identified by`, `Terminated by`, `Violated when`, `Overridden by`, `Present when`, `Current Time`, `Derived from`, `Except under`, `Enforced by`, `Related to`, `Syncs with`, `Valid when`, `Created by`, `Due within`, `Holds when`, `Placeholder`, `Obfuscates`, `Terminates`, `Identified`, `Recipient`, `Invariant`, `Predicate`, `Physical`, `Claimant`, `Function`, `Violated`, `Enabled`, `Creates`, `Current`, `Derived`, `Present`, `Foreach`, `Exists`, `Forall`, `Extend`, `Closed`, `Domain`, `Holder`, `String`, `Actor`, `Count`, `Event`, `False`, `Force`, `Holds`, `Union`, `Where`, `Atom`, `Bool`, `Duty`, `Fact`, `Open`, `Time`, `True`, `When`, `With`, `Act`, `For`, `Int`, `Max`, `Min`, `Not`, `Sum`, `Var`, `Do`.
 
 Claim keywords (matched when followed by whitespace and a non-`.`/`}` token):
-`?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
+`?!undetermined`, `?undetermined`, `?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
 
-Contextual keywords (`D17`, `D20`, `D21`, lexed as `atom` or `ident` and matched only in the grammar positions below):
-`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
+Contextual keywords (`D17`, `D20`, `D21`, `D22`, lexed as `atom` or `ident` and matched only in the grammar positions below):
+`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Finding`, `Evidenced`, `Confidential`, `To`, `Resolves`, `Standard`, `Supports`, `Rebuts`, `Retracts`, `SubmitEvidence`, `RetractEvidence`, `By`, `Note`, `Established`, `Refuted`, `Unresolved`, `Conflicted`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
 
 ---
 
@@ -57,11 +57,13 @@ phrase      ::= frame+
               | '!?' expr
               | '?-' opt_foreach
               | '?--' opt_foreach
-              | ('?lawful' | '?valid' | '?violated' | '?!lawful' | '?!valid' | '?!violated') expr
+              | ('?lawful' | '?valid' | '?violated' | '?undetermined' | '?!lawful' | '?!valid' | '?!violated' | '?!undetermined') expr
               | '?why' expr
+              | 'SubmitEvidence' '!'? expr ('By' (str_lit | atom | ident))?
+              | 'RetractEvidence' expr ('By' (str_lit | atom | ident))?
               | '@' expr
               | 'tick'                                (* before '.', '}', or EOF *)
-              | '!'? opt_foreach
+              | '!'? opt_foreach ('Note' str_lit)?
 
 opt_foreach ::= '(' 'Foreach' vars ':' expr ')'
               | expr
@@ -72,18 +74,18 @@ opt_foreach ::= '(' 'Foreach' vars ':' expr ')'
 ## 20.3 Declarations and clauses (`003`–`009`, `012`–`015`)
 
 ```ebnf
-frame       ::= ('Open' | 'Closed')? frame_body
+frame       ::= ('Open' | 'Closed' | 'Evidenced')* frame_body
 
 frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? dom_filter? fact_clause*
               | 'Bool' ident fact_clause*
               | ('Predicate' | 'Invariant') ident ('When' | 'Where') expr from_clause*
-              | ('Act' | 'Power') ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
+              | ('Act' | 'Power' | 'Finding') ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Physical' ident 'With'? ('Actor' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Event' ident 'With'? ('Related to' vars)? dom_filter? event_clause*
               | 'Duty' ident 'With'? 'Holder' var 'Claimant' var ('Related to' vars)? dom_filter? duty_clause*
               | 'Immunity' ident 'With'? 'Holder' var ('Related to' vars)? dom_filter? immunity_clause*
               | 'Extend' ('Fact' ident fact_clause*
-                        | ('Act' | 'Power') ident act_clause*
+                        | ('Act' | 'Power' | 'Finding') ident act_clause*
                         | 'Event' ident event_clause*
                         | 'Duty' ident duty_clause*
                         | 'Immunity' ident immunity_clause*)
@@ -115,7 +117,8 @@ domain      ::= 'String' | 'Atom' | 'Int' | 'Time' | 'Duration'
 deriv_clause ::= 'Derived from' opt_foreach (',' opt_foreach)*
                | ('Holds when' | 'Present when' | 'Holds' 'When' | 'Present' 'When') expr_list
 
-fact_clause     ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
+fact_clause     ::= 'Conditioned by' expr_list? | 'Open' | 'Closed' | 'Evidenced'
+                  | 'Confidential' ('To' idents)?
                   | ('Identified by' | 'Domain') ext_domain | from_clause | deriv_clause
 act_clause      ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Creates' create_eff (',' create_eff)*
@@ -123,6 +126,8 @@ act_clause      ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Obfuscates' opt_foreach (',' opt_foreach)*
                   | 'Syncs with' opt_foreach (',' opt_foreach)*
                   | 'Valid when' expr_list | 'Except under' idents
+                  | 'Resolves' '!'? expr | 'Standard' (ident | atom | str_lit)
+                  | ('Supports' | 'Rebuts' | 'Retracts') expr_list
                   | from_clause | deriv_clause
 event_clause    ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Creates' create_eff (',' create_eff)*
@@ -155,6 +160,7 @@ add_expr    ::= mul_expr (('+' | '-') mul_expr)*                 (* left-assoc *
 mul_expr    ::= unary_expr (('*' | '/' | '%') unary_expr)*       (* left-assoc *)
 unary_expr  ::= ('!' | 'Not' | 'Present' | 'Holds' | 'Violated' | 'Enabled') unary_expr
               | 'Held' '(' expr ')' 'For' add_expr
+              | ('Established' | 'Refuted' | 'Unresolved' | 'Conflicted') '(' expr ')'
               | postfix_expr
 postfix_expr ::= primary (proj_dot (var | '(' var ')') | ':' ident)*
 primary     ::= 'True' | 'False' | 'Current Time'

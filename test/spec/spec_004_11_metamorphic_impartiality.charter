@@ -1,0 +1,28 @@
+// 004.11, 011.14, 018.2 (T04, T05): advisory annotations (`Note "..."`, `Clause`, `From`)
+// never alter legal judgments, and permuting interchangeable actors (`Alice` <-> `Bob`)
+// preserves every query, expectation, and transition verdict under `//! metamorphic`.
+//! metamorphic
+Fact applicant Identified by Alice, Bob.
+Fact reviewer Identified by Rev1, Rev2.
+Fact eligible Identified by applicant.
+Fact license-granted Identified by applicant.
+
+Clause L.1 Approved "51513146d67da64faa4a048eb1e2a3882b4e35f8cc850e33e7ab08aab70bf94d"
+  Text "A reviewer may grant a license to an eligible applicant."
+  Norm "A reviewer may grant a license to an eligible applicant." => grant-license
+.
+
+Power grant-license Actor reviewer Recipient applicant
+  From L.1 "A reviewer may grant a license to an eligible applicant."
+  Holds when eligible(applicant)
+  Valid when eligible(applicant)
+  Creates license-granted(applicant).
+
+Scenario impartial-grant {
+  +eligible(Alice).
+  grant-license(Rev1, Alice) Note "advisory LLM score 0.12; informal note".
+  ?license-granted(Alice).
+  ?!valid grant-license(Rev2, Bob).
+  grant-license(Rev2, Bob) Note "advisory LLM score 0.99; strong endorsement".
+  ?!license-granted(Bob).
+}

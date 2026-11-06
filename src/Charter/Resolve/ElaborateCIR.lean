@@ -201,7 +201,8 @@ theorem elaborateLoop_wellFormed :
               | inr hmem =>
                 exact elaborateLoop_wellFormed rest (ver + 1) nextSpec [] (warns ++ ws) tail w2 htail ep hmem
       | trigger _ _ | create _ _ | terminate _ _ | obfuscate _ _ | query _ | instQuery _ _ _
-      | par _ | scenario _ _ _ | expect _ _ _ | setTime _ | tick | why _ =>
+      | par _ | scenario _ _ _ | expect _ _ _ _ | setTime _ | tick | why _ _
+      | submitEvidence _ _ _ _ | retractEvidence _ _ _ =>
         exact elaborateLoop_wellFormed rest ver nextSpec (_ :: curPhrases) (warns ++ ws) eps warns' h
 
 /-- Every `CIR.Epoch` produced by `elaboratePhrases` has a `WellFormed` `Spec`. -/

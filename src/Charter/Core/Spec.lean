@@ -86,13 +86,17 @@ inductive Derivation where
   | holdsWhen (t : Term)
   deriving Repr, Inhabited
 
-/-- An effect of an act or event: create, terminate, or obfuscate every instance
-the term produces under the `Foreach` binders. -/
+/-- An effect of an act or event: create, terminate, obfuscate, tender/retract evidence,
+or adjudicate a finding over every instance the term produces under `Foreach` binders. -/
 inductive Effect where
   /-- Create; Charter (D7): `For d` stamps the instances with an expiry `now + d`. -/
   | cAll (xs : List Var) (t : Term) (forDur : Option Term := none)
   | tAll (xs : List Var) (t : Term)
   | oAll (xs : List Var) (t : Term)
+  /-- Charter (D22, G3.2): `Supports` / `Rebuts` / `Retracts` on an `Evidenced` fact. -/
+  | evOp (op : EvidenceOp) (xs : List Var) (t : Term) (src : String := "")
+  /-- Charter (D22, G3.2, Law 3): `Finding ... Resolves [!]e [Standard s]`. -/
+  | findingOp (polarity : Bool) (xs : List Var) (t : Term) (standard : String := "default")
   deriving Repr, Inhabited
 
 /-- `Syncs with`: the transitions triggered together with this one. -/
@@ -102,8 +106,20 @@ structure Sync where
   deriving Repr, Inhabited
 
 structure FactSpec where
-  invariant : Bool := false
-  actor     : Bool := false
+  invariant    : Bool := false
+  actor        : Bool := false
+  /-- Charter (D22, G3.2): four-valued epistemic external-world proposition (`003.13`). -/
+  evidenced    : Bool := false
+  /-- Charter (D22, G3.2, T43): confidential evidence redacted outside `audiences`. -/
+  confidential : Bool := false
+  audiences    : List String := []
+  deriving Repr, Inhabited
+
+/-- Charter (D22, G3.2, Law 3): institutional `Finding` target and named proof standard. -/
+structure FindingSpec where
+  polarity : Bool := true
+  target   : Term
+  standard : String := "default"
   deriving Repr, Inhabited
 
 structure ActSpec where
@@ -117,8 +133,11 @@ structure ActSpec where
   exceptUnder : List DomId := []
   /-- Whether the act's second component is a `Recipient` (immunities protect recipients). -/
   hasRecipient : Bool := false
-  /-- Charter (005.10, G3.1): declared with `Power`, requiring explicit `Valid when`. -/
+  /-- Charter (005.10, G3.1): declared with `Power` or `Finding`, requiring explicit `Valid when`. -/
   isPower : Bool := false
+  /-- Charter (005.11, G3.2): declared with `Finding`. -/
+  isFinding : Bool := false
+  finding : Option FindingSpec := none
   deriving Repr, Inhabited
 
 /-- Charter (plan §2.2.2): while an instance holds, the acts in `against` are not valid
@@ -177,6 +196,11 @@ structure TypeSpec where
 
 def TypeSpec.isClosed (t : TypeSpec) : Bool := t.closed.getD true
 
+def TypeSpec.isEvidencedFact (t : TypeSpec) : Bool :=
+  match t.kind with
+  | .fact fs => fs.evidenced
+  | _ => false
+
 /-! ## Surface declarations -/
 
 /-- A clause of a declaration or `Extend` (eFLINT `ModClause`). -/
@@ -207,6 +231,14 @@ inductive ModClause where
   | dueWithin (d : Term)
   /-- Charter (D4): `From CLAUSE "span"`: the English this rule is the meaning of. -/
   | fromSpan (clause : ClauseId) (text : String)
+  /-- Charter (D22, G3.2): `Evidenced` and `Confidential [To ...]` on a fact. -/
+  | evidenced
+  | confidential (audiences : List String)
+  /-- Charter (D22, G3.2): `Resolves [!]e` and `Standard s` on a `Finding` act. -/
+  | resolves (polarity : Bool) (t : Term)
+  | standard (s : String)
+  /-- Charter (D22, G3.2): `Supports` / `Rebuts` / `Retracts` on an act (pre-compilation). -/
+  | evEffect (op : EvidenceOp) (ts : List (List Var × Term))
   deriving Repr, Inhabited
 
 /-- Temporal property formulae (`docs/rfc.md` §7.4, `D20`), verified in `Charter.Verify`
@@ -326,6 +358,10 @@ def insertDocument (s : Spec) (sd : SourceDoc) : Spec :=
 /-- Insert a clause, replacing one with the same id; clauses keep declaration order. -/
 def insertClause (s : Spec) (c : Clause) : Spec :=
   { s with clauses := s.clauses.filter (·.id != c.id) ++ [c] }
+
+/-- Whether any declared type in `s` is an `Evidenced` fact (`003.13`, fast-path guard). -/
+def hasEvidencedFacts (s : Spec) : Bool :=
+  s.decls.any fun (_, t) => t.isEvidencedFact
 
 /-- Insert or replace a temporal property in declaration order. -/
 def insertTemporal (s : Spec) (tp : TemporalSpec) : Spec :=
@@ -565,6 +601,37 @@ where
     -- clause (006.7); it never reaches a record unresolved
     | .dueWithin _ => t
     | .fromSpan c text => { t with spans := t.spans ++ [(c, text)] }
+    | .evidenced =>
+      { t with
+        closed := some false
+        kind := match t.kind with
+          | .fact fs => .fact { fs with evidenced := true }
+          | k => k }
+    | .confidential auds =>
+      { t with
+        kind := match t.kind with
+          | .fact fs => .fact { fs with confidential := true, audiences := (fs.audiences ++ auds).eraseDups }
+          | k => k }
+    | .resolves pol target =>
+      { t with
+        kind := match t.kind with
+          | .act a =>
+            let std := match a.finding with | some f => f.standard | none => "default"
+            .act { a with isFinding := true, isPower := true, finding := some { polarity := pol, target, standard := std } }
+          | k => k }
+    | .standard std =>
+      { t with
+        kind := match t.kind with
+          | .act a =>
+            let f' := match a.finding with
+              | some f => some { f with standard := std }
+              | none => some { polarity := true, target := .boolLit true, standard := std }
+            let effs' := a.effects.map fun
+              | .findingOp pol xs tm _ => .findingOp pol xs tm std
+              | eff => eff
+            .act { a with finding := f', effects := effs' }
+          | k => k }
+    | .evEffect _ _ => t
 
 /-! ## Renaming (module instantiation, D8) -/
 
@@ -576,6 +643,11 @@ def Effect.mapDom (f : DomId → DomId) : Effect → Effect
   | .cAll xs t d => .cAll (xs.map (Var.mapDom f)) (t.mapDom f) (d.map (·.mapDom f))
   | .tAll xs t => .tAll (xs.map (Var.mapDom f)) (t.mapDom f)
   | .oAll xs t => .oAll (xs.map (Var.mapDom f)) (t.mapDom f)
+  | .evOp op xs t src => .evOp op (xs.map (Var.mapDom f)) (t.mapDom f) src
+  | .findingOp pol xs t std => .findingOp pol (xs.map (Var.mapDom f)) (t.mapDom f) std
+
+def FindingSpec.mapDom (f : DomId → DomId) (fs : FindingSpec) : FindingSpec :=
+  { fs with target := fs.target.mapDom f }
 
 def Sync.mapDom (f : DomId → DomId) (s : Sync) : Sync := ⟨s.xs.map (Var.mapDom f), s.t.mapDom f⟩
 
@@ -586,7 +658,8 @@ def Kind.mapDom (f : DomId → DomId) : Kind → Kind
       effects := a.effects.map (Effect.mapDom f)
       syncs := a.syncs.map (Sync.mapDom f)
       validWhen := a.validWhen.map (Term.mapDom f)
-      exceptUnder := a.exceptUnder.map f }
+      exceptUnder := a.exceptUnder.map f
+      finding := a.finding.map (FindingSpec.mapDom f) }
   | .duty d =>
     .duty { d with
       enforcingActs := d.enforcingActs.map f
@@ -620,6 +693,8 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .against as => .against (as.map f)
   | .unlessCond ts => .unlessCond (ts.map (Term.mapDom f))
   | .dueWithin d => .dueWithin (d.mapDom f)
+  | .resolves pol t => .resolves pol (t.mapDom f)
+  | .evEffect op ts => .evEffect op (ts.map fun (xs, t) => (xs.map (Var.mapDom f), t.mapDom f))
   | c => c
 
 /-- Rename the type names a declaration mentions and declares. Modules and uses inside

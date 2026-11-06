@@ -73,6 +73,7 @@ def fmtTerm : Term → String
   | .app d args => d ++ "(" ++ fmtArgs args ++ ")"
   | .currentTime => "Current Time"
   | .heldFor t d => "(Held(" ++ fmtTerm t ++ ") For (" ++ fmtTerm d ++ "))"
+  | .evStatus want t => want.kwName ++ "(" ++ fmtTerm t ++ ")"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -117,6 +118,11 @@ def fmtEffect : Effect → String
   | .cAll xs t (some d) => "Creates " ++ fmtOptForeach xs t ++ " For " ++ fmtTerm d
   | .tAll xs t => "Terminates " ++ fmtOptForeach xs t
   | .oAll xs t => "Obfuscates " ++ fmtOptForeach xs t
+  | .evOp .support xs t _ => "Supports " ++ fmtOptForeach xs t
+  | .evOp .rebut xs t _ => "Rebuts " ++ fmtOptForeach xs t
+  | .evOp .retract xs t _ => "Retracts " ++ fmtOptForeach xs t
+  | .findingOp pol _ t std =>
+    s!"Resolves {if pol then "" else "!"}{fmtTerm t}" ++ (if std == "default" then "" else s!" Standard {fmtAtomOrStr std}")
 
 def fmtModClause : ModClause → String
   | .conditionedBy [] => "Conditioned by"
@@ -136,7 +142,9 @@ def fmtModClause : ModClause → String
       | .cAll xs t none => fmtOptForeach xs t
       | .cAll xs t (some d) => fmtOptForeach xs t ++ " For " ++ fmtTerm d
       | .tAll xs t => fmtOptForeach xs t
-      | .oAll xs t => fmtOptForeach xs t)
+      | .oAll xs t => fmtOptForeach xs t
+      | .evOp _ xs t _ => fmtOptForeach xs t
+      | .findingOp _ xs t _ => fmtOptForeach xs t)
   | .postCond effs@(.tAll .. :: _) =>
     "Terminates " ++ ", ".intercalate (effs.map fun
       | .tAll xs t => fmtOptForeach xs t
@@ -145,6 +153,7 @@ def fmtModClause : ModClause → String
     "Obfuscates " ++ ", ".intercalate (effs.map fun
       | .oAll xs t => fmtOptForeach xs t
       | _ => "")
+  | .postCond (eff :: _) => fmtEffect eff
   | .sync ss => "Syncs with " ++ ", ".intercalate (ss.map fun s => fmtOptForeach s.xs s.t)
   | .violation ts => "Violated when " ++ fmtTermList ts
   | .enforcingActs as => "Enforced by " ++ ", ".intercalate as
@@ -163,6 +172,14 @@ def fmtModClause : ModClause → String
   | .unlessCond ts => "Unless " ++ fmtTermList ts
   | .dueWithin d => "Due within " ++ fmtTerm d
   | .fromSpan cid txt => "From " ++ cid ++ " " ++ showString txt
+  | .evidenced => ""
+  | .confidential [] => "Confidential"
+  | .confidential auds => "Confidential To " ++ ", ".intercalate auds
+  | .resolves pol t => "Resolves " ++ (if pol then "" else "!") ++ fmtTerm t
+  | .standard s => "Standard " ++ fmtAtomOrStr s
+  | .evEffect .support ts => "Supports " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
+  | .evEffect .rebut ts => "Rebuts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
+  | .evEffect .retract ts => "Retracts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
   let rendered := (cls.map fmtModClause).filter (!·.isEmpty)
@@ -206,22 +223,23 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
   let childIndent := indent ++ "  "
   match t.kind with
   | .fact f =>
+    let factPrefix := if f.evidenced then "Evidenced " else openPrefix
     if f.invariant && t.domain == .products [] && reprStr t.domainConstraint == reprStr (Term.boolLit true) && t.closed.isNone then
       match extractInvariantForm cls with
       | some (cond, fs) =>
         let fromStr := String.join (fs.map fun (c, s) => s!"\n{childIndent}From {c} {showString s}")
         s!"{indent}Invariant {d} When {fmtTerm cond}{fromStr}"
       | none =>
-        s!"{indent}{openPrefix}Bool {d}{fmtModClauses childIndent cls}"
+        s!"{indent}{factPrefix}Bool {d}{fmtModClauses childIndent cls}"
     else if t.restriction.isNone && t.domain == .products [] && reprStr t.domainConstraint == reprStr (Term.boolLit true) then
-      s!"{indent}{openPrefix}Bool {d}{fmtModClauses childIndent cls}"
+      s!"{indent}{factPrefix}Bool {d}{fmtModClauses childIndent cls}"
     else
       let kw := match t.restriction with
         | some .var => "Var"
         | some .function => "Function"
         | none => "Fact"
       let domPart := if t.domain == .anyString then "" else " Identified by " ++ fmtDomain t.domain
-      s!"{indent}{openPrefix}{kw} {d}{domPart}{wherePart}{fmtModClauses childIndent cls}"
+      s!"{indent}{factPrefix}{kw} {d}{domPart}{wherePart}{fmtModClauses childIndent cls}"
   | .act a =>
     let comps := match t.domain with | .products xs => xs | _ => []
     if a.physical then
@@ -244,7 +262,7 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
           else
             (ap, "", if rest.isEmpty then "" else " Related to " ++ fmtVars rest)
         | [] => ("", "", "")
-      let kw := if a.isPower then "Power" else "Act"
+      let kw := if a.isFinding then "Finding" else if a.isPower then "Power" else "Act"
       s!"{indent}{openPrefix}{kw} {d}{actorPart}{recipPart}{relPart}{wherePart}{fmtModClauses childIndent cls}"
   | .event _ =>
     let objs := match t.domain with | .products xs => xs | _ => []
@@ -316,7 +334,8 @@ mutual
 
 def fmtPhrase (indent : String) : Nat → Phrase → String
   | 0, _ => ""
-  | _, .trigger xs t => indent ++ fmtOptForeach xs t
+  | _, .trigger xs t none => indent ++ fmtOptForeach xs t
+  | _, .trigger xs t (some note) => indent ++ fmtOptForeach xs t ++ " Note " ++ showString note
   | _, .create xs t => indent ++ "+" ++ fmtOptForeach xs t
   | _, .terminate xs t => indent ++ "-" ++ fmtOptForeach xs t
   | _, .obfuscate xs t => indent ++ "~" ++ fmtOptForeach xs t
@@ -336,6 +355,12 @@ def fmtPhrase (indent : String) : Nat → Phrase → String
   | _, .setTime t => indent ++ s!"@ {fmtTerm t}"
   | _, .tick => indent ++ "tick"
   | _, .why t => indent ++ s!"?why {fmtTerm t}"
+  | _, .submitEvidence pol t src =>
+    let byPart := if src.isEmpty then "" else " By " ++ showString src
+    indent ++ s!"SubmitEvidence {if pol then "" else "!"}{fmtTerm t}{byPart}"
+  | _, .retractEvidence t src =>
+    let byPart := if src.isEmpty then "" else " By " ++ showString src
+    indent ++ s!"RetractEvidence {fmtTerm t}{byPart}"
 
 def fmtPhrasesDot (indent : String) : Nat → List Phrase → String
   | 0, _ => ""

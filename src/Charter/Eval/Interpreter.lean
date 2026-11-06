@@ -174,19 +174,33 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
       | .error e => (none, [diagOf e])
       | .ok tess =>
         let lines := tess.flatten.map fun te =>
-          match state.lookup te with
-          | none =>
-            match spec.judgedAct te.2 with
-            | some _ =>
-              -- D15: judged for this instance, never materialised
-              match run (isHolds M.fuel te) with
-              | .ok [true] => s!"{te}: holds; judged for this instance by its Holds when (D15: the domain of {te.2} is not enumerable, so no instance is materialised)"
-              | _ => s!"{te}: does not hold; its Holds when is false for this instance (D15: the domain of {te.2} is not enumerable, so no instance is materialised)"
-            | none => s!"{te}: no assignment and not derived{if spec.closedType te.2 == some false then " (open type: input is missing)" else " (closed type: does not hold)"}"
-          | some i =>
-            let holds := if i.live state.time then "holds" else if i.value then "expired" else "does not hold"
-            let exp := match i.expiry with | some u => s!", until {u}" | none => ""
-            s!"{te}: {holds} since {i.since}{exp}; {i.origin.render}{ruleText spec i}"
+          let tspec? : Option TypeSpec := spec.findDecl te.2
+          let spanSuffix := match tspec? with
+            | some ts =>
+              if ts.spans.isEmpty then ""
+              else "; from " ++ ", ".intercalate (ts.spans.map fun (p : ClauseId × String) => s!"{p.1} {showString p.2}")
+            | none => ""
+          if (tspec?.map TypeSpec.isEvidencedFact).getD false then
+            let st := state.evidenceStatus te
+            let srcs := state.evidenceSources te
+            let srcStr := if srcs.isEmpty then "no tendered evidence"
+              else ", ".intercalate (srcs.map fun (k, s, n) =>
+                if s.isEmpty then s!"{k} at phrase {n}" else s!"{k} by {showString s} at phrase {n}")
+            s!"{te}: epistemic status {st.asString} ({srcStr}){spanSuffix}"
+          else
+            match state.lookup te with
+            | none =>
+              match spec.judgedAct te.2 with
+              | some _ =>
+                -- D15: judged for this instance, never materialised
+                match run (isHolds M.fuel te) with
+                | .ok [true] => s!"{te}: holds; judged for this instance by its Holds when (D15: the domain of {te.2} is not enumerable, so no instance is materialised){spanSuffix}"
+                | _ => s!"{te}: does not hold; its Holds when is false for this instance (D15: the domain of {te.2} is not enumerable, so no instance is materialised){spanSuffix}"
+              | none => s!"{te}: no assignment and not derived{if spec.closedType te.2 == some false then " (open type: input is missing)" else " (closed type: does not hold)"}{spanSuffix}"
+            | some i =>
+              let holds := if i.live state.time then "holds" else if i.value then "expired" else "does not hold"
+              let exp := match i.expiry with | some u => s!", until {u}" | none => ""
+              s!"{te}: {holds} since {i.since}{exp}; {i.origin.render}{ruleText spec i}{spanSuffix}"
         (some [], [.whyRes lines])
     | .setTime _ => (some [], [])
     | .tick => (some [], [])
@@ -195,6 +209,9 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
         | .lawful => isEnabled M.fuel te
         | .valid => isValid M.fuel te
         | .violated => isViolated M.fuel te
+        | .undetermined => do
+          let (lTri, vTri, _) ← evalActTri M.fuel te
+          pure (lTri == .undetermined || vTri == .undetermined)
       match run (foreach M.fuel xs (whenTagged (eval M.fuel t) ask)) with
       | .error e => (none, [diagOf e])
       | .ok bss => (some [], [.expectRes w neg (bss.flatten.all (fun b => b != neg))])
@@ -210,6 +227,8 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
     | .create xs t => effect ctx (.cAll xs t)
     | .terminate xs t => effect ctx (.tAll xs t)
     | .obfuscate xs t => effect ctx (.oAll xs t)
+    | .submitEvidence pol xs t src => effect ctx (.evOp (if pol then .support else .rebut) xs t src)
+    | .retractEvidence xs t src => effect ctx (.evOp .retract xs t src)
     | .trigger xs t =>
       let m : M (Sum DomId (List TransInfo)) := do
         let tes ← foreach M.fuel xs (whenTagged (eval M.fuel t) pure)

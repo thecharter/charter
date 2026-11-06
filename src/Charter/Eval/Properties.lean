@@ -1187,7 +1187,8 @@ theorem declClock_sound (spec : Spec) (specIdx : Spec.SpecIndex) (s : State) (cp
             · rw [if_pos hlt]; exact .setTimeBackwards t t' hr hlt
             · rw [if_neg hlt]; exact .setTimeOk t t' hr (by omega)
   | trigger _ _ | create _ _ | terminate _ _ | obfuscate _ _ | query _ | instQuery _ _ _
-  | onlyDecls _ | par _ | scenario _ _ _ | expect _ _ _ | why _ _ =>
+  | onlyDecls _ | par _ | scenario _ _ _ | expect _ _ _ _ | why _ _
+  | submitEvidence _ _ _ _ | retractEvidence _ _ _ =>
     exact .nonClock _ (fun h => nomatch h) (fun _ h => nomatch h)
 
 theorem declClock_complete {spec : Spec} {specIdx : Spec.SpecIndex} {s : State}

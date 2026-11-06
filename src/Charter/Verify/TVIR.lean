@@ -15,7 +15,7 @@ namespace Charter.Verify.TVIR
 mutual
 def termIntConsts : Term → List Int
   | .intLit n => [n]
-  | .not a | .present a | .violated a | .enabled a | .project a _ | .tag a _ | .untag a => termIntConsts a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a => termIntConsts a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => termIntConsts a ++ termIntConsts b
@@ -39,7 +39,7 @@ end
 mutual
 def hasSymbolicVar : Term → Bool
   | .ref _ | .untag _ | .project _ _ => true
-  | .not a | .present a | .violated a | .enabled a | .tag a _ => hasSymbolicVar a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .tag a _ => hasSymbolicVar a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasSymbolicVar a || hasSymbolicVar b
@@ -65,7 +65,7 @@ def hasComplexArith : Term → Bool
   | .mult a b | .div a b | .mod a b => hasSymbolicVar a && hasSymbolicVar b
   | .add a b | .sub a b => hasSymbolicVar a && hasSymbolicVar b
   | .sum _ _ | .count _ _ => true
-  | .not a | .present a | .violated a | .enabled a | .project a _ | .tag a _ | .untag a => hasComplexArith a
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a => hasComplexArith a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasComplexArith a || hasComplexArith b
   | .exists_ _ t | .forall_ _ t | .max _ t | .min _ t => hasComplexArith t
@@ -96,11 +96,11 @@ def specThresholdWitnesses (spec : Spec) (stateInts : List Int) : List Int :=
       | .act a =>
         (a.validWhen.flatMap termIntConsts) ++
         (a.effects.flatMap fun | .cAll _ tm md => termIntConsts tm ++ (md.map termIntConsts).getD []
-                               | .tAll _ tm | .oAll _ tm => termIntConsts tm)
+                               | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm)
       | .duty du => du.violatedWhen.flatMap termIntConsts
       | .immunity im => im.unlessConds.flatMap termIntConsts
       | .event ev => ev.effects.flatMap fun | .cAll _ tm md => termIntConsts tm ++ (md.map termIntConsts).getD []
-                                            | .tAll _ tm | .oAll _ tm => termIntConsts tm
+                                            | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
       | .fact _ => []
     dInts ++ cInts ++ fInts ++ kInts
   let seeds := (0 :: 1 :: (fromSpec ++ stateInts)).eraseDups
@@ -117,11 +117,11 @@ def isSingleThresholdFragment (spec : Spec) : Bool :=
       | .act a =>
         a.validWhen.all (!hasComplexArith ·) &&
         a.effects.all (fun | .cAll _ tm md => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
-                           | .tAll _ tm | .oAll _ tm => !hasComplexArith tm)
+                           | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm)
       | .duty du => du.violatedWhen.all (!hasComplexArith ·)
       | .immunity im => im.unlessConds.all (!hasComplexArith ·)
       | .event ev => ev.effects.all (fun | .cAll _ tm md => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
-                                         | .tAll _ tm | .oAll _ tm => !hasComplexArith tm)
+                                         | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm)
       | .fact _ => true
     dOk && cOk && fOk && kOk
 

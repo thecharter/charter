@@ -67,6 +67,9 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b =>
       deps spec fuel bound p a ++ deps spec fuel bound p b
     | .heldFor t d => deps spec fuel bound p t ++ deps spec fuel bound p d
+    | .evStatus want t =>
+      let pol := if want == .established then p else .neg
+      (typeOf spec t).toList.map (·, pol) ++ deps spec fuel bound pol t
     | .exists_ xs t => binderDeps spec xs p ++ deps spec fuel (bound ++ xs) p t
     | .forall_ xs t | .count xs t | .sum xs t | .max xs t | .min xs t =>
       binderDeps spec xs .neg ++ deps spec fuel (bound ++ xs) .neg t

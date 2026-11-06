@@ -12,21 +12,22 @@ Declarations are `Charter.Decl` records (`Charter.Core.Spec`); expressions are
 
 namespace Charter
 
-/-- Which of the three answers an expectation phrase asks about (Charter, plan §2.2.6). -/
+/-- Which of the answers an expectation phrase asks about (Charter, plan §2.2.6, D22). -/
 inductive Expect
   | lawful
   | valid
   | violated
+  | undetermined
   deriving Repr, DecidableEq, Inhabited
 
 def Expect.name : Expect → String
-  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
+  | .lawful => "lawful" | .valid => "valid" | .violated => "violated" | .undetermined => "undetermined"
 
-/-- One phrase (eFLINT `Phrase`, plus Charter's scenarios and expectations). Binders of
+/-- One phrase (eFLINT `Phrase`, plus Charter's scenarios, expectations, and epistemic evidence). Binders of
 `Foreach` forms are the `xs` lists. -/
 inductive Phrase where
-  /-- `a(args)`, `(Foreach x: a(x))`: trigger an act or event. -/
-  | trigger (xs : List Var) (t : Term)
+  /-- `a(args) [Note "..."]`, `(Foreach x: a(x))`: trigger an act or event, with optional advisory note (`T04`). -/
+  | trigger (xs : List Var) (t : Term) (note : Option String := none)
   /-- `+e` -/
   | create (xs : List Var) (t : Term)
   /-- `-e` -/
@@ -53,6 +54,10 @@ inductive Phrase where
   | tick
   /-- Charter (Law 6, plan §2.2.11): `?why e` prints where each instance of `e` came from. -/
   | why (t : Term)
+  /-- Charter (D22, G3.2, 011.14): `SubmitEvidence [!]e [By src].` -/
+  | submitEvidence (polarity : Bool) (t : Term) (src : String := "")
+  /-- Charter (D22, G3.2, 011.14): `RetractEvidence e [By src].` -/
+  | retractEvidence (t : Term) (src : String := "")
   deriving Repr, Inhabited
 
 /-- `#include "file"` and `#require "file"`. -/

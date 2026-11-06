@@ -55,12 +55,14 @@ def walkEflint (p : System.FilePath) : Nat → IO (List System.FilePath)
     else return []
 
 structure TestOpts where
-  paths    : List String := []
-  expect   : Option String := none
-  tolerate : Option String := none
+  paths       : List String := []
+  expect      : Option String := none
+  tolerate    : Option String := none
+  metamorphic : Bool := false
 
 def parseTestArgs : List String → TestOpts → Except String TestOpts
   | [], o => .ok { o with paths := o.paths.reverse }
+  | "--metamorphic" :: rest, o => parseTestArgs rest { o with metamorphic := true }
   | "--expect" :: f :: rest, o => parseTestArgs rest { o with expect := some f }
   | ["--expect"], _ => .error "--expect needs a file"
   | "--tolerate" :: f :: rest, o => parseTestArgs rest { o with tolerate := some f }
@@ -127,6 +129,8 @@ structure Directives where
   menuErrors     : List String := []
   /-- Inline opt-in static assurance gates (`//! require-provenance`, etc.). -/
   assurance      : AssuranceOpts := {}
+  /-- `//! metamorphic`: verify invariance under advisory stripping & actor renaming (`T04`, `T05`). -/
+  metamorphic    : Bool := false
 
 def readDirectives (src : String) : Directives :=
   src.splitOn "\n" |>.foldl (fun d line =>
@@ -138,6 +142,7 @@ def readDirectives (src : String) : Directives :=
       else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
       else if body.startsWith "expect-failed-claims:" then { d with expectFailedClaims := (body.drop 21).trim.toNat? }
       else if body.startsWith "explore:" then { d with explore := (body.drop 8).trim.toNat? }
+      else if body == "metamorphic" then { d with metamorphic := true }
       else if body == "require-provenance" then { d with assurance := { d.assurance with requireProvenance := true } }
       else if body == "forbid-midstream-decls" then { d with assurance := { d.assurance with forbidMidstreamDecls := true } }
       else if body == "require-complete-explore" then { d with assurance := { d.assurance with requireCompleteExplore := true } }
@@ -148,6 +153,205 @@ def readDirectives (src : String) : Directives :=
         | .error e => { d with menuErrors := d.menuErrors ++ [e] }
       else d
     else d) {}
+
+-- Collect string constants mentioned inside operative rule conditions of `spec` (`T05`).
+mutual
+def termStrConsts : Term → List String
+  | .stringLit s => [s]
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .project a _ | .tag a _ | .untag a =>
+    termStrConsts a
+  | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
+  | .sub a b | .add a b | .mult a b | .mod a b | .div a b
+  | .eq a b | .neq a b | .when a b | .heldFor a b =>
+    termStrConsts a ++ termStrConsts b
+  | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => termStrConsts t
+  | .app _ args => argsStrConsts args
+  | .boolLit _ | .intLit _ | .ref _ | .currentTime => []
+
+def argsStrConsts : Args → List String
+  | .pos ts => termListStrConsts ts
+  | .named ms => termModsStrConsts ms
+
+def termListStrConsts : List Term → List String
+  | [] => []
+  | t :: ts => termStrConsts t ++ termListStrConsts ts
+
+def termModsStrConsts : List (Var × Term) → List String
+  | [] => []
+  | (_, t) :: ms => termStrConsts t ++ termModsStrConsts ms
+end
+
+def specRuleConstants (spec : Spec) : List String :=
+  spec.decls.flatMap fun (_, t) =>
+    let dC := t.derivation.flatMap fun | .dv _ tm | .holdsWhen tm => termStrConsts tm
+    let cC := t.conditions.flatMap termStrConsts
+    let fC := termStrConsts t.domainConstraint
+    let kC := match t.kind with
+      | .act a => a.validWhen.flatMap termStrConsts
+      | .duty du => du.violatedWhen.flatMap termStrConsts
+      | .immunity im => im.unlessConds.flatMap termStrConsts
+      | _ => []
+    dC ++ cC ++ fC ++ kC
+
+mutual
+def permuteTerm (perm : List (String × String)) : Term → Term
+  | .stringLit s => .stringLit ((perm.find? (·.1 == s)).map (·.2) |>.getD s)
+  | .not a => .not (permuteTerm perm a)
+  | .and a b => .and (permuteTerm perm a) (permuteTerm perm b)
+  | .or a b => .or (permuteTerm perm a) (permuteTerm perm b)
+  | .leq a b => .leq (permuteTerm perm a) (permuteTerm perm b)
+  | .geq a b => .geq (permuteTerm perm a) (permuteTerm perm b)
+  | .ge a b => .ge (permuteTerm perm a) (permuteTerm perm b)
+  | .le a b => .le (permuteTerm perm a) (permuteTerm perm b)
+  | .sub a b => .sub (permuteTerm perm a) (permuteTerm perm b)
+  | .add a b => .add (permuteTerm perm a) (permuteTerm perm b)
+  | .mult a b => .mult (permuteTerm perm a) (permuteTerm perm b)
+  | .mod a b => .mod (permuteTerm perm a) (permuteTerm perm b)
+  | .div a b => .div (permuteTerm perm a) (permuteTerm perm b)
+  | .eq a b => .eq (permuteTerm perm a) (permuteTerm perm b)
+  | .neq a b => .neq (permuteTerm perm a) (permuteTerm perm b)
+  | .exists_ xs t => .exists_ xs (permuteTerm perm t)
+  | .forall_ xs t => .forall_ xs (permuteTerm perm t)
+  | .count xs t => .count xs (permuteTerm perm t)
+  | .sum xs t => .sum xs (permuteTerm perm t)
+  | .max xs t => .max xs (permuteTerm perm t)
+  | .min xs t => .min xs (permuteTerm perm t)
+  | .when a b => .when (permuteTerm perm a) (permuteTerm perm b)
+  | .present a => .present (permuteTerm perm a)
+  | .violated a => .violated (permuteTerm perm a)
+  | .enabled a => .enabled (permuteTerm perm a)
+  | .evStatus w a => .evStatus w (permuteTerm perm a)
+  | .project a x => .project (permuteTerm perm a) x
+  | .tag a d => .tag (permuteTerm perm a) d
+  | .untag a => .untag (permuteTerm perm a)
+  | .app d args => .app d (permuteArgs perm args)
+  | .heldFor a b => .heldFor (permuteTerm perm a) (permuteTerm perm b)
+  | t => t
+
+def permuteArgs (perm : List (String × String)) : Args → Args
+  | .pos ts => .pos (permuteTermList perm ts)
+  | .named ms => .named (permuteTermMods perm ms)
+
+def permuteTermList (perm : List (String × String)) : List Term → List Term
+  | [] => []
+  | t :: ts => permuteTerm perm t :: permuteTermList perm ts
+
+def permuteTermMods (perm : List (String × String)) : List (Var × Term) → List (Var × Term)
+  | [] => []
+  | (x, t) :: ms => (x, permuteTerm perm t) :: permuteTermMods perm ms
+end
+
+def stripAdvisoryDecls : List Decl → List Decl
+  | [] => []
+  | .clause _ :: rest => stripAdvisoryDecls rest
+  | .document .. :: rest => stripAdvisoryDecls rest
+  | .typeExt d cls k :: rest =>
+    let cls' := cls.filter fun | .fromSpan _ _ => false | _ => true
+    .typeExt d cls' k :: stripAdvisoryDecls rest
+  | .module n ps body :: rest =>
+    .module n ps (stripAdvisoryDecls body) :: stripAdvisoryDecls rest
+  | d :: rest => d :: stripAdvisoryDecls rest
+
+mutual
+def stripAdvisoryPhrase : Phrase → Phrase
+  | .trigger xs t _ => .trigger xs t none
+  | .decls ds => .decls (stripAdvisoryDecls ds)
+  | .par ps => .par (stripAdvisoryList ps)
+  | .scenario name ps _ => .scenario name (stripAdvisoryList ps) []
+  | p => p
+
+def stripAdvisoryList : List Phrase → List Phrase
+  | [] => []
+  | p :: ps => stripAdvisoryPhrase p :: stripAdvisoryList ps
+end
+
+mutual
+def permutePhrase (perm : List (String × String)) : Phrase → Phrase
+  | .trigger xs t _ => .trigger xs (permuteTerm perm t) none
+  | .create xs t => .create xs (permuteTerm perm t)
+  | .terminate xs t => .terminate xs (permuteTerm perm t)
+  | .obfuscate xs t => .obfuscate xs (permuteTerm perm t)
+  | .query t => .query (permuteTerm perm t)
+  | .instQuery b xs t => .instQuery b xs (permuteTerm perm t)
+  | .par ps => .par (permutePhraseList perm ps)
+  | .scenario name ps spans => .scenario name (permutePhraseList perm ps) spans
+  | .expect w neg t => .expect w neg (permuteTerm perm t)
+  | .setTime t => .setTime (permuteTerm perm t)
+  | .why t => .why (permuteTerm perm t)
+  | .submitEvidence pol t src => .submitEvidence pol (permuteTerm perm t) src
+  | .retractEvidence t src => .retractEvidence (permuteTerm perm t) src
+  | p => p
+
+def permutePhraseList (perm : List (String × String)) : List Phrase → List Phrase
+  | [] => []
+  | p :: ps => permutePhrase perm p :: permutePhraseList perm ps
+end
+
+/-- Execute `phrases` (including `Scenario`s) purely and return `(errors, failedClaims, judgmentSignature)`. -/
+def evalMetamorphicSignature (phrases : List Phrase) : Nat × Nat × List (TriBool × TriBool × Bool) := Id.run do
+  let mut cfg : Config := {}
+  let mut errs := 0
+  let mut fails := 0
+  let mut sig : List (TriBool × TriBool × Bool) := []
+  let procOuts (outs : List Output) : Nat × Nat × List (TriBool × TriBool × Bool) := Id.run do
+    let mut e := 0
+    let mut fl := 0
+    let mut sg : List (TriBool × TriBool × Bool) := []
+    for o in outs do
+      match o with
+      | .diag dg => if dg.isError then e := e + 1
+      | .queryRes ok => if !ok then fl := fl + 1
+      | .expectRes _ _ ok => if !ok then fl := fl + 1
+      | .executed info => sg := sg ++ [(info.lawfulTri, info.validTri, info.valid)]
+      | _ => pure ()
+    return (e, fl, sg)
+  for p in phrases do
+    match p with
+    | .scenario _ ps _ =>
+      let mut scCfg := cfg
+      for sp in ps do
+        let (c', outs) := runPhrase scCfg sp
+        scCfg := c'
+        let (e, fl, sg) := procOuts outs
+        errs := errs + e; fails := fails + fl; sig := sig ++ sg
+    | _ =>
+      let (c', outs) := runPhrase cfg p
+      cfg := c'
+      let (e, fl, sg) := procOuts outs
+      errs := errs + e; fails := fails + fl; sig := sig ++ sg
+  return (errs, fails, sig)
+
+/-- Run `T04` (advisory stripping) and `T05` (non-salient actor permutation) metamorphic checks. -/
+def checkMetamorphicImpartiality (path : System.FilePath) : IO (Option String) := do
+  let (items, loadDiags) ← loadProgram path
+  if loadDiags.any Diagnostic.isError then return none
+  let phrases := items.filterMap fun l => match l.item.val with | .inr p => some p | .inl _ => none
+  let baseSig := evalMetamorphicSignature phrases
+  -- 1. T04: strip all Clause, Document, From, and Note advisory metadata
+  let strippedSig := evalMetamorphicSignature (stripAdvisoryList phrases)
+  if strippedSig != baseSig then
+    return some "metamorphic T04 failure: stripping advisory Note/Clause/From metadata changed verdicts"
+  -- 2. T05: build cyclic permutation over interchangeable enumeration atoms
+  let mut finalSpec := emptySpec
+  for p in phrases do
+    match resolvePhrase finalSpec p with
+    | .ok (s', _, _) => finalSpec := s'
+    | .error _ => pure ()
+  let salient := specRuleConstants finalSpec
+  let mut perm : List (String × String) := []
+  for (_, ts) in finalSpec.decls do
+    match ts.domain with
+    | .strings ss =>
+      let freeAtoms := ss.filter fun a => !salient.contains a
+      if freeAtoms.length ≥ 2 then
+        let rotated := freeAtoms.drop 1 ++ [freeAtoms.headD ""]
+        perm := perm ++ (freeAtoms.zip rotated)
+    | _ => pure ()
+  if !perm.isEmpty then
+    let permSig := evalMetamorphicSignature (permutePhraseList perm phrases)
+    if permSig != baseSig then
+      return some "metamorphic T05 failure: permuting interchangeable actor/entity atoms changed verdicts"
+  return none
 
 /-- The verdict on a file: passed, and why in one phrase. -/
 def verdict (d : Directives) (denyWarnings : Bool) (stats : RunStats) : Bool × String :=
@@ -209,6 +413,9 @@ def testCommand (args : List String) : IO UInt32 := do
     }
     let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, scenarioFilter := fl.scenarios, explore := depth, exploreMenu := menu, assurance } f
     let stats := if d.menuErrors.isEmpty then stats else { stats with errors := stats.errors + d.menuErrors.length }
+    let metaErr? ← if opts.metamorphic || d.metamorphic then checkMetamorphicImpartiality f else pure none
+    if let some me := metaErr? then IO.eprintln s!"{f}: error: {me}"
+    let stats := if metaErr?.isSome then { stats with errors := stats.errors + 1 } else stats
     let (outcome, why) := verdict d assurance.denyWarnings stats
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)

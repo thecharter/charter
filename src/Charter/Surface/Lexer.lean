@@ -80,7 +80,7 @@ def wordKeywords : List String :=
 non-terminator token, so `?valid(5)` and `?valid .` still query a fact named `valid` while
 `?valid do(x)` is the claim (D17). -/
 def claimKeywords : List String :=
-  [ "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
+  [ "?!undetermined", "?undetermined", "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
 
 /-- Symbol keywords, longest first. -/
 def symbolKeywords : List String :=
