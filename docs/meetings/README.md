@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D18 — Canonical `CIR` evolves from `Core.Spec` with `LawVersion` epochs and pure-Lean SHA-256 `Artifact` digests](2026-11-06-D18-canonical-cir-and-artifact-hashing.md)
 - [D17 — Charter's single-word additions are contextual keywords; one unified grammar parses all `.charter` and `.eflint` programs](2026-11-06-D17-unified-contextual-eflint-superset.md)
 - [D16 — `Duration * Int`, `Int * Duration` and `Duration / Int` are durations; a duration is never multiplied by a duration, an instant is never scaled](2026-10-24-D16-duration-times-int.md)
 - [D15 — An act whose domain is not enumerable is judged for the instance asked about: `Holds when` is read with the components bound, never materialised (fifth eFLINT tolerance)](2026-10-24-D15-an-act-that-names-an-amount-is-judged-for-the-instance.md)

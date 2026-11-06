@@ -17,6 +17,7 @@ ESC=Examples/ServiceEscrow/service-escrow.charter
   "$B" help
   "$B" version
   "$B" check "$TEN" "$COM" "$ESC"
+  "$B" build "$ESC" -o "$tmp/escrow.artifact"
   "$B" check
   "$B" trace T.1 "$TEN"
   "$B" trace SE.2 "$ESC"

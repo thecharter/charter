@@ -1,0 +1,8 @@
+// 018.2 / D18: mid-stream declarations segment cleanly into successive LawVersion epochs
+// while preserving state and derived facts.
+Fact member Identified by Alice, Bob.
++member(Alice).
+?member(Alice).
+
+Extend Fact member Derived from Bob When member(Alice).
+?member(Bob).

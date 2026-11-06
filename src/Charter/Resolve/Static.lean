@@ -47,7 +47,7 @@ inductive CPhrase where
   | tick
   /-- Charter (Law 6): `?why e`, `xs` bound to every instance. -/
   | why (xs : List Var) (t : Term)
-  deriving Inhabited
+  deriving Repr, Inhabited
 
 namespace Resolve
 

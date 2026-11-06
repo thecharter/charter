@@ -51,6 +51,22 @@
       "summary": "Per-phrase kernel_rfl checkpoints compose into whole-program and scenario summary decisions with zero axioms (spec 013.4)."
     },
     {
+      "id": "artifact.sha256_fips_vectors",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Artifact/Hash.lean",
+      "symbol": "sha256_nist_vectors",
+      "summary": "Pure-Lean kernel-reducible SHA-256 implementation matches empty, single-block, and multi-block NIST FIPS 180-4 test vectors via rfl (D18)."
+    },
+    {
+      "id": "cir.elaborate_epochs_well_formed",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Resolve/ElaborateCIR.lean",
+      "symbol": "elaboratePhrases_epochs_wellFormed",
+      "summary": "Every CIR LawVersion epoch emitted by elaboratePhrases satisfies Spec.WellFormed (closed domains, resolved aliases, valid act/duty targets, and stratifiable derivations, D18)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

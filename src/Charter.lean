@@ -32,8 +32,12 @@ import Charter.Surface.Pretty
 import Charter.Core.Term
 import Charter.Core.Spec
 import Charter.Core.State
+import Charter.Core.Derivation
+import Charter.Artifact.Hash
 import Charter.Resolve.Static
+import Charter.Resolve.ElaborateCIR
 import Charter.Resolve.AssuranceGates
+import Charter.Artifact.Format
 import Charter.Eval.Eval
 import Charter.Eval.Interpreter
 import Charter.Eval.Properties
@@ -45,6 +49,7 @@ import Charter.Cli.Test
 import Charter.Cli.Repl
 import Charter.Cli.Prove
 import Charter.Cli.Fmt
+import Charter.Cli.Build
 import Charter.Cli.Main
 
 /-!
