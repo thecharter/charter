@@ -1,0 +1,10 @@
+// 018.2: under `--forbid-midstream-decls` and `--require-complete-explore`, top-level
+// declarations after state/execution phrases raise CHR030 and un-explored invariants raise CHR031.
+//! forbid-midstream-decls
+//! require-complete-explore
+//! expect-error: CHR030
+//! expect-error: CHR031
+Fact member Identified by Alice.
+Invariant always-ok When True.
++member(Alice).
+Fact late-decl Identified by Bob.

@@ -24,8 +24,9 @@ def helpText : String :=
   "  repl    [file.charter]                  interactive institutional session\n" ++
   "  version                                 print version\n" ++
   "  help                                    print this command summary\n" ++
-  "Shared flags (check, run, test): --out json, --eflint, --scenario <name>, --explore <depth>, --explore-domain \"type = values\"\n" ++
-  "Corpus flags (test): --expect <outcomes>, --tolerate <tolerances.md>"
+  "Shared flags (check, run, test): --out json, --scenario <name>, --explore <depth>, --explore-domain \"type = values\"\n" ++
+  "Assurance gates (check, run, test): --require-provenance, --forbid-midstream-decls, --require-complete-explore, --deny-warnings\n" ++
+  "Corpus flags (test): --expect <outcomes>, --tolerate <tolerances.json>"
 
 def main (args : List String) : IO UInt32 := do
   match args with

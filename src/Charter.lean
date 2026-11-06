@@ -32,6 +32,7 @@ import Charter.Core.Term
 import Charter.Core.Spec
 import Charter.Core.State
 import Charter.Resolve.Static
+import Charter.Resolve.AssuranceGates
 import Charter.Eval.Eval
 import Charter.Eval.Interpreter
 import Charter.Eval.Properties

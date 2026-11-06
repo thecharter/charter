@@ -22,4 +22,6 @@ Every norm carries its English, and the English leads (Law 8). A program names i
 
 **12.9 Tracing.** `charter trace <clause> <file>` prints the clause's span table: register, text, and the rules each span means, with the approval state and current hash.
 
+**12.10 Required provenance gate (`--require-provenance`).** By default, a program with neither `Document` nor `Clause`s skips provenance checks (for eFLINT scripts and standard-library modules), and an unreadable `Document` file is a warning (12.7). Passing `--require-provenance` (or `//! require-provenance`) raises `CHR029` when a program declares normative rules without an authoritative readable `Document` and `Clause` coverage (`docs/rfc.md` §12.1, T08). `test/spec/spec_012_8_require_provenance.charter`
+
 *Reused from v0.3:* the records `Clause`, `Span`, `Register` and the functions `covered`, `normsInterpreted`, `reverseProvenanceWith`, `stale`, `invalidated` in `src/Charter/Core/Provenance.lean` are the same definitions the v0.3 checker used (Law 13: one definition).

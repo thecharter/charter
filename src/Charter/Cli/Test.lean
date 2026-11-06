@@ -125,6 +125,8 @@ structure Directives where
   exploreMenu    : Explore.Menu := []
   /-- A malformed `explore-domain` line, reported as CHR001 against the file. -/
   menuErrors     : List String := []
+  /-- Inline opt-in static assurance gates (`//! require-provenance`, etc.). -/
+  assurance      : AssuranceOpts := {}
 
 def readDirectives (src : String) : Directives :=
   src.splitOn "\n" |>.foldl (fun d line =>
@@ -136,6 +138,10 @@ def readDirectives (src : String) : Directives :=
       else if body.startsWith "known-issue:" then { d with knownIssue := some (body.drop 12).trim }
       else if body.startsWith "expect-failed-claims:" then { d with expectFailedClaims := (body.drop 21).trim.toNat? }
       else if body.startsWith "explore:" then { d with explore := (body.drop 8).trim.toNat? }
+      else if body == "require-provenance" then { d with assurance := { d.assurance with requireProvenance := true } }
+      else if body == "forbid-midstream-decls" then { d with assurance := { d.assurance with forbidMidstreamDecls := true } }
+      else if body == "require-complete-explore" then { d with assurance := { d.assurance with requireCompleteExplore := true } }
+      else if body == "deny-warnings" then { d with assurance := { d.assurance with denyWarnings := true } }
       else if body.startsWith "explore-domain:" then
         match parseMenuLine (body.drop 15).trim with
         | .ok entry => { d with exploreMenu := d.exploreMenu ++ [entry] }
@@ -144,17 +150,22 @@ def readDirectives (src : String) : Directives :=
     else d) {}
 
 /-- The verdict on a file: passed, and why in one phrase. -/
-def verdict (d : Directives) (stats : RunStats) : Bool × String :=
+def verdict (d : Directives) (denyWarnings : Bool) (stats : RunStats) : Bool × String :=
   if !d.expectErrors.isEmpty || !d.expectWarnings.isEmpty then
     let missing := (d.expectErrors ++ d.expectWarnings).filter (fun c => !stats.codes.contains c)
     if missing.isEmpty then (true, s!"expected diagnostics reported: {", ".intercalate (d.expectErrors ++ d.expectWarnings)}")
     else (false, s!"expected diagnostics missing: {", ".intercalate missing}; reported: {", ".intercalate stats.codes}")
   else match d.expectFailedClaims, d.knownIssue with
     | some n, _ =>
-      if stats.errors == 0 && stats.failedQueries == n then (true, s!"exactly {n} failed claim(s), as expected")
+      if stats.errors == 0 && stats.failedQueries == n && (!denyWarnings || stats.warnings == 0) then
+        (true, s!"exactly {n} failed claim(s), as expected")
       else (false, s!"expected exactly {n} failed claim(s) and no error; got {stats.failedQueries} and {stats.errors} error(s)")
-    | none, some why => if stats.ok then (false, s!"known issue unexpectedly passes ({why}); delete the directive") else (true, s!"known issue, still failing ({why})")
-    | none, none => (stats.ok, s!"{stats.errors} error(s), {stats.failedQueries} failed claim(s)")
+    | none, some why =>
+      if stats.ok denyWarnings then (false, s!"known issue unexpectedly passes ({why}); delete the directive")
+      else (true, s!"known issue, still failing ({why})")
+    | none, none =>
+      let warnNote := if denyWarnings && stats.warnings > 0 then s!", {stats.warnings} denied warning(s)" else ""
+      (stats.ok denyWarnings, s!"{stats.errors} error(s), {stats.failedQueries} failed claim(s){warnNote}")
 
 /-- `charter test <paths…> [--expect file] [--tolerate file] [--out json]` -/
 def testCommand (args : List String) : IO UInt32 := do
@@ -190,9 +201,15 @@ def testCommand (args : List String) : IO UInt32 := do
     for e in d.menuErrors do
       IO.eprintln s!"{f}: error CHR001: {e}"
     let menu := d.exploreMenu ++ fl.exploreMenu
-    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, scenarioFilter := fl.scenarios, explore := depth, exploreMenu := menu } f
+    let assurance : AssuranceOpts := {
+      requireProvenance := d.assurance.requireProvenance || fl.assurance.requireProvenance
+      forbidMidstreamDecls := d.assurance.forbidMidstreamDecls || fl.assurance.forbidMidstreamDecls
+      requireCompleteExplore := d.assurance.requireCompleteExplore || fl.assurance.requireCompleteExplore
+      denyWarnings := d.assurance.denyWarnings || fl.assurance.denyWarnings
+    }
+    let stats ← runProgram { testMode := true, json, eflint := fl.eflint, scenarios := true, scenarioFilter := fl.scenarios, explore := depth, exploreMenu := menu, assurance } f
     let stats := if d.menuErrors.isEmpty then stats else { stats with errors := stats.errors + d.menuErrors.length }
-    let (outcome, why) := verdict d stats
+    let (outcome, why) := verdict d assurance.denyWarnings stats
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)
     match expected.find? (fun (p, _) => endsWithPath fS p) with

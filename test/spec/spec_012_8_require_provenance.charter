@@ -1,0 +1,6 @@
+// 012.10 (T08): under `--require-provenance`, a program declaring normative rules
+// without an authoritative `Document` and `Clause`s fails with CHR029.
+//! require-provenance
+//! expect-error: CHR029
+Fact member Identified by Alice.
+Act join Actor member Holds when True.

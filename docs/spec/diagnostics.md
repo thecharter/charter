@@ -43,6 +43,9 @@ more errors); `warning` does not.
 | CHR026 | error | `Overridden by` names something that is not a duty (007.3) | `Charter.Resolve` |
 | CHR027 | error | `Terminated by` or `Created by` names an act that lacks one of the duty's components, so it cannot bind it (006.4) | `Charter.Resolve` |
 | CHR028 | warning | `Exists` or `Forall` over an enumerable type with a constant `True`/`False` body: it tests only whether the domain is non-empty, ignoring whether any instance holds (010.6) | `Charter.Resolve` |
+| CHR029 | error | under `--require-provenance`: normative rules lack an authoritative readable `Document` and `Clause` coverage (012.10, T08) | `Charter.Resolve.AssuranceGates` |
+| CHR030 | error | under `--forbid-midstream-decls`: a declaration phrase appears after an execution, assignment, or query phrase at top level (018.2) | `Charter.Resolve.AssuranceGates` |
+| CHR031 | error | under `--require-complete-explore`: invariants are declared without a positive exploration depth (`--explore N` or `//! explore: N`) (018.2) | `Charter.Resolve.AssuranceGates` |
 
 ## Evaluation (CHR100–CHR149)
 

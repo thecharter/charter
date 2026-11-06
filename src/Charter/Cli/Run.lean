@@ -1,5 +1,6 @@
 import Charter.Cli.Load
 import Charter.Cli.Provenance
+import Charter.Resolve.AssuranceGates
 import Charter.Eval.Interpreter
 import Lean.Data.Json
 
@@ -36,6 +37,8 @@ structure RunOpts where
   explore   : Nat := 0
   /-- D15: candidate values per type for the components of judged acts (`explore-domain`). -/
   exploreMenu : Explore.Menu := []
+  /-- Opt-in static assurance gates (`docs/rfc.md` §12.1). -/
+  assurance : AssuranceOpts := {}
 
 structure RunStats where
   phrases       : Nat := 0
@@ -46,7 +49,8 @@ structure RunStats where
   codes         : List String := []
   deriving Repr
 
-def RunStats.ok (s : RunStats) : Bool := s.errors == 0 && s.failedQueries == 0
+def RunStats.ok (s : RunStats) (denyWarnings : Bool := false) : Bool :=
+  s.errors == 0 && s.failedQueries == 0 && (!denyWarnings || s.warnings == 0)
 
 def yesNo (b : Bool) : String := if b then "yes" else "no"
 
@@ -107,7 +111,7 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       stats := { stats with codes := stats.codes ++ [d.code] }
       if d.isError then stats := { stats with errors := stats.errors + 1 }
       else stats := { stats with warnings := stats.warnings + 1 }
-      if d.isError || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
+      if d.isError || o.assurance.denyWarnings || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
     | .queryRes ok =>
       if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
       let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("about", "holds"),
@@ -260,16 +264,16 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
 
 /-- Print the provenance report of a resolved spec (Law 8); returns the number of
 failed checks. -/
-def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO Nat := do
-  if spec.clauses.isEmpty && spec.document.isNone then return 0
+def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × Option (Except String String)) := do
   let doc? ← readDocument spec programDir
+  if spec.clauses.isEmpty && spec.document.isNone then return (0, doc?)
   let claims := provenanceReport spec doc?
   let mut failed := 0
   for c in claims do
-    if !c.ok then failed := failed + 1
+    if !c.ok || (o.assurance.denyWarnings && c.warn) then failed := failed + 1
     if o.json then IO.println c.json.compress
     else if !c.ok || c.warn || !o.testMode then IO.println c.render
-  return failed
+  return (failed, doc?)
 
 /-- Run a whole program. In test mode the provenance checks run at the end and a
 failed check is a failed claim. -/
@@ -280,6 +284,11 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     emit o (diagJson d) d.render (toErr := true)
     stats := { stats with codes := stats.codes ++ [d.code] }
     if d.isError then stats := { stats with errors := stats.errors + 1 }
+    else stats := { stats with warnings := stats.warnings + 1 }
+  if o.assurance.forbidMidstreamDecls then
+    for d in AssuranceGates.checkMidstreamDecls (items.map fun l => (l.file, l.item)) do
+      emit o (diagJson d) d.render (toErr := true)
+      stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   let mut cfg : Config := {}
   for l in items do
     let (cfg', stats') ← stepItem o cfg stats l
@@ -292,18 +301,27 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
       let d := (Diagnostic.error "CHR003" s!"unknown scenario `{wanted}` (declared scenarios: {avail})").withFile path.toString
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
+  if o.assurance.requireCompleteExplore then
+    for d in AssuranceGates.checkCompleteExploreGate path.toString cfg.spec o.explore do
+      emit o (diagJson d) d.render (toErr := true)
+      stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   if o.scenarioFilter.isEmpty then
     stats ← exploreFrom o s!"{path}" cfg stats
-  let failedProv ← reportProvenance o cfg.spec (path.parent.getD ".")
+  let (failedProv, doc?) ← reportProvenance o cfg.spec (path.parent.getD ".")
+  if o.assurance.requireProvenance then
+    for d in AssuranceGates.checkProvenanceGate path.toString cfg.spec doc? do
+      emit o (diagJson d) d.render (toErr := true)
+      stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   return { stats with failedQueries := stats.failedQueries + failedProv }
 
-/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`, `--scenario <name>`. -/
+/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`, `--scenario <name>`, and assurance gates. -/
 structure RunFlags where
   json    : Bool := false
   eflint  : Bool := false
   explore : Nat := 0
   exploreMenu : Explore.Menu := []
   scenarios : List String := []
+  assurance : AssuranceOpts := {}
   rest    : List String := []
 
 def takeFlags (args : List String) : Except String RunFlags :=
@@ -314,6 +332,10 @@ def takeFlags (args : List String) : Except String RunFlags :=
     | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
     | ["--out"], _ => .error "--out needs json or text"
     | "--eflint" :: rest, f => go rest { f with eflint := true }
+    | "--require-provenance" :: rest, f => go rest { f with assurance := { f.assurance with requireProvenance := true } }
+    | "--forbid-midstream-decls" :: rest, f => go rest { f with assurance := { f.assurance with forbidMidstreamDecls := true } }
+    | "--require-complete-explore" :: rest, f => go rest { f with assurance := { f.assurance with requireCompleteExplore := true } }
+    | "--deny-warnings" :: rest, f => go rest { f with assurance := { f.assurance with denyWarnings := true } }
     | "--scenario" :: s :: rest, f => go rest { f with scenarios := f.scenarios ++ [s] }
     | ["--scenario"], _ => .error "--scenario needs a scenario name"
     | "--explore" :: n :: rest, f => match n.toNat? with
@@ -327,21 +349,21 @@ def takeFlags (args : List String) : Except String RunFlags :=
     | a :: rest, f => go rest { f with rest := a :: f.rest }
   go args {}
 
-def summaryJson (stats : RunStats) : Json :=
+def summaryJson (stats : RunStats) (denyWarnings : Bool := false) : Json :=
   Json.mkObj [("kind", "summary"), ("phrases", Json.num stats.phrases), ("errors", Json.num stats.errors),
-    ("warnings", Json.num stats.warnings), ("failedQueries", Json.num stats.failedQueries), ("ok", Json.bool stats.ok)]
+    ("warnings", Json.num stats.warnings), ("failedQueries", Json.num stats.failedQueries), ("ok", Json.bool (stats.ok denyWarnings))]
 
-/-- `charter run <file.eflint> [--out json] [--eflint] [--scenario <name>]` -/
+/-- `charter run <file.charter> [--out json] [--eflint] [--scenario <name>]` -/
 def runCommand (args : List String) : IO UInt32 := do
   match takeFlags args with
   | .error e => IO.eprintln s!"charter run: {e}"; return 2
-  | .ok { json, eflint, explore, exploreMenu, scenarios, rest := [f] } =>
-    let stats ← runProgram { json, eflint, explore, exploreMenu, scenarios := !scenarios.isEmpty, scenarioFilter := scenarios } f
-    if json then IO.println (summaryJson stats).compress
+  | .ok { json, eflint, explore, exploreMenu, scenarios, assurance, rest := [f] } =>
+    let stats ← runProgram { json, eflint, explore, exploreMenu, scenarios := !scenarios.isEmpty, scenarioFilter := scenarios, assurance } f
+    if json then IO.println (summaryJson stats assurance.denyWarnings).compress
     else IO.println s!"{stats.phrases} phrase(s), {stats.errors} error(s), {stats.failedQueries} failed claim(s)"
-    return (if stats.ok then 0 else 1)
+    return (if stats.ok assurance.denyWarnings then 0 else 1)
   | .ok _ =>
-    IO.eprintln "usage: charter run <file.charter> [--out json] [--eflint] [--scenario <name>] [--explore <depth>] [--explore-domain \"type = values\"]"
+    IO.eprintln "usage: charter run <file.charter> [--out json] [--eflint] [--scenario <name>] [--explore <depth>] [--explore-domain \"type = values\"] [--require-provenance] [--forbid-midstream-decls] [--require-complete-explore] [--deny-warnings]"
     return 2
 
 /-- `charter check <file.charter> ... [--out json] [--eflint]`: resolve every phrase in
@@ -351,9 +373,9 @@ def checkCommand (args : List String) : IO UInt32 := do
     | .error e => IO.eprintln s!"charter check: {e}"; return 2
     | .ok r => pure r
   if fl.rest.isEmpty then
-    IO.eprintln "usage: charter check <file.charter> ... [--out json] [--eflint]"
+    IO.eprintln "usage: charter check <file.charter> ... [--out json] [--eflint] [--require-provenance] [--forbid-midstream-decls] [--deny-warnings]"
     return 2
-  let o : RunOpts := { json := fl.json, eflint := fl.eflint }
+  let o : RunOpts := { json := fl.json, eflint := fl.eflint, assurance := fl.assurance }
   let mut status : UInt32 := 0
   for f in fl.rest do
     let (items, loadDiags) ← loadProgram f fl.eflint
@@ -362,6 +384,10 @@ def checkCommand (args : List String) : IO UInt32 := do
     for d in loadDiags do
       emit o (diagJson d) d.render (toErr := true)
       if d.isError then errors := errors + 1 else warnings := warnings + 1
+    if fl.assurance.forbidMidstreamDecls then
+      for d in AssuranceGates.checkMidstreamDecls (items.map fun l => (l.file, l.item)) do
+        emit o (diagJson d) d.render (toErr := true)
+        errors := errors + 1
     let mut spec := emptySpec
     for l in items do
       match l.item.val with
@@ -379,14 +405,19 @@ def checkCommand (args : List String) : IO UInt32 := do
             let w := (w.withFile l.file).withPos l.item.pos
             emit o (diagJson w) w.render (toErr := true)
             warnings := warnings + 1
-    let failedProv ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
+    let (failedProv, doc?) ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
     errors := errors + failedProv
+    if fl.assurance.requireProvenance then
+      for d in AssuranceGates.checkProvenanceGate f spec doc? do
+        emit o (diagJson d) d.render (toErr := true)
+        errors := errors + 1
+    let failedTotal := errors != 0 || (fl.assurance.denyWarnings && warnings != 0)
     let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses, {warnings} warning(s))"
     let failLine := s!"FAIL {f}: {errors} error(s) or failed checks, {warnings} warning(s)"
     emit o (Json.mkObj [("kind", "summary"), ("file", Json.str f), ("phrases", Json.num items.length),
-      ("errors", Json.num errors), ("warnings", Json.num warnings), ("ok", Json.bool (errors == 0))])
-      (if errors == 0 then okLine else failLine)
-    if errors != 0 then status := 1
+      ("errors", Json.num errors), ("warnings", Json.num warnings), ("ok", Json.bool (!failedTotal))])
+      (if !failedTotal then okLine else failLine)
+    if failedTotal then status := 1
   return status
 
 /-- `charter trace <clause> <file.eflint>`: the span table of one clause. -/
