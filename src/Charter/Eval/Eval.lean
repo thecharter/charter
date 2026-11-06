@@ -21,8 +21,21 @@ namespace Charter
 abbrev Subs := List (Var × Tagged)
 
 structure Ctx where
-  spec  : Spec
-  state : State
+  spec     : Spec
+  state    : State
+  specIdx  : Spec.SpecIndex := .empty
+  stateIdx : State.StateIndex := .empty
+  indexed  : Bool := false
+
+namespace Ctx
+
+def ofIdx (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Ctx :=
+  { spec, state, specIdx, stateIdx := state.buildIndex, indexed := true }
+
+def of (spec : Spec) (state : State) : Ctx :=
+  ofIdx spec spec.buildIndex state
+
+end Ctx
 
 /-- The evaluation monad: a context and bindings in, a list of results or an error out. -/
 structure M (α : Type) where
@@ -34,7 +47,8 @@ instance : Monad M where
   pure a := ⟨fun _ _ => .ok [a]⟩
   bind m f := ⟨fun c s => do
     let as ← m.run c s
-    as.foldlM (fun acc a => do let bs ← (f a).run c s; pure (acc ++ bs)) []⟩
+    let bss ← as.mapM (fun a => (f a).run c s)
+    pure bss.flatten⟩
 
 def err {α} (e : RuntimeError) : M α := ⟨fun _ _ => .error e⟩
 
@@ -89,14 +103,41 @@ def checkFalse (m : M Value) : M Unit := do
   | .bool false => pure ()
   | _ => empty
 
-def getTypeSpec (d : DomId) : M TypeSpec := do
-  match (← getSpec).findDecl d with
-  | some t => pure t
-  | none => err (.undeclaredType d)
+def getTypeEntry (d : DomId) : M (TypeSpec × Bool × Option (List Term)) := ⟨fun c _ =>
+  if c.indexed then
+    match c.specIdx.lookup d with
+    | some entry => .ok [entry]
+    | none => .error (.undeclaredType d)
+  else
+    match c.spec.findDecl d with
+    | some t => .ok [(t, c.spec.enumerable t.domain, c.spec.judgedRule d)]
+    | none => .error (.undeclaredType d)⟩
 
-def getDom (d : DomId) : M (Domain × Term) := do
-  let t ← getTypeSpec d
-  pure (t.domain, t.domainConstraint)
+def getTypeSpec (d : DomId) : M TypeSpec := (·.1) <$> getTypeEntry d
+
+def getDom (d : DomId) : M (Domain × Term) :=
+  (fun (t, _, _) => (t.domain, t.domainConstraint)) <$> getTypeEntry d
+
+def lookupState (te : Tagged) : M (Option Info) := ⟨fun c _ =>
+  if c.indexed then
+    let bucket := (c.stateIdx.lookup te.2).getD []
+    .ok [(bucket.find? (·.1 == te)).map (·.2)]
+  else .ok [c.state.lookup te]⟩
+
+def trueInstancesOf (d : DomId) : M (List Tagged) := ⟨fun c _ =>
+  if c.indexed then
+    let now := c.state.time
+    let bucket := (c.stateIdx.lookup d).getD []
+    .ok [bucket.filterMap fun (te, i) => if i.value && i.live now then some te else none]
+  else .ok [c.state.trueInstances d]⟩
+
+def assignedInstancesOf (d : DomId) : M (List Tagged × List Tagged) := ⟨fun c _ =>
+  if c.indexed then
+    let now := c.state.time
+    let bucket := (c.stateIdx.lookup d).getD []
+    .ok [(bucket.filterMap fun (te, i) => if i.live now then some te else none,
+          bucket.filterMap fun (te, i) => if !(i.live now) then some te else none)]
+  else .ok [c.state.assignedInstances d]⟩
 
 def substituteVar (x : Var) : M Tagged := do
   let spec ← getSpec
@@ -164,20 +205,24 @@ def everyValidSubs : Nat → Var → M Tagged
   | 0, _ => err (.fuelExhausted "binding a variable")
   | fuel + 1, x => do
     let spec ← getSpec
-    let state ← getState
     let d := spec.removeDecoration x
-    let (dom, filter) ← getDom d
-    if spec.enumerable dom then
+    let (tspec, isEnum, _) ← getTypeEntry d
+    let dom := tspec.domain
+    let filter := tspec.domainConstraint
+    if isEnum then
       let e ← instantiateDomain fuel d dom
       let te : Tagged := (e, d)
-      withSubs (Tagged.bindings dom te) (checkTrue (eval fuel filter))
-      pure te
+      if filter.isTrueLit then pure te
+      else do
+        withSubs (Tagged.bindings dom te) (checkTrue (eval fuel filter))
+        pure te
     else
-      match spec.closedType d with
-      | some false =>
-        let (trues, falses) := state.assignedInstances d
+      if !tspec.isClosed then
+        let (trues, falses) ← assignedInstancesOf d
         if trues.isEmpty && falses.isEmpty then err (.missingInput (.instances d)) else nd trues
-      | _ => nd (state.trueInstances d)
+      else
+        let trues ← trueInstancesOf d
+        nd trues
 termination_by structural n => n
 
 /-- Whether an instance is well-formed: in its domain and passing the constraint. -/
@@ -185,7 +230,9 @@ def isValidInstance : Nat → Tagged → M Bool
   | 0, _ => err (.fuelExhausted "checking an instance")
   | fuel + 1, te => do
     let (dom, filter) ← getDom te.2
-    let check : M Bool := withSubs (Tagged.bindings dom te) (whenBool (eval fuel filter) pure)
+    let check : M Bool :=
+      if filter.isTrueLit then pure true
+      else withSubs (Tagged.bindings dom te) (whenBool (eval fuel filter) pure)
     match te.1, dom with
     | .int i, .ints is => if is.contains i then check else pure false
     | .int _, .anyInt => check
@@ -208,9 +255,11 @@ def satConditions : Nat → Tagged → M Bool
     if !(← isValidInstance fuel te) then pure false
     else
       let tspec ← getTypeSpec te.2
-      withSubs (Tagged.bindings tspec.domain te) do
-        let bs ← tspec.conditions.mapM (fun c => whenBool (eval fuel c) pure)
-        pure (bs.all id)
+      if tspec.conditions.isEmpty then pure true
+      else
+        withSubs (Tagged.bindings tspec.domain te) do
+          let bs ← tspec.conditions.mapM (fun c => whenBool (eval fuel c) pure)
+          pure (bs.all id)
 termination_by structural n => n
 
 /-- Whether an instance holds (eFLINT `is_holds`): its assignment, or false for a
@@ -220,24 +269,22 @@ def isHolds : Nat → Tagged → M Bool
   | fuel + 1, te => do
     if !(← isValidInstance fuel te) then pure false
     else
-      let state ← getState
-      let spec ← getSpec
-      match state.lookup te with
-      | some i => pure (i.live state.time)
+      let now ← getTime
+      match ← lookupState te with
+      | some i => pure (i.live now)
       | none =>
-        match spec.judgedRule te.2 with
+        let (tspec, _, judged) ← getTypeEntry te.2
+        match judged with
         | some clauses =>
           -- D15 (brief B11): an act or immunity whose domain is not enumerable is judged
           -- for the instance asked about; its `Holds when` is read with the components bound,
           -- as saturation would have read it had the domain been finite (004.1, 005.5).
-          let tspec ← getTypeSpec te.2
           withSubs (Tagged.bindings tspec.domain te) do
             let rs ← results (do let c ← nd clauses; whenBool (eval fuel c) pure)
             if rs.any id then satConditions fuel te else pure false
         | none =>
-          match spec.closedType te.2 with
-          | some false => err (.missingInput (.assignments [te]))
-          | _ => pure false
+          if !tspec.isClosed then err (.missingInput (.assignments [te]))
+          else pure false
 termination_by structural n => n
 
 /-- Whether an act or event instance is enabled: it holds, its conditions hold,
@@ -452,12 +499,18 @@ def eval : Nat → Term → M Value
       let d := (← getSpec).chaseAlias d
       match dom with
       | .products xs =>
-        let repl := args.substitutions xs
-        let tes ← repl.mapM (fun (x, t) => whenTagged (eval fuel t) (fun te => pure (x, te)))
-        let argsV ← withSubs tes (xs.mapM substituteVar)
-        withSubs (xs.zip argsV) do
-          checkTrue (eval fuel filter)
+        let argsV ← match args with
+          | .named [] => xs.mapM substituteVar
+          | _ =>
+            let repl := args.substitutions xs
+            let tes ← repl.mapM (fun (x, t) => whenTagged (eval fuel t) (fun te => pure (x, te)))
+            withSubs tes (xs.mapM substituteVar)
+        if filter.isTrueLit then
           pure (.tagged (.prod argsV, d))
+        else
+          withSubs (xs.zip argsV) do
+            checkTrue (eval fuel filter)
+            pure (.tagged (.prod argsV, d))
       | _ => err (.primitiveApplication d)
     | .tag t d => do let v ← eval fuel t; tagValue v d
     | .untag t => do let v ← eval fuel t; untagValue v
@@ -495,9 +548,9 @@ def eval : Nat → Term → M Value
         -- D7, Law 7: a condition over the stamp, never an event
         if !(← isHolds fuel te) then pure (.bool false)
         else
-          let state ← getState
-          match state.lookup te with
-          | some i => pure (.bool (state.time - i.since ≥ dur))
+          let now ← getTime
+          match ← lookupState te with
+          | some i => pure (.bool (now - i.since ≥ dur))
           | none => pure (.bool false)))
     | .violated t => whenTagged (eval fuel t) (fun te => .bool <$> isViolated fuel te)
     | .enabled t => whenTagged (eval fuel t) (fun te => .bool <$> isEnabled fuel te)

@@ -193,57 +193,68 @@ def checkFilter {α} (p : α → M Bool) (m : M α) : M α := do
 def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagged) :=
   let dyn (xs : List Var) (t : Term) : M (List Tagged) :=
     foreach M.fuel xs (checkFilter (satConditions M.fuel) (whenTagged (eval M.fuel t) pure))
+  let checkSat (m : M Tagged) : M Tagged :=
+    if tspec.conditions.isEmpty && tspec.domainConstraint.isTrueLit then m
+    else checkFilter (satConditions M.fuel) m
   match c with
   | .holdsWhen t =>
     match tspec.domain with
-    | .products xs => dyn xs (.when (.app d (.named [])) t)
+    | .products xs =>
+      if tspec.domainConstraint.isTrueLit then
+        foreach M.fuel xs do
+          checkTrue (eval M.fuel t)
+          checkSat (whenTagged (eval M.fuel (.app d (.named []))) pure)
+      else dyn xs (.when (.app d (.named [])) t)
     | _ => dyn [⟨d, ""⟩] (.when (.ref ⟨d, ""⟩) t)
   | .dv xs t => dyn xs t
 
-def runM {α} (spec : Spec) (state : State) (m : M α) : Except RuntimeError (List α) :=
-  m.run ⟨spec, state⟩ []
+def runM {α} (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (m : M α) : Except RuntimeError (List α) :=
+  m.run (Ctx.ofIdx spec specIdx state) []
 
 /-- One pass over the derivation clauses of one type; the state and whether it grew.
 `prev` are the derived facts before rebasing, whose stamps re-derived facts keep (D7). -/
-def passType (spec : Spec) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
+def passType (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
     List Derivation → State → Except RuntimeError (State × Bool)
   | [], s => .ok (s, false)
   | c :: cs, s =>
-    match runM spec s (deriveClause d tspec c) with
+    match runM spec specIdx s (deriveClause d tspec c) with
     | .error e => .error e
     | .ok ress =>
       match State.deriveAll prev s ress.flatten with
       | (s1, ch) =>
-        match passType spec prev d tspec cs s1 with
+        match passType spec specIdx prev d tspec cs s1 with
         | .error e => .error e
         | .ok (s2, ch2) => .ok (s2, ch || ch2)
 
 /-- One pass over the types of a stratum; returns the state and whether it grew. -/
-def pass (spec : Spec) (prev : List (Tagged × Info)) : List DomId → State → Except RuntimeError (State × Bool)
+def pass (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) : List DomId → State → Except RuntimeError (State × Bool)
   | [], s => .ok (s, false)
   | d :: ds, s =>
-    match spec.findDecl d with
-    | none => pass spec prev ds s
+    match (specIdx.lookup d).map (·.1) with
+    | none => pass spec specIdx prev ds s
     | some tspec =>
-      match passType spec prev d tspec tspec.derivation s with
+      match passType spec specIdx prev d tspec tspec.derivation s with
       | .error e => .error e
       | .ok (s1, ch) =>
-        match pass spec prev ds s1 with
+        match pass spec specIdx prev ds s1 with
         | .error e => .error e
         | .ok (s2, ch2) => .ok (s2, ch || ch2)
 
-def saturateStratum (spec : Spec) (prev : List (Tagged × Info)) (types : List DomId) : Nat → State → Except RuntimeError State
+def saturateStratum (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (types : List DomId) : Nat → State → Except RuntimeError State
   | 0, _ => .error (.fuelExhausted s!"saturating {", ".intercalate types}")
   | fuel + 1, state =>
-    match pass spec prev types state with
+    match pass spec specIdx prev types state with
     | .error e => .error e
-    | .ok (s', changed) => if changed then saturateStratum spec prev types fuel s' else .ok s'
+    | .ok (s', changed) => if changed then saturateStratum spec specIdx prev types fuel s' else .ok s'
 
 /-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`,
 D6); a fact derived before and again keeps its stamp (D7). -/
-def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
+def rebaseAndSatWithIdx (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
   let prev := state.derivedFacts
-  strata.foldlM (fun s layer => saturateStratum spec prev layer 100000 s) state.rebase
+  strata.foldlM (fun s layer => saturateStratum spec specIdx prev layer 100000 s) state.rebase
+
+def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
+  rebaseAndSatWithIdx spec spec.buildIndex strata state
 
 end Saturate
 
@@ -308,10 +319,11 @@ def triggerViolations (info : TransInfo) (fuel : Nat) : List Output :=
 
 /-- Evaluate a compiled phrase to the store it applies (eFLINT `sem_phrase`).
 `none` means the phrase failed and the configuration is unchanged. -/
-def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store × List Output
+def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat → CPhrase → Option Store × List Output
   | 0, _ => (none, [.diag (Diagnostic.error "CHR104" "phrase too deeply nested")])
   | fuel + 1, p =>
-    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state⟩ []
+    let ctx := Ctx.ofIdx spec specIdx state
+    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx []
     match p with
     | .onlyDecls init => (some init, [])
     | .scenario .. => (some [], [])
@@ -353,9 +365,9 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
       match run (foreach M.fuel xs (whenTagged (eval M.fuel t') pure)) with
       | .error e => (none, [diagOf e])
       | .ok vss => (some [], [.instQueryRes vss.flatten])
-    | .create xs t => effect (.cAll xs t)
-    | .terminate xs t => effect (.tAll xs t)
-    | .obfuscate xs t => effect (.oAll xs t)
+    | .create xs t => effect ctx (.cAll xs t)
+    | .terminate xs t => effect ctx (.tAll xs t)
+    | .obfuscate xs t => effect ctx (.oAll xs t)
     | .trigger xs t =>
       let m : M (Sum DomId (List TransInfo)) := do
         let tes ← foreach M.fuel xs (whenTagged (eval M.fuel t) pure)
@@ -372,27 +384,28 @@ def semPhrase (spec : Spec) (state : State) : Nat → CPhrase → Option Store �
         (some (Store.unions (infos.map (·.assignments))), outs)
       | .ok _ => (none, [.diag (Diagnostic.error "CHR104" "a trigger produced an unexpected number of results")])
     | .par ps =>
-      let rs := ps.map (semPhrase spec state fuel)
+      let rs := ps.map (semPhrase spec specIdx state fuel)
       let outs := rs.flatMap (·.2)
       if rs.all (·.1.isSome) then (some (Store.unions (rs.filterMap (·.1))), outs)
       else (none, outs)
 where
-  effect (e : Effect) : Option Store × List Output :=
-    match (evalEffect M.fuel e).run ⟨spec, state⟩ [] with
+  effect (ctx : Ctx) (e : Effect) : Option Store × List Output :=
+    match (evalEffect M.fuel e).run ctx [] with
     | .error err => (none, [diagOf err])
     | .ok stores => (some (Store.unions stores), [])
 
 /-- Apply a store, saturate, and find the violations (eFLINT `new_context`). `state1`
 is the state after the phrase's assignments (and any clock change). -/
-def newContext (cfg : Config) (spec : Spec) (strata : List (List DomId)) (state1 : State) :
+def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state1 : State) :
     Option Config × List Output :=
-  match Saturate.rebaseAndSat spec strata state1 with
+  match Saturate.rebaseAndSatWithIdx spec specIdx strata state1 with
   | .error e => (none, [diagOf e])
   | .ok state' =>
-    let duties := state'.holdsList.filter fun te => match spec.kindOf te.2 with
-      | some (.duty _) => true
+    let duties := state'.holdsList.filter fun te => match specIdx.lookup te.2 with
+      | some ({ kind := .duty _, .. }, _, _) => true
       | _ => false
-    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec, state'⟩ []
+    let ctx' := Ctx.ofIdx spec specIdx state'
+    let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx' []
     let violatedNow : Except RuntimeError (List Tagged) :=
       duties.filterMapM fun te => do
         let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te (spec.findViolationCond te.2)))
@@ -440,11 +453,12 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       (cfg, warnOuts ++ [.diag (Diagnostic.error "CHR020"
         s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
     | .ok strata =>
+      let specIdx := spec'.buildIndex
       -- the clock (D7): environment input applied before saturation, never a transition
       let clock : Except RuntimeError (Option Int) := match cp with
         | .tick => .ok (some (cfg.state.time + 1))
         | .setTime t =>
-          match (M.eval M.fuel t).run ⟨spec', cfg.state⟩ [] with
+          match (M.eval M.fuel t).run (Ctx.ofIdx spec' specIdx cfg.state) [] with
           | .error e => .error e
           | .ok [.int t] => if t < cfg.state.time then .error (.timeBackwards cfg.state.time t) else .ok (some t)
           | .ok _ => .error (.fuelExhausted "reading the clock")
@@ -455,7 +469,7 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
       let state0 := match newTime with
         | some t => { cfg.state with time := t, step := cfg.state.step + 1 }
         | none => { cfg.state with step := cfg.state.step + 1 }
-      let (store?, outs) := Interp.semPhrase spec' state0 1000 cp
+      let (store?, outs) := Interp.semPhrase spec' specIdx state0 1000 cp
       let outs := match newTime with
         | some t => Output.timeSet t :: outs
         | none => outs
@@ -465,7 +479,8 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
         if !declChanged && newTime.isNone && store.isEmpty then
           -- No declaration, clock, or assignment changed: `state0` is already at its
           -- stratified fixpoint and `cfg.violatedDuties` is unchanged; check invariants (013.1).
-          let run {α} (m : M α) : Except RuntimeError (List α) := m.run ⟨spec', state0⟩ []
+          let ctx0 := Ctx.ofIdx spec' specIdx state0
+          let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx0 []
           let invs : Except RuntimeError (List DomId) :=
             spec'.invariants.filterMapM fun d => do
               let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
@@ -478,7 +493,7 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
             ({ cfg with spec := spec', state := state0 }, warnOuts ++ outs ++ outs2)
         else
           let state1 := State.makeAssignments spec' store state0
-          let (cfg'?, outs2) := Interp.newContext cfg spec' strata state1
+          let (cfg'?, outs2) := Interp.newContext cfg spec' specIdx strata state1
           match cfg'? with
           | none => (cfg, warnOuts ++ outs ++ outs2)
           | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
@@ -568,6 +583,7 @@ candidates for a next step under lawful behaviour. A judged act's candidates com
 the menu or the state (D15). -/
 def enabledActs (menu : Menu) (cfg : Config) : Except RuntimeError (List Tagged) := do
   let spec := cfg.spec
+  let ctx := Ctx.of spec cfg.state
   let acts := spec.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
     | .act _ => some p.1
     | _ => none
@@ -577,26 +593,29 @@ def enabledActs (menu : Menu) (cfg : Config) : Except RuntimeError (List Tagged)
     let m : M (List Tagged) := results (match spec.judgedAct d with
       | some _ => scopeJudged menu M.fuel xs body
       | none => scope M.fuel xs body)
-    let insts ← (ignoreMissingInput m).run ⟨spec, cfg.state⟩ []
+    let insts ← (ignoreMissingInput m).run ctx []
     let insts := insts.flatten
     let enabled ← insts.filterMapM fun te => do
-      let r ← (ignoreMissingInput (isEnabled M.fuel te)).run ⟨spec, cfg.state⟩ []
+      let r ← (ignoreMissingInput (isEnabled M.fuel te)).run ctx []
       pure (if r.any id then some te else none)
     pure (acc ++ enabled)) []
 
 /-- Perform one act instance from a configuration (the `trigger` step without a phrase). -/
 def perform (cfg : Config) (te : Tagged) : Except RuntimeError Config := do
-  let infos ← (instantiateTrans M.fuel [] te).run ⟨cfg.spec, cfg.state⟩ []
+  let specIdx := cfg.spec.buildIndex
+  let ctx := Ctx.ofIdx cfg.spec specIdx cfg.state
+  let infos ← (instantiateTrans M.fuel [] te).run ctx []
   let store := Store.unions (infos.map (·.assignments))
   let state1 := State.makeAssignments cfg.spec store { cfg.state with step := cfg.state.step + 1 }
-  let state' ← Saturate.rebaseAndSat cfg.spec cfg.strata state1
+  let state' ← Saturate.rebaseAndSatWithIdx cfg.spec specIdx cfg.strata state1
   pure { cfg with state := state' }
 
 /-- The invariants that do not hold in a configuration. -/
 def violatedInvariants (cfg : Config) : List DomId :=
+  let ctx := Ctx.of cfg.spec cfg.state
   cfg.spec.invariants.filter fun d =>
     let term := Term.exists_ [⟨d, ""⟩] (.present (.ref ⟨d, ""⟩))
-    match (ignoreMissingInput (checkFalse (eval M.fuel term))).run ⟨cfg.spec, cfg.state⟩ [] with
+    match (ignoreMissingInput (checkFalse (eval M.fuel term))).run ctx [] with
     | .ok rs => !rs.isEmpty
     | .error _ => false
 

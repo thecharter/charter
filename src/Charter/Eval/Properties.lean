@@ -99,9 +99,9 @@ end State
 
 namespace Saturate
 
-theorem passType_unchanged (spec : Spec) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
+theorem passType_unchanged (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
     ∀ (cs : List Derivation) (s s2 : State),
-      passType spec prev d tspec cs s = .ok (s2, false) → s2 = s
+      passType spec specIdx prev d tspec cs s = .ok (s2, false) → s2 = s
   | [], s, s2, h => by
     simp only [passType, Except.ok.injEq, Prod.mk.injEq] at h
     exact h.1.symm
@@ -120,18 +120,18 @@ theorem passType_unchanged (spec : Spec) (prev : List (Tagged × Info)) (d : Dom
         have hch : ch = false := by cases ch <;> simp_all
         have hch2 : ch2 = false := by cases ch2 <;> simp_all
         have e1 : s1 = s := State.deriveAll_unchanged prev ress.flatten s s1 (by rw [h1, hch])
-        have e2 : s2' = s1 := passType_unchanged spec prev d tspec cs s1 s2' (by rw [h2, hch2])
+        have e2 : s2' = s1 := passType_unchanged spec specIdx prev d tspec cs s1 s2' (by rw [h2, hch2])
         rw [← hs, e2, e1]
 
-theorem pass_unchanged (spec : Spec) (prev : List (Tagged × Info)) :
-    ∀ (types : List DomId) (s s2 : State), pass spec prev types s = .ok (s2, false) → s2 = s
+theorem pass_unchanged (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) :
+    ∀ (types : List DomId) (s s2 : State), pass spec specIdx prev types s = .ok (s2, false) → s2 = s
   | [], s, s2, h => by
     simp only [pass, Except.ok.injEq, Prod.mk.injEq] at h
     exact h.1.symm
   | d :: ds, s, s2, h => by
     simp only [pass] at h
     split at h
-    · exact pass_unchanged spec prev ds s s2 h
+    · exact pass_unchanged spec specIdx prev ds s s2 h
     · next tspec _ =>
       split at h
       · cases h
@@ -143,15 +143,15 @@ theorem pass_unchanged (spec : Spec) (prev : List (Tagged × Info)) :
           obtain ⟨hs, hb⟩ := h
           have hch : ch = false := by cases ch <;> simp_all
           have hch2 : ch2 = false := by cases ch2 <;> simp_all
-          have e1 : s1 = s := passType_unchanged spec prev d tspec tspec.derivation s s1 (by rw [h1, hch])
-          have e2 : s2' = s1 := pass_unchanged spec prev ds s1 s2' (by rw [h2, hch2])
+          have e1 : s1 = s := passType_unchanged spec specIdx prev d tspec tspec.derivation s s1 (by rw [h1, hch])
+          have e2 : s2' = s1 := pass_unchanged spec specIdx prev ds s1 s2' (by rw [h2, hch2])
           rw [← hs, e2, e1]
 
 /-- 004.5: the state `saturateStratum` returns is a fixpoint of the stratum's
 derivation step: one more pass derives nothing. -/
-theorem saturateStratum_fixpoint (spec : Spec) (prev : List (Tagged × Info)) (types : List DomId) :
+theorem saturateStratum_fixpoint (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (types : List DomId) :
     ∀ (fuel : Nat) (s s' : State),
-      saturateStratum spec prev types fuel s = .ok s' → pass spec prev types s' = .ok (s', false)
+      saturateStratum spec specIdx prev types fuel s = .ok s' → pass spec specIdx prev types s' = .ok (s', false)
   | 0, _, _, h => by simp [saturateStratum] at h
   | fuel + 1, s, s', h => by
     simp only [saturateStratum] at h
@@ -159,12 +159,12 @@ theorem saturateStratum_fixpoint (spec : Spec) (prev : List (Tagged × Info)) (t
     · cases h
     · next s1 changed heq =>
       split at h
-      · exact saturateStratum_fixpoint spec prev types fuel s1 s' h
+      · exact saturateStratum_fixpoint spec specIdx prev types fuel s1 s' h
       · next hnot =>
         simp only [Except.ok.injEq] at h
         have hc : changed = false := by cases changed <;> simp_all
         rw [hc] at heq
-        have e : s1 = s := pass_unchanged spec prev types s s1 heq
+        have e : s1 = s := pass_unchanged spec specIdx prev types s s1 heq
         subst e
         subst h
         exact heq
@@ -277,9 +277,9 @@ end State
 
 namespace Saturate
 
-theorem passType_lookup (spec : Spec) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
+theorem passType_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
     ∀ (cs : List Derivation) (s s2 : State) (b : Bool) (te : Tagged) (i : Info),
-      s.lookup te = some i → passType spec prev d tspec cs s = .ok (s2, b) → s2.lookup te = some i
+      s.lookup te = some i → passType spec specIdx prev d tspec cs s = .ok (s2, b) → s2.lookup te = some i
   | [], s, s2, b, te, i, h, hp => by
     simp only [passType, Except.ok.injEq, Prod.mk.injEq] at hp
     rw [← hp.1]; exact h
@@ -298,49 +298,49 @@ theorem passType_lookup (spec : Spec) (prev : List (Tagged × Info)) (d : DomId)
       · next s2' ch2 h2 =>
         simp only [Except.ok.injEq, Prod.mk.injEq] at hp
         rw [← hp.1]
-        exact passType_lookup spec prev d tspec cs s1 s2' ch2 te i hs1 h2
+        exact passType_lookup spec specIdx prev d tspec cs s1 s2' ch2 te i hs1 h2
 
-theorem pass_lookup (spec : Spec) (prev : List (Tagged × Info)) :
+theorem pass_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) :
     ∀ (types : List DomId) (s s2 : State) (b : Bool) (te : Tagged) (i : Info),
-      s.lookup te = some i → pass spec prev types s = .ok (s2, b) → s2.lookup te = some i
+      s.lookup te = some i → pass spec specIdx prev types s = .ok (s2, b) → s2.lookup te = some i
   | [], s, s2, b, te, i, h, hp => by
     simp only [pass, Except.ok.injEq, Prod.mk.injEq] at hp
     rw [← hp.1]; exact h
   | d :: ds, s, s2, b, te, i, h, hp => by
     simp only [pass] at hp
     split at hp
-    · exact pass_lookup spec prev ds s s2 b te i h hp
+    · exact pass_lookup spec specIdx prev ds s s2 b te i h hp
     · next tspec _ =>
       split at hp
       · cases hp
       · next s1 ch h1 =>
         have hs1 : s1.lookup te = some i :=
-          passType_lookup spec prev d tspec tspec.derivation s s1 ch te i h h1
+          passType_lookup spec specIdx prev d tspec tspec.derivation s s1 ch te i h h1
         split at hp
         · cases hp
         · next s2' ch2 h2 =>
           simp only [Except.ok.injEq, Prod.mk.injEq] at hp
           rw [← hp.1]
-          exact pass_lookup spec prev ds s1 s2' ch2 te i hs1 h2
+          exact pass_lookup spec specIdx prev ds s1 s2' ch2 te i hs1 h2
 
-theorem saturateStratum_lookup (spec : Spec) (prev : List (Tagged × Info)) (types : List DomId) :
+theorem saturateStratum_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (types : List DomId) :
     ∀ (fuel : Nat) (s s' : State) (te : Tagged) (i : Info),
-      s.lookup te = some i → saturateStratum spec prev types fuel s = .ok s' → s'.lookup te = some i
+      s.lookup te = some i → saturateStratum spec specIdx prev types fuel s = .ok s' → s'.lookup te = some i
   | 0, _, _, _, _, _, h => by simp [saturateStratum] at h
   | fuel + 1, s, s', te, i, h, hs => by
     simp only [saturateStratum] at hs
     split at hs
     · cases hs
     · next s1 changed heq =>
-      have hs1 : s1.lookup te = some i := pass_lookup spec prev types s s1 changed te i h heq
+      have hs1 : s1.lookup te = some i := pass_lookup spec specIdx prev types s s1 changed te i h heq
       split at hs
-      · exact saturateStratum_lookup spec prev types fuel s1 s' te i hs1 hs
+      · exact saturateStratum_lookup spec specIdx prev types fuel s1 s' te i hs1 hs
       · simp only [Except.ok.injEq] at hs; rw [← hs]; exact hs1
 
-theorem foldl_saturate_lookup (spec : Spec) (prev : List (Tagged × Info)) :
+theorem foldl_saturate_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) :
     ∀ (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info),
       s.lookup te = some i →
-      strata.foldlM (fun s layer => saturateStratum spec prev layer 100000 s) s = .ok s' →
+      strata.foldlM (fun s layer => saturateStratum spec specIdx prev layer 100000 s) s = .ok s' →
       s'.lookup te = some i
   | [], s, s', te, i, h, hf => by
     simp only [List.foldlM, pure, Except.pure, Except.ok.injEq] at hf
@@ -350,15 +350,15 @@ theorem foldl_saturate_lookup (spec : Spec) (prev : List (Tagged × Info)) :
     split at hf
     · cases hf
     · next s1 h1 =>
-      exact foldl_saturate_lookup spec prev rest s1 s' te i
-        (saturateStratum_lookup spec prev layer 100000 s s1 te i h h1) hf
+      exact foldl_saturate_lookup spec specIdx prev rest s1 s' te i
+        (saturateStratum_lookup spec specIdx prev layer 100000 s s1 te i h h1) hf
 
 /-- 004.3, in full: an assigned fact is exactly what the state holds after saturation,
 with its stamp, expiry and origin. -/
 theorem rebaseAndSat_assigned (spec : Spec) (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info)
     (h : s.lookup te = some i) (hi : i.fromSat = false) (hs : rebaseAndSat spec strata s = .ok s') :
     s'.lookup te = some i :=
-  foldl_saturate_lookup spec s.derivedFacts strata s.rebase s' te i (State.rebase_lookup s te i h hi) hs
+  foldl_saturate_lookup spec spec.buildIndex s.derivedFacts strata s.rebase s' te i (State.rebase_lookup s te i h hi) hs
 
 end Saturate
 
@@ -371,9 +371,9 @@ namespace M
 
 theorem run_bind_single {α β} (m : M α) (f : α → M β) (c : Ctx) (s : Subs) (a : α)
     (h : m.run c s = .ok [a]) : (m >>= f).run c s = (f a).run c s := by
-  show (do let as ← m.run c s; as.foldlM (fun acc a => do let bs ← (f a).run c s; pure (acc ++ bs)) []) = (f a).run c s
+  show (do let as ← m.run c s; let bss ← as.mapM (fun a => (f a).run c s); pure bss.flatten) = (f a).run c s
   rw [h]
-  simp only [List.foldlM, bind, Except.bind, pure, Except.pure]
+  simp only [List.mapM_cons, List.mapM_nil, bind, Except.bind, pure, Except.pure]
   rcases hf : (f a).run c s with e | bs
   · rfl
   · simp

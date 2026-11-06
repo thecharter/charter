@@ -18,6 +18,60 @@ resolver turns it into the same records by `applyTypeExt`.
 
 namespace Charter
 
+/-- Fast syntactic check for the default unconstrained domain filter `.boolLit true`. -/
+def _root_.Charter.Term.isTrueLit : Term → Bool
+  | .boolLit true => true
+  | _ => false
+
+/-- Structural radix map keyed by `DomId`, for kernel-unfoldable indexed lookups in `Eval`. -/
+inductive DomMap (α : Type) where
+  | empty
+  | leaf (entries : List (DomId × α))
+  | branch (l r : DomMap α)
+  deriving Repr, Inhabited
+
+namespace DomMap
+
+def hashChars : List Char → Nat → Nat
+  | [], h => h
+  | c :: cs, h => hashChars cs ((h * 33 + c.toNat) % 65536)
+
+def hash (k : DomId) : Nat := hashChars k.toList 5381
+
+def treeDepth : Nat := 8
+
+def lookupAux {α} : Nat → Nat → DomMap α → DomId → Option α
+  | _, _, .empty, _ => none
+  | 0, _, .leaf es, k => (es.find? (·.1 == k)).map (·.2)
+  | n + 1, h, .branch l r, k =>
+    if h % 2 == 0 then lookupAux n (h / 2) l k else lookupAux n (h / 2) r k
+  | _, _, _, _ => none
+
+def lookup {α} (m : DomMap α) (k : DomId) : Option α :=
+  lookupAux treeDepth (hash k) m k
+
+def modifyAux {α} (f : Option α → α) : Nat → Nat → DomId → DomMap α → DomMap α
+  | 0, _, k, .empty => .leaf [(k, f none)]
+  | 0, _, k, .leaf es =>
+    match es.find? (·.1 == k) with
+    | some (_, v) => .leaf ((k, f (some v)) :: es.filter (·.1 != k))
+    | none => .leaf ((k, f none) :: es)
+  | n + 1, h, k, .empty =>
+    if h % 2 == 0 then .branch (modifyAux f n (h / 2) k .empty) .empty
+    else .branch .empty (modifyAux f n (h / 2) k .empty)
+  | n + 1, h, k, .branch l r =>
+    if h % 2 == 0 then .branch (modifyAux f n (h / 2) k l) r
+    else .branch l (modifyAux f n (h / 2) k r)
+  | _, _, _, m => m
+
+def insert {α} (m : DomMap α) (k : DomId) (v : α) : DomMap α :=
+  modifyAux (fun _ => v) treeDepth (hash k) k m
+
+def prepend {β} (m : DomMap (List β)) (k : DomId) (v : β) : DomMap (List β) :=
+  modifyAux (fun | some vs => v :: vs | none => [v]) treeDepth (hash k) k m
+
+end DomMap
+
 /-- `Var` and `Function` restrictions: a new instance replaces the previous one
 (all instances / the one with the same first component). -/
 inductive Restriction
@@ -236,7 +290,7 @@ def ruleIds (s : Spec) : List DomId :=
 
 /-- Follow placeholder aliases (eFLINT `chase_alias`); fuel bounds a cycle. -/
 def chaseAlias (s : Spec) (d : DomId) : DomId :=
-  go (s.aliases.length + 1) d
+  if s.aliases.isEmpty then d else go (s.aliases.length + 1) d
 where
   go : Nat → DomId → DomId
     | 0, d => d
@@ -345,6 +399,40 @@ def components (s : Spec) (d : DomId) : List Var :=
     | .products xs => xs
     | _ => [⟨d, ""⟩]
   | none => [⟨d, ""⟩]
+
+/-- Precomputed per-type entry for `Eval`: `(tspec, isEnumerable, judgedRule)`. -/
+abbrev SpecIndex := DomMap (TypeSpec × Bool × Option (List Term))
+
+def enumerableWithMap (s : Spec) (declMap : DomMap TypeSpec) : Nat → Domain → Bool
+  | _, .strings _ => true
+  | _, .ints _ => true
+  | 0, .products _ => false
+  | n + 1, .products xs => xs.all fun x => match declMap.lookup (s.removeDecoration x) with
+    | some t => enumerableWithMap s declMap n t.domain
+    | none => false
+  | _, .anyString => false
+  | _, .anyInt => false
+  | _, .time => false
+  | _, .duration => false
+
+def buildIndex (s : Spec) : SpecIndex :=
+  let declMap : DomMap TypeSpec := s.decls.foldr (fun (d, t) m => m.insert d t) .empty
+  let maxDepth := 16
+  let base := s.decls.foldr (fun (d, t) m =>
+    let isEnum := enumerableWithMap s declMap maxDepth t.domain
+    let judged := match t.kind with
+      | .act _ | .immunity _ =>
+        if isEnum then none
+        else
+          let cs := t.derivation.filterMap fun | .holdsWhen c => some c | _ => none
+          if cs.isEmpty then none else some cs
+      | _ => none
+    m.insert d (t, isEnum, judged)) .empty
+  s.aliases.foldr (fun (f, _) m =>
+    let target := s.chaseAlias f
+    match base.lookup target with
+    | some entry => m.insert f entry
+    | none => m) base
 
 end Spec
 

@@ -124,6 +124,12 @@ def deriveAll (prev : List (Tagged × Info)) : State → List Tagged → State �
 /-- The derived facts of a state (what `rebase` removes). -/
 def derivedFacts (s : State) : List (Tagged × Info) := s.contents.filter (·.2.fromSat)
 
+/-- Precomputed per-`DomId` buckets preserving the exact left-to-right order of `s.contents`. -/
+abbrev StateIndex := DomMap (List (Tagged × Info))
+
+def buildIndex (s : State) : StateIndex :=
+  s.contents.foldr (fun p m => m.prepend p.1.2 p) .empty
+
 end State
 
 /-- The truth value an effect assigns; a creation may carry an expiry (D7); an
