@@ -24,8 +24,8 @@ Reserved multi-word and word keywords (`wordKeywords`):
 Claim keywords (matched when followed by whitespace and a non-`.`/`}` token):
 `?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
 
-Contextual keywords (`D17`, `D20`, lexed as `atom` or `ident` and matched only in the grammar positions below):
-`Document`, `Clause`, `Approved`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
+Contextual keywords (`D17`, `D20`, `D21`, lexed as `atom` or `ident` and matched only in the grammar positions below):
+`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
 
 ---
 
@@ -77,13 +77,13 @@ frame       ::= ('Open' | 'Closed')? frame_body
 frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? dom_filter? fact_clause*
               | 'Bool' ident fact_clause*
               | ('Predicate' | 'Invariant') ident ('When' | 'Where') expr from_clause*
-              | 'Act' ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
+              | ('Act' | 'Power') ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Physical' ident 'With'? ('Actor' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Event' ident 'With'? ('Related to' vars)? dom_filter? event_clause*
               | 'Duty' ident 'With'? 'Holder' var 'Claimant' var ('Related to' vars)? dom_filter? duty_clause*
               | 'Immunity' ident 'With'? 'Holder' var ('Related to' vars)? dom_filter? immunity_clause*
               | 'Extend' ('Fact' ident fact_clause*
-                        | 'Act' ident act_clause*
+                        | ('Act' | 'Power') ident act_clause*
                         | 'Event' ident event_clause*
                         | 'Duty' ident duty_clause*
                         | 'Immunity' ident immunity_clause*)
@@ -92,8 +92,8 @@ frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? do
               | 'Use' ident '(' idents? ')' ('As' ident)?
               | 'Param' ident (':' ('Int' | 'Time' | 'Duration'))? '=' '-'? int_lit
               | 'Property' ident ('Assumes' idents)? ('When' | 'Where') temporal_form from_clause*
-              | 'Document' str_lit
-              | 'Clause' clause_id ('Approved' int_lit)? clause_item*
+              | 'Document' (atom | ident)? str_lit ('SHA256' str_lit)? ('Rank' '-'? int_lit)?
+              | 'Clause' clause_id ('In' (atom | ident))? ('Approved' (int_lit | str_lit))? clause_item*
 
 temporal_form ::= 'Always' '(' expr '=>' ('Next' expr | 'Eventually' expr | 'EventuallyWithin' add_expr expr) ')'
                 | 'Always' expr

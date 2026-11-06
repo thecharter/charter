@@ -1,3 +1,5 @@
+import Charter.Artifact.Hash
+
 /-!
 # Charter.Core.Provenance
 
@@ -43,21 +45,70 @@ structure Span where
   meaning  : List String := []
   deriving Repr, DecidableEq, BEq, Inhabited
 
+/-- Reference to an authoritative source document (`012.1`, `G3.1`). -/
+structure SourceDoc where
+  id             : Option String := none
+  path           : String
+  expectedSha256 : Option String := none
+  rank           : Option Int := none
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+/-- Markdown section anchor and surrounding context fingerprint for a `Clause` inside its
+source document, resilient to line-number shifts elsewhere in the file (`docs/rfc.md` §4.5). -/
+structure ClauseAnchor where
+  heading       : Option String := none
+  line          : Nat := 0
+  contextSha256 : String := ""
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+/-- Locate `clauseText` inside `docText`, returning its 1-indexed starting line, nearest
+preceding Markdown heading (`# ...`), and SHA-256 fingerprint of normalized surrounding context. -/
+def locateClauseAnchor (docText : String) (clauseText : String) : Option ClauseAnchor :=
+  if clauseText.isEmpty then none
+  else match docText.splitOn clauseText with
+    | pre :: post :: _ =>
+      let preLines := pre.splitOn "\n"
+      let line := preLines.length
+      let heading := preLines.reverse.find? (fun l => l.trimLeft.startsWith "#") |>.map String.trim
+      let ctxBefore := String.mk ((pre.toList.reverse.take 80).reverse)
+      let ctxAfter := String.mk (post.toList.take 80)
+      let ctxDigest := Artifact.sha256String (ctxBefore.trim ++ "\n" ++ clauseText ++ "\n" ++ ctxAfter.trim)
+      some { heading, line, contextSha256 := ctxDigest }
+    | _ => none
+
+/-- Provenance completeness classification (`docs/rfc.md` §4.5, `T08`):
+- `complete`: every normative rule is grounded, every clause is covered/interpreted/approved/verbatim,
+  and every declared `Document` is readable and matches any `SHA256` pin;
+- `partialCov` (`"partial"`): some provenance is declared or some rule/clause/document is incomplete or `STALE`;
+- `illustrative`: neither `Document` nor `Clause` is declared for the program's rules. -/
+inductive ProvenanceCoverage where
+  | complete
+  | partialCov
+  | illustrative
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+def ProvenanceCoverage.asString : ProvenanceCoverage → String
+  | .complete => "complete"
+  | .partialCov => "partial"
+  | .illustrative => "illustrative"
+
 /-- A clause is a contiguous passage of the source together with the
 spans that partition it. -/
 structure Clause where
-  id     : ClauseId
-  source : String
-  spans  : List Span
-  /-- Hash of the source text at the moment its spans and meanings were
-  reviewed and approved. If the English changes, the approval is stale
-  and every formal id the clause names loses its reviewed status until
-  the mapping is re-approved. `0` = never approved. -/
-  approvedHash : UInt64 := 0
+  id             : ClauseId
+  source         : String
+  spans          : List Span
+  approvedHash   : UInt64 := 0
+  docId          : Option String := none
+  approvedSha256 : Option String := none
   deriving Repr, DecidableEq, Inhabited
 
-/-- Has the English drifted from what was approved? -/
-def Clause.stale (c : Clause) : Bool := c.source.hash != c.approvedHash
+/-- Has the English drifted from what was approved? Uses cryptographic SHA-256 when
+`approvedSha256` is present (`T39`), falling back to legacy 64-bit `approvedHash`. -/
+def Clause.stale (c : Clause) : Bool :=
+  match c.approvedSha256 with
+  | some hex => Artifact.sha256String c.source != hex
+  | none => c.source.hash != c.approvedHash
 
 /-- Formal ids whose review status is invalidated by a stale clause. -/
 def Clause.invalidated (c : Clause) : List String :=

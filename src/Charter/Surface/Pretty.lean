@@ -177,12 +177,15 @@ def fmtRegister : Register → String
   | .commentary => "Commentary"
 
 def fmtClauseBlock (indent : String) (c : Clause) : String :=
-  let app := if c.approvedHash == 0 then "" else s!" Approved {c.approvedHash}"
+  let inDoc := match c.docId with | some id => s!" In {id}" | none => ""
+  let app := match c.approvedSha256 with
+    | some hex => s!" Approved {showString hex}"
+    | none => if c.approvedHash == 0 then "" else s!" Approved {c.approvedHash}"
   let txtLine := s!"{indent}  Text {showString c.source}"
   let spanLines := c.spans.map fun s =>
     let ids := if s.meaning.isEmpty then "" else " => " ++ ", ".intercalate s.meaning
     s!"{indent}  {fmtRegister s.register} {showString s.text}{ids}"
-  "\n".intercalate ((s!"{indent}Clause {c.id}{app}") :: txtLine :: spanLines)
+  "\n".intercalate ((s!"{indent}Clause {c.id}{inDoc}{app}") :: txtLine :: spanLines)
 
 def stripPhysicalDefault : List ModClause → List ModClause
   | .derivation [.holdsWhen (.boolLit true)] :: rest => rest
@@ -241,7 +244,8 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
           else
             (ap, "", if rest.isEmpty then "" else " Related to " ++ fmtVars rest)
         | [] => ("", "", "")
-      s!"{indent}{openPrefix}Act {d}{actorPart}{recipPart}{relPart}{wherePart}{fmtModClauses childIndent cls}"
+      let kw := if a.isPower then "Power" else "Act"
+      s!"{indent}{openPrefix}{kw} {d}{actorPart}{recipPart}{relPart}{wherePart}{fmtModClauses childIndent cls}"
   | .event _ =>
     let objs := match t.domain with | .products xs => xs | _ => []
     let relPart := if objs.isEmpty then "" else " Related to " ++ fmtVars objs
@@ -285,8 +289,11 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     s!"{indent}Placeholder {f} For {t}" :: fmtDecls indent fuel rest
   | fuel + 1, .clause c :: rest =>
     fmtClauseBlock indent c :: fmtDecls indent fuel rest
-  | fuel + 1, .document p :: rest =>
-    s!"{indent}Document {showString p}" :: fmtDecls indent fuel rest
+  | fuel + 1, .document p docId? sha? rank? :: rest =>
+    let idPart := match docId? with | some id => s!" {id}" | none => ""
+    let shaPart := match sha? with | some h => s!" SHA256 {showString h}" | none => ""
+    let rankPart := match rank? with | some r => s!" Rank {r}" | none => ""
+    s!"{indent}Document{idPart} {showString p}{shaPart}{rankPart}" :: fmtDecls indent fuel rest
   | fuel + 1, .param name dom value :: rest =>
     let tyPart := match dom with
       | .time => " : Time"

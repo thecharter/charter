@@ -47,13 +47,15 @@ def buildCommand (args : List String) : IO UInt32 := do
       for w in prog.warnings do IO.eprintln (w.withFile f).render
       let finalSpec := (prog.epochs.getLast?.map (·.spec)).getD emptySpec
       let dir := (System.FilePath.mk f).parent.getD "."
-      let docRes? ← readDocument finalSpec dir
-      let provClaims := if finalSpec.clauses.isEmpty && finalSpec.document.isNone then [] else provenanceReport finalSpec docRes?
+      let loadedDocs ← readDocuments finalSpec dir
+      let provClaims := if finalSpec.clauses.isEmpty && finalSpec.document.isNone && finalSpec.documents.isEmpty then [] else provenanceReportDocs finalSpec loadedDocs
+      let cov := computeProvenanceCoverage finalSpec loadedDocs provClaims
       let failedProv := provClaims.filter (!·.ok)
       for c in failedProv do IO.eprintln c.render
       if !failedProv.isEmpty then return 1
-      let docTxt? := match docRes? with | some (.ok txt) => some txt | _ => none
-      let bundle := Artifact.buildBundle prog docTxt?
+      let docTexts : List (SourceDoc × Option String) := loadedDocs.map fun (sd, r) =>
+        (sd, match r with | .ok txt => some txt | .error _ => none)
+      let bundle := Artifact.buildBundleDocs prog docTexts cov.asString
       let rendered := bundle.toJson.pretty ++ "\n"
       match output with
       | some outPath =>

@@ -46,6 +46,7 @@ more errors); `warning` does not.
 | CHR029 | error | under `--require-provenance`: normative rules lack an authoritative readable `Document` and `Clause` coverage (012.10, T08) | `Charter.Resolve.AssuranceGates` |
 | CHR030 | error | under `--forbid-midstream-decls`: a declaration phrase appears after an execution, assignment, or query phrase at top level (018.2) | `Charter.Resolve.AssuranceGates` |
 | CHR031 | error | under `--require-complete-explore`: invariants are declared without a positive exploration depth (`--explore N` or `//! explore: N`) (018.2) | `Charter.Resolve.AssuranceGates` |
+| CHR032 | error | a `Power` declaration omits `Valid when <expr>` (institutional powers require explicit competence conditions; use `Act` when validity defaults to `True`, 005.10) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

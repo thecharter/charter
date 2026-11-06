@@ -1,0 +1,40 @@
+// 005.10 & 012.1-12.2 (T37, T39): multi-document provenance (`Document ID "path" SHA256 "..." Rank n`),
+// cryptographic SHA-256 `Clause ... In ID Approved "<sha256>"`, and `Power` with `Valid when`.
+Document TENANCY "include/tenancy.md" Rank 1.
+Document BYLAW "include/bylaw.md" SHA256 "50d10d99288fe7844ce7b6e167931091fb64ee3d3fe6248a5fa4d81ef62b07b1" Rank 2.
+
+Clause T.1 In TENANCY Approved 7561569358177147353
+  Text "The tenant pays the rent on the first of each month. Late payment accrues a fee."
+  Norm "The tenant pays the rent on the first of each month." => pay-rent
+  Commentary " Late payment accrues a fee."
+.
+
+Clause B.1 In BYLAW Approved "6ac4054cc9ee87ed421c9de60e053a45d961a994c92f0eeaf41eda8550cdc754"
+  Text "The board may authorize a share issuance only when quorum holds."
+  Norm "The board may authorize a share issuance only when quorum holds." => authorize-issuance
+.
+
+Fact tenant Identified by Tess.
+Fact landlord Identified by Lee.
+Fact board Identified by Chair.
+Fact quorum-present Identified by board.
+Fact issuance-authorized Identified by board.
+
+Duty pay-rent Holder tenant Claimant landlord
+  From T.1 "The tenant pays the rent on the first of each month.".
+
+Power authorize-issuance Actor board
+  From B.1 "The board may authorize a share issuance only when quorum holds."
+  Holds when quorum-present(board)
+  Valid when quorum-present(board)
+  Creates issuance-authorized(board).
+
+Scenario competence-checked {
+  ?!valid authorize-issuance(Chair).
+  authorize-issuance(Chair).
+  ?!issuance-authorized(Chair).
+  +quorum-present(Chair).
+  ?valid authorize-issuance(Chair).
+  authorize-issuance(Chair).
+  ?issuance-authorized(Chair).
+}

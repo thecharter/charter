@@ -1,0 +1,4 @@
+// 005.10: `Power` requires an explicit `Valid when` competence condition (`CHR032`).
+//! expect-error: CHR032
+Fact board Identified by Chair.
+Power issue-shares Actor board Holds when True.

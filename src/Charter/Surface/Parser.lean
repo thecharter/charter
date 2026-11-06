@@ -524,10 +524,15 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Module", "Use", "Param", "Property"].contains s then
+    if ["Immunity", "Module", "Use", "Param", "Property", "Power"].contains s then
       return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
     else if s == "Document" then
-      return (match ← peekAt (idx + 1) with | .str _ => true | _ => false)
+      let t1 ← peekAt (idx + 1)
+      let t2 ← peekAt (idx + 2)
+      return (match t1, t2 with
+        | .str _, _ => true
+        | .atom _, .str _ | .ident _, .str _ => true
+        | _, _ => false)
     else if s == "Clause" then
       return (match ← peekAt (idx + 1) with | .atom _ | .ident _ | .int _ => true | _ => false)
     else return false
@@ -765,7 +770,8 @@ def frame : Nat → P (List Decl)
     let fs ← fromClauses 100
     return mkFact inv false true none d (.products []) (.boolLit true)
       (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s))
-  | .kw "Act" =>
+  | .kw "Act" | .atom "Power" | .kw "Power" =>
+    let isPow := (← peek) != .kw "Act"
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -775,7 +781,8 @@ def frame : Nat → P (List Decl)
     let filter ← domainConstraint
     let cls ← clauses .act 1000
     let actorV := actor.getD ⟨"actor", ""⟩
-    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome }, domain := .products (actorV :: (recip.toList ++ objs)),
+    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow },
+                           domain := .products (actorV :: (recip.toList ++ objs)),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
   | .kw "Physical" =>
@@ -832,9 +839,10 @@ def frame : Nat → P (List Decl)
     | .atom "Immunity" | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000) "Immunity"]
     | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000) "Fact"]
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Act"]
+    | .atom "Power" | .kw "Power" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Power"]
     | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000) "Event"]
     | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000) "Duty"]
-    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
+    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Power`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
   | .kw "Placeholder" =>
     advance
     let f ← ident
@@ -883,18 +891,52 @@ def frame : Nat → P (List Decl)
     return [.property { name, assumptions := assumes, formula := tf, spans := fs }]
   | .atom "Document" | .kw "Document" =>
     advance
-    match ← peek with
-    | .str p => advance; return [.document p]
-    | k => fail "CHR003" s!"expected the document path in double quotes after `Document` but found {k.describe}"
+    let docId? ← (do match ← peek with
+      | .atom s | .ident s =>
+        if (match ← peekAt 1 with | .str _ => true | _ => false) then advance; return some s else return none
+      | _ => return none)
+    let p ← (do match ← peek with
+      | .str path => advance; return path
+      | k => fail "CHR003" s!"expected the document path in double quotes after `Document` but found {k.describe}")
+    let sha? ← (do
+      if ← isCtxAtom "SHA256" then
+        advance
+        match ← peek with
+        | .str hex => advance; return some hex
+        | k => fail "CHR003" s!"expected SHA-256 hex digest in double quotes after `SHA256` but found {k.describe}"
+      else return none)
+    let rank? ← (do
+      if ← isCtxAtom "Rank" then
+        advance
+        let neg ← optKw "-"
+        let n ← intLit
+        let val : Int := if neg then -n else n
+        return some val
+      else return none)
+    return [.document p docId? sha? rank?]
   | .atom "Clause" | .kw "Clause" =>
     advance
     let cid ← clauseId
-    let approved ← (do if ← isCtxAtom "Approved" then advance; let n ← intLit; return n.toNat.toUInt64 else return (0 : UInt64))
+    let docId? ← (do
+      if ← isCtxAtom "In" then
+        advance
+        match ← peek with
+        | .atom s | .ident s => advance; return some s
+        | k => fail "CHR003" s!"expected document identifier after `In` but found {k.describe}"
+      else return none)
+    let (approvedFnv, approvedSha?) ← (do
+      if ← isCtxAtom "Approved" then
+        advance
+        match ← peek with
+        | .str hex => advance; return ((0 : UInt64), some hex)
+        | .int n => advance; return (n.toUInt64, none)
+        | k => fail "CHR003" s!"expected approval hash or SHA-256 hex string after `Approved` but found {k.describe}"
+      else return ((0 : UInt64), none))
     let (txt, spans) ← clauseItems cid 1000
     let source := match txt with
       | some t => t
       | none => String.join (spans.map (·.text))
-    return [.clause { id := cid, source, spans, approvedHash := approved }]
+    return [.clause { id := cid, source, spans, approvedHash := approvedFnv, docId := docId?, approvedSha256 := approvedSha? }]
   | k => fail "CHR003" s!"expected a declaration but found {k.describe}"
 
 end

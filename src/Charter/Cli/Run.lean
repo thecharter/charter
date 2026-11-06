@@ -269,18 +269,19 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
     let stats ← report o l.file it.pos.line it.text cfg.state cfg'.state outs stats
     return (cfg', stats)
 
-/-- Print the provenance report of a resolved spec (Law 8); returns the number of
-failed checks. -/
-def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × Option (Except String String)) := do
-  let doc? ← readDocument spec programDir
-  if spec.clauses.isEmpty && spec.document.isNone then return (0, doc?)
-  let claims := provenanceReport spec doc?
+/-- Print the provenance report of a resolved spec (Law 8); returns `(failedChecks, loadedDocs, coverage)`. -/
+def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × LoadedDocs × ProvenanceCoverage) := do
+  let loaded ← readDocuments spec programDir
+  if spec.clauses.isEmpty && spec.document.isNone && spec.documents.isEmpty then
+    return (0, loaded, computeProvenanceCoverage spec loaded [])
+  let claims := provenanceReportDocs spec loaded
+  let cov := computeProvenanceCoverage spec loaded claims
   let mut failed := 0
   for c in claims do
     if !c.ok || (o.assurance.denyWarnings && c.warn) then failed := failed + 1
     if o.json then IO.println c.json.compress
     else if !c.ok || c.warn || !o.testMode then IO.println c.render
-  return (failed, doc?)
+  return (failed, loaded, cov)
 
 /-- Run a whole program. In test mode the provenance checks run at the end and a
 failed check is a failed claim. -/
@@ -314,9 +315,9 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   if o.scenarioFilter.isEmpty then
     stats ← exploreFrom o s!"{path}" cfg stats
-  let (failedProv, doc?) ← reportProvenance o cfg.spec (path.parent.getD ".")
+  let (failedProv, loadedDocs, cov) ← reportProvenance o cfg.spec (path.parent.getD ".")
   if o.assurance.requireProvenance then
-    for d in AssuranceGates.checkProvenanceGate path.toString cfg.spec doc? do
+    for d in AssuranceGates.checkProvenanceGate path.toString cfg.spec loadedDocs cov do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   return { stats with failedQueries := stats.failedQueries + failedProv }
@@ -412,16 +413,17 @@ def checkCommand (args : List String) : IO UInt32 := do
             let w := (w.withFile l.file).withPos l.item.pos
             emit o (diagJson w) w.render (toErr := true)
             warnings := warnings + 1
-    let (failedProv, doc?) ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
+    let (failedProv, loadedDocs, cov) ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
     errors := errors + failedProv
     if fl.assurance.requireProvenance then
-      for d in AssuranceGates.checkProvenanceGate f spec doc? do
+      for d in AssuranceGates.checkProvenanceGate f spec loadedDocs cov do
         emit o (diagJson d) d.render (toErr := true)
         errors := errors + 1
     let failedTotal := errors != 0 || (fl.assurance.denyWarnings && warnings != 0)
-    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses, {warnings} warning(s))"
+    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses, coverage {cov.asString}, {warnings} warning(s))"
     let failLine := s!"FAIL {f}: {errors} error(s) or failed checks, {warnings} warning(s)"
     emit o (Json.mkObj [("kind", "summary"), ("file", Json.str f), ("phrases", Json.num items.length),
+      ("coverage", Json.str cov.asString),
       ("errors", Json.num errors), ("warnings", Json.num warnings), ("ok", Json.bool (!failedTotal))])
       (if !failedTotal then okLine else failLine)
     if failedTotal then status := 1

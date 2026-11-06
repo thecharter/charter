@@ -38,21 +38,28 @@ def checkMidstreamDecls (items : List (String × Item)) : List Diagnostic :=
     | .inr _ => (true, acc)) (false, [])
   diags
 
-/-- `CHR029` (`--require-provenance`): require an authoritative readable `Document` and
-`Clause` coverage whenever normative rules are declared (012.10, T08). -/
-def checkProvenanceGate (file : String) (spec : Spec) (docLoaded : Option (Except String String)) : List Diagnostic :=
+/-- `CHR029` (`--require-provenance`): require `complete` provenance coverage (all declared
+`Document`s readable and matching any `SHA256` pin, and every normative rule grounded by
+approved `Clause`s) whenever normative rules are declared (012.10, `G3.1`, `T08`). -/
+def checkProvenanceGate (file : String) (spec : Spec)
+    (loaded : List (SourceDoc × Except String String))
+    (coverage : ProvenanceCoverage) : List Diagnostic :=
   if spec.ruleIds.isEmpty then []
-  else if spec.document.isNone || spec.clauses.isEmpty then
+  else if loaded.isEmpty || spec.clauses.isEmpty then
     [(Diagnostic.error "CHR029"
-      "normative rules declared without an authoritative `Document` and `Clause` coverage (--require-provenance)").withFile file]
-  else match docLoaded with
-    | some (.ok _) => []
-    | some (.error e) =>
+      s!"normative rules declared with provenance coverage `{coverage.asString}` (expected `complete`: an authoritative `Document` and approved `Clause` coverage; --require-provenance)").withFile file]
+  else
+    let docErrs := loaded.filterMap fun (sd, res) =>
+      match res with
+      | .ok _ => none
+      | .error e =>
+        some ((Diagnostic.error "CHR029"
+          s!"authoritative Document `{sd.path}` could not be read ({e}) (--require-provenance)").withFile file)
+    if !docErrs.isEmpty then docErrs
+    else if coverage != .complete then
       [(Diagnostic.error "CHR029"
-        s!"authoritative Document `{spec.document.getD ""}` could not be read ({e}) (--require-provenance)").withFile file]
-    | none =>
-      [(Diagnostic.error "CHR029"
-        s!"authoritative Document `{spec.document.getD ""}` was not read (--require-provenance)").withFile file]
+        s!"provenance coverage is `{coverage.asString}`, expected `complete` (--require-provenance)").withFile file]
+    else []
 
 /-- `CHR031` (`--require-complete-explore`): require a positive exploration depth whenever
 invariants are declared. -/

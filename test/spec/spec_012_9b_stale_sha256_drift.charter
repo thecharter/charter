@@ -1,0 +1,16 @@
+// 012.1, 012.8 (T37, T39): cryptographic SHA-256 mismatch on either `Document ... SHA256`
+// or `Clause ... Approved "<sha256>"` marks provenance `STALE` as failed claims.
+//! expect-failed-claims: 2
+Document BYLAW "include/bylaw.md" SHA256 "0000000000000000000000000000000000000000000000000000000000000000".
+
+Clause B.1 In BYLAW Approved "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  Text "The board may authorize a share issuance only when quorum holds."
+  Norm "The board may authorize a share issuance only when quorum holds." => authorize-issuance
+.
+
+Fact board Identified by Chair.
+Fact quorum-present Identified by board.
+
+Power authorize-issuance Actor board
+  From B.1 "The board may authorize a share issuance only when quorum holds."
+  Valid when quorum-present(board).

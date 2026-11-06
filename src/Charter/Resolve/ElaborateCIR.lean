@@ -28,10 +28,12 @@ def checkWellFormed (s : Spec) : Bool :=
   let aliasesOk := s.aliases.all fun (f, _) => (s.lookupDecl (s.chaseAlias f)).isSome
   let actsOk := s.decls.all fun (_, t) =>
     match t.kind with
-    | .act a => a.exceptUnder.all fun target =>
-      match s.findDecl target with
-      | some tt => match tt.kind with | .act _ => true | _ => false
-      | none => false
+    | .act a =>
+      (!a.isPower || !a.validWhen.isEmpty) &&
+      a.exceptUnder.all fun target =>
+        match s.findDecl target with
+        | some tt => match tt.kind with | .act _ => true | _ => false
+        | none => false
     | .immunity im => im.against.all fun target =>
       match s.findDecl target with
       | some tt => match tt.kind with | .act _ => true | _ => false
@@ -47,6 +49,27 @@ def checkWellFormed (s : Spec) : Bool :=
 def WellFormed (s : Spec) : Prop := s.checkWellFormed = true
 
 theorem checkWellFormed_iff (s : Spec) : s.checkWellFormed = true ↔ s.WellFormed := Iff.rfl
+
+/-- Every `Power` declaration in a `WellFormed` `Spec` carries at least one explicit
+`Valid when` competence condition (`005.10`, `G3.1`). -/
+theorem wellFormed_power_has_validWhen {s : Spec} (hwf : s.WellFormed)
+    {d : DomId} {t : TypeSpec} {a : ActSpec}
+    (hmem : (d, t) ∈ s.decls) (hkind : t.kind = .act a) (hpow : a.isPower = true) :
+    a.validWhen ≠ [] := by
+  unfold WellFormed checkWellFormed at hwf
+  simp only [Bool.and_eq_true] at hwf
+  have hacts := hwf.1.2
+  rw [List.all_eq_true] at hacts
+  have ht := hacts (d, t) hmem
+  dsimp only at ht
+  rw [hkind] at ht
+  simp only [Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true'] at ht
+  cases ht.1 with
+  | inl hnp => rw [hpow] at hnp; cases hnp
+  | inr hne =>
+    intro hemp
+    rw [hemp] at hne
+    cases hne
 
 end Spec
 

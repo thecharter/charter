@@ -749,7 +749,7 @@ def executeDecls (ds : List Decl) : Stc Store := do
       setSpec (spec.insertDecl ty tspec)
     | .placeholder f t => modifySpec (·.insertAlias f t)
     | .clause c => modifySpec (·.insertClause c)
-    | .document p => modifySpec (fun s => { s with document := some p })
+    | .document p docId? sha? rank? => modifySpec (·.insertDocument { id := docId?, path := p, expectedSha256 := sha?, rank := rank? })
     | .param n dom _ =>
       let spec ← getSpec
       if (spec.lookupDecl n).isSome then
@@ -795,6 +795,18 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | .until_ a b => .until_ <$> compileClosedBool a <*> compileClosedBool b
         | .weakUntil a b => .weakUntil <$> compileClosedBool a <*> compileClosedBool b
       modifySpec (·.insertTemporal { tp with formula := tf' })
+    | _ => pure ()
+  -- 4. enforce `Power` competence requirement (`CHR032`, 005.10): every declared `Power`
+  --    must have at least one `Valid when` clause after extensions apply
+  let finalSpec ← getSpec
+  inits.forM fun d => do
+    match d with
+    | .typeDecl ty { kind := .act { isPower := true, .. }, .. } =>
+      match finalSpec.lookupDecl ty with
+      | some { kind := .act a, .. } =>
+        if a.validWhen.isEmpty then
+          err "CHR032" s!"Power {ty}: an institutional `Power` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
+      | _ => pure ()
     | _ => pure ()
   return init
 

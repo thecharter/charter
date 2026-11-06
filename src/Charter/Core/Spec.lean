@@ -117,6 +117,8 @@ structure ActSpec where
   exceptUnder : List DomId := []
   /-- Whether the act's second component is a `Recipient` (immunities protect recipients). -/
   hasRecipient : Bool := false
+  /-- Charter (005.10, G3.1): declared with `Power`, requiring explicit `Valid when`. -/
+  isPower : Bool := false
   deriving Repr, Inhabited
 
 /-- Charter (plan §2.2.2): while an instance holds, the acts in `against` are not valid
@@ -243,8 +245,8 @@ inductive Decl where
   | placeholder (f t : DomId)
   /-- Charter (D4): a clause of the authoritative document with its register spans. -/
   | clause (c : Clause)
-  /-- Charter (D4): `Document "path"`. -/
-  | document (path : String)
+  /-- Charter (D4, G3.1): `Document [ID] "path" [SHA256 "hex"] [Rank n]`. -/
+  | document (path : String) (docId : Option String := none) (sha256 : Option String := none) (rank : Option Int := none)
   /-- Charter (D11): `Param name [: Int|Time|Duration] = n`, a `Var` fact with an initial instance. -/
   | param (name : DomId) (dom : Domain) (value : Int)
   /-- Charter (D8): `Module name(params) { declarations }`. -/
@@ -271,7 +273,7 @@ def Decl.name : Decl → DomId
   | .typeExt d _ _ => d
   | .placeholder f _ => f
   | .clause c => c.id
-  | .document p => p
+  | .document p _ _ _ => p
   | .param n _ _ => n
   | .module n _ _ => n
   | .use n _ _ => n
@@ -284,6 +286,8 @@ structure Spec where
   aliases : List (DomId × DomId) := []
   /-- Charter (D4): the authoritative English document, as `Document "path"` names it. -/
   document : Option String := none
+  /-- Charter (G3.1): multi-document source authority manifest (`Document [ID] "path" [SHA256 ...]`). -/
+  documents : List SourceDoc := []
   /-- Charter (D4): the clauses with their register spans. -/
   clauses  : List Clause := []
   /-- Charter (D10, Law 8): declared scenarios, by name, with their `From` spans. -/
@@ -307,6 +311,17 @@ def adjustDecl (s : Spec) (d : DomId) (f : TypeSpec → TypeSpec) : Spec :=
 
 def insertAlias (s : Spec) (f t : DomId) : Spec :=
   { s with aliases := (f, t) :: s.aliases.filter (·.1 != f) }
+
+/-- Insert or replace a `SourceDoc` entry and keep `document` pointing at the primary path. -/
+def insertDocument (s : Spec) (sd : SourceDoc) : Spec :=
+  let docs' := match sd.id with
+    | some id => s.documents.filter (·.id != some id) ++ [sd]
+    | none => s.documents.filter (·.path != sd.path) ++ [sd]
+  let prim := match s.document, sd.id with
+    | none, _ => some sd.path
+    | some _, none => some sd.path
+    | some p, some _ => some p
+  { s with document := prim, documents := docs' }
 
 /-- Insert a clause, replacing one with the same id; clauses keep declaration order. -/
 def insertClause (s : Spec) (c : Clause) : Spec :=

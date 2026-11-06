@@ -1,0 +1,18 @@
+// 012.10 (T08, G3.1): under `--require-provenance`, partial provenance (e.g. a second
+// declared `Document` that cannot be read, or an unapproved clause yielding `partial` coverage)
+// must fail with `CHR029`, never pass as `complete`.
+//! require-provenance
+//! expect-error: CHR029
+Document PRIMARY "include/tenancy.md".
+Document MISSING "include/does_not_exist.md".
+
+Clause T.1 In PRIMARY Approved 7561569358177147353
+  Text "The tenant pays the rent on the first of each month. Late payment accrues a fee."
+  Norm "The tenant pays the rent on the first of each month." => pay-rent
+  Commentary " Late payment accrues a fee."
+.
+
+Fact tenant Identified by T.
+Fact landlord Identified by L.
+Duty pay-rent Holder tenant Claimant landlord
+  From T.1 "The tenant pays the rent on the first of each month.".
