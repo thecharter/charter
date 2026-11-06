@@ -61,6 +61,7 @@ more errors); `warning` does not.
 | CHR104 | error | evaluation fuel exhausted (a derivation or sync chain did not converge within the bound) | `Charter.Eval` |
 | CHR105 | error | an undeclared type reached the evaluator (internal; a resolution gap) | `Charter.Eval` |
 | CHR106 | error | `@ t` would move the clock backwards (D7) | `Charter.Eval.Interpreter` |
+| CHR108 | error | `MulDivRound` division by zero or non-zero remainder under `ExactOrReject` (010.12) | `Charter.Eval` |
 
 ## Claims are not diagnostics
 

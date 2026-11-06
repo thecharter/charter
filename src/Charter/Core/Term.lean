@@ -1,4 +1,5 @@
 import Charter.Core.Evidence
+import Charter.Core.Scale
 
 /-!
 # Charter.Core.Term — Values, domains, and the term language of the eFLINT core
@@ -119,7 +120,15 @@ inductive Domain where
   | time
   /-- Charter (D7): differences of instants, over `Int`. -/
   | duration
+  /-- Charter (D24, G3.4): `Money(CUR, SCALE)` minor units over exact `Int`. -/
+  | money (currency : String) (scale : Nat)
+  /-- Charter (D24, G3.4): `Quantity(UNIT)` units over exact `Int`. -/
+  | quantity (unit : String)
   deriving Repr, Inhabited, BEq
+
+def Domain.isDimensionalInt : Domain → Bool
+  | .time | .duration | .money _ _ | .quantity _ => true
+  | _ => false
 
 mutual
 /-- The term language (eFLINT `Term`). `tag`/`untag` are inserted by resolution. -/
@@ -163,6 +172,8 @@ inductive Term where
   | evStatus (want : EvidenceStatus) (t : Term)
   /-- Charter (D23, G3.3): `Conflict(e)` tests normative conflict among unranked defeasible rules. -/
   | hasConflict (t : Term)
+  /-- Charter (D24, G3.4): `MulDivRound(x, num, den, mode)` exact scaled integer division. -/
+  | mulDivRound (x : Term) (num : Term) (den : Term) (mode : RoundingMode)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -181,11 +192,16 @@ inductive Ty where
   | time
   /-- Charter (D7): a difference of instants. -/
   | duration
+  /-- Charter (D24, G3.4): `Money(CUR, SCALE)` minor units. -/
+  | money (currency : String) (scale : Nat)
+  /-- Charter (D24, G3.4): `Quantity(UNIT)` units. -/
+  | quantity (unit : String)
   deriving Repr, DecidableEq, Inhabited
 
 instance : ToString Ty := ⟨fun
   | .strings => "a string" | .ints => "an integer" | .bool => "a boolean" | .tagged d => s!"an instance of {d}"
-  | .time => "a time" | .duration => "a duration"⟩
+  | .time => "a time" | .duration => "a duration"
+  | .money c s => s!"Money({c}, {s})" | .quantity u => s!"Quantity({u})"⟩
 
 /-- Run-time values (eFLINT `Value`). -/
 inductive Value where
@@ -251,6 +267,7 @@ def Term.pp : Term → String
   | .heldFor t d => "Held(" ++ t.pp ++ ") For " ++ d.pp
   | .evStatus want t => want.kwName ++ "(" ++ t.pp ++ ")"
   | .hasConflict t => "Conflict(" ++ t.pp ++ ")"
+  | .mulDivRound x n d m => "MulDivRound(" ++ x.pp ++ ", " ++ n.pp ++ ", " ++ d.pp ++ ", " ++ m.kwName ++ ")"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -306,6 +323,7 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .heldFor t d => .heldFor (t.mapDom f) (d.mapDom f)
   | .evStatus want t => .evStatus want (t.mapDom f)
   | .hasConflict t => .hasConflict (t.mapDom f)
+  | .mulDivRound x n d m => .mulDivRound (x.mapDom f) (n.mapDom f) (d.mapDom f) m
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)

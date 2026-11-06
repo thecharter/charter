@@ -19,6 +19,7 @@ def termIntConsts : Term → List Int
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => termIntConsts a ++ termIntConsts b
+  | .mulDivRound x n d _ => termIntConsts x ++ termIntConsts n ++ termIntConsts d
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => termIntConsts t
   | .app _ args => argsIntConsts args
   | .boolLit _ | .stringLit _ | .ref _ | .currentTime => []
@@ -43,6 +44,7 @@ def hasSymbolicVar : Term → Bool
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .sub a b | .add a b | .mult a b | .mod a b | .div a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasSymbolicVar a || hasSymbolicVar b
+  | .mulDivRound x n d _ => hasSymbolicVar x || hasSymbolicVar n || hasSymbolicVar d
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => hasSymbolicVar t
   | .app _ args => argsHasVar args
   | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => false
@@ -68,6 +70,7 @@ def hasComplexArith : Term → Bool
   | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a | .project a _ | .tag a _ | .untag a => hasComplexArith a
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
   | .eq a b | .neq a b | .when a b | .heldFor a b => hasComplexArith a || hasComplexArith b
+  | .mulDivRound x n d _ => hasSymbolicVar x && (hasSymbolicVar n || hasSymbolicVar d)
   | .exists_ _ t | .forall_ _ t | .max _ t | .min _ t => hasComplexArith t
   | .app _ args => argsComplex args
   | .boolLit _ | .intLit _ | .stringLit _ | .ref _ | .currentTime => false

@@ -1,0 +1,33 @@
+// 003.14, 010.12 (T10, T11): dimensional `Money(USD, 2)` and `Quantity(units)` over exact
+// `Int` minor units, `MulDivRound` across `Floor`, `Ceil`, `NearestEven`, and `ExactOrReject`,
+// T10 tiered allowance (`20 @ 2% + 280 @ 5% = $14.40 = 1440` cents), T11 split-transaction
+// vs. period-aggregate fee comparison, and unquoted eFLINT atom compatibility.
+Fact legacy-scale-atoms Identified by Money, Quantity, MulDivRound, Floor, Ceil, NearestEven, ExactOrReject.
+
+Param allowance : Quantity(units) = 20.
+Fact usage Identified by Quantity(units).
+Fact fee-cents Identified by Money(USD, 2).
+Fact tx-id Identified by T1, T2.
+Fact tx-charge Identified by tx-id * fee-cents.
+
+// T10 helper: compute tiered fee in USD cents (1 unit = $1.00 = 100 cents; 2% = 2 cents/unit, 5% = 5 cents/unit)
+Scenario tiered-allowance-exact {
+  // allowance = 20 units, prior used = 0, purchase = 300 units:
+  // tier A = 20 units @ 2% ($0.40 = 40 cents); tier B = 280 units @ 5% ($14.00 = 1400 cents); total = 1440 cents ($14.40)
+  ?(MulDivRound(20 * 100, 2, 100, ExactOrReject) + MulDivRound(280 * 100, 5, 100, ExactOrReject) == 1440).
+  // Rounding modes on 144 / 10 (= 14.4) and half-way ties 145 / 10 (= 14.5) vs 155 / 10 (= 15.5):
+  ?(MulDivRound(144, 1, 10, Floor) == 14).
+  ?(MulDivRound(144, 1, 10, Ceil) == 15).
+  ?(MulDivRound(145, 1, 10, NearestEven) == 14).
+  ?(MulDivRound(155, 1, 10, NearestEven) == 16).
+}
+
+Scenario split-tx-vs-period-aggregate {
+  // Split 300-unit purchase into T1 (15 units, all in tier A @ 2% = 30 cents)
+  // and T2 (285 units: 5 remaining in tier A @ 2% = 10 cents + 280 in tier B @ 5% = 1400 cents => 1410 cents):
+  +tx-charge(T1, fee-cents(MulDivRound(15 * 100, 2, 100, ExactOrReject))).
+  +tx-charge(T2, fee-cents(MulDivRound(5 * 100, 2, 100, ExactOrReject) + MulDivRound(280 * 100, 5, 100, ExactOrReject))).
+  // Sum over `Money(USD, 2)` preserves dimensional type and matches single-tx period total (1440 cents):
+  ?(Sum(Foreach tx-charge: tx-charge.fee-cents) == 1440).
+  ?(allowance + 10 == 30).
+}

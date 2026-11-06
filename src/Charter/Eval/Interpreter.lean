@@ -447,7 +447,7 @@ partial def Elem.leaves : Elem → List Elem
 def stateValues (s : State) (dom : Domain) : List Elem :=
   let leaves := s.holdsList.flatMap (fun te => Elem.leaves te.1)
   let wanted := leaves.filter fun e => match dom, e with
-    | .anyInt, .int _ | .time, .int _ | .duration, .int _ => true
+    | .anyInt, .int _ | .time, .int _ | .duration, .int _ | .money _ _, .int _ | .quantity _, .int _ => true
     | .anyString, .str _ => true
     | _, _ => false
   wanted.foldl (fun acc e => if acc.any (Elem.beq e) then acc else acc ++ [e]) []
@@ -457,7 +457,7 @@ that cannot be listed. A product component with an `Int` inside ranges over what
 def needsMenu (spec : Spec) (d : DomId) : Option Domain :=
   match spec.findDecl d with
   | some t => match t.domain with
-    | .anyInt | .anyString | .time | .duration => some t.domain
+    | .anyInt | .anyString | .time | .duration | .money _ _ | .quantity _ => some t.domain
     | _ => none
   | none => none
 

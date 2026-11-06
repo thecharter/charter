@@ -1,0 +1,3 @@
+// 010.12: `MulDivRound(..., ExactOrReject)` fails loudly with `CHR108` when division leaves a remainder.
+//! expect-error: CHR108
+?(MulDivRound(144, 1, 10, ExactOrReject) == 14).

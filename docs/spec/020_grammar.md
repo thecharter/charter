@@ -24,8 +24,8 @@ Reserved multi-word and word keywords (`wordKeywords`):
 Claim keywords (matched when followed by whitespace and a non-`.`/`}` token):
 `?!undetermined`, `?undetermined`, `?!conflict`, `?conflict`, `?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
 
-Contextual keywords (`D17`, `D20`, `D21`, `D22`, `D23`, lexed as `atom` or `ident` and matched only in the grammar positions below):
-`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Finding`, `Evidenced`, `Confidential`, `To`, `Resolves`, `Standard`, `Supports`, `Rebuts`, `Retracts`, `SubmitEvidence`, `RetractEvidence`, `By`, `Note`, `Established`, `Refuted`, `Unresolved`, `Conflicted`, `Default`, `Exception`, `Overrides`, `Priority`, `Over`, `Rejects`, `Yields`, `Conflict`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
+Contextual keywords (`D17`, `D20`, `D21`, `D22`, `D23`, `D24`, lexed as `atom` or `ident` and matched only in the grammar positions below):
+`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Finding`, `Evidenced`, `Confidential`, `To`, `Resolves`, `Standard`, `Supports`, `Rebuts`, `Retracts`, `SubmitEvidence`, `RetractEvidence`, `By`, `Note`, `Established`, `Refuted`, `Unresolved`, `Conflicted`, `Default`, `Exception`, `Overrides`, `Priority`, `Over`, `Rejects`, `Yields`, `Conflict`, `Money`, `Quantity`, `MulDivRound`, `Floor`, `Ceil`, `NearestEven`, `ExactOrReject`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
 
 ---
 
@@ -92,7 +92,7 @@ frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? do
               | 'Placeholder' ident 'For' ident
               | 'Module' ident '(' idents? ')' '{' (frame | '.')* '}'
               | 'Use' ident '(' idents? ')' ('As' ident)?
-              | 'Param' ident (':' ('Int' | 'Time' | 'Duration'))? '=' '-'? int_lit
+              | 'Param' ident (':' ('Int' | 'Time' | 'Duration' | 'Money' '(' (atom | ident) ',' int_lit ')' | 'Quantity' '(' (atom | ident) ')'))? '=' '-'? int_lit
               | 'Property' ident ('Assumes' idents)? ('When' | 'Where') temporal_form from_clause*
               | 'Document' (atom | ident)? str_lit ('SHA256' str_lit)? ('Rank' '-'? int_lit)?
               | 'Clause' clause_id ('In' (atom | ident))? ('Approved' (int_lit | str_lit))? clause_item*
@@ -108,6 +108,8 @@ clause_item ::= 'Text' str_lit
               | ('Norm' | 'Definition' | 'Invariant' | 'Acceptance' | 'Commentary') str_lit ('=>' idents)?
 
 domain      ::= 'String' | 'Atom' | 'Int' | 'Time' | 'Duration'
+              | 'Money' '(' (atom | ident) ',' int_lit ')'
+              | 'Quantity' '(' (atom | ident) ')'
               | int_lit ('..' int_lit | ((',' | '+') int_lit)*)
               | char_lit '..' char_lit
               | (atom | str_lit) ((',' | '+') (atom | str_lit))*
@@ -170,6 +172,7 @@ unary_expr  ::= ('!' | 'Not' | 'Present' | 'Holds' | 'Violated' | 'Enabled') una
 postfix_expr ::= primary (proj_dot (var | '(' var ')') | ':' ident)*
 primary     ::= 'True' | 'False' | 'Current Time'
               | int_lit | str_lit | atom
+              | 'MulDivRound' '(' expr ',' expr ',' expr ',' ('Floor' | 'Ceil' | 'NearestEven' | 'ExactOrReject') ')'
               | ('Sum' | 'Count' | 'Max' | 'Min') '(' 'Foreach' vars ':' expr ')'
               | '(' 'Exists' vars ':' expr ')'
               | '(' 'Forall' vars ':' expr ')'

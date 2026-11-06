@@ -1,0 +1,5 @@
+// 003.14, 010.12: mixing incompatible currencies (`USD` vs `EUR`), scales, or units is rejected statically with `CHR012`.
+//! expect-error: CHR012
+Param usd-bal : Money(USD, 2) = 1000.
+Param eur-bal : Money(EUR, 2) = 1000.
+?(usd-bal + eur-bal == 2000).

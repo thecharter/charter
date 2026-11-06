@@ -67,7 +67,7 @@ def buildSymbolicMenu (spec : Spec) (state : State) (baseMenu : Explore.Menu) : 
   let intTypes := ("int" :: "duration" :: "time" ::
     spec.decls.filterMap fun (d, t) =>
       match t.domain with
-      | .anyInt | .time | .duration => some d
+      | .anyInt | .time | .duration | .money _ _ | .quantity _ => some d
       | _ => none).eraseDups
   let synth : Explore.Menu := intTypes.map fun d =>
     match baseMenu.find? (·.1 == d) with

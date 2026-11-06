@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D24 — Static dimensional `Money(CUR, SCALE)` and `Quantity(UNIT)` over exact `Int` with `MulDivRound` (`T10`, `T11`)](2026-11-06-D24-dimensional-money-quantity-and-rounding.md)
 - [D23 — Stratified `Default` / `Exception` / `Priority` calculus and typed `Conflict` (`T21`, `T22`)](2026-11-06-D23-defeasible-defaults-exceptions-and-conflict.md)
 - [D22 — Four-valued epistemic `Evidence`/`Finding`, 3-valued `Eval`, and audience-redacted `ReasonGraph` (`T04`–`T07`, `T43`)](2026-11-06-D22-epistemic-evidence-findings-and-reasongraph.md)
 - [D21 — `Power` competence requirement (`CHR032`) and multi-document SHA-256 provenance (`T08`, `T37`, `T39`)](2026-11-06-D21-power-competence-and-multidoc-provenance.md)

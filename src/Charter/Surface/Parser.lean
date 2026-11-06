@@ -318,6 +318,27 @@ def primary : Nat → P Term
     | .kw "Current Time" => advance; return .currentTime
     | .int n => advance; return .intLit n
     | .str s => advance; return .stringLit s
+    | .atom "MulDivRound" =>
+      if (← peekAt 1) == .kw "(" then
+        advance
+        expectKw "("
+        let x ← expr fuel
+        expectKw ","
+        let num ← expr fuel
+        expectKw ","
+        let den ← expr fuel
+        expectKw ","
+        let mode : RoundingMode ← (do
+          match ← peek with
+          | .atom "Floor" | .ident "floor" => advance; return .floor
+          | .atom "Ceil" | .ident "ceil" => advance; return .ceil
+          | .atom "NearestEven" | .ident "nearestEven" => advance; return .nearestEven
+          | .atom "ExactOrReject" | .ident "exactOrReject" => advance; return .exactOrReject
+          | k => fail "CHR003" s!"expected rounding mode (`Floor`, `Ceil`, `NearestEven`, or `ExactOrReject`), found {k.describe}")
+        expectKw ")"
+        return .mulDivRound x num den mode
+      else
+        advance; return .stringLit "MulDivRound"
     | .atom s => advance; return .stringLit s
     | .kw "Sum" => advance; aggregate fuel .sum
     | .kw "Count" => advance; aggregate fuel .count
@@ -394,6 +415,29 @@ def typeExpr : P Domain := do
       return .strings (a :: rest)
     else
       advance; return .duration
+  | .atom "Money" =>
+    if (← peekAt 1) == .kw "(" then
+      advance; expectKw "("
+      let cur ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected currency code in `Money(CUR, SCALE)`, found {k.describe}")
+      expectKw ","
+      let sc ← intLit
+      if sc < 0 then fail "CHR003" s!"Money({cur}, {sc}): scale must be non-negative"
+      expectKw ")"
+      return .money cur sc.toNat
+    else
+      let a ← atom
+      let rest ← moreAtoms
+      return .strings (a :: rest)
+  | .atom "Quantity" =>
+    if (← peekAt 1) == .kw "(" then
+      advance; expectKw "("
+      let unit ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected unit name in `Quantity(UNIT)`, found {k.describe}")
+      expectKw ")"
+      return .quantity unit
+    else
+      let a ← atom
+      let rest ← moreAtoms
+      return .strings (a :: rest)
   | .int lo =>
     advance
     if ← isKw ".." then advance; let hi ← intLit; return .ints (intsFromRange lo hi)
@@ -817,7 +861,20 @@ def paramDomain : P Domain := do
     | .kw "Int" => advance; return Domain.anyInt
     | .kw "Time" => advance; return Domain.time
     | .atom "Duration" | .kw "Duration" => advance; return Domain.duration
-    | k => fail "CHR003" s!"expected Int, Time, or Duration after `:` but found {k.describe}"
+    | .atom "Money" =>
+      advance; expectKw "("
+      let cur ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected currency code in `Money(CUR, SCALE)`, found {k.describe}")
+      expectKw ","
+      let sc ← intLit
+      if sc < 0 then fail "CHR003" s!"Money({cur}, {sc}): scale must be non-negative"
+      expectKw ")"
+      return .money cur sc.toNat
+    | .atom "Quantity" =>
+      advance; expectKw "("
+      let unit ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected unit name in `Quantity(UNIT)`, found {k.describe}")
+      expectKw ")"
+      return .quantity unit
+    | k => fail "CHR003" s!"expected Int, Time, Duration, Money(CUR, SCALE), or Quantity(UNIT) after `:` but found {k.describe}"
   else return Domain.anyInt
 
 /-- Parse a `TemporalFormula` after `Property <name> [Assumes ...] When` (`D20`). -/

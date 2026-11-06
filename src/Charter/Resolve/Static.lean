@@ -130,6 +130,7 @@ def freeVars (spec : Spec) : Term → List Var
       | _ => freeVarsArgs spec args
     | none => freeVarsArgs spec args
   | .not t | .present t | .violated t | .enabled t | .evStatus _ t | .hasConflict t | .project t _ | .tag t _ | .untag t => freeVars spec t
+  | .mulDivRound x n d _ => union (freeVars spec x) (union (freeVars spec n) (freeVars spec d))
   | .heldFor t d => union (freeVars spec t) (freeVars spec d)
   | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
   | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b => union (freeVars spec a) (freeVars spec b)
@@ -177,8 +178,20 @@ def matchDomain : Domain → Domain → Bool
   | .time, _ => false
   | .duration, .duration => true
   | .duration, _ => false
+  | .money c1 s1, .money c2 s2 => c1 == c2 && s1 == s2
+  | .money _ _, _ => false
+  | .quantity u1, .quantity u2 => u1 == u2
+  | .quantity _, _ => false
   | .products r, .products r' => r == r'
   | .products _, _ => false
+
+def _root_.Charter.Ty.isDimensionalInt : Ty → Bool
+  | .time | .duration | .money _ _ | .quantity _ => true
+  | _ => false
+
+def _root_.Charter.Ty.isScalableDim : Ty → Bool
+  | .duration | .money _ _ | .quantity _ => true
+  | _ => false
 
 def matchType (ty : Ty) (dom : Domain) : Stc Bool := do
   match ty with
@@ -187,22 +200,27 @@ def matchType (ty : Ty) (dom : Domain) : Stc Bool := do
   | .strings => return match dom with | .anyString | .strings _ => true | _ => false
   | .time => return match dom with | .time => true | _ => false
   | .duration => return match dom with | .duration => true | _ => false
+  | .money c s => return match dom with | .money c' s' => c == c' && s == s' | _ => false
+  | .quantity u => return match dom with | .quantity u' => u == u' | _ => false
   | .bool => return false
 
 /-- A term built only from literals and arithmetic: the only integer that converts to a
-`Time` or a `Duration` by demand (D7). -/
+dimensional integer type (`Time`, `Duration`, `Money`, `Quantity`) by demand (`D7`, `D24`). -/
 def literalArith : Term → Bool
   | .intLit _ => true
   | .add a b | .sub a b | .mult a b | .div a b | .mod a b => literalArith a && literalArith b
+  | .mulDivRound x n d _ => literalArith x && literalArith n && literalArith d
   | _ => false
 
-/-- The result type of `+`/`-` over integers, times, and durations (D7), or `none`. -/
+/-- The result type of `+`/`-` over integers, times, durations, money, and quantities (`D7`, `D24`), or `none`. -/
 def arithTy (isSub : Bool) : Ty → Ty → Option Ty
   | .ints, .ints => some .ints
   | .time, .duration => some .time
   | .duration, .time => if isSub then none else some .time
   | .duration, .duration => some .duration
   | .time, .time => if isSub then some .duration else none
+  | .money c1 s1, .money c2 s2 => if c1 == c2 && s1 == s2 then some (.money c1 s1) else none
+  | .quantity u1, .quantity u2 => if u1 == u2 then some (.quantity u1) else none
   | _, _ => none
 
 /-! ## Terms -/
@@ -274,6 +292,8 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
           | .ints _ | .anyInt => return (.untag t', .ints)
           | .time => return (.untag t', .time)
           | .duration => return (.untag t', .duration)
+          | .money c s => return (.untag t', .money c s)
+          | .quantity u => return (.untag t', .quantity u)
           | _ => err "CHR003" "untagging is an internal operation"
       | _ => err "CHR003" "untagging is an internal operation"
     | .not t => do let t' ← convertTerm fuel t .bool; return (.not t', .bool)
@@ -295,7 +315,20 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         let d' ← convertTerm fuel d .duration
         return (.heldFor t' d', .bool)
       | _ => err "CHR015" s!"Held({t}) needs an instance, not {ty}"
-    | .sum xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.sum xs t', .ints)
+    | .sum xs t => do
+      warnJudgedBinders xs
+      let (t1, ty1) ← compileTerm fuel t
+      let (t2, ty2) ← asNumber t1 ty1
+      if ty2 == .ints || ty2.isScalableDim then return (.sum xs t2, ty2)
+      else convErr ty1 .ints
+    | .mulDivRound x num den mode => do
+      let (x1, tx1) ← compileTerm fuel x
+      let (x2, tx2) ← asNumber x1 tx1
+      if !(tx2 == .ints || tx2.isScalableDim) then
+        err "CHR012" s!"MulDivRound first operand must be Int, Duration, Money, or Quantity, not {tx1}"
+      let num' ← convertTerm fuel num .ints
+      let den' ← convertTerm fuel den .ints
+      return (.mulDivRound x2 num' den' mode, tx2)
     | .eq a b =>
       orElse
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.eq a' b', .bool))
@@ -305,8 +338,18 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.neq a' b', .bool))
         (do let (b', tb) ← compileTerm fuel b; let a' ← convertTerm fuel a tb; return (.neq a' b', .bool))
     | .count xs t => do warnJudgedBinders xs; let (t', _) ← compileTerm fuel t; return (.count xs t', .ints)
-    | .max xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.max xs t', .ints)
-    | .min xs t => do warnJudgedBinders xs; let t' ← convertTerm fuel t .ints; return (.min xs t', .ints)
+    | .max xs t => do
+      warnJudgedBinders xs
+      let (t1, ty1) ← compileTerm fuel t
+      let (t2, ty2) ← asNumber t1 ty1
+      if ty2 == .ints || ty2.isScalableDim then return (.max xs t2, ty2)
+      else convErr ty1 .ints
+    | .min xs t => do
+      warnJudgedBinders xs
+      let (t1, ty1) ← compileTerm fuel t
+      let (t2, ty2) ← asNumber t1 ty1
+      if ty2 == .ints || ty2.isScalableDim then return (.min xs t2, ty2)
+      else convErr ty1 .ints
     | .when a c => do let (a', ta) ← compileTerm fuel a; let c' ← convertTerm fuel c .bool; return (.when a' c', ta)
     | .present t => do
       let (t', ty) ← compileTerm fuel t
@@ -383,7 +426,7 @@ def convertTerm : Nat → Term → Ty → Stc Term
     | .tagged d =>
       let dom ← getDom d
       if ← matchType ty' dom then return .tag t' d
-      else if ty' == .ints && literalArith t' && (dom == .time || dom == .duration) then return .tag t' d
+      else if ty' == .ints && literalArith t' && dom.isDimensionalInt then return .tag t' d
       else convErr ty' ty
     | .time =>
       match ty' with
@@ -395,19 +438,30 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | .ints => if literalArith t' then return t' else convErr ty' ty
       | .tagged d => if matchDomain (← getDom d) .duration then return .untag t' else convErr ty' ty
       | _ => convErr ty' ty
+    | .money c s =>
+      match ty' with
+      | .ints => if literalArith t' then return t' else convErr ty' ty
+      | .tagged d => if matchDomain (← getDom d) (.money c s) then return .untag t' else convErr ty' ty
+      | _ => convErr ty' ty
+    | .quantity u =>
+      match ty' with
+      | .ints => if literalArith t' then return t' else convErr ty' ty
+      | .tagged d => if matchDomain (← getDom d) (.quantity u) then return .untag t' else convErr ty' ty
+      | _ => convErr ty' ty
 
-/-- An instance of an integer, time, or duration type used as its value. -/
+/-- An instance of an integer, time, duration, money, or quantity type used as its value. -/
 def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
   match ty with
   | .tagged d => match ← getDom d with
     | .anyInt | .ints _ => pure (Term.untag t, Ty.ints)
     | .time => pure (Term.untag t, Ty.time)
     | .duration => pure (Term.untag t, Ty.duration)
+    | .money c s => pure (Term.untag t, Ty.money c s)
+    | .quantity u => pure (Term.untag t, Ty.quantity u)
     | _ => convErr ty .ints
   | _ => pure (t, ty)
 
-/-- Two operands of a comparison, resolved to one type among integer, time, duration
-(D7: a time is never compared with a duration or an integer other than a literal). -/
+/-- Two operands of a comparison, resolved to one numeric/dimensional type (`D7`, `D24`). -/
 def compileCompare : Nat → Term → Term → Stc (Term × Term)
   | 0, _, _ => err "CHR003" "expression too deeply nested to resolve"
   | fuel + 1, a, b => do
@@ -415,7 +469,7 @@ def compileCompare : Nat → Term → Term → Stc (Term × Term)
     let (b', tb) ← compileTerm fuel b
     let (a', ta) ← asNumber a' ta
     let (b', tb) ← asNumber b' tb
-    let numeric (t : Ty) : Bool := t == .ints || t == .time || t == .duration
+    let numeric (t : Ty) : Bool := t == .ints || t.isDimensionalInt
     if !(numeric ta) then convErr ta .ints
     else if !(numeric tb) then convErr tb .ints
     else if ta == tb then return (a', b')
@@ -423,30 +477,23 @@ def compileCompare : Nat → Term → Term → Stc (Term × Term)
     else if tb == .ints && literalArith b' then return (a', b')
     else convErr tb ta
 
-/-- `+`/`-` over integers, times, and durations (D7). -/
+/-- `+`/`-` over integers, times, durations, money, and quantities (`D7`, `D24`). -/
 def compileArith : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
   | 0, _, _, _ => err "CHR003" "expression too deeply nested to resolve"
   | fuel + 1, isSub, a, b => do
     let (a', ta) ← compileTerm fuel a
     let (b', tb) ← compileTerm fuel b
-    -- an instance of an integer/time/duration type is used as its value
     let (a', ta) ← asNumber a' ta
     let (b', tb) ← asNumber b' tb
     match arithTy isSub ta tb with
     | some ty => return (a', b', ty)
     | none =>
-      -- a literal side takes the other's type (`Current Time + 10`)
-      if ta == .ints && literalArith a' && (tb == .time || tb == .duration) then
-        match arithTy isSub (if tb == .time && isSub then .time else tb) tb with
-        | _ => return (a', b', if isSub && tb == .time then .time else tb)
-      else if tb == .ints && literalArith b' && (ta == .time || ta == .duration) then
+      if ta == .ints && literalArith a' && tb.isDimensionalInt then
+        return (a', b', tb)
+      else if tb == .ints && literalArith b' && ta.isDimensionalInt then
         return (a', b', ta)
-      else err "CHR012" s!"cannot {if isSub then "subtract" else "add"} {tb} {if isSub then "from" else "to"} {ta} (D7: a time and a duration combine, two times only subtract)"
-/-- `*`/`/` over integers and durations (D16, brief B12): `Int * Int : Int`,
-`Duration * Int : Duration`, `Int * Duration : Duration`, `Duration / Int : Duration`
-(rounding toward negative infinity, as `Int /`); at most one operand of `*` may be a
-duration, an instant is never scaled, and `Int / Duration` has no meaning. A literal
-beside a duration resolves to `Int`, so `base * 2` is unambiguous (D7). -/
+      else err "CHR012" s!"cannot {if isSub then "subtract" else "add"} {tb} {if isSub then "from" else "to"} {ta} (dimensional mismatch)"
+/-- `*`/`/` over integers and scalable dimensions (`Duration`, `Money`, `Quantity`, `D16`, `D24`). -/
 def compileScale : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
   | 0, _, _, _ => err "CHR003" "expression too deeply nested to resolve"
   | fuel + 1, isDiv, a, b => do
@@ -455,17 +502,17 @@ def compileScale : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
     let (a', ta) ← asNumber a' ta
     let (b', tb) ← asNumber b' tb
     let op := if isDiv then "/" else "*"
-    match ta, tb with
-    | .ints, .ints => return (a', b', .ints)
-    | .duration, .ints => return (a', b', .duration)
-    | .ints, .duration =>
-      if isDiv then err "CHR012" s!"cannot divide an integer by a duration (D16: `Duration / Int` is a duration; `Int / Duration` has no meaning)"
-      else return (a', b', .duration)
-    | .duration, .duration =>
-      err "CHR012" s!"cannot {if isDiv then "divide" else "multiply"} a duration by a duration (D16: in `{op}` at most one operand may be a duration)"
-    | .time, _ | _, .time => err "CHR012" s!"cannot use an instant in `{op}` (D16: a time is never scaled)"
-    | .ints, other | .duration, other => convErr other .ints
-    | other, _ => convErr other .ints
+    if ta == .ints && tb == .ints then return (a', b', .ints)
+    else if ta.isScalableDim && tb == .ints then return (a', b', ta)
+    else if ta == .ints && tb.isScalableDim then
+      if isDiv then err "CHR012" s!"cannot divide an integer by {tb}"
+      else return (a', b', tb)
+    else if ta == .time || tb == .time then
+      err "CHR012" s!"cannot use an instant in `{op}` (D16: a time is never scaled)"
+    else if ta.isScalableDim && tb.isScalableDim then
+      err "CHR012" s!"cannot {if isDiv then "divide" else "multiply"} {ta} by {tb} in `{op}`"
+    else if ta == .ints || ta.isScalableDim then convErr tb .ints
+    else convErr ta .ints
 
 def compilePrimitiveApplication : Nat → DomId → Args → Stc (Term × Ty)
   | 0, _, _ => err "CHR003" "expression too deeply nested to resolve"
@@ -487,6 +534,8 @@ def compilePrimitiveApplication : Nat → DomId → Args → Stc (Term × Ty)
     | .ints _, .pos [a] => prim a .ints
     | .time, .pos [a] => prim a .time
     | .duration, .pos [a] => prim a .duration
+    | .money c s, .pos [a] => prim a (.money c s)
+    | .quantity u, .pos [a] => prim a (.quantity u)
     | _, _ => e
 
 /-- Positional arguments become named modifiers; every modifier is checked

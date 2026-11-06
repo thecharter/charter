@@ -326,6 +326,8 @@ inductive RuntimeError where
   | fuelExhausted (what : String)
   /-- Charter (D7): `@ t` with `t` before the current time. -/
   | timeBackwards (now t : Int)
+  /-- Charter (D24, G3.4): `MulDivRound` division by zero or inexact `ExactOrReject`. -/
+  | arithmeticError (msg : String)
   deriving Inhabited
 
 def RuntimeError.code : RuntimeError → String
@@ -336,6 +338,7 @@ def RuntimeError.code : RuntimeError → String
   | .undeclaredType _ => "CHR105"
   | .fuelExhausted _ => "CHR104"
   | .timeBackwards _ _ => "CHR106"
+  | .arithmeticError _ => "CHR108"
 
 def RuntimeError.message : RuntimeError → String
   | .missingInput (.assignments tes) => s!"missing input: no truth value for {", ".intercalate (tes.map Tagged.pp)}"
@@ -346,6 +349,7 @@ def RuntimeError.message : RuntimeError → String
   | .undeclaredType d => s!"undeclared type {d}"
   | .fuelExhausted what => s!"evaluation did not finish within its bound while {what}"
   | .timeBackwards now t => s!"time cannot move backwards: the clock is at {now}, `@ {t}` asked for {t}"
+  | .arithmeticError msg => msg
 
 def RuntimeError.isMissingInput : RuntimeError → Bool
   | .missingInput _ => true

@@ -26,4 +26,6 @@ An expression denotes zero or more values: a term with free variables takes ever
 
 **10.11 Time.** `Current Time` is the clock (009.1), of type `Time`; `Held(e) For d` is the stamp condition (009.3).
 
+**10.12 Dimensional `Money`/`Quantity` arithmetic and `MulDivRound` (`D24`, `G3.4`).** `+`, `-`, comparisons, and `Sum`/`Max`/`Min` preserve `Money(CUR, SCALE)` and `Quantity(UNIT)` across identical dimensional tags (with integer literals coercing by demand) and reject mismatched currencies, scales, or units with `CHR012`. `*` and `/` scale `Money` or `Quantity` by `Int`. `MulDivRound(x, num, den, Floor | Ceil | NearestEven | ExactOrReject)` evaluates `(x * num) / den` in exact integer arithmetic with explicit rounding, preserving `x`'s dimensional type and raising `CHR108` on zero `den` or inexact `ExactOrReject` (`T10`, `T11`). `test/spec/spec_010_12_money_tiers_and_rounding.charter`, `spec_010_12b_exact_or_reject_error.charter`
+
 *Differences from eFLINT:* 10.5 and 10.10 commit to one reading where eFLINT's grammar has several (D14).

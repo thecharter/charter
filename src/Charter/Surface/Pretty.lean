@@ -75,6 +75,7 @@ def fmtTerm : Term → String
   | .heldFor t d => "(Held(" ++ fmtTerm t ++ ") For (" ++ fmtTerm d ++ "))"
   | .evStatus want t => want.kwName ++ "(" ++ fmtTerm t ++ ")"
   | .hasConflict t => "Conflict(" ++ fmtTerm t ++ ")"
+  | .mulDivRound x n d m => "MulDivRound(" ++ fmtTerm x ++ ", " ++ fmtTerm n ++ ", " ++ fmtTerm d ++ ", " ++ m.kwName ++ ")"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -101,6 +102,8 @@ def fmtDomain : Domain → String
   | .anyInt => "Int"
   | .time => "Time"
   | .duration => "Duration"
+  | .money cur sc => s!"Money({cur}, {sc})"
+  | .quantity unit => s!"Quantity({unit})"
   | .strings [] => "'z'..'a'"
   | .strings ss => ", ".intercalate (ss.map fmtAtomOrStr)
   | .ints [] => "1..0"
@@ -330,6 +333,8 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     let tyPart := match dom with
       | .time => " : Time"
       | .duration => " : Duration"
+      | .money cur sc => s!" : Money({cur}, {sc})"
+      | .quantity unit => s!" : Quantity({unit})"
       | _ => ""
     s!"{indent}Param {name}{tyPart} = {value}" :: fmtDecls indent fuel rest
   | fuel + 1, .module name params body :: rest =>

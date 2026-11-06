@@ -426,6 +426,8 @@ def enumerableFuel (s : Spec) : Nat → Domain → Bool
   | _, .anyInt => false
   | _, .time => false
   | _, .duration => false
+  | _, .money _ _ => false
+  | _, .quantity _ => false
 
 def enumerable (s : Spec) (dom : Domain) : Bool := s.enumerableFuel (s.decls.length + 1) dom
 
@@ -520,6 +522,8 @@ def enumerableWithMap (s : Spec) (declMap : DomMap TypeSpec) : Nat → Domain �
   | _, .anyInt => false
   | _, .time => false
   | _, .duration => false
+  | _, .money _ _ => false
+  | _, .quantity _ => false
 
 def buildIndex (s : Spec) : SpecIndex :=
   let declMap : DomMap TypeSpec := s.decls.foldr (fun (d, t) m => m.insert d t) .empty

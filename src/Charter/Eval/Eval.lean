@@ -228,6 +228,8 @@ def instantiateDomain : Nat → DomId → Domain → M Elem
     | .anyString => err (.enumerateInfiniteDomain d)
     | .anyInt => err (.enumerateInfiniteDomain d)
     | .duration => err (.enumerateInfiniteDomain d)
+    | .money _ _ => err (.enumerateInfiniteDomain d)
+    | .quantity _ => err (.enumerateInfiniteDomain d)
     | .strings ss => nd (ss.map .str)
     | .ints is => nd (is.map .int)
     | .products xs => do
@@ -281,6 +283,8 @@ def isValidInstance : Nat → Tagged → M Bool
     | .int _, .anyInt => check
     | .int _, .time => check
     | .int _, .duration => check
+    | .int _, .money _ _ => check
+    | .int _, .quantity _ => check
     | .str s, .strings ss => if ss.contains s then check else pure false
     | .str _, .anyString => check
     | .prod args, .products params =>
@@ -783,6 +787,13 @@ def eval : Nat → Term → M Value
     | .hasConflict t => whenTagged (eval fuel t) (fun te => do
         let conf? ← lookupNormativeConflict te
         pure (.bool conf?.isSome))
+    | .mulDivRound x num den mode =>
+      whenInt (eval fuel x) fun vx =>
+      whenInt (eval fuel num) fun vnum =>
+      whenInt (eval fuel den) fun vden =>
+        match mulDivRound vx vnum vden mode with
+        | .ok res => pure (.int res)
+        | .error msg => err (.arithmeticError msg)
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

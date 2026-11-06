@@ -30,6 +30,7 @@ import Charter.Surface.Ast
 import Charter.Surface.Parser
 import Charter.Surface.Pretty
 import Charter.Core.Evidence
+import Charter.Core.Scale
 import Charter.Core.Term
 import Charter.Core.Defeasible
 import Charter.Core.Intern

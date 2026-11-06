@@ -251,6 +251,22 @@
       "summary": "Multi-level Catala exception-to-exception chains resolve deterministically across base, first-tier exception, and second-tier exception states (D23, T22)."
     },
     {
+      "id": "scale.t10_tiered_allowance",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Scale.lean",
+      "symbol": "mulDivRound_t10_tiered_allowance",
+      "summary": "Exact integer minor-unit tiered fee calculation (20 @ 2% + 280 @ 5%) equals 1440 cents ($14.40) and rejects inexact truncation under ExactOrReject (D24, T10)."
+    },
+    {
+      "id": "scale.nearest_even_and_floor_le_ceil",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Scale.lean",
+      "symbol": "mulDivRound_floor_le_ceil",
+      "summary": "MulDivRound Floor never exceeds Ceil across all non-zero denominators, with banker's NearestEven midpoint rounding proved (D24, G3.4)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",
