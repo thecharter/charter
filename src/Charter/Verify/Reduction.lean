@@ -15,7 +15,8 @@ def effectWriteTypes (spec : Spec) (effs : List Effect) : List DomId :=
   (effs.flatMap fun
     | .cAll _ t _ | .tAll _ t | .oAll _ t => (Stratify.typeOf spec t).toList
     | .evOp _ _ t _ | .findingOp _ _ t _ =>
-      (Stratify.typeOf spec t).toList ++ [evSupportDom, evRebutDom, evFindingPosDom, evFindingNegDom]).eraseDups
+      (Stratify.typeOf spec t).toList ++ [evSupportDom, evRebutDom, evFindingPosDom, evFindingNegDom]
+    | .amendOp actId => [amendCommitDom, actId] ++ spec.decls.map (·.1)).eraseDups
 
 /-- Types written by triggering `d` (including bounded `Syncs with` targets). -/
 def actWriteTypes (spec : Spec) : Nat → List DomId → DomId → List DomId
@@ -65,7 +66,8 @@ def actReadTypes (spec : Spec) (d : DomId) : List DomId :=
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
             (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
           | .tAll ys t | .oAll ys t | .evOp _ ys t _ | .findingOp _ ys t _ =>
-            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t)
+            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
+          | .amendOp _ => [])
       | .event evSpec =>
         evSpec.effects.flatMap fun
           | .cAll ys t md =>
@@ -73,6 +75,7 @@ def actReadTypes (spec : Spec) (d : DomId) : List DomId :=
             (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
           | .tAll ys t | .oAll ys t | .evOp _ ys t _ | .findingOp _ ys t _ =>
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
+          | .amendOp _ => []
       | _ => []
     ((cDeps ++ dDeps ++ kDeps).map (·.1)).eraseDups
 

@@ -21,6 +21,7 @@ structure ExploreCliOpts where
   minimize        : Bool := true
   requireComplete : Bool := false
   json            : Bool := false
+  regime          : Option String := none
   menu            : Explore.Menu := []
   files           : List String := []
 
@@ -59,6 +60,8 @@ def parseExploreArgs : List String → ExploreCliOpts → Except String ExploreC
   | "--no-minimize" :: rest, o => parseExploreArgs rest { o with minimize := false }
   | "--minimize" :: rest, o => parseExploreArgs rest { o with minimize := true }
   | "--require-complete" :: rest, o => parseExploreArgs rest { o with requireComplete := true }
+  | "--regime" :: r :: rest, o => parseExploreArgs rest { o with regime := some r }
+  | ["--regime"], _ => .error "--regime needs a regime name"
   | "--out" :: "json" :: rest, o => parseExploreArgs rest { o with json := true }
   | "--out" :: "text" :: rest, o => parseExploreArgs rest o
   | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
@@ -152,6 +155,12 @@ def exploreCommand (args : List String) : IO UInt32 := do
             | .diag d => if d.isError then violations := violations + 1
             | _ => pure ()
           cfg := cfg'
+      if let some regName := o.regime then
+        match applyRegimeOverlay cfg regName with
+        | .ok cfgR => cfg := cfgR
+        | .error e =>
+          IO.eprintln s!"{f}: error CHR003: {e}"
+          violations := violations + 1
       let (v, inc) ← runVerifyAt o depth menu f cfg
       violations := violations + v
       inconclusives := inconclusives + inc

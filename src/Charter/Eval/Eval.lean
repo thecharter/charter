@@ -1,4 +1,5 @@
 import Charter.Core.State
+import Charter.Core.Amend
 
 /-!
 # Charter.Eval.Eval — The evaluator of terms, instances, and triggers
@@ -387,17 +388,20 @@ def isValid : Nat → Tagged → M Bool
         let (_, vTri, _) ← evalActTri fuel te
         pure (vTri == .yes)
       else
-        let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
-        if !(conds.all id) then pure false
+        let amBlocked ← amendImmunityBlocks fuel te.2 a
+        if amBlocked then pure false
         else
-          match tspec.domain, te.1, a.hasRecipient with
-          | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
-            let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
-            pure (!blocked)
-          | _, .prod (_ :: recipient :: _), true => do
-            let blocked ← immunityBlocks fuel te.2 recipient []
-            pure (!blocked)
-          | _, _, _ => pure true
+          let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
+          if !(conds.all id) then pure false
+          else
+            match tspec.domain, te.1, a.hasRecipient with
+            | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
+              let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
+              pure (!blocked)
+            | _, .prod (_ :: recipient :: _), true => do
+              let blocked ← immunityBlocks fuel te.2 recipient []
+              pure (!blocked)
+            | _, _, _ => pure true
     | _ => pure true
 termination_by structural n => n
 
@@ -450,6 +454,42 @@ def immunityBlocks : Nat → DomId → Tagged → List (Var × Tagged) → M Boo
             else pure false
       | _ => pure false
     pure (rs.any id)
+termination_by structural n => n
+
+/-- Charter (D11, D25, 014.5): whether an active entrenchment immunity blocks an `Amend` act
+`actId` (`Against` names `actId` or `"Amend"`, and the amendment's touched rules intersect the
+immunity's reflexively protected rule set, with at least one holding un-lifted instance). -/
+def amendImmunityBlocks : Nat → DomId → ActSpec → M Bool
+  | 0, _, _ => err (.fuelExhausted "checking amendment entrenchment")
+  | fuel + 1, actId, a => do
+    if !a.isAmend then pure false
+    else
+      let spec ← getSpec
+      let state ← getState
+      let installs := (spec.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
+      let touched := Amend.touchedIds a.repeals installs
+      let rs ← (spec.immunitiesAgainstAmend actId).mapM fun entry => do
+        let imId := entry.1
+        let imTs := entry.2.1
+        let imSpec := entry.2.2
+        let extraDeps := Amend.governingDeps spec imId imTs imSpec actId
+        let protectedIds := Amend.reflexiveProtectedIds spec imId imSpec extraDeps
+        if !(touched.any protectedIds.contains) then pure false
+        else
+          let activeUnlessFalse (im : Tagged) : M Bool := do
+            let us ← withSubs (Tagged.bindings imTs.domain im) (imSpec.unlessConds.mapM (fun c => whenBool (eval fuel c) pure))
+            pure (!(us.any id))
+          let held := state.holdsList.filter (fun im => im.2 == imId)
+          let fromHeld ← held.mapM activeUnlessFalse
+          if fromHeld.any id then pure true
+          else if spec.enumerable imTs.domain then
+            let imVars := spec.components imId
+            let insts ← results (scopeWith (everyValidSubs fuel) imVars (whenTagged (eval fuel (.app imId (.named []))) pure))
+            let bs ← insts.mapM fun im => do
+              if ← isHolds fuel im then activeUnlessFalse im else pure false
+            pure (bs.any id)
+          else pure false
+      pure (rs.any id)
 termination_by structural n => n
 
 /-- Whether a duty instance's violation condition holds. Charter (007.3): a duty
@@ -564,7 +604,8 @@ def evalActTri : Nat → Tagged → M (TriBool × TriBool × List (Tagged × Evi
           | _, .prod (_ :: recipient :: _), true =>
             immunityBlocks fuel te.2 recipient []
           | _, _, _ => pure false
-        if immBlocked then pure (TriBool.no, []) else pure folded
+        let amBlocked ← amendImmunityBlocks fuel te.2 a
+        if immBlocked || amBlocked then pure (TriBool.no, []) else pure folded
       let (lTri, lUnmet) ← (do
         if !a.exceptUnder.isEmpty then
           let b ← isEnabled fuel te
@@ -708,6 +749,8 @@ def evalEffect : Nat → Effect → M Store
           else none
         ((.prod [te, (.str std, "string")], posDom), Assignment.holdsTrue none none) :: clearOpp
       pure entries
+    | .amendOp actId =>
+      pure [((.str actId, amendCommitDom), Assignment.holdsTrue none none)]
 termination_by structural n => n
 
 /-- Evaluate a checked term to its values (eFLINT `eval`). -/

@@ -267,6 +267,14 @@
       "summary": "MulDivRound Floor never exceeds Ceil across all non-zero denominators, with banker's NearestEven midpoint rounding proved (D24, G3.4)."
     },
     {
+      "id": "amend.cir_ratchet_trajectory_preserves_entrenched",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Amend.lean",
+      "symbol": "cir_ratchet_trajectory_preserves_entrenched",
+      "summary": "Across any valid CIR Amend trajectory under active reflexive Immunity entrenchment, the entrenchment immunity itself, all Protected rules, and all Entrenched Invariants remain preserved (D11, D25, G3.5, T24)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

@@ -44,6 +44,7 @@ structure VerifyCliOpts where
   emitSmt     : Option String := none
   mustProve   : Bool := false
   json        : Bool := false
+  regime      : Option String := none
   menu        : Explore.Menu := []
   files       : List String := []
 
@@ -83,6 +84,8 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
   | "--emit-smt" :: p :: rest, o => parseVerifyArgs rest { o with emitSmt := some p }
   | ["--emit-smt"], _ => .error "--emit-smt needs an output path"
   | "--must-prove" :: rest, o => parseVerifyArgs rest { o with mustProve := true }
+  | "--regime" :: r :: rest, o => parseVerifyArgs rest { o with regime := some r }
+  | ["--regime"], _ => .error "--regime needs a regime name"
   | "--require-complete" :: rest, o => parseVerifyArgs rest o
   | "--report-assumptions" :: rest, o => parseVerifyArgs rest o
   | "--out" :: "json" :: rest, o => parseVerifyArgs rest { o with json := true }
@@ -127,6 +130,12 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
         | _ => pure ()
       cfg := cfg'
   if errs > 0 then return (0, 1, 0)
+  if let some regName := o.regime then
+    match applyRegimeOverlay cfg regName with
+    | .ok cfgR => cfg := cfgR
+    | .error e =>
+      IO.eprintln s!"{path}: error CHR003: {e}"
+      return (0, 1, 0)
   let lawHash := Artifact.sha256String (reprStr cfg.spec)
   match o.backend with
   | .finite =>

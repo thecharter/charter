@@ -589,8 +589,16 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Module", "Use", "Param", "Property", "Power", "Finding"].contains s then
+    if ["Immunity", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
       return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
+    else if s == "Entrenched" then
+      return (match ← peekAt (idx + 1) with | .kw "Invariant" | .kw "Predicate" => true | _ => false)
+    else if s == "Regime" then
+      let t1 ← peekAt (idx + 1)
+      let t2 ← peekAt (idx + 2)
+      return (match t1, t2 with
+        | .ident _, .kw "{" | .atom _, .kw "{" | .str _, .kw "{" => true
+        | _, _ => false)
     else if s == "Evidenced" then
       let t1 ← peekAt (idx + 1)
       let t2 ← peekAt (idx + 2)
@@ -780,6 +788,16 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     let neg ← optKw "!"
     let target ← expression
     return some (.resolves (!neg) target)
+  | .atom "Repeals" =>
+    if k != .act then return none
+    advance
+    let rs ← idList
+    return some (.repeals rs)
+  | .atom "Protects" =>
+    if k != .immunity then return none
+    advance
+    let ps ← idList
+    return some (.protects ps)
   | .atom "Standard" =>
     if k != .act then return none
     advance
@@ -797,7 +815,11 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     return some (.evEffect op ts)
   | .atom "Against" | .kw "Against" =>
     if k != .immunity then return none
-    advance; return some (.against (← idList))
+    advance
+    let parseAgainstTarget : P DomId := do
+      if ← isCtxAtom "Amend" then advance; return "Amend"
+      else ident
+    return some (.against (← sepBy1 parseAgainstTarget "," 1000))
   | .atom "Unless" | .kw "Unless" =>
     if k != .immunity then return none
     advance; return some (.unlessCond (← exprList))
@@ -847,8 +869,8 @@ def relatedTo : P (List Var) := do
   if ← isKw "Related to" then advance; vars else return []
 
 def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId) (dom : Domain)
-    (filter : Term) (cls : List ModClause) (isEv : Bool := false) : List Decl :=
-  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor, evidenced := isEv }, domain := dom,
+    (filter : Term) (cls : List ModClause) (isEv : Bool := false) (isEnt : Bool := false) : List Decl :=
+  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor, evidenced := isEv, entrenched := isEnt }, domain := dom,
                   domainConstraint := filter, restriction := restr, derivation := [],
                   closed := if isClosed && !isEv then none else some false, conditions := [] },
     .typeExt d cls ]
@@ -913,7 +935,35 @@ def temporalFormula : P TemporalFormula := do
   else
     fail "CHR003" s!"expected `Always`, `Until`, or `WeakUntil` in `Property` but found {(← peek).describe}"
 
+def parseRegimeEntries : Nat → P (List (DomId × Int))
+  | 0 => return []
+  | rem + 1 => do
+    if ← isKw "}" then advance; return []
+    else
+      let pname ← ident
+      expectKw "="
+      let neg ← optKw "-"
+      let n ← intLit
+      let val : Int := if neg then -n else n
+      let _ ← (do if (← isKw ",") || (← isKw ".") then advance else pure ())
+      return (pname, val) :: (← parseRegimeEntries rem)
+
 mutual
+
+def parseActExtras (bodyFuel : Nat) : Nat → P (List ModClause × List Decl)
+  | 0 => return ([], [])
+  | rem + 1 => do
+    if (← isCtxAtom "Installs") && (← peekAt 1) == .kw "{" then
+      advance; expectKw "{"
+      let body ← moduleBody bodyFuel
+      let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
+      return (moreCls, body ++ moreInsts)
+    else
+      match ← clause .act with
+      | some c =>
+        let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
+        return (c :: moreCls, moreInsts)
+      | none => return ([], [])
 
 /-- The declarations of a `Module` body, up to `}`, each block ended by `.` or by the
 next declaration keyword. -/
@@ -946,8 +996,11 @@ def frame : Nat → P (List Decl)
     let d ← ident
     let cls ← clauses .fact 1000
     return mkFact false false isClosed none d (.products []) (.boolLit true) cls isEv
-  | .kw "Predicate" | .kw "Invariant" =>
+  | .kw "Predicate" | .kw "Invariant" | .atom "Entrenched" =>
+    let isEnt ← if ← isCtxAtom "Entrenched" then advance; pure true else pure false
     let inv := (← peek) == .kw "Invariant"
+    if !inv && (← peek) != .kw "Predicate" then
+      unexpected "`Invariant` after `Entrenched`"
     advance
     let d ← ident
     match ← peek with
@@ -956,11 +1009,12 @@ def frame : Nat → P (List Decl)
     let t ← expression
     let fs ← fromClauses 100
     return mkFact inv false true none d (.products []) (.boolLit true)
-      (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s))
-  | .kw "Act" | .atom "Power" | .kw "Power" | .atom "Finding" | .kw "Finding" =>
+      (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s)) false isEnt
+  | .kw "Act" | .atom "Power" | .kw "Power" | .atom "Finding" | .kw "Finding" | .atom "Amend" | .kw "Amend" =>
     let cur ← peek
     let isFind := cur == .atom "Finding" || cur == .kw "Finding"
-    let isPow := isFind || cur != .kw "Act"
+    let isAm := cur == .atom "Amend" || cur == .kw "Amend"
+    let isPow := isFind || isAm || cur != .kw "Act"
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -968,12 +1022,13 @@ def frame : Nat → P (List Decl)
     let recip ← (do if ← isKw "Recipient" then advance; return some (← var) else return none)
     let objs ← relatedTo
     let filter ← domainConstraint
-    let cls ← clauses .act 1000
+    let (cls, instBody) ← parseActExtras fuel 1000
     let actorV := actor.getD ⟨"actor", ""⟩
-    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind },
+    let instDecls := if instBody.isEmpty then [] else [Decl.amendInstall d instBody]
+    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind, isAmend := isAm },
                            domain := .products (actorV :: (recip.toList ++ objs)),
                            domainConstraint := filter, closed := if isClosed then none else some false },
-             .typeExt d cls ]
+             .typeExt d cls ] ++ instDecls
   | .kw "Physical" =>
     advance
     let d ← ident
@@ -1030,9 +1085,10 @@ def frame : Nat → P (List Decl)
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Act"]
     | .atom "Power" | .kw "Power" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Power"]
     | .atom "Finding" | .kw "Finding" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Finding"]
+    | .atom "Amend" | .kw "Amend" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Amend"]
     | .kw "Event" => advance; let d ← ident; return [.typeExt d (← clauses .event 1000) "Event"]
     | .kw "Duty" => advance; let d ← ident; return [.typeExt d (← clauses .duty 1000) "Duty"]
-    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Power`, `Finding`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
+    | k => fail "CHR003" s!"expected `Fact`, `Act`, `Power`, `Finding`, `Amend`, `Event`, `Duty`, or `Immunity` after `Extend` but found {k.describe}"
   | .kw "Placeholder" =>
     advance
     let f ← ident
@@ -1065,6 +1121,14 @@ def frame : Nat → P (List Decl)
     let n ← intLit
     let value : Int := if neg then -n else n
     return [.param name dom value]
+  | .atom "Regime" | .kw "Regime" =>
+    advance
+    let rname ← (do match ← peek with
+      | .ident s | .atom s | .str s => advance; return s
+      | k => fail "CHR003" s!"expected regime name after `Regime`, found {k.describe}")
+    expectKw "{"
+    let entries ← parseRegimeEntries 1000
+    return [.regime { name := rname, params := entries }]
   | .atom "Property" | .kw "Property" =>
     advance
     let name ← ident

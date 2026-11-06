@@ -162,6 +162,7 @@ structure Config where
   strata         : List (List DomId) := []
   state          : State := {}
   violatedDuties : List Tagged := []
+  lawVersion     : Nat := 0
   deriving Repr, Inhabited
 
 /-- What a phrase reports (eFLINT `Output`). -/
@@ -332,31 +333,51 @@ def evalClockStep (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (cp :
     | .ok _ => .error (.fuelExhausted "reading the clock")
   | _ => .ok none
 
-/-- Apply a store, saturate, and find the violations (eFLINT `new_context`). `state1`
-is the state after the phrase's assignments (and any clock change). -/
-def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state1 : State) :
+/-- Extract and strip transient `amendCommitDom` markers written by valid `Amend` acts (`D11`, `D25`). -/
+def extractAmendCommits (s : State) : List DomId × State :=
+  let commits := s.contents.filterMap fun (te, i) =>
+    if te.2 == amendCommitDom && i.live s.time then
+      match te.1 with | .str actId => some actId | _ => none
+    else none
+  if commits.isEmpty then ([], s)
+  else (commits.reverse, { s with contents := s.contents.filter fun (te, _) => te.2 != amendCommitDom })
+
+def newContextAfterAmend (cfg : Config) (effSpec : Spec) (effSpecIdx : Spec.SpecIndex)
+    (effStrata : List (List DomId)) (nextVer : Nat) (state1Clean : State) :
     Option Config × List Output :=
-  match Saturate.rebaseAndSatWithIdx spec specIdx strata state1 with
+  match Saturate.rebaseAndSatWithIdx effSpec effSpecIdx effStrata state1Clean with
   | .error e => (none, [diagOf e])
   | .ok state' =>
-    let duties := state'.holdsList.filter fun te => match specIdx.lookup te.2 with
+    let duties := state'.holdsList.filter fun te => match effSpecIdx.lookup te.2 with
       | some ({ kind := .duty _, .. }, _, _) => true
       | _ => false
-    let ctx' := Ctx.ofIdx spec specIdx state'
+    let ctx' := Ctx.ofIdx effSpec effSpecIdx state'
     let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx' []
     let violatedNow : Except RuntimeError (List Tagged) :=
       duties.filterMapM fun te => do
-        let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te (spec.findViolationCond te.2)))
+        let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te (effSpec.findViolationCond te.2)))
         pure (if r.any id then some te else none)
     match violatedNow with
     | .error e => (none, [diagOf e])
     | .ok violated =>
       let newDuty := violated.filter (fun te => !cfg.violatedDuties.contains te)
-      match checkInvariants spec specIdx state' with
+      match checkInvariants effSpec effSpecIdx state' with
       | .error e => (none, [diagOf e])
       | .ok invViol =>
         let outs := newDuty.map (fun te => Output.violation (.duty te)) ++ invViol.map (fun d => Output.violation (.invariant d))
-        (some { spec, strata, state := state', violatedDuties := violated }, outs)
+        (some { spec := effSpec, strata := effStrata, state := state', violatedDuties := violated, lawVersion := nextVer }, outs)
+
+/-- Apply a store, saturate, and find the violations (eFLINT `new_context`). `state1`
+is the state after the phrase's assignments (and any clock change). -/
+def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state1 : State) :
+    Option Config × List Output :=
+  let (amCommits, state1Clean) := extractAmendCommits state1
+  if amCommits.isEmpty then
+    newContextAfterAmend cfg spec specIdx strata cfg.lawVersion state1Clean
+  else
+    let sUpd := amCommits.foldl Amend.applyTriggeredAmend spec
+    let stUpd := match Stratify.strata sUpd with | .ok st => st | .error _ => strata
+    newContextAfterAmend cfg sUpd sUpd.buildIndex stUpd (cfg.lawVersion + amCommits.length) state1Clean
 
 end Interp
 
@@ -412,6 +433,19 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
           match cfg'? with
           | none => (cfg, warnOuts ++ outs ++ outs2)
           | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
+
+/-- Apply a declared `Regime` parameter overlay onto `cfg` (`014.4`, `D11`, `D25`). -/
+def applyRegimeOverlay (cfg : Config) (regimeName : String) : Except String Config :=
+  match cfg.spec.regimes.find? (·.name == regimeName) with
+  | none =>
+    let avail := if cfg.spec.regimes.isEmpty then "(none)" else ", ".intercalate (cfg.spec.regimes.map (·.name))
+    .error s!"unknown regime `{regimeName}` (declared regimes: {avail})"
+  | some reg =>
+    let st : Store := reg.params.map fun (pname, val) => ((.int val, pname), Assignment.holdsTrue none none)
+    let state1 := State.makeAssignments cfg.spec st cfg.state
+    match Saturate.rebaseAndSat cfg.spec cfg.strata state1 with
+    | .ok state' => .ok { cfg with state := state' }
+    | .error e => .error e.message
 
 /-! ## Exploration (plan §2.2.7): bounded search over acts from a state -/
 

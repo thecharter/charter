@@ -35,6 +35,7 @@ def checkWellFormed (s : Spec) : Bool :=
         | some tt => match tt.kind with | .act _ => true | _ => false
         | none => false
     | .immunity im => im.against.all fun target =>
+      target == "Amend" ||
       match s.findDecl target with
       | some tt => match tt.kind with | .act _ => true | _ => false
       | none => false

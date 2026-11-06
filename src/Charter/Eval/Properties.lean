@@ -1508,12 +1508,18 @@ theorem rebaseAndSatWithIdx_time (spec : Spec) (specIdx : Spec.SpecIndex)
 
 end Saturate
 
-theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIndex}
-    {strata : List (List DomId)} {state1 : State} {outs : List Output}
-    (h : Interp.newContext cfg spec specIdx strata state1 = (some cfg', outs)) :
-    cfg'.state.time = state1.time := by
-  unfold Interp.newContext at h
-  cases hrs : Saturate.rebaseAndSatWithIdx spec specIdx strata state1 with
+theorem extractAmendCommits_time (s : State) :
+    (Interp.extractAmendCommits s).2.time = s.time := by
+  unfold Interp.extractAmendCommits
+  dsimp only
+  split <;> rfl
+
+theorem newContextAfterAmend_time {cfg cfg' : Config} {effSpec : Spec} {effSpecIdx : Spec.SpecIndex}
+    {effStrata : List (List DomId)} {nextVer : Nat} {s1 : State} {outs : List Output}
+    (h : Interp.newContextAfterAmend cfg effSpec effSpecIdx effStrata nextVer s1 = (some cfg', outs)) :
+    cfg'.state.time = s1.time := by
+  unfold Interp.newContextAfterAmend at h
+  cases hrs : Saturate.rebaseAndSatWithIdx effSpec effSpecIdx effStrata s1 with
   | error _ => rw [hrs] at h; cases h
   | ok state' =>
     rw [hrs] at h
@@ -1524,7 +1530,22 @@ theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIn
       · cases h
       · simp only [Prod.mk.injEq, Option.some.injEq] at h
         rw [← h.1]
-        exact Saturate.rebaseAndSatWithIdx_time spec specIdx strata state1 state' hrs
+        exact Saturate.rebaseAndSatWithIdx_time effSpec effSpecIdx effStrata s1 state' hrs
+
+theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIndex}
+    {strata : List (List DomId)} {state1 : State} {outs : List Output}
+    (h : Interp.newContext cfg spec specIdx strata state1 = (some cfg', outs)) :
+    cfg'.state.time = state1.time := by
+  unfold Interp.newContext at h
+  have hClean := extractAmendCommits_time state1
+  rcases hEx : Interp.extractAmendCommits state1 with ⟨amCommits, state1Clean⟩
+  rw [hEx] at h hClean
+  dsimp only at h hClean
+  by_cases hemp : amCommits.isEmpty = true
+  · rw [if_pos hemp] at h
+    rw [newContextAfterAmend_time h, hClean]
+  · rw [if_neg hemp] at h
+    rw [newContextAfterAmend_time h, hClean]
 
 /-- Clock monotonicity (`009.1`): no transition ever moves `state.time` backwards. -/
 theorem clock_never_decreases {cfg cfg' : Config} {p : Phrase} {outs : List Output}

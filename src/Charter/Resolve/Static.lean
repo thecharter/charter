@@ -1,5 +1,6 @@
 import Charter.Surface.Ast
 import Charter.Core.State
+import Charter.Core.Amend
 
 /-!
 # Charter.Resolve.Static — Names, types, arities, and the checked form of terms
@@ -622,6 +623,8 @@ def compileEffect (bound : List Var) : Effect → Stc Effect
     let _ ← checkEvidencedTarget "Resolves" t
     compileEffect' (fun ys u => .findingOp pol ys u std) bound xs t
 
+  | .amendOp actId => return .amendOp actId
+
 def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Derivation
   | .holdsWhen t => do
     let t' ← convertTerm termFuel t .bool
@@ -666,11 +669,13 @@ def compileDefeasibleRule (ty : DomId) (tspec : TypeSpec) (r : DefeasibleRule) :
 def checkActs (what : String) (as : List DomId) : Stc Unit := do
   let spec ← getSpec
   as.forM fun a =>
-    match spec.findDecl a with
-    | some t => match t.kind with
-      | .act _ => pure ()
-      | k => err "CHR022" s!"`{what}` names {a}, which is {k.lowerName}, not an act"
-    | none => err "CHR010" s!"undeclared type {a} in `{what}`"
+    if what == "Against" && a == "Amend" then pure ()
+    else
+      match spec.findDecl a with
+      | some t => match t.kind with
+        | .act _ => pure ()
+        | k => err "CHR022" s!"`{what}` names {a}, which is {k.lowerName}, not an act"
+      | none => err "CHR010" s!"undeclared type {a} in `{what}`"
 
 /-- `Terminated by a` and `Created by a` bind the duty's components from the act's (006.4):
 every component of the duty must be one of `a`'s, by name, or the effect added to `a` would
@@ -810,6 +815,19 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         return [(ty, [.defeasibleRule r'])]
       | .priorityEdge hi los =>
         return [(ty, [.priorityEdge hi los])]
+      | .repeals rs =>
+        let curSpec ← getSpec
+        rs.forM fun r => do
+          if (curSpec.findDecl r).isNone then
+            err "CHR010" s!"`Repeals` names undeclared rule `{r}`"
+        return [(ty, [.repeals rs, .postCond [.amendOp ty]])]
+      | .protects ps =>
+        let curSpec ← getSpec
+        ps.forM fun p => do
+          if (curSpec.findDecl p).isNone then
+            err "CHR010" s!"`Protects` names undeclared rule `{p}`"
+        return [(ty, [.protects ps])]
+      | .entrenched => return [(ty, [.entrenched])]
       | .dueWithin d =>
         -- a requirement duty: violated once it has been held for `d` (006.7)
         match tspec.kind with
@@ -892,6 +910,8 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .use .. => pure ()
     | .typeExt .. => pure ()
     | .property .. => pure ()
+    | .amendInstall .. => pure ()
+    | .regime .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
@@ -928,6 +948,44 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | .until_ a b => .until_ <$> compileClosedBool a <*> compileClosedBool b
         | .weakUntil a b => .weakUntil <$> compileClosedBool a <*> compileClosedBool b
       modifySpec (·.insertTemporal { tp with formula := tf' })
+    | .amendInstall actId body =>
+      let curSpec ← getSpec
+      let compiledBody ← withSpec curSpec do
+        let bExp ← expandUses 16 body
+        let (bInits, bExts) := bExp.partition Decl.isInitial
+        bInits.forM fun bd => match bd with
+          | .typeDecl bty bts => modifySpec (·.insertDecl bty bts)
+          | _ => pure ()
+        let cInits ← bInits.mapM fun bd => match bd with
+          | .typeDecl bty bts => do
+            let cb ← compileTypeSpec bty bts
+            modifySpec (·.insertDecl bty cb)
+            return Decl.typeDecl bty cb
+          | other => return other
+        let cExts ← bExts.flatMapM fun bd => match bd with
+          | .typeExt bty bcls bk => do
+            let parts ← compileExt bty bcls
+            parts.forM fun part => executeExt part.1 part.2
+            return parts.map fun (pty, pcls) => Decl.typeExt pty pcls bk
+          | _ => return []
+        return cInits ++ cExts
+      let touched := Amend.touchedByDecls compiledBody
+      modifySpec fun s =>
+        let s1 := s.insertAmendBody actId compiledBody
+        s1.adjustDecl actId fun ts => match ts.kind with
+          | .act a =>
+            let hasOp := a.effects.any fun | .amendOp _ => true | _ => false
+            let effs := if hasOp then a.effects else .amendOp actId :: a.effects
+            { ts with kind := .act { a with isAmend := true, isPower := true, installedNames := (a.installedNames ++ touched).eraseDups, effects := effs } }
+          | _ => ts
+    | .regime r =>
+      let curSpec ← getSpec
+      r.params.forM fun (pname, _) => do
+        match curSpec.lookupDecl pname with
+        | some { restriction := some .var, .. } => pure ()
+        | some _ => err "CHR012" s!"Regime {r.name}: `{pname}` is not a `Param` (`Var` fact)"
+        | none => err "CHR010" s!"Regime {r.name}: undeclared parameter `{pname}`"
+      modifySpec (·.insertRegime r)
     | _ => pure ()
   -- 4. enforce `Power` competence requirement (`CHR032`, 005.10): every declared `Power`
   --    must have at least one `Valid when` clause after extensions apply
@@ -938,8 +996,12 @@ def executeDecls (ds : List Decl) : Stc Store := do
       match finalSpec.lookupDecl ty with
       | some { kind := .act a, .. } =>
         if a.validWhen.isEmpty then
-          let kw := if a.isFinding then "Finding" else "Power"
+          let kw := if a.isFinding then "Finding" else if a.isAmend then "Amend" else "Power"
           err "CHR032" s!"{kw} {ty}: an institutional `{kw}` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
+        else if a.isAmend && !(a.effects.any fun | .amendOp _ => true | _ => false) then
+          modifySpec fun s => s.adjustDecl ty fun ts => match ts.kind with
+            | .act a' => { ts with kind := .act { a' with effects := .amendOp ty :: a'.effects } }
+            | _ => ts
       | _ => pure ()
     | _ => pure ()
   -- 5. validate defeasible rule IDs, override targets, and priority acyclicity (`CHR034`, 004.12, 007.6)

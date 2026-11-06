@@ -128,6 +128,7 @@ def fmtEffect : Effect → String
   | .evOp .retract xs t _ => "Retracts " ++ fmtOptForeach xs t
   | .findingOp pol _ t std =>
     s!"Resolves {if pol then "" else "!"}{fmtTerm t}" ++ (if std == "default" then "" else s!" Standard {fmtAtomOrStr std}")
+  | .amendOp _ => ""
 
 def fmtModClause : ModClause → String
   | .conditionedBy [] => "Conditioned by"
@@ -152,7 +153,8 @@ def fmtModClause : ModClause → String
       | .tAll xs t => fmtOptForeach xs t
       | .oAll xs t => fmtOptForeach xs t
       | .evOp _ xs t _ => fmtOptForeach xs t
-      | .findingOp _ xs t _ => fmtOptForeach xs t)
+      | .findingOp _ xs t _ => fmtOptForeach xs t
+      | .amendOp _ => "")
   | .postCond effs@(.tAll .. :: _) =>
     "Terminates " ++ ", ".intercalate (effs.map fun
       | .tAll xs t => fmtOptForeach xs t
@@ -197,6 +199,9 @@ def fmtModClause : ModClause → String
       | .yieldsVal v => "Yields (" ++ fmtTerm v ++ ") When " ++ fmtTerm r.cond
     head ++ " " ++ body
   | .priorityEdge hi los => s!"Priority {hi} Over {", ".intercalate los}"
+  | .repeals rs => s!"Repeals {", ".intercalate rs}"
+  | .protects ps => s!"Protects {", ".intercalate ps}"
+  | .entrenched => ""
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
   let rendered := (cls.map fmtModClause).filter (!·.isEmpty)
@@ -242,10 +247,11 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
   | .fact f =>
     let factPrefix := if f.evidenced then "Evidenced " else openPrefix
     if f.invariant && t.domain == .products [] && reprStr t.domainConstraint == reprStr (Term.boolLit true) && t.closed.isNone then
+      let entPref := if f.entrenched then "Entrenched " else ""
       match extractInvariantForm cls with
       | some (cond, fs) =>
         let fromStr := String.join (fs.map fun (c, s) => s!"\n{childIndent}From {c} {showString s}")
-        s!"{indent}Invariant {d} When {fmtTerm cond}{fromStr}"
+        s!"{indent}{entPref}Invariant {d} When {fmtTerm cond}{fromStr}"
       | none =>
         s!"{indent}{factPrefix}Bool {d}{fmtModClauses childIndent cls}"
     else if t.restriction.isNone && t.domain == .products [] && reprStr t.domainConstraint == reprStr (Term.boolLit true) then
@@ -279,7 +285,7 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
           else
             (ap, "", if rest.isEmpty then "" else " Related to " ++ fmtVars rest)
         | [] => ("", "", "")
-      let kw := if a.isFinding then "Finding" else if a.isPower then "Power" else "Act"
+      let kw := if a.isFinding then "Finding" else if a.isAmend then "Amend" else if a.isPower then "Power" else "Act"
       s!"{indent}{openPrefix}{kw} {d}{actorPart}{recipPart}{relPart}{wherePart}{fmtModClauses childIndent cls}"
   | .event _ =>
     let objs := match t.domain with | .products xs => xs | _ => []
@@ -311,6 +317,14 @@ def fmtTemporalFormula : TemporalFormula → String
 def fmtDecls (indent : String) : Nat → List Decl → List String
   | 0, _ => []
   | _, [] => []
+  | fuel + 1, .typeDecl d t :: .typeExt d' cls _ :: .amendInstall d'' body :: rest =>
+    if d == d' && d == d'' then
+      let base := fmtTypeDeclAndExt indent d t cls
+      let inner := fmtDecls (indent ++ "    ") fuel body
+      let instPart := if inner.isEmpty then "" else s!"\n{indent}  Installs \{\n" ++ (".\n").intercalate inner ++ s!".\n{indent}  }"
+      (base ++ instPart) :: fmtDecls indent fuel rest
+    else
+      fmtTypeDeclAndExt indent d t [] :: fmtDecls indent fuel (.typeExt d' cls "Act" :: .amendInstall d'' body :: rest)
   | fuel + 1, .typeDecl d t :: .typeExt d' cls _ :: rest =>
     if d == d' then
       fmtTypeDeclAndExt indent d t cls :: fmtDecls indent fuel rest
@@ -348,6 +362,14 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     let assPart := if tp.assumptions.isEmpty then "" else " Assumes " ++ ", ".intercalate tp.assumptions
     let fromPart := String.join (tp.spans.map fun (c, s) => s!"\n{indent}  From {c} {showString s}")
     s!"{indent}Property {tp.name}{assPart} When {fmtTemporalFormula tp.formula}{fromPart}" :: fmtDecls indent fuel rest
+  | fuel + 1, .amendInstall actId body :: rest =>
+    let inner := fmtDecls (indent ++ "    ") fuel body
+    let bodyStr := if inner.isEmpty then "" else "\n" ++ (".\n").intercalate inner ++ "."
+    s!"{indent}Extend Amend {actId}\n{indent}  Installs \{{bodyStr}\n{indent}  }" :: fmtDecls indent fuel rest
+  | fuel + 1, .regime r :: rest =>
+    let rows := r.params.map fun (k, v) => s!"{indent}  {k} = {v}"
+    let bodyStr := if rows.isEmpty then "" else "\n" ++ (",\n").intercalate rows ++ "\n" ++ indent
+    s!"{indent}Regime {fmtAtomOrStr r.name} \{{bodyStr}}" :: fmtDecls indent fuel rest
 
 mutual
 

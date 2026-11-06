@@ -1,0 +1,24 @@
+// 014.4: `Regime` initial-state parameter overlays resolve against declared `Param`s
+// and round-trip through `charter fmt`.
+Param quorum-min = 3.
+Param timelock-window : Duration = 7.
+
+Regime baseline {
+  quorum-min = 3,
+  timelock-window = 7
+}.
+
+Regime emergency-high {
+  quorum-min = 5,
+  timelock-window = 14
+}.
+
+Fact council Identified by C1.
+Fact votes Identified by Int.
+Act adopt Actor council Related to votes
+  Holds when votes >= quorum-min.
+
+Scenario default-regime-uses-initial-param {
+  +votes(3).
+  ?lawful adopt(C1, 3).
+}

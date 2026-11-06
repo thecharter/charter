@@ -77,5 +77,37 @@ fi
 check_case "t43-explain-auditor-authorized-reveals-source" 0 'secret-escrow-bank-ref-991' \
   "$B" explain "release-wire(Off1, Acc1)" test/spec/spec_004_12_reasongraph_redaction.charter --audience auditor
 
+# 9. T38 (G3.5): Semantic rule change under unchanged Clause English flags REVIEW-REQUIRED
+tmp_diff=$(mktemp -d)
+cat > "$tmp_diff/old.charter" <<'EOF'
+Clause C.1 Approved "51513146d67da64faa4a048eb1e2a3882b4e35f8cc850e33e7ab08aab70bf94d"
+  Text "A reviewer may grant a license to an eligible applicant."
+  Norm "A reviewer may grant a license to an eligible applicant." => grant-license
+.
+Fact reviewer Identified by Rev1.
+Fact applicant Identified by Alice.
+Fact eligible Identified by applicant.
+Power grant-license Actor reviewer Recipient applicant
+  From C.1 "A reviewer may grant a license to an eligible applicant."
+  Holds when eligible(applicant)
+  Valid when eligible(applicant).
+EOF
+cat > "$tmp_diff/new.charter" <<'EOF'
+Clause C.1 Approved "51513146d67da64faa4a048eb1e2a3882b4e35f8cc850e33e7ab08aab70bf94d"
+  Text "A reviewer may grant a license to an eligible applicant."
+  Norm "A reviewer may grant a license to an eligible applicant." => grant-license
+.
+Fact reviewer Identified by Rev1.
+Fact applicant Identified by Alice.
+Fact eligible Identified by applicant.
+Power grant-license Actor reviewer Recipient applicant
+  From C.1 "A reviewer may grant a license to an eligible applicant."
+  Holds when True
+  Valid when True.
+EOF
+check_case "t38-diff-detects-unreviewed-formal-change" 1 'REVIEW-REQUIRED.*T38' \
+  "$B" diff --require-approved "$tmp_diff/old.charter" "$tmp_diff/new.charter"
+rm -rf "$tmp_diff"
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

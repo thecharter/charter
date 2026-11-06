@@ -24,8 +24,8 @@ Reserved multi-word and word keywords (`wordKeywords`):
 Claim keywords (matched when followed by whitespace and a non-`.`/`}` token):
 `?!undetermined`, `?undetermined`, `?!conflict`, `?conflict`, `?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
 
-Contextual keywords (`D17`, `D20`, `D21`, `D22`, `D23`, `D24`, lexed as `atom` or `ident` and matched only in the grammar positions below):
-`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Finding`, `Evidenced`, `Confidential`, `To`, `Resolves`, `Standard`, `Supports`, `Rebuts`, `Retracts`, `SubmitEvidence`, `RetractEvidence`, `By`, `Note`, `Established`, `Refuted`, `Unresolved`, `Conflicted`, `Default`, `Exception`, `Overrides`, `Priority`, `Over`, `Rejects`, `Yields`, `Conflict`, `Money`, `Quantity`, `MulDivRound`, `Floor`, `Ceil`, `NearestEven`, `ExactOrReject`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
+Contextual keywords (`D17`, `D20`, `D21`, `D22`, `D23`, `D24`, `D25`, lexed as `atom` or `ident` and matched only in the grammar positions below):
+`Document`, `Clause`, `Approved`, `In`, `SHA256`, `Rank`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Power`, `Finding`, `Amend`, `Repeals`, `Installs`, `Protects`, `Entrenched`, `Regime`, `Evidenced`, `Confidential`, `To`, `Resolves`, `Standard`, `Supports`, `Rebuts`, `Retracts`, `SubmitEvidence`, `RetractEvidence`, `By`, `Note`, `Established`, `Refuted`, `Unresolved`, `Conflicted`, `Default`, `Exception`, `Overrides`, `Priority`, `Over`, `Rejects`, `Yields`, `Conflict`, `Money`, `Quantity`, `MulDivRound`, `Floor`, `Ceil`, `NearestEven`, `ExactOrReject`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
 
 ---
 
@@ -78,14 +78,14 @@ frame       ::= ('Open' | 'Closed' | 'Evidenced')* frame_body
 
 frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? dom_filter? fact_clause*
               | 'Bool' ident fact_clause*
-              | ('Predicate' | 'Invariant') ident ('When' | 'Where') expr from_clause*
-              | ('Act' | 'Power' | 'Finding') ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
+              | 'Entrenched'? ('Predicate' | 'Invariant') ident ('When' | 'Where') expr from_clause*
+              | ('Act' | 'Power' | 'Finding' | 'Amend') ident 'With'? ('Actor' var)? ('Recipient' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Physical' ident 'With'? ('Actor' var)? ('Related to' vars)? dom_filter? act_clause*
               | 'Event' ident 'With'? ('Related to' vars)? dom_filter? event_clause*
               | 'Duty' ident 'With'? 'Holder' var 'Claimant' var ('Related to' vars)? dom_filter? duty_clause*
               | 'Immunity' ident 'With'? 'Holder' var ('Related to' vars)? dom_filter? immunity_clause*
               | 'Extend' ('Fact' ident fact_clause*
-                        | ('Act' | 'Power' | 'Finding') ident act_clause*
+                        | ('Act' | 'Power' | 'Finding' | 'Amend') ident act_clause*
                         | 'Event' ident event_clause*
                         | 'Duty' ident duty_clause*
                         | 'Immunity' ident immunity_clause*)
@@ -93,6 +93,7 @@ frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? do
               | 'Module' ident '(' idents? ')' '{' (frame | '.')* '}'
               | 'Use' ident '(' idents? ')' ('As' ident)?
               | 'Param' ident (':' ('Int' | 'Time' | 'Duration' | 'Money' '(' (atom | ident) ',' int_lit ')' | 'Quantity' '(' (atom | ident) ')'))? '=' '-'? int_lit
+              | 'Regime' (ident | atom | str_lit) '{' (ident '=' '-'? int_lit ((',' | '.')? ident '=' '-'? int_lit)* (',' | '.')?)? '}'
               | 'Property' ident ('Assumes' idents)? ('When' | 'Where') temporal_form from_clause*
               | 'Document' (atom | ident)? str_lit ('SHA256' str_lit)? ('Rank' '-'? int_lit)?
               | 'Clause' clause_id ('In' (atom | ident))? ('Approved' (int_lit | str_lit))? clause_item*
@@ -133,6 +134,7 @@ act_clause      ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Obfuscates' opt_foreach (',' opt_foreach)*
                   | 'Syncs with' opt_foreach (',' opt_foreach)*
                   | 'Valid when' expr_list | 'Except under' idents
+                  | 'Repeals' idents | 'Installs' '{' (frame | '.')* '}'
                   | 'Resolves' '!'? expr | 'Standard' (ident | atom | str_lit)
                   | ('Supports' | 'Rebuts' | 'Retracts') expr_list
                   | from_clause | deriv_clause
@@ -148,7 +150,8 @@ duty_clause     ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Overridden by' idents | 'Due within' expr
                   | from_clause | deriv_clause
 immunity_clause ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
-                  | 'Against' idents | 'Unless' expr_list
+                  | 'Against' (ident | 'Amend') (',' (ident | 'Amend'))*
+                  | 'Protects' idents | 'Unless' expr_list
                   | from_clause | deriv_clause
 
 create_eff  ::= opt_foreach ('For' expr)?

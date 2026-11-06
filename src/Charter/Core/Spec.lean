@@ -99,6 +99,8 @@ inductive Effect where
   | evOp (op : EvidenceOp) (xs : List Var) (t : Term) (src : String := "")
   /-- Charter (D22, G3.2, Law 3): `Finding ... Resolves [!]e [Standard s]`. -/
   | findingOp (polarity : Bool) (xs : List Var) (t : Term) (standard : String := "default")
+  /-- Charter (D11, D25, G3.5): rule-level `Amend` commit marker applied in `newContext`. -/
+  | amendOp (actId : DomId)
   deriving Repr, Inhabited
 
 /-- `Syncs with`: the transitions triggered together with this one. -/
@@ -115,6 +117,8 @@ structure FactSpec where
   /-- Charter (D22, G3.2, T43): confidential evidence redacted outside `audiences`. -/
   confidential : Bool := false
   audiences    : List String := []
+  /-- Charter (D11, D25, G3.5): `Entrenched Invariant` protected across `Amend` trajectories. -/
+  entrenched   : Bool := false
   deriving Repr, Inhabited
 
 /-- Charter (D22, G3.2, Law 3): institutional `Finding` target and named proof standard. -/
@@ -135,18 +139,24 @@ structure ActSpec where
   exceptUnder : List DomId := []
   /-- Whether the act's second component is a `Recipient` (immunities protect recipients). -/
   hasRecipient : Bool := false
-  /-- Charter (005.10, G3.1): declared with `Power` or `Finding`, requiring explicit `Valid when`. -/
+  /-- Charter (005.10, G3.1): declared with `Power`, `Finding`, or `Amend`, requiring explicit `Valid when`. -/
   isPower : Bool := false
   /-- Charter (005.11, G3.2): declared with `Finding`. -/
   isFinding : Bool := false
   finding : Option FindingSpec := none
+  /-- Charter (014.3, D11, D25, G3.5): declared with `Amend`, targeting rule records. -/
+  isAmend : Bool := false
+  repeals : List DomId := []
+  installedNames : List DomId := []
   deriving Repr, Inhabited
 
 /-- Charter (plan §2.2.2): while an instance holds, the acts in `against` are not valid
-when the instance's holder is their recipient, unless one of `unlessConds` holds. -/
+when the instance's holder is their recipient (or when `against` covers `Amend` and the
+amendment touches `protects` or reflexively protected rules, `D11`), unless one of `unlessConds` holds. -/
 structure ImmunitySpec where
   against : List DomId := []
   unlessConds : List Term := []
+  protects : List DomId := []
   deriving Repr, Inhabited
 
 /-- The act-name lists are record-keeping (eFLINT); their meaning is compiled into
@@ -247,6 +257,10 @@ inductive ModClause where
   /-- Charter (D23, G3.3): `Default` / `Exception ... Overrides ...` and `Priority ... Over ...`. -/
   | defeasibleRule (r : DefeasibleRule)
   | priorityEdge (higher : String) (lowers : List String)
+  /-- Charter (D11, D25, G3.5): `Repeals <id, ...>` on `Amend`, `Protects <id, ...>` on `Immunity`, `Entrenched` on `Invariant`. -/
+  | repeals (ids : List DomId)
+  | protects (ids : List DomId)
+  | entrenched
   deriving Repr, Inhabited
 
 /-- Temporal property formulae (`docs/rfc.md` §7.4, `D20`), verified in `Charter.Verify`
@@ -278,6 +292,11 @@ structure TemporalSpec where
 def TemporalSpec.mapDom (f : DomId → DomId) (tp : TemporalSpec) : TemporalSpec :=
   { tp with name := f tp.name, formula := tp.formula.mapDom f }
 
+structure RegimeSpec where
+  name   : String
+  params : List (DomId × Int) := []
+  deriving Repr, DecidableEq, Inhabited
+
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
 inductive Decl where
   | typeDecl (d : DomId) (t : TypeSpec)
@@ -295,6 +314,10 @@ inductive Decl where
   | use (name : DomId) (args : List DomId) (pre : Option String)
   /-- Charter (D20): `Property name [Assumes ...] When <TemporalFormula> [From ...]`. -/
   | property (tp : TemporalSpec)
+  /-- Charter (D11, D25, G3.5): `Installs { decls }` attached to an `Amend` act. -/
+  | amendInstall (actId : DomId) (body : List Decl)
+  /-- Charter (D11, D25, G3.5): `Regime name { param = val, ... }` initial-state overlay. -/
+  | regime (r : RegimeSpec)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
@@ -307,6 +330,8 @@ def Decl.isInitial : Decl → Bool
   | .module .. => true
   | .use .. => true
   | .property .. => false
+  | .amendInstall .. => false
+  | .regime .. => false
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
@@ -318,6 +343,8 @@ def Decl.name : Decl → DomId
   | .module n _ _ => n
   | .use n _ _ => n
   | .property tp => tp.name
+  | .amendInstall a _ => a
+  | .regime r => r.name
 
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
@@ -336,6 +363,10 @@ structure Spec where
   modules  : List (DomId × List DomId × List Decl) := []
   /-- Charter (D20): declared temporal properties (`Property`), consumed by `Verify/`. -/
   temporalProperties : List TemporalSpec := []
+  /-- Charter (D11, D25, G3.5): `Installs { ... }` rule payloads per `Amend` act. -/
+  amendBodies : List (DomId × List Decl) := []
+  /-- Charter (D11, D25, G3.5): declared `Regime` initial-state parameter overlays. -/
+  regimes : List RegimeSpec := []
   deriving Repr, Inhabited
 
 namespace Spec
@@ -487,10 +518,28 @@ def findViolationCond (s : Spec) (d : DomId) : Option (List Term) :=
 def invariants (s : Spec) : List DomId :=
   s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with | .fact f => if f.invariant then some p.1 else none | _ => none
 
+def entrenchedInvariants (s : Spec) : List DomId :=
+  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .fact f => if f.invariant && f.entrenched then some p.1 else none
+    | _ => none
+
+def insertRegime (s : Spec) (r : RegimeSpec) : Spec :=
+  { s with regimes := s.regimes.filter (·.name != r.name) ++ [r] }
+
+def insertAmendBody (s : Spec) (actId : DomId) (ds : List Decl) : Spec :=
+  let prev := (s.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
+  { s with amendBodies := s.amendBodies.filter (·.1 != actId) ++ [(actId, prev ++ ds)] }
+
 /-- The immunity types naming `a` in `Against`, with their specs. -/
 def immunitiesAgainst (s : Spec) (a : DomId) : List (DomId × TypeSpec × ImmunitySpec) :=
   s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
     | .immunity i => if i.against.contains a then some (p.1, p.2, i) else none
+    | _ => none
+
+/-- The immunity types covering an `Amend` act `a` (naming `a` or `"Amend"` in `Against`). -/
+def immunitiesAgainstAmend (s : Spec) (a : DomId) : List (DomId × TypeSpec × ImmunitySpec) :=
+  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .immunity i => if i.against.contains a || i.against.contains "Amend" then some (p.1, p.2, i) else none
     | _ => none
 
 def derivedTypes (s : Spec) : List DomId :=
@@ -667,6 +716,18 @@ where
     | .priorityEdge hi los =>
       let newEdges := los.map (hi, ·)
       TypeSpec.syncDefeasibleDAG { t with priorityEdges := t.priorityEdges ++ newEdges }
+    | .repeals rs =>
+      { t with kind := match t.kind with
+          | .act a => .act { a with isAmend := true, isPower := true, repeals := (a.repeals ++ rs).eraseDups }
+          | k => k }
+    | .protects ps =>
+      { t with kind := match t.kind with
+          | .immunity im => .immunity { im with protects := (im.protects ++ ps).eraseDups }
+          | k => k }
+    | .entrenched =>
+      { t with kind := match t.kind with
+          | .fact fs => .fact { fs with entrenched := true }
+          | k => k }
 
 /-! ## Renaming (module instantiation, D8) -/
 
@@ -681,6 +742,7 @@ def Effect.mapDom (f : DomId → DomId) : Effect → Effect
   | .oAll xs t => .oAll (xs.map (Var.mapDom f)) (t.mapDom f)
   | .evOp op xs t src => .evOp op (xs.map (Var.mapDom f)) (t.mapDom f) src
   | .findingOp pol xs t std => .findingOp pol (xs.map (Var.mapDom f)) (t.mapDom f) std
+  | .amendOp actId => .amendOp (f actId)
 
 def FindingSpec.mapDom (f : DomId → DomId) (fs : FindingSpec) : FindingSpec :=
   { fs with target := fs.target.mapDom f }
@@ -695,7 +757,9 @@ def Kind.mapDom (f : DomId → DomId) : Kind → Kind
       syncs := a.syncs.map (Sync.mapDom f)
       validWhen := a.validWhen.map (Term.mapDom f)
       exceptUnder := a.exceptUnder.map f
-      finding := a.finding.map (FindingSpec.mapDom f) }
+      finding := a.finding.map (FindingSpec.mapDom f)
+      repeals := a.repeals.map f
+      installedNames := a.installedNames.map f }
   | .duty d =>
     .duty { d with
       enforcingActs := d.enforcingActs.map f
@@ -704,7 +768,7 @@ def Kind.mapDom (f : DomId → DomId) : Kind → Kind
       violatedWhen := d.violatedWhen.map (Term.mapDom f)
       overriddenBy := d.overriddenBy.map f }
   | .event e => .event { e with effects := e.effects.map (Effect.mapDom f), syncs := e.syncs.map (Sync.mapDom f) }
-  | .immunity i => .immunity { i with against := i.against.map f, unlessConds := i.unlessConds.map (Term.mapDom f) }
+  | .immunity i => .immunity { i with against := i.against.map f, unlessConds := i.unlessConds.map (Term.mapDom f), protects := i.protects.map f }
 
 def TypeSpec.mapDom (f : DomId → DomId) (t : TypeSpec) : TypeSpec :=
   { t with
@@ -733,10 +797,12 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .resolves pol t => .resolves pol (t.mapDom f)
   | .evEffect op ts => .evEffect op (ts.map fun (xs, t) => (xs.map (Var.mapDom f), t.mapDom f))
   | .defeasibleRule r => .defeasibleRule (r.mapDom f)
+  | .repeals rs => .repeals (rs.map f)
+  | .protects ps => .protects (ps.map f)
   | c => c
 
-/-- Rename the type names a declaration mentions and declares. Modules and uses inside
-a module body are renamed in their arguments only. -/
+-- Rename the type names a declaration mentions and declares.
+mutual
 def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .typeDecl d t => .typeDecl (f d) (t.mapDom f)
   | .typeExt d cs k => .typeExt (f d) (cs.map (ModClause.mapDom f)) k
@@ -744,7 +810,14 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .param n dom v => .param (f n) dom v
   | .use n args pre => .use n (args.map f) pre
   | .property tp => .property (tp.mapDom f)
+  | .amendInstall a ds => .amendInstall (f a) (Decl.mapDomList f ds)
+  | .regime r => .regime { r with params := r.params.map fun (n, v) => (f n, v) }
   | d => d
+
+def Decl.mapDomList (f : DomId → DomId) : List Decl → List Decl
+  | [] => []
+  | d :: ds => d.mapDom f :: Decl.mapDomList f ds
+end
 
 /-- The type names a block of declarations introduces (what a `Use` prefixes). -/
 def declaredNames (ds : List Decl) : List DomId :=

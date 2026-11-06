@@ -1,0 +1,53 @@
+// 014.3, 014.5 (D11, T24): reflexive entrenchment via `Immunity ... Against Amend Protects ...`:
+// 1. Direct `Amend` repealing a protected power is performable (`occurred`) and void (`!valid`).
+// 2. Two-step bypass (`Amend` repealing the entrenchment `Immunity` itself, then repealing the
+//    protected power) is ALSO void on step 1 because entrenchment is reflexive (`D11` clause 3),
+//    unless the holder's `Unless` consent condition lifts the protection.
+Fact council Identified by Council1.
+Fact member Identified by Ava.
+Fact quorum Identified by council.
+Fact member-consent Identified by member.
+Fact exited Identified by member.
+
+Power exit-institution Actor member
+  Holds when True
+  Valid when True
+  Creates exited(member).
+
+Entrenched Invariant exit-right-preserved When True.
+
+Immunity core-exit-ratchet Holder member
+  Against Amend
+  Protects exit-institution
+  Holds when True
+  Unless member-consent(member).
+
+Amend strip-ratchet Actor council
+  Repeals core-exit-ratchet
+  Holds when quorum(council)
+  Valid when quorum(council).
+
+Amend repeal-exit Actor council
+  Repeals exit-institution
+  Holds when quorum(council)
+  Valid when quorum(council).
+
+Scenario reflexive-ratchet-blocks-direct-and-two-step-bypass {
+  +quorum(Council1).
+  // 1. Direct repeal of protected `exit-institution` occurs and is VOID:
+  ?!valid repeal-exit(Council1).
+  repeal-exit(Council1).
+  // `exit-institution` still exists and works:
+  ?valid exit-institution(Ava).
+
+  // 2. Two-step bypass: try to repeal `core-exit-ratchet` itself first -> ALSO VOID (reflexive!):
+  ?!valid strip-ratchet(Council1).
+  strip-ratchet(Council1).
+  ?core-exit-ratchet(Ava).
+  ?!valid repeal-exit(Council1).
+  repeal-exit(Council1).
+
+  // Ava can still validly exit:
+  exit-institution(Ava).
+  ?exited(Ava).
+}

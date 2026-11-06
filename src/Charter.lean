@@ -35,6 +35,7 @@ import Charter.Core.Term
 import Charter.Core.Defeasible
 import Charter.Core.Intern
 import Charter.Core.Spec
+import Charter.Core.Amend
 import Charter.Core.State
 import Charter.Core.Derivation
 import Charter.Artifact.Hash
@@ -64,6 +65,8 @@ import Charter.Cli.Build
 import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
+import Charter.Project.Diff
+import Charter.Cli.Diff
 import Charter.Cli.Main
 
 /-!

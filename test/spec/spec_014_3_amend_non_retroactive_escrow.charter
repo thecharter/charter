@@ -1,0 +1,45 @@
+// 014.3 (T23): a valid prospective `Amend` updates rules for future transactions without
+// retroactively extinguishing an already-accrued escrow obligation, and void `Amend`s
+// lacking quorum/timelock leave the active rule set unchanged. Also checks eFLINT atoms.
+Fact legacy-amend-atoms Identified by Amend, Repeals, Installs, Protects, Entrenched, Regime.
+
+Fact board Identified by Board1.
+Fact depositor Identified by Alice, Bob.
+Fact custodian Identified by Cust1.
+Fact quorum Identified by board.
+Fact timelock-ready Identified by board.
+Fact escrow-settled Identified by depositor.
+
+Duty refund-escrow Holder custodian Claimant depositor
+  Violated when Held(refund-escrow(custodian, depositor)) For 10.
+
+Power open-escrow Actor depositor Related to custodian
+  Holds when True
+  Valid when True
+  Creates refund-escrow(custodian, depositor).
+
+Amend suspend-new-escrows Actor board
+  Repeals open-escrow
+  Holds when quorum(board)
+  Valid when quorum(board) && timelock-ready(board).
+
+Scenario prospective-amend-preserves-active-escrow {
+  // Alice opens escrow at t = 0 under LawVersion 0:
+  open-escrow(Alice, Cust1).
+  ?refund-escrow(Cust1, Alice).
+  @ 3.
+  // Attempt Amend before quorum + timelock -> void, open-escrow still valid!
+  ?!valid suspend-new-escrows(Board1).
+  suspend-new-escrows(Board1).
+  ?valid open-escrow(Bob, Cust1).
+  // Establish quorum + timelock -> valid Amend repeals prospective `open-escrow`:
+  +quorum(Board1).
+  +timelock-ready(Board1).
+  ?valid suspend-new-escrows(Board1).
+  suspend-new-escrows(Board1).
+  // Alice's already-accrued `refund-escrow` duty remains in force with its t = 0 timestamp!
+  ?refund-escrow(Cust1, Alice).
+  ?!violated refund-escrow(Cust1, Alice).
+  @ 10.
+  ?violated refund-escrow(Cust1, Alice).
+}
