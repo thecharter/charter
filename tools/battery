@@ -42,7 +42,8 @@ done
 EX1=Examples/Tenancy/tenancy.charter
 EX2=Examples/AutonomousCommons/commons.charter
 EX3=Examples/ServiceEscrow/service-escrow.charter
-"$B" check --require-provenance --forbid-midstream-decls --deny-warnings "$EX1" "$EX2" "$EX3" > "$OUT/check-files.log" 2>&1; st=$?
+EX4=Examples/TreasuryMandate/treasury-mandate.charter
+"$B" check --require-provenance --forbid-midstream-decls --deny-warnings "$EX1" "$EX2" "$EX3" "$EX4" > "$OUT/check-files.log" 2>&1; st=$?
 bad=$(grep -cE '^(FAIL|STALE)' "$OUT/check-files.log")
 ok=$(grep -c '^ok' "$OUT/check-files.log")
 step check-examples $(( st != 0 || bad != 0 )) "$ok ok, $bad FAIL/STALE"
@@ -77,9 +78,9 @@ tools/verify-check > "$OUT/verify.log" 2>&1; st=$?
 step verify $st "$(tail -1 "$OUT/verify.log")"
 
 # 9. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
-#    modules), and service-escrow; `test` runs their scenarios, explores their invariants,
-#    and verifies all Law 8 provenance and completeness gates
-"$B" test --require-provenance --forbid-midstream-decls --require-complete-explore --deny-warnings "$EX1" "$EX2" "$EX3" > "$OUT/examples.log" 2>&1; st=$?
+#    modules), service-escrow, and treasury-mandate (G3.7); `test` runs their scenarios,
+#    explores their invariants, and verifies all Law 8 provenance and completeness gates
+"$B" test --require-provenance --forbid-midstream-decls --require-complete-explore --deny-warnings "$EX1" "$EX2" "$EX3" "$EX4" > "$OUT/examples.log" 2>&1; st=$?
 step examples $st "$(tail -1 "$OUT/examples.log")"
 
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi

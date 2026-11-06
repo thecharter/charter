@@ -1,0 +1,281 @@
+// Examples/TreasuryMandate/treasury-mandate.charter — End-to-end reference workload (`docs/rfc.md` §16, G3.7):
+// Combines SHA-256 provenance (`G3.1`), `Power` competence (`G3.1`), 4-valued `Evidenced` custody
+// confirmations + `Confidential` redaction + `Finding` adjudication (`G3.2`), stratified
+// `Default`/`Exception` apparent authority (`G3.3`), dimensional `Money(USD, 2)` caps (`G3.4`),
+// reporting deadlines (`T16`), revocation notice gaps (`T17`), non-imputation (`Law 3`), and
+// intent-nonce idempotence (`Trace F`, `T09`, `T34`) across Traces A–F (§16.3).
+//! explore: 1
+//! explore-domain: usd-cents = 40000, 120000
+Document MAIN "treasury-mandate.md" SHA256 "f6d8b3eba6d46f25f001a2aa0a2e7894471f53e40c8fcd3e724ac9de991633cc" Rank 1
+
+Clause TM.1 In MAIN Approved "4417240bcfa07364a0e479bfb48114e950dc774662bc0e8bb84a873235e064ff"
+  Text "A company may appoint an accountant to purchase approved bonds using a specified custody account up to the stated mandate cap. Any bond purchase beyond the mandate cap is not authorized on the company's behalf except where apparent authority protects an innocent counterparty without revocation notice."
+  Norm "A company may appoint an accountant to purchase approved bonds using a specified custody account up to the stated mandate cap." => issue-mandate, revoke-mandate, deliver-revocation-notice
+  Norm " Any bond purchase beyond the mandate cap is not authorized on the company's behalf except where apparent authority protects an innocent counterparty without revocation notice." => recognize-bond-purchase
+Clause TM.2 In MAIN Approved "e57bd6a8ee6a34e5af1ce398b04bfb680c7e823bf55ae8cc57a6c852c6257dff"
+  Text "An unauthorized purchase is recorded as an observed external event even when it has no authorized corporate effect. The accountant must submit a trade confirmation within two days of any observed purchase; a missing report breaches the reporting duty without establishing concealment or theft by the company unless the company directed the misconduct."
+  Norm "An unauthorized purchase is recorded as an observed external event even when it has no authorized corporate effect." => execute-bond-trade
+  Norm " The accountant must submit a trade confirmation within two days of any observed purchase; a missing report breaches the reporting duty without establishing concealment or theft by the company unless the company directed the misconduct." => submit-confirmation, report-trade-duty
+Clause TM.3 In MAIN Approved "efb593fb4bac1b55b0f692d9daab01b7cb51c9f33c122349b1bf7d2809ea2af6"
+  Text "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard. Each purchase receipt and execution intent nonce may be recognized or settled at most once."
+  Norm "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard." => custodian-attest-receipt, accountant-dispute-receipt, adjudicate-receipt
+  Norm " Each purchase receipt and execution intent nonce may be recognized or settled at most once." => settle-transfer-intent
+Clause TM.4 In MAIN Approved "d48ec99db8055aa986feba9aa0aefae2983a5d9bbdefbc2455127d0c0a00c116"
+  Text "Recognized corporate bond holdings stay within the mandate cap unless apparent authority applied prior to revocation notice, no purchase receipt or execution intent is settled twice, and independent delegate misconduct is never imputed to the company without company direction."
+  Invariant "Recognized corporate bond holdings stay within the mandate cap unless apparent authority applied prior to revocation notice, " => mandate-authorization-bound
+  Invariant "no purchase receipt or execution intent is settled twice, " => no-double-settlement
+  Invariant "and independent delegate misconduct is never imputed to the company without company direction." => non-imputation-without-direction
+
+// ---- Domains, dimensional Money(USD, 2), and state
+Fact company Identified by AcmeCorp
+Fact accountant Identified by CPA
+Fact custodian Identified by CustodyBank
+Fact counterparty Identified by Dealer1
+Fact panel Identified by AuditPanel
+Fact account Identified by CustAcctA
+Fact asset Identified by Bond2028, UnapprovedNote
+Fact trade-id Identified by T1, T2
+Fact intent-id Identified by Intent1
+Fact usd-cents Identified by Money(USD, 2)
+
+Param report-window : Duration = 2
+Param mandate-limit : Money(USD, 2) = 100000
+
+Fact asset-approved Identified by asset
+Fact account-permitted Identified by account
+Fact mandate-active Identified by company * accountant
+Fact mandate-revoked Identified by company * accountant
+Fact revocation-notice Identified by counterparty
+Fact panel-quorum Identified by panel
+Fact apparent-authority-clause-granted Identified by company
+Fact company-directed-trade Identified by trade-id * company
+
+// Stratified Default/Exception rule for apparent-authority protection (§16.1, G3.3):
+Fact apparent-authority-protects Identified by company * counterparty
+  Default app-none Rejects when True
+  Exception app-innocent Overrides app-none Holds when apparent-authority-clause-granted(company) && !revocation-notice(counterparty)
+
+// Confidential 4-valued Evidenced custody receipt (§16.2, G3.2, T43):
+Evidenced Fact custody-receipt-verified Identified by trade-id
+  Confidential To auditor, panel
+
+Function mandate-exposure Identified by company * usd-cents
+Fact observed-trade Identified by trade-id * accountant * account * asset * counterparty * usd-cents
+Fact trade-confirmed Identified by trade-id
+Fact recognized-holding Identified by trade-id * company * asset * usd-cents
+Fact recognized-via-apparent Identified by trade-id
+Fact settled-intent Identified by intent-id * trade-id * usd-cents
+Fact imputed-company-breach Identified by trade-id * company
+  Holds when (Exists accountant, account, asset, counterparty, usd-cents:
+    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents)
+    && company-directed-trade(trade-id, company))
+
+// ---- TM.1: Mandate appointment, revocation, and principal-binding recognition Power
+Power issue-mandate Actor company Recipient accountant
+  From TM.1 "A company may appoint an accountant to purchase approved bonds using a specified custody account up to the stated mandate cap."
+  Holds when !mandate-active(company, accountant) && !mandate-revoked(company, accountant)
+  Valid when !mandate-active(company, accountant) && !mandate-revoked(company, accountant)
+  Creates mandate-active(company, accountant), mandate-exposure(company, usd-cents(0))
+
+Power revoke-mandate Actor company Recipient accountant
+  From TM.1 "A company may appoint an accountant to purchase approved bonds using a specified custody account up to the stated mandate cap."
+  Holds when mandate-active(company, accountant)
+  Valid when mandate-active(company, accountant)
+  Creates mandate-revoked(company, accountant)
+  Terminates mandate-active(company, accountant)
+
+Act deliver-revocation-notice Actor company Recipient counterparty
+  From TM.1 "A company may appoint an accountant to purchase approved bonds using a specified custody account up to the stated mandate cap."
+  Holds when (Exists accountant: mandate-revoked(company, accountant))
+  Creates revocation-notice(counterparty)
+
+// ---- TM.2: External trade observation, 2-day reporting duty, and confirmation
+Duty report-trade-duty Holder accountant Claimant company Related to trade-id
+  From TM.2 "The accountant must submit a trade confirmation within two days of any observed purchase; a missing report breaches the reporting duty without establishing concealment or theft by the company unless the company directed the misconduct."
+  Due within report-window
+
+Physical execute-bond-trade Actor accountant Related to trade-id, account, asset, counterparty, usd-cents
+  From TM.2 "An unauthorized purchase is recorded as an observed external event even when it has no authorized corporate effect."
+  Creates observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents)
+        , report-trade-duty(accountant, AcmeCorp, trade-id)
+
+Act submit-confirmation Actor accountant Related to trade-id
+  From TM.2 "The accountant must submit a trade confirmation within two days of any observed purchase; a missing report breaches the reporting duty without establishing concealment or theft by the company unless the company directed the misconduct."
+  Holds when (Exists account, asset, counterparty, usd-cents:
+    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Creates trade-confirmed(trade-id)
+  Terminates report-trade-duty(accountant, AcmeCorp, trade-id)
+
+// ---- TM.3: Evidenced custody attestations, Finding under `verifiedReceipt`, and idempotent settlement
+Act custodian-attest-receipt Actor custodian Related to trade-id
+  From TM.3 "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard."
+  Holds when (Exists accountant, account, asset, counterparty, usd-cents:
+    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Supports custody-receipt-verified(trade-id)
+
+Act accountant-dispute-receipt Actor accountant Related to trade-id
+  From TM.3 "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard."
+  Holds when (Exists account, asset, counterparty, usd-cents:
+    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Rebuts custody-receipt-verified(trade-id)
+
+Finding adjudicate-receipt Actor panel Related to trade-id
+  From TM.3 "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard."
+  Resolves custody-receipt-verified(trade-id)
+  Standard verified-receipt
+  Holds when Conflicted(custody-receipt-verified(trade-id)) || Unresolved(custody-receipt-verified(trade-id))
+  Valid when panel-quorum(panel)
+
+Power recognize-bond-purchase Actor custodian Related to trade-id, company, accountant, account, asset, counterparty, usd-cents
+  From TM.1 "Any bond purchase beyond the mandate cap is not authorized on the company's behalf except where apparent authority protects an innocent counterparty without revocation notice."
+  Holds when observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents)
+    && account-permitted(account) && asset-approved(asset)
+    && custody-receipt-verified(trade-id)
+    && !(Exists recognized-holding: recognized-holding.trade-id == trade-id)
+  Valid when observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents)
+    && account-permitted(account) && asset-approved(asset)
+    && custody-receipt-verified(trade-id)
+    && !(Exists recognized-holding: recognized-holding.trade-id == trade-id)
+    && ((mandate-active(company, accountant)
+          && (Exists mandate-exposure:
+                mandate-exposure.company == company
+                && mandate-exposure.usd-cents + usd-cents <= mandate-limit))
+        || apparent-authority-protects(company, counterparty))
+  Creates recognized-holding(trade-id, company, asset, usd-cents)
+        , (recognized-via-apparent(trade-id)
+            When (!mandate-active(company, accountant)
+                  || !(Exists mandate-exposure:
+                         mandate-exposure.company == company
+                         && mandate-exposure.usd-cents + usd-cents <= mandate-limit)))
+        , (Foreach mandate-exposure:
+            mandate-exposure(company, mandate-exposure.usd-cents + usd-cents)
+            When mandate-exposure.company == company
+              && mandate-active(company, accountant)
+              && mandate-exposure.usd-cents + usd-cents <= mandate-limit)
+
+Power settle-transfer-intent Actor custodian Related to intent-id, trade-id, company, asset, usd-cents
+  From TM.3 "Each purchase receipt and execution intent nonce may be recognized or settled at most once."
+  Holds when recognized-holding(trade-id, company, asset, usd-cents)
+    && !(Exists settled-intent: settled-intent.intent-id == intent-id || settled-intent.trade-id == trade-id)
+  Valid when recognized-holding(trade-id, company, asset, usd-cents)
+    && !(Exists settled-intent: settled-intent.intent-id == intent-id || settled-intent.trade-id == trade-id)
+  Creates settled-intent(intent-id, trade-id, usd-cents)
+
+// ---- TM.4: Safety, accounting, and attribution Invariants (§16.4)
+Invariant mandate-authorization-bound
+  When (Forall mandate-exposure: mandate-exposure.usd-cents <= mandate-limit)
+  From TM.4 "Recognized corporate bond holdings stay within the mandate cap unless apparent authority applied prior to revocation notice, "
+
+Invariant no-double-settlement
+  When (Forall settled-intent, settled-intent':
+    settled-intent.trade-id == settled-intent'.trade-id && settled-intent.usd-cents == settled-intent'.usd-cents
+    When settled-intent.intent-id == settled-intent'.intent-id)
+  From TM.4 "no purchase receipt or execution intent is settled twice, "
+
+Invariant non-imputation-without-direction
+  When (Forall trade-id, company:
+    company-directed-trade(trade-id, company) When imputed-company-breach(trade-id, company))
+  From TM.4 "and independent delegate misconduct is never imputed to the company without company direction."
+.
+
+// ---- Genesis state
++account-permitted(CustAcctA).
++asset-approved(Bond2028).
+issue-mandate(AcmeCorp, CPA).
+
+// ---- Required Traces A–F (`docs/rfc.md` §16.3)
+
+Scenario trace-a-normal-performance {
+  // Principal issued mandate (cap 100,000 cents = $1,000.00); CPA buys Bond2028 for 40,000 cents:
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 40000).
+  custodian-attest-receipt(CustodyBank, T1).
+  ?Established(custody-receipt-verified(T1)).
+  ?valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  ?recognized-holding(T1, AcmeCorp, Bond2028, 40000).
+  ?mandate-exposure(AcmeCorp, 40000).
+  submit-confirmation(CPA, T1).
+  ?!violated report-trade-duty(CPA, AcmeCorp, T1).
+}
+
+Scenario trace-b-delegate-exceeds-scope {
+  // CPA buys 120,000 cents (> 100,000 cap): physical event occurs; corporate recognition is void
+  // unless apparent authority applies!
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 120000).
+  ?observed-trade(T1, CPA, CustAcctA, Bond2028, Dealer1, 120000).
+  custodian-attest-receipt(CustodyBank, T1).
+  ?!valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 120000).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 120000).
+  ?!recognized-holding(T1, AcmeCorp, Bond2028, 120000).
+  // When separate apparent-authority clause is granted and Dealer1 had no revocation notice:
+  +apparent-authority-clause-granted(AcmeCorp).
+  ?apparent-authority-protects(AcmeCorp, Dealer1).
+  ?valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 120000).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 120000).
+  ?recognized-holding(T1, AcmeCorp, Bond2028, 120000).
+  ?recognized-via-apparent(T1).
+  submit-confirmation(CPA, T1).
+}
+
+Scenario trace-c-missing-report-not-imputed-theft {
+  // Trade occurs, CPA misses 2-day confirmation deadline -> reporting breach recorded,
+  // WITHOUT inventing company concealment or imputing misconduct to AcmeCorp!
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 40000).
+  @ 2.
+  ?violated report-trade-duty(CPA, AcmeCorp, T1).
+  ?!imputed-company-breach(T1, AcmeCorp).
+  submit-confirmation(CPA, T1).
+}
+
+Scenario trace-d-conflicting-evidence-and-finding {
+  // CustodyBank attests T1 while CPA disputes T1 -> Conflicted, recognition undetermined & void
+  // until AuditPanel issues a valid Finding under `verifiedReceipt`!
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 40000).
+  custodian-attest-receipt(CustodyBank, T1).
+  accountant-dispute-receipt(CPA, T1).
+  ?Conflicted(custody-receipt-verified(T1)).
+  ?undetermined recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  ?!valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  +panel-quorum(AuditPanel).
+  ?valid adjudicate-receipt(AuditPanel, T1).
+  adjudicate-receipt(AuditPanel, T1).
+  ?Established(custody-receipt-verified(T1)).
+  ?valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  ?recognized-holding(T1, AcmeCorp, Bond2028, 40000).
+  submit-confirmation(CPA, T1).
+}
+
+Scenario trace-e-revoked-mandate-and-notice-gap {
+  // AcmeCorp revokes mandate; in the gap before Dealer1 receives notice, apparent authority governs;
+  // once notice arrives, apparent authority terminates and further trades cannot bind AcmeCorp!
+  +apparent-authority-clause-granted(AcmeCorp).
+  revoke-mandate(AcmeCorp, CPA).
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 40000).
+  custodian-attest-receipt(CustodyBank, T1).
+  ?valid recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  submit-confirmation(CPA, T1).
+
+  // Deliver revocation notice to Dealer1 -> T2 cannot bind AcmeCorp!
+  deliver-revocation-notice(AcmeCorp, Dealer1).
+  ?!apparent-authority-protects(AcmeCorp, Dealer1).
+  execute-bond-trade(CPA, T2, CustAcctA, Bond2028, Dealer1, 40000).
+  custodian-attest-receipt(CustodyBank, T2).
+  ?!valid recognize-bond-purchase(CustodyBank, T2, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  submit-confirmation(CPA, T2).
+}
+
+Scenario trace-f-idempotent-retry-prevents-double-transfer {
+  // Retrying settlement with the same Intent1 nonce or for an already-settled trade T1 is void!
+  execute-bond-trade(CPA, T1, CustAcctA, Bond2028, Dealer1, 40000).
+  custodian-attest-receipt(CustodyBank, T1).
+  recognize-bond-purchase(CustodyBank, T1, AcmeCorp, CPA, CustAcctA, Bond2028, Dealer1, 40000).
+  ?valid settle-transfer-intent(CustodyBank, Intent1, T1, AcmeCorp, Bond2028, 40000).
+  settle-transfer-intent(CustodyBank, Intent1, T1, AcmeCorp, Bond2028, 40000).
+  ?settled-intent(Intent1, T1, 40000).
+  // Network timeout retry with same Intent1 nonce -> void (`!valid`), no second settlement!
+  ?!valid settle-transfer-intent(CustodyBank, Intent1, T1, AcmeCorp, Bond2028, 40000).
+  settle-transfer-intent(CustodyBank, Intent1, T1, AcmeCorp, Bond2028, 40000).
+  submit-confirmation(CPA, T1).
+}
