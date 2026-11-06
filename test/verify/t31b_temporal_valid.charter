@@ -1,0 +1,17 @@
+// T31b: Temporal `Always (... => Next ...)` and `WeakUntil` verified over finite domain!
+Fact clerk Identified by Clerk.
+Fact step-state Identified by Init, Settled.
+Fact current Identified by step-state.
+
+Act settle Actor clerk
+  Holds when current(Init)
+  Creates current(Settled)
+  Terminates current(Init).
+
+Property settle-transitions-to-settled
+  When Always (current(Init) => Next current(Settled)).
+
+Property weak-until-settled
+  When WeakUntil(current(Init), current(Settled)).
+
++current(Init).

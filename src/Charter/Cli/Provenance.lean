@@ -56,7 +56,7 @@ def occursIn (hay needle : String) : Bool := (hay.splitOn needle).length > 1
 `Document` names one and it could be read. -/
 def provenanceReport (spec : Spec) (doc? : Option (Except String String)) : List ProvClaim :=
   let rules := spec.ruleIds
-  let scenarioNames := spec.scenarios.map (·.1)
+  let scenarioNames := spec.scenarios.map (·.1) ++ spec.temporalProperties.map (·.name)
   let knownIds := rules ++ scenarioNames
   let invariants := spec.invariants
   let fromSpans : List Span := spec.decls.flatMap fun (p : DomId × TypeSpec) =>
@@ -88,7 +88,8 @@ def provenanceReport (spec : Spec) (doc? : Option (Except String String)) : List
       { ok := ok, check := "named", clause := cid, text := msg }
   let fromChecks :=
     (spec.decls.flatMap fun (p : DomId × TypeSpec) => p.2.spans.map (checkFrom p.1)) ++
-    (spec.scenarios.flatMap fun (name, sps) => sps.map (checkFrom s!"Scenario {name}"))
+    (spec.scenarios.flatMap fun (name, sps) => sps.map (checkFrom s!"Scenario {name}")) ++
+    (spec.temporalProperties.flatMap fun tp => tp.spans.map (checkFrom s!"Property {tp.name}"))
   let verbatim := match spec.document, doc? with
     | none, _ => []
     | some path, none => [{ ok := true, warn := true, check := "verbatim", text := s!"{path} was not read; verbatim check skipped" }]

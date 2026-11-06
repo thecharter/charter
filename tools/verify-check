@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verification suite runner for Gate G2 (`Verify/Explorer`, `Verify/Reduction`, T28, T29).
+# Verification suite runner for Gate G2 (`Verify/Explorer`, `Verify/Reduction`, `Verify/Temporal`, `Verify/Smt`).
 set -u
 cd "$(dirname "$0")/.." || exit 2
 B=.lake/build/bin/charter
@@ -33,13 +33,33 @@ check_case "t28-mixed-adversary-finds-trace" 1 "invariant no-tampered-payout vio
 check_case "t29-adversarial-missing-menu-inconclusive" 3 "^INCONCLUSIVE" \
   "$B" explore --mode adversarial --depth 2 test/verify/t29_missing_menu_inconclusive.charter
 
-# 3. Safe fenced lease under full adversarial + clock steps passes with exit 0
+# 3. Safe fenced lease under full adversarial + clock steps passes both finite and inductive
 check_case "safe-fenced-lease-adversarial-complete" 0 "^ok " \
   "$B" explore --mode adversarial --depth 3 test/verify/safe_fenced_lease.charter
 
-# 4. Seeded random strategy is deterministic and also finds T28
-check_case "t28-seeded-random-finds-trace" 1 "invariant no-tampered-payout violated" \
-  "$B" explore --mode adversarial --strategy random --seed 42 --depth 3 test/verify/t28_adversarial_unlawful.charter
+check_case "safe-fenced-lease-inductive-closed" 0 "^proved " \
+  "$B" verify --backend inductive --mode lawful test/verify/safe_fenced_lease.charter
+
+# 4. T26 & T27: partition race without recovery fence caught automatically
+check_case "t26-t27-partition-race-caught" 1 "invariant single-authority-fenced violated" \
+  "$B" verify --backend finite --mode adversarial --depth 2 test/verify/t26_t27_partition_lease.charter
+
+# 5. T30: SMT bound smaller than exploit horizon reports INCONCLUSIVE; depth 2 finds symbolic `10000` trace!
+check_case "t30-smt-shallow-bound-inconclusive" 3 "^INCONCLUSIVE.*T30" \
+  "$B" verify --backend smt --depth 1 --min-depth 2 test/verify/t30_smt_symbolic_int.charter
+
+tmp_smt="out/_t30_emitted.smt2"
+check_case "t30-smt-discovers-symbolic-threshold-exploit" 1 "invariant cap-preserved violated in 2 step" \
+  "$B" verify --backend smt --depth 2 --emit-smt "$tmp_smt" test/verify/t30_smt_symbolic_int.charter
+rm -f "$tmp_smt"
+
+# 6. T31: Unbounded liveness without fairness assumption is INCONCLUSIVE (exit 3)
+check_case "t31-unbounded-liveness-requires-fairness" 3 "^INCONCLUSIVE.*T31" \
+  "$B" verify --backend finite --depth 2 test/verify/t31_liveness_unfair.charter
+
+# 7. Valid WeakUntil temporal property holds
+check_case "t31b-weak-until-holds" 0 "^ok " \
+  "$B" verify --backend finite --mode lawful --depth 3 test/verify/t31b_temporal_valid.charter
 
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

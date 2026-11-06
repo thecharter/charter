@@ -524,7 +524,7 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Module", "Use", "Param"].contains s then
+    if ["Immunity", "Module", "Use", "Param", "Property"].contains s then
       return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
     else if s == "Document" then
       return (match ← peekAt (idx + 1) with | .str _ => true | _ => false)
@@ -685,6 +685,42 @@ def paramDomain : P Domain := do
     | k => fail "CHR003" s!"expected Int, Time, or Duration after `:` but found {k.describe}"
   else return Domain.anyInt
 
+/-- Parse a `TemporalFormula` after `Property <name> [Assumes ...] When` (`D20`). -/
+def temporalFormula : P TemporalFormula := do
+  if ← isCtxAtom "Always" then
+    advance
+    if ← isKw "(" then
+      let saved : St ← fun s => .ok (s, s)
+      advance
+      let lhs ← expression
+      if ← isKw "=>" then
+        advance
+        if ← isCtxAtom "Next" then
+          advance; let rhs ← expression; expectKw ")"; return .alwaysNext lhs rhs
+        else if ← isCtxAtom "EventuallyWithin" then
+          advance
+          let bound ← addExpr exprFuel
+          let rhs ← expression
+          expectKw ")"
+          return .alwaysEventuallyWithin bound lhs rhs
+        else if ← isCtxAtom "Eventually" then
+          advance; let rhs ← expression; expectKw ")"; return .alwaysEventually lhs rhs
+        else
+          fail "CHR003" "expected `Next`, `Eventually`, or `EventuallyWithin` after `=>` in `Always (... => ...)`"
+      else
+        let _ ← (fun _ => .ok ((), saved) : P Unit)
+        return .always (← expression)
+    else
+      return .always (← expression)
+  else if ← isCtxAtom "Until" then
+    advance; expectKw "("; let phi ← expression; expectKw ","; let psi ← expression; expectKw ")"
+    return .until_ phi psi
+  else if ← isCtxAtom "WeakUntil" then
+    advance; expectKw "("; let phi ← expression; expectKw ","; let psi ← expression; expectKw ")"
+    return .weakUntil phi psi
+  else
+    fail "CHR003" s!"expected `Always`, `Until`, or `WeakUntil` in `Property` but found {(← peek).describe}"
+
 mutual
 
 /-- The declarations of a `Module` body, up to `}`, each block ended by `.` or by the
@@ -831,6 +867,20 @@ def frame : Nat → P (List Decl)
     let n ← intLit
     let value : Int := if neg then -n else n
     return [.param name dom value]
+  | .atom "Property" | .kw "Property" =>
+    advance
+    let name ← ident
+    let assumes ← (do
+      if ← isCtxAtom "Assumes" then
+        advance
+        sepBy1 ident "," 100
+      else return [])
+    match ← peek with
+    | .kw "When" | .kw "Where" => advance
+    | _ => unexpected "`When` after `Property` header"
+    let tf ← temporalFormula
+    let fs ← fromClauses 100
+    return [.property { name, assumptions := assumes, formula := tf, spans := fs }]
   | .atom "Document" | .kw "Document" =>
     advance
     match ← peek with

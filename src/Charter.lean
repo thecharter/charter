@@ -46,6 +46,9 @@ import Charter.Core.Transition
 import Charter.Eval.Properties
 import Charter.Verify.Reduction
 import Charter.Verify.Explorer
+import Charter.Verify.Temporal
+import Charter.Verify.TVIR
+import Charter.Verify.Smt
 import Charter.Prove.Run
 import Charter.Prove.LeanGen
 import Charter.Cli.Load
@@ -56,6 +59,7 @@ import Charter.Cli.Prove
 import Charter.Cli.Fmt
 import Charter.Cli.Build
 import Charter.Cli.Explore
+import Charter.Cli.Verify
 import Charter.Cli.Main
 
 /-!

@@ -207,6 +207,35 @@ inductive ModClause where
   | fromSpan (clause : ClauseId) (text : String)
   deriving Repr, Inhabited
 
+/-- Temporal property formulae (`docs/rfc.md` §7.4, `D20`), verified in `Charter.Verify`
+without widening `Charter.Eval`. -/
+inductive TemporalFormula where
+  | always (phi : Term)
+  | alwaysNext (ante : Term) (post : Term)
+  | alwaysEventually (req : Term) (resp : Term)
+  | alwaysEventuallyWithin (bound : Term) (req : Term) (resp : Term)
+  | until_ (phi : Term) (psi : Term)
+  | weakUntil (phi : Term) (psi : Term)
+  deriving Repr, Inhabited
+
+def TemporalFormula.mapDom (f : DomId → DomId) : TemporalFormula → TemporalFormula
+  | .always p => .always (p.mapDom f)
+  | .alwaysNext a b => .alwaysNext (a.mapDom f) (b.mapDom f)
+  | .alwaysEventually a b => .alwaysEventually (a.mapDom f) (b.mapDom f)
+  | .alwaysEventuallyWithin d a b => .alwaysEventuallyWithin (d.mapDom f) (a.mapDom f) (b.mapDom f)
+  | .until_ a b => .until_ (a.mapDom f) (b.mapDom f)
+  | .weakUntil a b => .weakUntil (a.mapDom f) (b.mapDom f)
+
+structure TemporalSpec where
+  name        : DomId
+  assumptions : List String := []
+  formula     : TemporalFormula
+  spans       : List (ClauseId × String) := []
+  deriving Repr, Inhabited
+
+def TemporalSpec.mapDom (f : DomId → DomId) (tp : TemporalSpec) : TemporalSpec :=
+  { tp with name := f tp.name, formula := tp.formula.mapDom f }
+
 /-- A declaration: a new type, an extension of one, or a placeholder alias. -/
 inductive Decl where
   | typeDecl (d : DomId) (t : TypeSpec)
@@ -222,6 +251,8 @@ inductive Decl where
   | module (name : DomId) (params : List DomId) (body : List Decl)
   /-- Charter (D8): `Use name(args) [As prefix]`: instantiate a module. -/
   | use (name : DomId) (args : List DomId) (pre : Option String)
+  /-- Charter (D20): `Property name [Assumes ...] When <TemporalFormula> [From ...]`. -/
+  | property (tp : TemporalSpec)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
@@ -233,6 +264,7 @@ def Decl.isInitial : Decl → Bool
   | .param .. => true
   | .module .. => true
   | .use .. => true
+  | .property .. => false
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
@@ -243,6 +275,7 @@ def Decl.name : Decl → DomId
   | .param n _ _ => n
   | .module n _ _ => n
   | .use n _ _ => n
+  | .property tp => tp.name
 
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
@@ -257,6 +290,8 @@ structure Spec where
   scenarios : List (String × List (ClauseId × String)) := []
   /-- Charter (D8): declared modules, by name: their parameters and body. -/
   modules  : List (DomId × List DomId × List Decl) := []
+  /-- Charter (D20): declared temporal properties (`Property`), consumed by `Verify/`. -/
+  temporalProperties : List TemporalSpec := []
   deriving Repr, Inhabited
 
 namespace Spec
@@ -276,6 +311,10 @@ def insertAlias (s : Spec) (f t : DomId) : Spec :=
 /-- Insert a clause, replacing one with the same id; clauses keep declaration order. -/
 def insertClause (s : Spec) (c : Clause) : Spec :=
   { s with clauses := s.clauses.filter (·.id != c.id) ++ [c] }
+
+/-- Insert or replace a temporal property in declaration order. -/
+def insertTemporal (s : Spec) (tp : TemporalSpec) : Spec :=
+  { s with temporalProperties := s.temporalProperties.filter (·.name != tp.name) ++ [tp] }
 
 /-- Record a scenario and its `From` spans in declaration order. -/
 def insertScenario (s : Spec) (name : String) (spans : List (ClauseId × String)) : Spec :=
@@ -576,6 +615,7 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .placeholder a b => .placeholder (f a) (f b)
   | .param n dom v => .param (f n) dom v
   | .use n args pre => .use n (args.map f) pre
+  | .property tp => .property (tp.mapDom f)
   | d => d
 
 /-- The type names a block of declarations introduces (what a `Use` prefixes). -/
@@ -584,6 +624,7 @@ def declaredNames (ds : List Decl) : List DomId :=
     | .typeDecl d _ => some d
     | .placeholder a _ => some a
     | .param n _ _ => some n
+    | .property tp => some tp.name
     | _ => none
 
 end Charter

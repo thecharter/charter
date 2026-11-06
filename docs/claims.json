@@ -131,6 +131,22 @@
       "summary": "Assignment batches writing to disjoint DomId sets commute observationally on State.lookup across all instances (G2.2 partial-order reduction)."
     },
     {
+      "id": "verify.temporal_weak_until_safety",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Verify/Temporal.lean",
+      "symbol": "weakUntil_of_always_true",
+      "summary": "Any state predicate holding invariantly along a trace satisfies WeakUntil regardless of termination horizon (G2.3)."
+    },
+    {
+      "id": "verify.temporal_bounded_response_monotone",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Verify/Temporal.lean",
+      "symbol": "eventuallyWithin_monotone",
+      "summary": "Bounded-response satisfaction (EventuallyWithin d1) is monotone under deadline relaxation d1 <= d2 (G2.3)."
+    },
+    {
       "id": "eval.elem_structural_beq",
       "assurance": "proved",
       "scope": "live-evaluator",

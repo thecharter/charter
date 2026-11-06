@@ -261,6 +261,14 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
       s!"{indent}{openPrefix}Immunity {d} Holder {h}{relPart}{wherePart}{fmtModClauses childIndent cls}"
     | [] => s!"{indent}{openPrefix}Immunity {d}{wherePart}{fmtModClauses childIndent cls}"
 
+def fmtTemporalFormula : TemporalFormula → String
+  | .always phi => "Always " ++ fmtTerm phi
+  | .alwaysNext a b => "Always (" ++ fmtTerm a ++ " => Next " ++ fmtTerm b ++ ")"
+  | .alwaysEventually a b => "Always (" ++ fmtTerm a ++ " => Eventually " ++ fmtTerm b ++ ")"
+  | .alwaysEventuallyWithin d a b => "Always (" ++ fmtTerm a ++ " => EventuallyWithin (" ++ fmtTerm d ++ ") " ++ fmtTerm b ++ ")"
+  | .until_ a b => "Until(" ++ fmtTerm a ++ ", " ++ fmtTerm b ++ ")"
+  | .weakUntil a b => "WeakUntil(" ++ fmtTerm a ++ ", " ++ fmtTerm b ++ ")"
+
 def fmtDecls (indent : String) : Nat → List Decl → List String
   | 0, _ => []
   | _, [] => []
@@ -292,6 +300,10 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
   | fuel + 1, .use name args pre :: rest =>
     let asPart := match pre with | some p => s!" As {p}" | none => ""
     s!"{indent}Use {name}({", ".intercalate args}){asPart}" :: fmtDecls indent fuel rest
+  | fuel + 1, .property tp :: rest =>
+    let assPart := if tp.assumptions.isEmpty then "" else " Assumes " ++ ", ".intercalate tp.assumptions
+    let fromPart := String.join (tp.spans.map fun (c, s) => s!"\n{indent}  From {c} {showString s}")
+    s!"{indent}Property {tp.name}{assPart} When {fmtTemporalFormula tp.formula}{fromPart}" :: fmtDecls indent fuel rest
 
 mutual
 

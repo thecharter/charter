@@ -758,6 +758,7 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .module .. => pure ()
     | .use .. => pure ()
     | .typeExt .. => pure ()
+    | .property .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
@@ -771,12 +772,29 @@ def executeDecls (ds : List Decl) : Stc Store := do
       let compiled ← compileTypeSpec ty tspec
       modifySpec (·.insertDecl ty compiled)
     | _ => pure ()
-  -- 3. extensions, in order
+  -- 3. extensions and temporal properties, in order
   exts.forM fun d => do
     match d with
     | .typeExt ty clauses _ =>
       let parts ← compileExt ty clauses
       parts.forM fun part => executeExt part.1 part.2
+    | .property tp =>
+      let compileClosedBool (t : Term) : Stc Term := do
+        let fs ← freeVarsChecked t
+        let t' ← convertTerm termFuel t .bool
+        return if fs.isEmpty then t' else .forall_ fs t'
+      let tf' ← match tp.formula with
+        | .always phi => .always <$> compileClosedBool phi
+        | .alwaysNext a b => .alwaysNext <$> compileClosedBool a <*> compileClosedBool b
+        | .alwaysEventually a b => .alwaysEventually <$> compileClosedBool a <*> compileClosedBool b
+        | .alwaysEventuallyWithin dur a b => do
+          let dur' ← convertTerm termFuel dur .duration
+          let a' ← compileClosedBool a
+          let b' ← compileClosedBool b
+          pure (.alwaysEventuallyWithin dur' a' b')
+        | .until_ a b => .until_ <$> compileClosedBool a <*> compileClosedBool b
+        | .weakUntil a b => .weakUntil <$> compileClosedBool a <*> compileClosedBool b
+      modifySpec (·.insertTemporal { tp with formula := tf' })
     | _ => pure ()
   return init
 

@@ -24,8 +24,8 @@ Reserved multi-word and word keywords (`wordKeywords`):
 Claim keywords (matched when followed by whitespace and a non-`.`/`}` token):
 `?!violated`, `?!lawful`, `?!valid`, `?violated`, `?lawful`, `?valid`, `?why`.
 
-Contextual keywords (`D17`, lexed as `atom` or `ident` and matched only in the grammar positions below):
-`Document`, `Clause`, `Approved`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `tick`.
+Contextual keywords (`D17`, `D20`, lexed as `atom` or `ident` and matched only in the grammar positions below):
+`Document`, `Clause`, `Approved`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`, `Property`, `Assumes`, `Always`, `Next`, `Eventually`, `EventuallyWithin`, `Until`, `WeakUntil`, `tick`.
 
 ---
 
@@ -91,8 +91,13 @@ frame_body  ::= ('Fact' | 'Var' | 'Function') ident ('Identified by' domain)? do
               | 'Module' ident '(' idents? ')' '{' (frame | '.')* '}'
               | 'Use' ident '(' idents? ')' ('As' ident)?
               | 'Param' ident (':' ('Int' | 'Time' | 'Duration'))? '=' '-'? int_lit
+              | 'Property' ident ('Assumes' idents)? ('When' | 'Where') temporal_form from_clause*
               | 'Document' str_lit
               | 'Clause' clause_id ('Approved' int_lit)? clause_item*
+
+temporal_form ::= 'Always' '(' expr '=>' ('Next' expr | 'Eventually' expr | 'EventuallyWithin' add_expr expr) ')'
+                | 'Always' expr
+                | ('Until' | 'WeakUntil') '(' expr ',' expr ')'
 
 dom_filter  ::= ('When' | 'Where') expr
 from_clause ::= 'From' clause_id str_lit

@@ -1,0 +1,17 @@
+// T31 (RFC §7.4 & §14):
+// 1. Unbounded liveness `Always (filed => Eventually decided)` WITHOUT `Assumes` returns INCONCLUSIVE (exit 3).
+// 2. Bounded response `Always (filed => EventuallyWithin 3 decided)` violates when clock advances to 3 without decision!
+//! explore-domain: duration = 3
+Fact matter Identified by M1.
+Fact filed Identified by matter.
+Fact decided Identified by matter.
+
+Act rule-on-matter Actor actor Related to matter
+  Holds when filed(matter)
+  Creates decided(matter).
+
+Property unbounded-liveness-missing-fairness
+  When Always (filed(M1) => Eventually decided(M1)).
+
++actor("Panel").
++filed(M1).

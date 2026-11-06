@@ -1,0 +1,28 @@
+// T26 & T27 (RFC §14): partitioned node records a local revocation unseen by the coordinator,
+// while an unfenced new-host activation races the unexpired lease -> double-authority violation!
+//! explore-domain: duration = 1, 3
+Fact node Identified by N1, N2.
+Fact active-lease Identified by node.
+Fact local-revoked Identified by node.
+Fact unfenced-restored Identified by node.
+
+Act grant-lease Actor actor Related to node
+  Holds when !active-lease(node)
+  Valid when !active-lease(node)
+  Creates active-lease(node) For 3.
+
+// Disconnected local revocation on partitioned node N1 (unseen globally):
+Event partitioned-local-revoke Related to node
+  Creates local-revoked(node).
+
+// Buggy coordinator activates N2 without waiting for N1's lease fence to expire:
+Act unfenced-activate Actor actor Related to node
+  Holds when !active-lease(node)
+  Creates unfenced-restored(node).
+
+// Single-authority fails if `unfenced-restored(N2)` coexists with unexpired `active-lease(N1)`:
+Invariant single-authority-fenced
+  When !(Exists node, node': active-lease(node) && unfenced-restored(node') && node != node').
+
++actor("Coord").
+grant-lease("Coord", N1).

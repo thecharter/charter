@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D20 — Temporal `Property` declarations, fairness-gated liveness (`T31`), and symbolic `TVIR`/SMT (`T30`)](2026-11-06-D20-temporal-properties-and-symbolic-tvir.md)
 - [D19 — Structured assurance certificates (`scope` + `completion`) and monotonic symbol interning](2026-11-06-D19-assurance-certificates-and-interning.md)
 - [D18 — Canonical `CIR` evolves from `Core.Spec` with `LawVersion` epochs and pure-Lean SHA-256 `Artifact` digests](2026-11-06-D18-canonical-cir-and-artifact-hashing.md)
 - [D17 — Charter's single-word additions are contextual keywords; one unified grammar parses all `.charter` and `.eflint` programs](2026-11-06-D17-unified-contextual-eflint-superset.md)
