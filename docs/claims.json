@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "description": "Machine-verifiable registry of Charter's implemented assurance claims (enforced by test/gates/claims-backed.sh).",
+  "claims": [
+    {
+      "id": "eval.create_beats_terminate",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "create_beats_terminate",
+      "summary": "Within one atomic store merge, creating an instance beats terminating it and terminating beats obfuscating (spec 005.3)."
+    },
+    {
+      "id": "eval.rebase_and_sat_assigned",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "rebaseAndSat_assigned",
+      "summary": "Explicitly assigned facts survive rebase and saturation with their value, since-stamp, expiry, and origin intact (spec 004.3)."
+    },
+    {
+      "id": "eval.saturate_stratum_fixpoint",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "saturateStratum_fixpoint",
+      "summary": "When saturateStratum converges on a state, an additional derivation pass over the stratum produces no new facts (spec 004.5; leastness pending G1.3)."
+    },
+    {
+      "id": "eval.elem_structural_beq",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "Elem.beq_iff",
+      "summary": "Boolean equality (==) on Elem and Tagged coincides with propositional equality (=)."
+    },
+    {
+      "id": "eval.duty_violated_iff",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "isViolated_of_holds",
+      "summary": "Violated(d) query and post-phrase violation reporting agree for holding duty instances (spec 006.2, 006.5)."
+    },
+    {
+      "id": "prove.checkpoint_chain_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Prove/Run.lean",
+      "symbol": "foldl_scenario",
+      "summary": "Per-phrase kernel_rfl checkpoints compose into whole-program and scenario summary decisions with zero axioms (spec 013.4)."
+    },
+    {
+      "id": "prove.concrete_fixtures",
+      "assurance": "decided",
+      "scope": "concrete-trace",
+      "artifact": "test/prove/scenario.eflint",
+      "symbol": "tools/prove-check",
+      "summary": "End-to-end zero-axiom kernel decisions over concrete programs, scenarios, and standard-library module instantiations."
+    },
+    {
+      "id": "compat.unified_eflint_corpus",
+      "assurance": "checked",
+      "scope": "concrete-trace",
+      "artifact": "test/eflint-corpus/tolerances.json",
+      "symbol": "tools/battery",
+      "summary": "Unified contextual parser and evaluator pass the 196-file upstream eFLINT 4.1.0.1 corpus without --eflint, modulo 32 documented tolerances."
+    },
+    {
+      "id": "spec.conformance_suite",
+      "assurance": "checked",
+      "scope": "concrete-trace",
+      "artifact": "docs/spec/README.md",
+      "symbol": "test/spec",
+      "summary": "Normative statements in drafted specification chapters 001-015 and 018 are covered by executable conformance fixtures."
+    },
+    {
+      "id": "model.veil_internal_law_sigma",
+      "assurance": "proved",
+      "scope": "idealized-core-model",
+      "artifact": "src/Charter/Projection/Veil.lean",
+      "symbol": "veil_projection_sound_and_complete",
+      "summary": "Internal VeilSpec transition structure matches Phase-0 Law sigma semantics (retargeting to live Core.Spec + external Veil syntax scheduled for G1/G5)."
+    },
+    {
+      "id": "model.contract_guard_internal_law_sigma",
+      "assurance": "proved",
+      "scope": "idealized-core-model",
+      "artifact": "src/Charter/Projection/ContractABI.lean",
+      "symbol": "contract_guard_sound_and_complete",
+      "summary": "Internal guard transition function matches Phase-0 Law sigma compliance/validity (retargeting to live Core.Spec + solc/EVM parity scheduled for G1/G5)."
+    },
+    {
+      "id": "model.composition_and_ratchet_law_sigma",
+      "assurance": "proved",
+      "scope": "idealized-core-model",
+      "artifact": "src/Charter/Core/Ratchet.lean",
+      "symbol": "universal_ratchet_trajectory_safe",
+      "summary": "Parameterized RatchetSpec preserves entrenched core predicates across valid trajectories on Law sigma (retargeting to live Amend acts scheduled for G3.5)."
+    }
+  ]
+}

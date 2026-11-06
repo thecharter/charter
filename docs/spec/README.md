@@ -1,7 +1,7 @@
 # The Charter Language Specification
 
 **Version:** 0.4.0-draft
-**Implementation status:** NON-COMPLIANT with the plan's full §2 grammar; **compliant with chapters 002–011 as drafted** (the eFLINT core, Phase 1) for `.eflint` files, every normative statement of those chapters having a passing conformance test under `test/spec/`. The `.charter` extension still means the v0.3 flat grammar (`docs/completed/2026-10-18-charter-spec-v0.3.md`) until Phase 2 moves it to this grammar; the conformance tests therefore use `.eflint` for now. Every chapter is a **draft**: D2 fixes the meaning (eFLINT 4.1 unchanged) and the decisions fix the differences, but the wording is Eric's to bless (`AGENTS.md`, "Spec changes are solemn"). A chapter with no file yet is unwritten, not implied.
+**Implementation status:** Compliant with drafted chapters `001`–`015` and `018` across both `.charter` and `.eflint` files under one unified contextual grammar (`D17`), with 133 passing conformance tests under `test/spec/`. Chapters `017`, `019`, and `020` remain unwritten until Gate `G1`/`G5` (`docs/plans/2026-11-06-charter-1.0-implementation-plan.md`). Every chapter is a **draft**: `D2`/`D17` fix the stratified eFLINT 4.1 core and the decision log fixes Charter's additions, while final normative wording is Eric's to bless (`AGENTS.md`, "Spec changes are solemn"). A chapter with no file yet is unwritten, not implied.
 
 This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the implementation: a change here is a ruling that the product is non-compliant until the code catches up, and only Eric authors or blesses normative wording (`AGENTS.md`, "The specification leads").
 
@@ -31,8 +31,8 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 
 | Chapter | File | Status |
 |---|---|---|
-| 001 design goals | `001_design_goals.md` | unwritten (source: `docs/mission.md`) |
-| 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green |
+| 001 design goals | `001_design_goals.md` | draft (`docs/mission.md`, `docs/rfc.md`) |
+| 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green (unified contextual grammar, D17) |
 | 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green (`Time`/`Duration` in 009) |
 | 004 facts and derivation | `004_facts_and_derivation.md` | draft; 13 tests green (D6; origins and `?why`; D15 in 4.1 and 4.7) |
 | 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 11 tests green, `Valid when` (D5) and judged acts (D15) included |
