@@ -1,5 +1,6 @@
 import Charter.Cli.Load
 import Charter.Cli.Run
+import Charter.Artifact.Cert
 import Charter.Prove.LeanGen
 
 /-!
@@ -140,13 +141,29 @@ def owner (proj : Prove.Project) (loc : Prove.Loc) : Option String :=
     | some (_, l') => if l ≥ l' then some (n, l) else acc
     | none => some (n, l)) none |>.map (·.1)
 
-def claimJson (o : Prove.Obligation) (file : String) (result : Bool) (note : String) : Json :=
-  Json.mkObj ([("kind", Json.str "claim"), ("tag", Json.str "decided"), ("about", Json.str o.about), ("claim", Json.str o.text),
-    ("result", Json.bool result), ("file", Json.str file), ("line", Json.num o.line), ("theorem", Json.str o.name)]
-    ++ (if note.isEmpty then [] else [("note", Json.str note)]))
+def claimCertJson (ob : Prove.Obligation) (file : String) (verdict : Option Bool)
+    (completion : Artifact.CompletionStatus) (note : String) : Json :=
+  let cert : Artifact.ClaimCertificate := {
+    claim := ob.text
+    about := ob.about
+    verdict := verdict
+    assurance := .decided
+    scope := .concreteTrace
+    completion := completion
+    file := file
+    line := ob.line
+    theoremName := ob.name
+    note := note
+  }
+  cert.toJson
 
-/-- Prove one program: returns `(decided, failed)`. -/
-def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO (Nat × Nat) := do
+def classifyStop (stopped : String) : Artifact.CompletionStatus :=
+  if (stopped.splitOn "memory").length > 1 then .oom
+  else if (stopped.splitOn "time cap").length > 1 then .timeout
+  else .inconclusive
+
+/-- Prove one program: returns `(decided, failed, inconclusive)`. -/
+def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO (Nat × Nat × Nat) := do
   let (items, loadDiags) ← loadProgram path o.eflint
   let mut errors := 0
   for d in loadDiags do
@@ -154,7 +171,7 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
     if d.isError then errors := errors + 1
   if errors > 0 then
     IO.eprintln s!"{path}: prove: the program does not load; nothing to decide"
-    return (0, 1)
+    return (0, 1, 0)
   let stem := (System.FilePath.mk path).fileStem.getD "program"
   let dir := match o.dir with
     | some d =>
@@ -167,10 +184,10 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
     IO.FS.writeFile (dir / (m ++ ".lean")) src
   if proj.obligations.isEmpty then
     IO.println s!"{path}: prove: the program makes no claim and declares no invariant; nothing to decide"
-    return (0, 0)
+    return (0, 0, 0)
   if o.emitOnly then
     IO.println s!"{path}: prove: project written ({proj.files.length} module(s), {proj.steps.length} checkpoint(s), {proj.obligations.length} theorem(s) about claims); not run (--emit-only)"
-    return (0, 0)
+    return (0, 0, 0)
   -- one checker process per module, in order (each imports the one before); the time cap
   -- is the whole run's, the memory cap each process's
   let mut result : Option (UInt32 × String) := some (0, "")
@@ -184,7 +201,7 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
     let t0 ← IO.monoMsNow
     let (r, pk, st) ← runChecker root dir file olean o.memory left
     let spent := ((← IO.monoMsNow) - t0) / 1000
-    left := if spent + 1 < left then left - spent else 1
+    left := if left == 0 then 0 else if spent + 1 < left then left - spent else 1
     if pk > peak then peak := pk
     match r, result with
     | none, _ => result := none; stopped := st; break
@@ -194,23 +211,28 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
     | _, _ => pure ()
   let mut decided := 0
   let mut failed := 0
-  let report (ob : Prove.Obligation) (ok : Bool) (note : String) : IO Unit := do
+  let mut inconclusive := 0
+  let report (ob : Prove.Obligation) (verdict : Option Bool) (comp : Artifact.CompletionStatus) (note : String) : IO Unit := do
     let label := if ob.about == "invariant" then s!"invariant {ob.text}" else s!"{path}:{ob.line}  {ob.text}"
-    if o.json then IO.println (claimJson ob path ok note).compress
-    else IO.println s!"{if ok then "decided" else "FAILED "}  {label}{if note.isEmpty then "" else s!"  ({note})"}"
+    if o.json then IO.println (claimCertJson ob path verdict comp note).compress
+    else
+      let prefixTag := match verdict with
+        | some true => "decided"
+        | some false => "FAILED "
+        | none => "INCONCLUSIVE"
+      IO.println s!"{prefixTag}  {label}{if note.isEmpty then "" else s!"  ({note})"}"
   match result with
   | none =>
+    let comp := classifyStop stopped
     for (ob, _) in proj.obligations do
-      report ob false s!"not decided: stopped by {stopped}"
-      failed := failed + 1
+      report ob none comp s!"not decided: stopped by {stopped}"
+      inconclusive := inconclusive + 1
   | some (st, out) =>
     if o.showChecker then IO.println out
     let lines := out.splitOn "\n"
     let errLines := lines.filterMap errorLine
     let failing := (errLines.filterMap (owner proj)).eraseDups
     let axiomatic := (lines.filterMap axiomUser).eraseDups
-    -- a checkpoint the kernel disagrees with names its phrase (Law 9); the chain, and with it
-    -- every claim, then fails
     let failedSteps := proj.steps.filter fun (s, _) => failing.contains s.name
     let disagreement := match failedSteps with
       | [] => ""
@@ -220,26 +242,33 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
         | _ => "the kernel's check of the program's end state disagrees with the evaluator's (Law 9); nothing is decided"
     let decidedFailed := !disagreement.isEmpty || failing.contains proj.decided.1 || axiomatic.contains proj.decided.1
     let unattributed := st != 0 && errLines.isEmpty
+    let isMemCap := unattributed && (out.splitOn "memory").length > 1
     for (ob, _) in proj.obligations do
-      let note :=
-        if !disagreement.isEmpty then disagreement
-        else if decidedFailed then "the chain of checkpoints did not close; --show-checker prints the checker's output"
-        else if unattributed then
-          if (out.splitOn "memory").length > 1 then s!"not decided within {o.memory} MB"
-          else "the checker could not run; --show-checker prints its output"
-        else if failing.contains ob.name then
-          if ob.expected then "" else "the evaluator reported this claim false and the kernel agrees"
-        else if axiomatic.contains ob.name then "depends on axioms (Law 10)"
-        else ""
-      let ok := !decidedFailed && !unattributed && !failing.contains ob.name && !axiomatic.contains ob.name
-      report ob ok note
-      if ok then decided := decided + 1 else failed := failed + 1
+      if isMemCap then
+        report ob none .oom s!"not decided within {o.memory} MB"
+        inconclusive := inconclusive + 1
+      else if unattributed then
+        report ob none .inconclusive "the checker could not run; --show-checker prints its output"
+        inconclusive := inconclusive + 1
+      else
+        let note :=
+          if !disagreement.isEmpty then disagreement
+          else if decidedFailed then "the chain of checkpoints did not close; --show-checker prints the checker's output"
+          else if failing.contains ob.name then
+            if ob.expected then "" else "the evaluator reported this claim false and the kernel agrees"
+          else if axiomatic.contains ob.name then "depends on axioms (Law 10)"
+          else ""
+        let ok := !decidedFailed && !failing.contains ob.name && !axiomatic.contains ob.name
+        report ob (some ok) .complete note
+        if ok then decided := decided + 1 else failed := failed + 1
   if o.showChecker then IO.println s!"checker peak resident size: {peak} MB"
-  return (decided, failed)
+  return (decided, failed, inconclusive)
 
-/-- `charter prove <file.eflint> … [--dir DIR] [--memory MB] [--time S] [--chunk N] [--show-checker] [--out json] [--eflint]` -/
+/-- `charter prove <file.charter> … [--dir DIR] [--memory MB] [--time S] [--chunk N] [--show-checker] [--out json]`
+Exit status: `0` when all obligations are decided, `1` when any claim/invariant fails,
+`2` on usage error, and `3` when stopped inconclusively by resource caps (`T44`, `D19`). -/
 def proveCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter prove <file.eflint> ... [--dir <directory>] [--memory <MB>] [--time <seconds>] [--chunk <phrases>] [--show-checker] [--emit-only] [--out json] [--eflint]"
+  let usage := "usage: charter prove <file.charter> ... [--dir <directory>] [--memory <MB>] [--time <seconds>] [--chunk <phrases>] [--show-checker] [--emit-only] [--out json]"
   match parseProveArgs args {} with
   | .error e => IO.eprintln s!"charter prove: {e}"; IO.eprintln usage; return 2
   | .ok o =>
@@ -250,13 +279,23 @@ def proveCommand (args : List String) : IO UInt32 := do
         return 2
     let mut decided := 0
     let mut failed := 0
+    let mut inconclusive := 0
     for f in o.files do
-      let (d, fl) ← proveFile o root cwd f
+      let (d, fl, inc) ← proveFile o root cwd f
       decided := decided + d
       failed := failed + fl
+      inconclusive := inconclusive + inc
+    let incSuffix := if inconclusive > 0 then s!", {inconclusive} inconclusive" else ""
     if o.json then
-      IO.println (Json.mkObj [("kind", "summary"), ("decided", Json.num decided), ("failed", Json.num failed), ("ok", Json.bool (failed == 0))]).compress
-    else IO.println s!"prove: {decided} decided, {failed} failed"
-    return (if failed == 0 then 0 else 1)
+      IO.println (Json.mkObj [
+        ("kind", Json.str "summary"),
+        ("decided", Json.num decided),
+        ("failed", Json.num failed),
+        ("inconclusive", Json.num inconclusive),
+        ("completion", Json.str (if inconclusive > 0 then "inconclusive" else "complete")),
+        ("ok", Json.bool (failed == 0 && inconclusive == 0))
+      ]).compress
+    else IO.println s!"prove: {decided} decided, {failed} failed{incSuffix}"
+    return (if failed > 0 then 1 else if inconclusive > 0 then 3 else 0)
 
 end Charter.Cli

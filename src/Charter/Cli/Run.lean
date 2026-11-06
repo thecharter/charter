@@ -114,13 +114,15 @@ def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before af
       if d.isError || o.assurance.denyWarnings || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
     | .queryRes ok =>
       if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
-      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("about", "holds"),
+      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("assurance", "checked"),
+        ("about", "holds"), ("scope", Json.mkObj [("kind", "concrete-trace")]), ("completion", "complete"),
         ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
       if !ok then emit o j s!"{where_}: query failed: {text}"
       else if !o.testMode then emit o j "  query holds"
     | .expectRes w neg ok =>
       if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
-      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("about", Json.str w.name),
+      let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("assurance", "checked"),
+        ("about", Json.str w.name), ("scope", Json.mkObj [("kind", "concrete-trace")]), ("completion", "complete"),
         ("negated", Json.bool neg), ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
       if !ok then emit o j s!"{where_}: claim failed: {text}"
       else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
@@ -196,8 +198,10 @@ def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats
     let fromMenu := cov.filter (·.source == .menu)
     let menuNote := if fromMenu.isEmpty then "" else
       s!"; candidates from the menu for {", ".intercalate ((fromMenu.map (·.comp)).eraseDups)}"
+    let scopeJson := Json.mkObj [("kind", Json.str "bounded-exhaustive"), ("depth", Json.num o.explore)]
     if unexplored.isEmpty then
-      let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool true),
+      let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("assurance", "checked"), ("about", "invariants"),
+        ("scope", scopeJson), ("completion", "complete"), ("result", Json.bool true),
         ("depth", Json.num o.explore), ("states", Json.num n), ("coverage", covJson)]
       if !o.testMode || o.json then emit o j s!"{where_}: explore: no invariant violated within {o.explore} step(s) ({n} states{menuNote})"
       return stats
@@ -205,13 +209,16 @@ def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats
       let tried := unexplored.map fun c =>
         let vals := Explore.stateValues cfg.state ((Explore.needsMenu cfg.spec c.comp).getD .anyInt)
         s!"{c.act} ({c.comp}: tried the state's values {if vals.isEmpty then "(none)" else ", ".intercalate (vals.map ppElem)})"
-      let j := Json.mkObj [("kind", "claim"), ("tag", "unexplored"), ("about", "invariants"), ("result", Json.bool false),
+      let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("assurance", "checked"), ("about", "invariants"),
+        ("scope", scopeJson), ("completion", "inconclusive"), ("result", Json.null),
         ("depth", Json.num o.explore), ("states", Json.num n), ("coverage", covJson)]
       emit o j s!"{where_}: explore: incomplete: no invariant violated within {o.explore} step(s) ({n} states{menuNote}), but no menu names the candidates for {", ".intercalate tried}; add `//! explore-domain: {(unexplored.head!).comp} = …` (D15)"
       return { stats with failedQueries := stats.failedQueries + 1 }
   | .violated d trace n =>
+    let scopeJson := Json.mkObj [("kind", Json.str "bounded-exhaustive"), ("depth", Json.num o.explore)]
     let traceS := ", ".intercalate (trace.map Tagged.pp)
-    let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "invariants"), ("result", Json.bool false),
+    let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("assurance", "checked"), ("about", "invariants"),
+      ("scope", scopeJson), ("completion", "complete"), ("result", Json.bool false),
       ("invariant", Json.str d), ("trace", Json.arr (trace.map (fun te => Json.str te.pp)).toArray), ("states", Json.num n)]
     emit o j s!"{where_}: explore: invariant {d} violated after {trace.length} step(s): {if trace.isEmpty then "(already in the end state)" else traceS}"
     return { stats with failedQueries := stats.failedQueries + 1 }

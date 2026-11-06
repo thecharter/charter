@@ -43,8 +43,11 @@ def ProvClaim.render (c : ProvClaim) : String :=
   s!"{tag} {c.text}"
 
 def ProvClaim.json (c : ProvClaim) : Json :=
-  Json.mkObj [("kind", "claim"), ("tag", "checked"), ("about", "provenance"), ("check", Json.str c.check),
-    ("clause", Json.str c.clause), ("result", Json.bool c.ok), ("warning", Json.bool c.warn), ("text", Json.str c.text)]
+  Json.mkObj [("kind", "claim"), ("tag", "checked"), ("assurance", "checked"), ("about", "provenance"),
+    ("scope", Json.mkObj [("kind", "concrete-trace")]),
+    ("completion", Json.str (if c.warn then "inconclusive" else "complete")),
+    ("check", Json.str c.check), ("clause", Json.str c.clause),
+    ("result", Json.bool c.ok), ("warning", Json.bool c.warn), ("text", Json.str c.text)]
 
 /-- Whether `needle` occurs in `hay`. -/
 def occursIn (hay needle : String) : Bool := (hay.splitOn needle).length > 1

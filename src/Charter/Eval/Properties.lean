@@ -1546,6 +1546,14 @@ theorem clock_never_decreases {cfg cfg' : Config} {p : Phrase} {outs : List Outp
       rw [hst0]
       exact declClock_monotone hclk
 
+/-- Idempotent fast-path for an already-converged stratum (`G1.5`): when `pass` reports
+no change (`changed = false`), `saturateStratum` returns the identical state in one pass. -/
+theorem saturateStratum_idempotent (spec : Spec) (specIdx : Spec.SpecIndex)
+    (prev : List (Tagged × Info)) (types : List DomId) (fuel : Nat) (s : State)
+    (hp : Saturate.pass spec specIdx prev types s = .ok (s, false)) :
+    Saturate.saturateStratum spec specIdx prev types (fuel + 1) s = .ok s := by
+  simp [Saturate.saturateStratum, hp]
+
 #print axioms evalPhrase_sound
 #print axioms evalPhrase_complete
 #print axioms replay_deterministic

@@ -1,0 +1,30 @@
+// 003.1 / T42: open-domain String and Int actor/entity types admit arbitrary new runtime
+// entities without a fixed compile-time enumeration.
+Fact party Identified by String.
+Fact account Identified by String.
+Function balance Identified by account * int.
+
+Act open-account Actor party Related to account, int
+  Holds when int >= 0
+  Creates party(party), account(account), balance(account, int).
+
+Act transfer Actor party Related to account, account', int
+  Holds when int > 0
+    && (Exists balance: balance.account == account && balance.int >= int)
+    && (Exists balance': balance'.account == account')
+  Creates (Foreach balance, balance':
+             balance(account, balance.int - int)
+             When balance.account == account && balance'.account == account'),
+          (Foreach balance, balance':
+             balance(account', balance'.int + int)
+             When balance.account == account && balance'.account == account').
+
+// Introduce brand-new actors and accounts dynamically at runtime
+open-account("Custodian-Alpha-2026", "Acct-9001", 500).
+open-account("Newcomer-Beta-99", "Acct-9002", 100).
+?balance("Acct-9001", 500).
+?balance("Acct-9002", 100).
+
+transfer("Custodian-Alpha-2026", "Acct-9001", "Acct-9002", 175).
+?balance("Acct-9001", 325).
+?balance("Acct-9002", 275).

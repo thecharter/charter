@@ -107,6 +107,22 @@
       "summary": "Lawfulness and institutional validity are orthogonal on occurred transitions across all four (lawful, valid) quadrants (Law 2, T01-T03)."
     },
     {
+      "id": "eval.saturate_stratum_idempotent",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "saturateStratum_idempotent",
+      "summary": "An already-converged stratum completes saturateStratum in one non-mutating pass (G1.5)."
+    },
+    {
+      "id": "intern.bijective_roundtrip",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Core/Intern.lean",
+      "symbol": "intern_resolve_self",
+      "summary": "Monotonic SymbolTable interning resolves every newly or previously interned string back to its exact spelling while preserving prior IDs (G1.5, T42)."
+    },
+    {
       "id": "eval.elem_structural_beq",
       "assurance": "proved",
       "scope": "live-evaluator",

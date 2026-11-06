@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run `charter prove` on every fixture under the given paths and compare each outcome
-# with its directive `//! prove-failed: N` (default 0): exactly N theorems must fail.
-# The binary must already be built (tools/battery builds it first).
+# with its directives `//! prove-failed: N` (default 0), `//! prove-inconclusive: K` (default 0),
+# and optional `//! prove-time: S`.
 #
 #     tools/prove-check test/prove
 set -u
@@ -9,24 +9,30 @@ cd "$(dirname "$0")/.." || exit 2
 B=.lake/build/bin/charter
 [ -x "$B" ] || { echo "FAIL prove-check: $B is not built"; exit 2; }
 pass=0; fail=0
-for f in $(find "$@" -name '*.eflint' | sort); do
+for f in $(find "$@" \( -name '*.eflint' -o -name '*.charter' \) | sort); do
   want=$(grep -o '^//! prove-failed: [0-9]*' "$f" | awk '{print $3}'); want=${want:-0}
-  # --show-checker, so the checker's own `#print axioms` lines are seen here as well as by
-  # the tool: a theorem depending on a real axiom (not `sorryAx`, which a failed theorem
-  # carries by design) is a Law 10 failure of the battery, not a note (spec 013.4)
-  out=$("$B" prove "$f" --show-checker 2>&1); st=$?
+  want_inc=$(grep -o '^//! prove-inconclusive: [0-9]*' "$f" | awk '{print $3}'); want_inc=${want_inc:-0}
+  tcap=$(grep -o '^//! prove-time: [0-9]*' "$f" | awk '{print $3}')
+  if [ -n "$tcap" ]; then
+    out=$("$B" prove "$f" --show-checker --time "$tcap" 2>&1); st=$?
+  else
+    out=$("$B" prove "$f" --show-checker 2>&1); st=$?
+  fi
   got=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided, [0-9]* failed' | awk '{print $4}')
   decided=$(printf '%s\n' "$out" | grep -o '^prove: [0-9]* decided' | awk '{print $2}')
+  inc=$(printf '%s\n' "$out" | grep -o '[0-9]* inconclusive$' | awk '{print $1}'); inc=${inc:-0}
   axioms=$(printf '%s\n' "$out" | grep -cE "depends on axioms: \[.*(propext|Classical\.choice|Quot\.sound)")
-  if [ "$want" -eq 0 ]; then wantst=0; else wantst=1; fi
+  if [ "$want" -gt 0 ]; then wantst=1
+  elif [ "$want_inc" -gt 0 ]; then wantst=3
+  else wantst=0; fi
   if [ "$axioms" -ne 0 ]; then
     printf '%s\n' "$out" | grep -E "depends on axioms: \[.*(propext|Classical\.choice|Quot\.sound)" | sed 's/^/     /'
     echo "FAIL $f ($axioms theorem(s) depend on an axiom; Law 10)"; fail=$((fail+1))
-  elif [ "${got:-x}" = "$want" ] && [ $st -eq $wantst ]; then
-    echo "ok   $f (${decided:-0} decided, $got failed)"; pass=$((pass+1))
+  elif [ "${got:-x}" = "$want" ] && [ "$inc" = "$want_inc" ] && [ $st -eq $wantst ]; then
+    echo "ok   $f (${decided:-0} decided, $got failed, $inc inconclusive)"; pass=$((pass+1))
   else
     printf '%s\n' "$out" | sed 's/^/     /'
-    echo "FAIL $f (expected $want failed; got ${got:-no summary}, exit $st)"; fail=$((fail+1))
+    echo "FAIL $f (expected failed=$want inconclusive=$want_inc exit=$wantst; got failed=${got:-none} inconclusive=$inc exit=$st)"; fail=$((fail+1))
   fi
 done
 echo "$pass passed, $fail failed, $((pass+fail)) total"

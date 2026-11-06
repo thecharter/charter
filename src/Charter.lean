@@ -30,10 +30,12 @@ import Charter.Surface.Ast
 import Charter.Surface.Parser
 import Charter.Surface.Pretty
 import Charter.Core.Term
+import Charter.Core.Intern
 import Charter.Core.Spec
 import Charter.Core.State
 import Charter.Core.Derivation
 import Charter.Artifact.Hash
+import Charter.Artifact.Cert
 import Charter.Resolve.Static
 import Charter.Resolve.ElaborateCIR
 import Charter.Resolve.AssuranceGates

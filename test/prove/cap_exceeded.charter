@@ -1,0 +1,8 @@
+// 013.4 / T44: when `charter prove` hits its wall-clock resource cap, obligations are
+// reported as INCONCLUSIVE (exit status 3), never green pass and never falsified claims.
+//! prove-time: 0
+//! prove-inconclusive: 2
+Fact member Identified by Alice.
+Invariant non-trivial When True.
++member(Alice).
+?member(Alice).
