@@ -6,7 +6,7 @@ A file is a sequence of phrases and directives. Each phrase is a step: it is res
 
 **11.1 Assignments.** `+e` makes the instances `e` produces hold; `-e` makes them not hold; `~e` forgets their assignment. Free variables are bound to every valid instance, so `+x.` over an enumerable type creates every instance and over a non-enumerable one re-asserts those that hold. `test/spec/spec_011_1_assignments.eflint`
 
-**11.2 Triggers.** `a(args)`, `(Foreach xs: a(args))`, or `a` performs every instance the term produces (005, 008). `test/spec/spec_011_2_triggers_enumerate.eflint`
+**11.2 Triggers.** `a(args)`, `(Foreach xs: a(args))`, or `a` performs every instance the term produces (005, 008). The term of a trigger, a `+`, a `-`, or a `~` denotes an instance: a bare number, string, or condition is CHR012 (so `10000.00.`, which is the integer `10000`, a terminator, and the phrase `00.`, is refused). `test/spec/spec_011_2_triggers_enumerate.eflint`, `spec_011_2b_bare_literal_is_not_a_phrase.charter`
 
 **11.3 Queries.** `?e` holds when every value of `e` is true (and when `e` has no value); `?!e` and `!?e` query the negation; `?-e` lists the instances `e` produces and `?--e` those that hold. A query is a *claim* tagged *checked*, about *holds*; a failed query fails `charter test` and is never a diagnostic. `test/spec/spec_011_3_queries.eflint`
 

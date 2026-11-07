@@ -1,4 +1,0 @@
-// DEFECT (silent wrong answer). `10000.00` is read as 10000 followed by a phrase terminator and
-// a phrase `00`, so ten thousand dollars becomes one hundred. Expected: an error or 1000000.
-Param loan : Money(USD, 2) = 10000.00.
-?loan(10000).            // WRONG: this is $100.00

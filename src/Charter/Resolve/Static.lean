@@ -1023,8 +1023,12 @@ def executeDecls (ds : List Decl) : Stc Store := do
 def compileTransTerm (xs : List Var) (t : Term) : Stc (List Var × Term) := do
   let fs ← freeVarsChecked t
   let unbound := diff fs xs
-  let (t', _) ← compileTerm termFuel t
-  return (xs ++ unbound, t')
+  let (t', ty) ← compileTerm termFuel t
+  -- a phrase triggers, creates, or terminates an instance; a bare number, string, or condition
+  -- denotes none and would be accepted and do nothing (`= 10000.00.` leaves the phrase `00.`)
+  match ty with
+  | .tagged _ => return (xs ++ unbound, t')
+  | _ => err "CHR012" s!"cannot use {ty} where an instance is needed: `{t.pp}` is not something a phrase can trigger, create, or terminate (a number written with a decimal point is read as a number, the end of the phrase, and a second phrase)"
 
 /-- Compile a query: free variables are existentially bound, inside the negation
 for `?!e` (eFLINT `compile_stmt (Query t)`). -/

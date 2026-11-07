@@ -1,0 +1,6 @@
+// 002.7, 011.2: there are no decimal literals. `10000.00.` is the integer 10000, the end of the
+// phrase, and a second phrase `00.`; a bare number is not an instance, so that phrase is refused
+// (CHR012) where it used to be accepted and do nothing (ten thousand dollars read as one hundred).
+//! expect-error: CHR012
+Param loan : Money(USD, 2) = 10000.00.
+?loan(10000).
