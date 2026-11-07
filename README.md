@@ -19,7 +19,7 @@ Architecturally, **Charter is a strict syntactic and semantic superset of strati
 
 - **One unified grammar and semantics (`D2`, `D17`)**: Every well-stratified eFLINT 4.1 program parses and executes in Charter as-is under a single contextual parser — with no `--eflint` mode switch or forked `compat`/`strict` profiles.
 - **Continuous 196-file upstream regression gate**: Charter vendors the upstream Haskell `eflint-4.1.0.1` test and example corpus (`test/eflint-corpus/`), enforcing exact outcome parity except for **32 machine-audited tolerances** ([`tolerances.md`](test/eflint-corpus/tolerances.md), [`tolerances.json`](test/eflint-corpus/tolerances.json)):
-  - **8 upstream interpreter bug fixes** where Haskell `eflint-4.1.0.1` fails its own tests due to alphabetical map-iteration order in `Saturation.hs` (`D6(a)`), broken `Placeholder` alias tags (`D13`), and ambiguous `When` precedence (`D14`); and
+  - **8 files that fail in our run of `eflint-repl` 4.1.0.1 and pass in Charter**, traced to the order in which types are saturated (`D6(a)`), the type given to an instance created through a `Placeholder` (`D13`), and the precedence of `When` (`D14`); and
   - **1 intentional well-foundedness boundary (`D6(b)`, `CHR020`)**: rejecting cyclic self-negation in `Holds when` / `Derived from` (`archetypes.eflint` and the 23 files that include it) so every derived fact has a unique stratified fixpoint and truthful `?why` explanations.
 
 ### What Charter Adds Beyond eFLINT 4.1
@@ -77,9 +77,9 @@ Requires Lean `v4.24.0` (pinned in `lean-toolchain`; zero Mathlib or external Le
 # Build the standalone `charter` binary (.lake/build/bin/charter)
 lake build
 
-# Run the full PR verification battery (build, G0-independence / Law 10 / Law 11 / Law 13 /
-# claims-backed gates, 196-file unified eFLINT corpus, 133 spec conformance tests,
-# 8 standard-library modules, kernel proof fixtures, and 3 domain-neutral examples)
+# Run the full PR verification battery: the build, 13 gates, the 196-file eFLINT corpus,
+# 162 spec conformance tests, 12 standard-library modules, kernel proof fixtures, the server
+# and projection suites, and every example
 ./tools/battery
 ```
 
@@ -104,7 +104,41 @@ lake build
 
 # Generate and kernel-check per-phrase proof obligations (zero-axiom `kernel_rfl`)
 .lake/build/bin/charter prove test/prove/scenario.eflint
+
+# Explain an answer: which facts prevent an act, and what would enable it
+.lake/build/bin/charter explain "enter(Lou, Tess)" Examples/Tenancy/tenancy.charter
+
+# Compile to a signed artifact and verify it with the standalone server
+.lake/build/bin/charter build Examples/ServiceEscrow/service-escrow.charter -o out/escrow.artifact
+.lake/build/bin/charter-server verify out/escrow.artifact
 ```
+
+`charter help` lists the rest: `init`, `fmt`, `doc`, `lsp`, `doctor`, `explore`, `verify`, `diff`, `generate`.
+
+---
+
+## Examples
+
+[`Examples/`](Examples/README.md) holds twenty-four agreements, each with its English, its specification, and the cases that test it. Twenty are documents a person might actually sign: a will, a living trust, a deed, a power of attorney, a prenuptial agreement, a promissory note, an employment agreement, an insurance policy, club bylaws, and others. The English is original and fictional; it is not legal advice.
+
+```sh
+.lake/build/bin/charter check --require-provenance --deny-warnings Examples/LastWill/will.charter
+.lake/build/bin/charter test Examples/LastWill/cases/estate.charter
+./tools/examples-check          # every example in the root-and-cases layout
+```
+
+---
+
+## Status
+
+Charter 1.0.1. The twenty worked agreements pass, and they were not easy to write. What they cost, a ranked list of what would make them easy, and the defects found on the way are in [`docs/plans/2026-11-07-example-friction/`](docs/plans/2026-11-07-example-friction/README.md); every item is filed, tracked in [#79](https://github.com/thecharter/charter/issues/79).
+
+Known limits worth reading before relying on a result:
+
+- Six cases remain where a natural spelling is accepted and gives a wrong answer ([#3](https://github.com/thecharter/charter/issues/3), [#6](https://github.com/thecharter/charter/issues/6), [#8](https://github.com/thecharter/charter/issues/8), [#9](https://github.com/thecharter/charter/issues/9), [#11](https://github.com/thecharter/charter/issues/11), [#12](https://github.com/thecharter/charter/issues/12)). Their reproductions are in `docs/plans/2026-11-07-example-friction/reproductions/`.
+- `evalPhrase_sound` and `evalPhrase_complete` relate the evaluator to a step relation that is itself stated in terms of the evaluator's functions ([#65](https://github.com/thecharter/charter/issues/65)).
+- The Solidity, Quint and prompt targets are generated, not proved: `cir_guard_step_correspondence` concerns an intermediate guard step, not the emitted text ([#66](https://github.com/thecharter/charter/issues/66)).
+- There is no calendar: time is counted in whole steps (spec 9.6).
 
 ---
 
@@ -117,30 +151,40 @@ src/
   Charter/
     Surface/                       Unified contextual lexer, parser, AST, diagnostics (.charter & .eflint)
     Resolve/                       Static resolution (`Static.lean`) & assurance gates (`AssuranceGates.lean`)
-    Core/                          `Term`, `Spec` (`DomMap`), `State`, `Provenance`, plus `Law σ` metatheorems
+    Core/                          `Term`, `Spec` (`DomMap`), `State`, `Provenance`, evidence, defaults, amendment
     Eval/                          Stratified fixpoint saturation, judged rules, transitions, & kernel proofs (`Properties.lean`)
+    Verify/                        Explorer, temporal properties, and the finite/SMT/inductive back ends
     Prove/                         Checkpointed proof generator & capped kernel runner (`charter prove`)
-    Projection/                    Veil, Solidity/JSON ABI guards, AI prompts, and timelines
-    Cli/                           `check`, `test`, `run`, `trace`, `prove`, `repl`, `version`, `help`
-lib/                               8 reusable institutional standard-library modules (`*.charter`)
-Examples/                          Domain-neutral institutions (`Tenancy`, `AutonomousCommons`, `ServiceEscrow`)
+    Project/                       Solidity/JSON ABI guard, Quint, and prompt targets; `charter diff`
+    Artifact/                      SHA-256, HMAC, and the signed content-addressed artifact
+    Server/                        `charter-server`: state store, reservations, protocol (links no parser or resolver)
+    Lsp/                           Language server
+    Cli/                           One file per `charter` subcommand
+  Server.lean                      Standalone `charter-server` entry point
+lib/                               12 reusable institutional standard-library modules (`*.charter`)
+Examples/                          24 agreements with their English and cases (`Examples/README.md`)
+benchmarks/                        Nine benchmark institutions (`docs/benchmarks.md`)
+sdk/, editors/                     TypeScript, Python and Rust clients; Tree-sitter and VS Code grammars
 test/
-  spec/                            133 normative conformance tests mapped to `docs/spec/` chapters
+  spec/                            162 normative conformance tests mapped to `docs/spec/` chapters
   lib/                             Test harnesses & bounded invariant exploration for `lib/*.charter`
   prove/                           End-to-end zero-axiom kernel-decision fixtures for `charter prove`
   eflint-corpus/                   Vendored upstream Haskell eFLINT 4.1.0.1 corpus (196 files) + `tolerances.json`
-  gates/                           Automated `g0-independence`, `claims-backed`, `law10`, `law11`, & `law13` gates
+  gates/                           13 gates, one script per law or guarantee (`g0-independence`, `claims-backed`, `operator-blind`, …)
 docs/
   mission.md                       Charter's goals and fourteen design laws
   rfc.md                           Charter 1.0 architecture RFC & 2026-11-06 maintainer rulings
   trust.md                         Enumerated Trusted Computing Base & environmental assumptions
   assurance-levels.md              Normative `proved` / `decided` / `checked` / `assumed` + scope taxonomy
   claims.json                      Machine-checked assurance claim inventory
-  plans/                           Implementation plans (`2026-11-06-charter-1.0-implementation-plan.md`)
-  meetings/                        Architectural decision records (`D1`–`D17`)
-  spec/                            Draft Charter 0.4 language specification (`001`–`018`) + `diagnostics.md`
+  plans/                           Implementation plans, and `2026-11-07-example-friction/` (what the examples cost to write)
+  meetings/                        Architectural decision records (`D1`–`D29`)
+  spec/                            Charter 1.0 language specification (`001`–`020`, approved) + `diagnostics.md`
 tools/
   battery                          Full verification suite required before landing changes on `main`
+  examples-check                   Checks every example's root and runs every case
+  examples-metrics                 Counts retyped English and repeated patterns per example
+  approve-clauses                  Stamps clause approvals (stands in for a `charter approve` command)
   kernel-probe                     Memory- and time-capped runner for kernel reduction experiments
 ```
 
@@ -155,13 +199,53 @@ tools/
 If you use Charter in your work, please cite it:
 
 ```bibtex
-@software{hartford2026charter,
+@software{Hartford2026Charter,
   author  = {Hartford, Eric},
-  title   = {Charter: An Institutional Specification and Verification Language},
+  title   = {{Charter}: An Institutional Specification
+             and Verification Language},
   year    = {2026},
   version = {1.0.1},
-  url     = {https://github.com/thecharter/charter}
+  url     = {https://github.com/thecharter/charter},
+  orcid   = {0009-0002-0159-2127},
+  note    = {Open-source research implementation in Lean 4.
+             ORCID: 0009-0002-0159-2127.
+             Google Scholar: SwrFngsAAAAJ}
 }
 ```
 
-Author: Eric Hartford ([ORCID 0009-0002-0159-2127](https://orcid.org/0009-0002-0159-2127), [Google Scholar](https://scholar.google.com/citations?user=SwrFngsAAAAJ&hl=en)).
+Charter is built on eFLINT. Please cite the work it rests on as well:
+
+```bibtex
+@inproceedings{vanBinsbergen2020eFLINT,
+  author    = {van Binsbergen, L. Thomas and
+               Liu, Lu-Chi and
+               van Doesburg, Robert and
+               van Engers, Tom},
+  title     = {{eFLINT}: A Domain-Specific Language
+               for Executable Norm Specifications},
+  booktitle = {Proceedings of the 19th ACM SIGPLAN
+               International Conference on Generative
+               Programming: Concepts and Experiences},
+  pages     = {124--136},
+  year      = {2020},
+  publisher = {Association for Computing Machinery},
+  doi       = {10.1145/3425898.3426958}
+}
+
+@article{vanBinsbergen2026Reflections,
+  author  = {van Binsbergen, L. Thomas and
+             Esterhuyse, Christopher A. and
+             M{\"u}ller, Tim},
+  title   = {Reflections on the Design, Applications
+             and Implementations of {eFLINT},
+             a Domain-Specific Language for
+             Legal Compliance Reasoning},
+  journal = {Journal of Computer Languages},
+  volume  = {88},
+  pages   = {101411},
+  year    = {2026},
+  doi     = {10.1016/j.cola.2026.101411}
+}
+```
+
+Author: Eric Hartford. ORCID: [0009-0002-0159-2127](https://orcid.org/0009-0002-0159-2127). Google Scholar: [SwrFngsAAAAJ](https://scholar.google.com/citations?user=SwrFngsAAAAJ&hl=en). Contact: eric@quixi.ai.
