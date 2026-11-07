@@ -1,6 +1,6 @@
 # 002 — Lexical structure
 
-**Status:** draft (2026-10-23). The meaning is fixed by D2 (eFLINT 4.1's lexer, `Parse.hs` `lexer_settings`) and D14; the wording awaits Eric's blessing. Implementation: compliant (`src/Charter/Surface/Lexer.lean`); every statement below has its conformance test under `test/spec/` and all pass.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2 (eFLINT 4.1's lexer, `Parse.hs` `lexer_settings`), D14, and D17. Implementation: compliant (`src/Charter/Surface/Lexer.lean`); every statement below has a passing conformance test under `test/spec/`.
 
 A Charter source file is a sequence of tokens separated by whitespace and comments.
 

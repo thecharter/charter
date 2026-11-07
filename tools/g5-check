@@ -93,11 +93,11 @@ else
   bad "g5-python-sdk-live-server-integration" "SDK integration failed"
 fi
 
-# 6. All 9 competitive benchmark institutions (`benchmarks/01_*.charter` .. `09_*.charter`)
-if "$B" test benchmarks >/dev/null 2>&1; then
-  ok "g5-nine-benchmark-institutions"
+# 6. All 9 competitive benchmark institutions + executable spec cheatsheet (`docs/spec/cheatsheet.charter`)
+if "$B" test benchmarks docs/spec/cheatsheet.charter >/dev/null 2>&1; then
+  ok "g5-nine-benchmark-institutions-and-cheatsheet"
 else
-  bad "g5-nine-benchmark-institutions" "benchmark suite failed"
+  bad "g5-nine-benchmark-institutions-and-cheatsheet" "benchmark suite or cheatsheet failed"
 fi
 
 echo "$pass passed, $fail failed, $((pass+fail)) total"

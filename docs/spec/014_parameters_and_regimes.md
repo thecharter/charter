@@ -1,6 +1,6 @@
 # 014 — Parameters and regimes
 
-**Status:** draft (2026-10-23). Meaning fixed by D11 and D7; wording awaits Eric. Implementation: 14.1–14.2 compliant (Phase 2's fourth slice); 14.3–14.5 are Phase 3 and Phase 4, stated as pending.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D7, D11, D24, and D25. Implementation: compliant (`src/Charter/Core/Amend.lean`, `src/Charter/Eval/Step.lean`).
 
 **14.1 Parameters are facts (D11, D24).** `Param name [: Int | Time | Duration | Money(CUR, SCALE) | Quantity(UNIT)] = n` declares a `Var` fact over the named domain (`Int` by default) whose initial instance is `n`. Any position of that type may name it as a variable (`notice-window + 1`), binding to the instance that holds. An act may `Creates name(m)`; the `Var` restriction makes the new instance the only one, and the program judges that amendment like any event: it occurs, it is lawful or not, it is valid or not. `test/spec/spec_014_1_param.eflint`, `spec_014_1b_param_typed.eflint`, `spec_014_1c_param_as_duration.eflint` (a `Duration` parameter as the `For d` of `Creates e For d`)
 

@@ -1,6 +1,6 @@
 # 018 — Toolchain and CLI
 
-**Status:** draft (2026-10-23; updated 2026-11-06 for standalone `.charter` cutover). Fixed by D1, D9, and D10; wording awaits Eric. Implementation: all commands marked *today* run directly on `.charter` and `.eflint` programs, from inside or outside the Charter repository (`test/spec/spec_018_1_charter_extension.charter`, `test/gates/g0-independence.sh`).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D1, D9, D10, D17–D28. Implementation: compliant across both `charter` and operator-blind `charter-server` (`test/spec/spec_018_1_charter_extension.charter`, `test/gates/g0-independence.sh`, `test/gates/operator-blind.sh`).
 
 **18.1 One binary (D1).** `charter` is one native executable that parses, checks, runs, tests, and projects programs itself. No diagnostic, path, flag, or help text names the engine (Law 11; the gate `test/gates/law11-no-engine-in-output.sh`).
 

@@ -1,6 +1,6 @@
 # 011 — Phrases and scenarios
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 (eFLINT `Interpreter.hs`, `REPL.hs`); wording awaits Eric. Implementation: compliant, including 11.11 (`Scenario` and the claim phrases, Phase 2's first slice).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2, D7, D10, D17, D22, and D23. Implementation: compliant (`src/Charter/Eval/Step.lean`, `src/Charter/Eval/Interpreter.lean`).
 
 A file is a sequence of phrases and directives. Each phrase is a step: it is resolved against the current declarations, evaluated against the current state, its effects are applied, derived facts are recomputed (004.4), and violations are reported (006.5).
 

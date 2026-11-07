@@ -1,6 +1,6 @@
 # 017 — Projections and Target Interoperability
 
-**Status:** draft (2026-11-06; `D28`, `G5.1`–`G5.2`). Implementation: compliant (`src/Charter/Project/{GuardTarget,QuintTarget,PromptTarget}.lean`, `src/Charter/Cli/Generate.lean`).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0; `D28`, `G5.1`–`G5.2`). Implementation: compliant (`src/Charter/Project/{GuardTarget,QuintTarget,PromptTarget}.lean`, `src/Charter/Cli/Generate.lean`).
 
 Every projection reads the elaborated `Core.Spec` (`CIR`) records directly (Law 5) and never re-parses English prose.
 

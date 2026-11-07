@@ -1,6 +1,6 @@
 # 012 — Clauses and provenance
 
-**Status:** draft (2026-10-23). Meaning fixed by D4 and Law 8; the spellings are the plan's (§2.2.5) and await Eric's wording. Implementation: compliant (Phase 2's third slice, landed the same day); every statement has a passing conformance test. The literate `.charter.md` container of D4 is Phase 5.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D4, D21, and Law 8. Implementation: compliant (`src/Charter/Core/Provenance.lean`, `src/Charter/Cli/Provenance.lean`); every statement has a passing conformance test.
 
 Every norm carries its English, and the English leads (Law 8). A program names its authoritative document, quotes that document clause by clause, classifies every span of a clause into a register, and says which rule each normative span means. The checks below are run by `charter check` and at the end of `charter test`; each is a *claim* tagged *checked*, about *provenance*, and a failed one fails the file.
 

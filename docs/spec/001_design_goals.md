@@ -1,6 +1,6 @@
 # 001 — Design goals and institutional invariants
 
-**Status:** draft (2026-11-06). Grounded in `docs/mission.md` and `docs/rfc.md` (§0.2, §18.3). Every design decision in `docs/meetings/` instances one or more of the laws below.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Grounded in `docs/mission.md` and `docs/rfc.md` (§0.2, §18.3). Every design decision in `docs/meetings/` instances one or more of the laws below.
 
 **1.1 Purpose.** An institution is three independent answers about any event: *did it occur*, *was it lawful*, and *did it take institutional effect* (Laws 1–2). A Charter program binds formal institutional rules directly to the authoritative natural-language text from which those answers come, evaluates events deterministically, checks or proves invariants under explicit assumptions, and projects inspectable records without exposing proof-engine internals to authors.
 

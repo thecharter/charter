@@ -1,6 +1,6 @@
 # 008 — Events, physical acts, syncs
 
-**Status:** draft (2026-10-23). Meaning fixed by D2; wording awaits Eric. Implementation: compliant; all tests pass.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2. Implementation: compliant; all conformance tests pass.
 
 **8.1 Events.** `Event e [Related to …]` declares a type whose instances are triggered like acts but have no actor: an event is never reported as a violation itself, and its effects apply when it is triggered. `test/spec/spec_008_1_events.eflint`
 

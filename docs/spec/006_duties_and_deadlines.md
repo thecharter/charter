@@ -1,6 +1,6 @@
 # 006 — Duties and deadlines
 
-**Status:** draft (2026-10-23). Meaning fixed by D2, D7, and D12; wording awaits Eric. Implementation: compliant, including 6.7 (`Due within`).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2, D7, and D12. Implementation: compliant (`src/Charter/Eval/Eval.lean`, `src/Charter/Eval/Step.lean`).
 
 **6.1 Duty instances.** `Duty d Holder h Claimant c [Related to …]` declares a type whose instances have a holder, a claimant, and the related objects, created and terminated like any fact (by `+`/`-` or by effects). `test/spec/spec_006_1_duty_instance.eflint`
 

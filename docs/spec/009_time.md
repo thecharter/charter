@@ -1,6 +1,6 @@
 # 009 — Time
 
-**Status:** draft (2026-10-23). Meaning fixed by D7 and Law 7; wording awaits Eric. Implementation: compliant (Phase 2's second slice, landed the same day); every statement has a passing conformance test. Calendars are not in scope (9.6).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D7, D16, and Law 7. Implementation: compliant (`src/Charter/Core/State.lean`, `src/Charter/Eval/Properties.lean`); every statement has a passing conformance test. Calendars are out of scope for 1.0 (9.6).
 
 **9.1 The clock.** `Current Time` is an instant. It starts at 0. The phrase `@ t.` sets it to the time `t`; `tick.` advances it by one. Both are environment input (Law 6): they are not acts, appear in no transition report, and leave no event in the history; like any phrase they recompute derived facts and violations (9.5). The clock never moves backwards: `@ t` with `t` before now is CHR106 and changes nothing. `test/spec/spec_009_1_clock.eflint`, `spec_009_1b_clock_never_backwards.eflint`
 

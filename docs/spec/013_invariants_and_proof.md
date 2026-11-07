@@ -1,6 +1,6 @@
 # 013 — Invariants and proof
 
-**Status:** draft (2026-10-23). Meaning fixed by plan §2.2.7, D8, D9, D10; wording awaits Eric. Implementation: 13.1–13.2 compliant (Phase 2's sixth slice); 13.3 *checked* and *decided* in use; 13.4 as the maintainer tool of Phase 2, the checkpointed chain (the managed toolchain is Phase 4); 13.5 pending.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D8, D9, D10, D19, and D20. Implementation: compliant (`src/Charter/Prove/`, `src/Charter/Verify/`, `src/Charter/Artifact/Cert.lean`).
 
 **13.1 Invariants are checked.** `Invariant name When e` is a fact over no components that holds when `e` does (004.9). After every phrase, every invariant that does not hold is reported as a violation; `?name()` asks whether it holds. `test/spec/spec_013_1_invariant_checked.eflint`
 

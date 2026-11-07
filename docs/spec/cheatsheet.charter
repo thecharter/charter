@@ -1,0 +1,78 @@
+// docs/spec/cheatsheet.charter — Executable Charter 1.0 Language Reference Tour
+// Exercises every core Charter 1.0 construct in one self-contained, passing program.
+//! explore: 1
+
+// 1. Clauses & SHA-256 Provenance (012)
+Clause CS.1 Approved "f430afdf64f733e9b3078b14cd22c4f3bd09dc584589e5c33b014e534aa271b4"
+  Text "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds."
+  Norm "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds." => release-funds, freeze-shield, adjudicate-kyc
+.
+
+// 2. Parameters, Regimes, & Dimensional Types (003, 009, 010, 014)
+Param payout-cap : Money(USD, 2) = 50000.
+Param hold-window : Duration = 3.
+
+Regime conservative {
+  payout-cap = 25000,
+  hold-window = 5
+}.
+
+// 3. Facts, Evidenced Propositions, & Stratified Default/Exception Rules (003, 004, 007)
+Fact steward Identified by Steward1.
+Fact beneficiary Identified by Alice, Bob.
+Fact arbiter Identified by Arb1.
+Fact frozen Identified by beneficiary.
+Fact usd-amt Identified by Money(USD, 2).
+Fact arbiter-quorum Identified by arbiter.
+
+Evidenced Fact kyc-verified Identified by beneficiary
+  Confidential To auditor, arbiter.
+
+Fact eligible-tier Identified by beneficiary
+  Default tier-base Holds when True
+  Exception tier-frozen Overrides tier-base Rejects when frozen(beneficiary).
+
+// 4. Modules & Instantiation (015)
+Module receipt-log(party) {
+  Fact paid Identified by party.
+}
+Use receipt-log(beneficiary) As rl.
+
+// 5. Powers, Findings, Duties, Immunities, & Invariants (005, 006, 007, 013)
+Finding adjudicate-kyc Actor arbiter Related to beneficiary
+  From CS.1 "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds."
+  Resolves kyc-verified(beneficiary)
+  Standard preponderance
+  Holds when Unresolved(kyc-verified(beneficiary)) || Conflicted(kyc-verified(beneficiary))
+  Valid when arbiter-quorum(arbiter).
+
+Power release-funds Actor steward Recipient beneficiary
+  From CS.1 "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds."
+  Holds when eligible-tier(beneficiary) && kyc-verified(beneficiary) && MulDivRound(10000, 2, 1, ExactOrReject) <= payout-cap
+  Valid when eligible-tier(beneficiary) && kyc-verified(beneficiary) && MulDivRound(10000, 2, 1, ExactOrReject) <= payout-cap
+  Creates rl-paid(beneficiary) For hold-window.
+
+Immunity freeze-shield Holder beneficiary
+  From CS.1 "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds."
+  Against release-funds
+  Holds when frozen(beneficiary).
+
+Entrenched Invariant paid-implies-verified
+  When (Forall beneficiary: Established(kyc-verified(beneficiary)) When rl-paid(beneficiary))
+  From CS.1 "A steward may release funds up to the cap to a verified beneficiary unless an immunity holds.".
+
+Property safety-always When WeakUntil(paid-implies-verified(), False).
+
+// 6. Scenarios & Three-Answer Claims (011)
+Scenario cheatsheet-tour {
+  ?Unresolved(kyc-verified(Alice)).
+  ?undetermined release-funds(Steward1, Alice).
+  +arbiter-quorum(Arb1).
+  adjudicate-kyc(Arb1, Alice).
+  ?Established(kyc-verified(Alice)).
+  ?valid release-funds(Steward1, Alice).
+  release-funds(Steward1, Alice) Note "authorized escrow release".
+  ?rl-paid(Alice).
+  @ 3.
+  ?!rl-paid(Alice).
+}

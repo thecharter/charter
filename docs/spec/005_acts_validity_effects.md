@@ -1,6 +1,6 @@
 # 005 — Acts, validity, effects
 
-**Status:** draft (2026-10-23, 5.5 revised 2026-10-24 for D15). Meaning fixed by D2, D5 and D15; wording awaits Eric. Implementation: compliant, including 5.9 (`Valid when`, Phase 2's first construct, landed the same day).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2, D5, D15, D21, and D22. Implementation: compliant (`src/Charter/Eval/Eval.lean`, `src/Charter/Eval/Properties.lean`).
 
 An act is a type whose instances are performed. Performing one is an event in the history and is judged by three independent answers (Law 2): it *occurred* (always, once performed: Law 1), it was *lawful* (eFLINT's *enabled*: the instance holds, its conditions hold, and nothing it syncs with is forced), and it was *valid* (it had institutional effect). In the eFLINT core every performed act is valid, so a disabled act still has its effects and the violation is reported, not enforced (D5).
 

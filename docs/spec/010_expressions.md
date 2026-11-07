@@ -1,6 +1,6 @@
 # 010 — Expressions
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 (eFLINT `Eval.hs`, `StaticEval.hs`) and D14; wording awaits Eric. Implementation: compliant; all tests pass.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2 (eFLINT `Eval.hs`, `StaticEval.hs`), D14, and D24. Implementation: compliant; all conformance tests pass.
 
 An expression denotes zero or more values: a term with free variables takes every value it has under every binding of those variables to valid instances (004.7). A query over no values holds; a condition over no values is never true.
 

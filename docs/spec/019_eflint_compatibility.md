@@ -1,6 +1,6 @@
 # 019 — eFLINT compatibility
 
-**Status:** draft (2026-11-06). Fixed by `D2`, `D5`–`D7`, `D12`–`D15`, `D17`, and `Mission Law 12`. Tested continuously by `test/eflint-corpus/` (196 upstream files) against `eflint-outcomes.txt` and `tolerances.json` / `tolerances.md`.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by `D2`, `D5`–`D7`, `D12`–`D15`, `D17`, and `Mission Law 12`. Tested continuously by `test/eflint-corpus/` (196 upstream files) against `eflint-outcomes.txt` and `tolerances.json` / `tolerances.md`.
 
 **19.1 Unified stratified-eFLINT superset (`Law 12`, `D2`, `D17`).** Charter is a strict syntactic and semantic superset of well-stratified eFLINT 4.1 (`docs/reference/eflint.pdf`). Every `.eflint` and `.charter` file is tokenized and parsed by one unified contextual front-end (`002.9`): multi-word additions (`Valid when`, `Except under`, `Due within`) cannot collide with single-word atoms; single-word uppercase Charter keywords (`Document`, `Clause`, `Approved`, `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`, `From`, `Immunity`, `Against`, `Unless`, `Duration`, `Held`, `Param`, `Module`, `Use`, `As`, `Scenario`) remain valid unquoted atoms in `Identified by` lists and expressions; and lowercase `tick` remains a valid event/act identifier, advancing the clock on a bare `tick.` phrase only when no type `tick` is declared in scope.
 

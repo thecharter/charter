@@ -1,9 +1,10 @@
 # The Charter Language Specification
 
-**Version:** 1.0.0-draft
-**Implementation status:** Compliant across all twenty specification chapters (`001`–`020`) over both `.charter` and `.eflint` files under one unified contextual grammar (`D17`–`D28`), backed by 155 conformance tests under `test/spec/`, 12 standard-library modules (`lib/`), 46 verified assurance claims (`docs/claims.json`), and both `charter` and operator-blind `charter-server` executables. Every chapter remains marked **draft** where final normative prose blessing rests with Eric (`AGENTS.md`, "Spec changes are solemn").
+**Version:** 1.0.0
+**Status:** Approved (Eric, 2026-11-06).
+**Implementation status:** Compliant across all twenty specification chapters (`001`–`020`) over both `.charter` and `.eflint` files under one unified contextual grammar (`D1`–`D28`), backed by 155 conformance tests under `test/spec/`, the executable `docs/spec/cheatsheet.charter`, 12 standard-library modules (`lib/`), 46 verified assurance claims (`docs/claims.json`), and both `charter` and operator-blind `charter-server` executables.
 
-This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the implementation: a change here is a ruling that the product is non-compliant until the code catches up, and only Eric authors or blesses normative wording (`AGENTS.md`, "The specification leads").
+This directory is the canonical normative specification of Charter (`AGENTS.md`, "The specification leads"). A change here is a ruling that the product is non-compliant until the code catches up, and only Eric authors or blesses normative wording.
 
 ## Changelog
 
@@ -32,27 +33,27 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 
 | Chapter | File | Status |
 |---|---|---|
-| 001 design goals | `001_design_goals.md` | draft (`docs/mission.md`, `docs/rfc.md`) |
-| 002 lexical structure | `002_lexical_structure.md` | draft; 8 tests green (unified contextual grammar, D17) |
-| 003 types and domains | `003_types_and_domains.md` | draft; 14 tests green (`Time`/`Duration` in 009) |
-| 004 facts and derivation | `004_facts_and_derivation.md` | draft; 13 tests green (D6; origins and `?why`; D15 in 4.1 and 4.7) |
-| 005 acts, validity, effects | `005_acts_validity_effects.md` | draft; 11 tests green, `Valid when` (D5) and judged acts (D15) included |
-| 006 duties and deadlines | `006_duties_and_deadlines.md` | draft; 6 tests green, `Due within` included |
-| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | draft; 6 tests green (`Except under`, `Immunity`, `Overridden by`) |
-| 008 events, physical, syncs | `008_events_physical_syncs.md` | draft; 4 tests green |
-| 009 time | `009_time.md` | draft; 14 tests green (D7: the clock, `Time`/`Duration`, stamps, `Held … For`, expiry; D16: `Duration * Int`) |
-| 010 expressions | `010_expressions.md` | draft; 13 tests green (D14) |
-| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | draft; 12 tests green, `Scenario` and claims included |
-| 012 clauses and provenance | `012_clauses_and_provenance.md` | draft; 7 tests green (D4, Law 8: `Document`, `Clause … Approved`, register spans, `From`, the six checks) |
-| 013 invariants and proof | `013_invariants_and_proof.md` | draft; 6 tests green (invariants checked, `--explore`, the `explore-domain` menu and its loud default); `prove` as a maintainer tool (the checkpointed chain), 3 kernel fixtures under `test/prove/`; module theorems (13.5) pending |
-| 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
-| 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
-| 016 diagnostics | `diagnostics.md` | started: code registry only |
-| 017 projections | `017_projections.md` | draft (`D28`: `solidity`, `abi`, `quint`, `prompt`, `CHR035`, `T32`–`T33`) |
-| 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: `init`, `check`, `build`, `fmt`, `doc`, `lsp`, `doctor`, `run`, `test`, `explore`, `verify`, `explain`, `diff`, `generate`, `trace`, `prove`, `repl`, and `charter-server` |
-| 019 eFLINT compatibility | `019_eflint_compatibility.md` | draft (`D2`, `D6`, `D12`–`D15`, `D17`; 196-file corpus + `tolerances.json`) |
-| 020 grammar | `020_grammar.md` | draft (`test/gates/spec-inventory.sh`, `charter fmt` round-trip) |
+| 001 design goals | `001_design_goals.md` | approved (`docs/mission.md`, `docs/rfc.md`) |
+| 002 lexical structure | `002_lexical_structure.md` | approved; unified contextual grammar (`D17`) |
+| 003 types and domains | `003_types_and_domains.md` | approved; includes `Evidenced`, `Money`, `Quantity` (`D7`, `D22`, `D24`) |
+| 004 facts and derivation | `004_facts_and_derivation.md` | approved; stratified least fixpoint, `ReasonGraph`, `Default`/`Exception` (`D6`, `D15`, `D22`, `D23`) |
+| 005 acts, validity, effects | `005_acts_validity_effects.md` | approved; `Valid when`, `Power`, `Finding`, evidence clauses (`D5`, `D15`, `D21`, `D22`) |
+| 006 duties and deadlines | `006_duties_and_deadlines.md` | approved; `Due within`, transition violation reporting (`D12`) |
+| 007 immunities and exceptions | `007_immunities_and_exceptions.md` | approved; `Except under`, `Overridden by`, `Immunity`, `Default`/`Exception`/`Conflict` (`D23`) |
+| 008 events, physical, syncs | `008_events_physical_syncs.md` | approved |
+| 009 time | `009_time.md` | approved; `Time`/`Duration`, half-open `[start, end)` expiry, `Held … For` (`D7`, `D16`) |
+| 010 expressions | `010_expressions.md` | approved; dimensional arithmetic & `MulDivRound` (`D14`, `D24`) |
+| 011 phrases and scenarios | `011_phrases_and_scenarios.md` | approved; `Scenario`, `?lawful`/`?valid`/`?violated`/`?undetermined`/`?conflict`, `SubmitEvidence` |
+| 012 clauses and provenance | `012_clauses_and_provenance.md` | approved; multi-doc SHA-256 `Document`/`Clause`, Markdown anchors, `complete\|partial\|illustrative` (`D4`, `D21`) |
+| 013 invariants and proof | `013_invariants_and_proof.md` | approved; `prove` checkpointed chain, `explore`, temporal `Property`, `verify` (`D9`, `D19`, `D20`) |
+| 014 parameters and regimes | `014_parameters_and_regimes.md` | approved; `Param`, rule-level `Amend`, `Regime`, reflexive entrenchment (`D11`, `D25`) |
+| 015 modules and require | `015_modules_and_require.md` | approved; `Module`/`Use` & 12 standard-library modules (`D8`, `D26`) |
+| 016 diagnostics | `diagnostics.md` | approved (`CHR001`–`CHR035`, `CHR100`–`CHR108`; `spec-inventory.sh`) |
+| 017 projections | `017_projections.md` | approved (`D28`: `solidity`, `abi`, `quint`, `prompt`, `CHR035`, `T32`–`T33`) |
+| 018 toolchain and CLI | `018_toolchain_and_cli.md` | approved: `charter` & operator-blind `charter-server` (`D1`, `D27`) |
+| 019 eFLINT compatibility | `019_eflint_compatibility.md` | approved (`D2`, `D6`, `D12`–`D15`, `D17`; 196-file corpus + `tolerances.json`) |
+| 020 grammar | `020_grammar.md` | approved (`test/gates/spec-inventory.sh`, `charter fmt` round-trip) |
 
 ## Cheat sheet
 
-`cheatsheet.charter` will be a program that exercises every construct and is itself a test (Catala). Not yet written.
+`docs/spec/cheatsheet.charter` exercises Charter 1.0's constructs end-to-end and is continuously executed as part of `tools/g5-check` in `tools/battery`.

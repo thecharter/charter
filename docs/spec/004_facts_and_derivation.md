@@ -1,6 +1,6 @@
 # 004 — Facts and derivation
 
-**Status:** draft (2026-10-23, 4.1 and 4.7 revised 2026-10-24 for D15). Meaning fixed by D2, D6 and D15; wording awaits Eric. Implementation: compliant (`src/Charter/Eval/Interpreter.lean`, `Stratify` and `Saturate`); all tests pass.
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2, D6, D15, D22, and D23. Implementation: compliant (`src/Charter/Eval/Step.lean`, `Stratify`, `Saturate`, `Defeasible`); all conformance tests pass.
 
 A *state* assigns truth values to instances. An assignment comes from a phrase (`+e`, `-e`), from an act's effects (005), or from derivation; a derived truth is recomputed after every phrase, an assigned one stays until changed. The three state questions of an instance are whether it holds, whether it is enabled (005.5), and whether it is violated (006.2).
 
@@ -12,7 +12,7 @@ A *state* assigns truth values to instances. An assignment comes from a phrase (
 
 **4.4 Derived facts are recomputed.** After every phrase all derived facts are discarded and re-derived from the assignments then in force. A derived fact whose ground is gone is gone. `test/spec/spec_004_4_recomputed_each_phrase.eflint`
 
-**4.5 Fixpoint.** A rule may read the type it derives; derivation is the least fixpoint, so a transitive closure needs no bound. `test/spec/spec_004_5_fixpoint.eflint`; proved (the fixpoint half): `Charter.Saturate.saturateStratum_fixpoint`, the state the evaluator returns for a stratum is unchanged by one more pass (`src/Charter/Eval/Properties.lean`); leastness awaits the declarative semantics
+**4.5 Fixpoint.** A rule may read the type it derives; derivation is the least fixpoint, so a transitive closure needs no bound. `test/spec/spec_004_5_fixpoint.eflint`; proved: `Charter.Saturate.saturateStratum_fixpoint`, `Charter.Saturate.saturateStratum_closed`, and `Charter.Saturate.saturateStratum_least_prefixpoint` (`src/Charter/Eval/Properties.lean`)
 
 **4.6 Stratification (D6).** A rule *reads* a type when it mentions one of its instances as a condition (`Holds`, an instance used as a boolean, `Enabled`, `Violated`), binds a variable of the type, or projects from it. A read under `Not`, under the body of `Forall`, or under the body of `Count`, `Sum`, `Max`, `Min` is *negative*. The derived types are ordered so that every type comes after the types it reads; types that read each other only positively form one stratum and are derived together to their least fixpoint; a negative read of a type that reads back, directly or indirectly, is rejected with CHR020 naming the types, before anything is evaluated. The result does not depend on the names of the types. `test/spec/spec_004_6_stratified_order_independent.eflint`, `spec_004_6b_negation_over_lower_stratum.eflint`, `spec_004_6c_negative_cycle_rejected.eflint`
 

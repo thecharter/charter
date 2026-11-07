@@ -1,6 +1,6 @@
 # 015 — Modules and require
 
-**Status:** draft (2026-10-23). Meaning fixed by D8 and plan §2.2.9; wording awaits Eric. Implementation: 15.1–15.4 compliant (Phase 2's fifth slice); 15.5: the eight modules exist under `lib/` with their properties as checked `Invariant`s (Phase 2's seventh slice); the proofs under `lib/lean/` and the *proved* tag wait for `prove` (013.4).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D8 and D26. Implementation: compliant (`src/Charter/Resolve/Static.lean`, 12 modules under `lib/*.charter`, `src/Charter/Modules/`).
 
 **15.1 `#require` and `#include`.** Files compose by `#require "f"` (once per file) and `#include "f"` (every time), as 011.7 says; this is eFLINT's mechanism and is unchanged.
 
@@ -12,4 +12,4 @@
 
 **15.5 The standard library.** The eight patterns of `Charter/Modules/` (residual ledger, collateral pool, circuit breaker, entity group, exit and voice, sortition court, attested lease, oracle feed) are `.charter` modules under `lib/` (`.eflint` until the extension moves, 011.10); every property of a module is an `Invariant` declared in its file, checked after every phrase and explored by `charter test` (013.1–13.2), and is to be proved in `lib/lean/Modules/` by name and reported as *proved* when a program `Use`s the module (D8; pending `prove`, 013.4). Each module is exercised by a program under `test/lib/` that `#require`s it, `Use`s it with a prefix, and runs scenarios with `//! explore: 1`; `lib/README.md` states the conventions (environment inputs are facts, D10; an amount an act names is a type parameter, brief B11). `test/lib/*.eflint`
 
-*Spelling this draft chose, for Eric:* the prefix joins with `-` (`a-balance`), since identifiers may contain `-` and the dot is projection.
+*Spelling:* the prefix joins with `-` (`a-balance`), since identifiers may contain `-` and `.` is projection.

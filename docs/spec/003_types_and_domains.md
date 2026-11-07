@@ -1,6 +1,6 @@
 # 003 — Types and domains
 
-**Status:** draft (2026-10-23). Meaning fixed by D2 (eFLINT `Spec.hs`, `StaticEval.hs`), D7 (time types deferred to Phase 2), D13; wording awaits Eric. Implementation: compliant; all tests pass. Resolution owns names, types, and arities (`src/Charter/Resolve/Static.lean`).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2 (eFLINT `Spec.hs`, `StaticEval.hs`), D7, D13, D22, and D24. Implementation: compliant (`src/Charter/Resolve/Static.lean`); all conformance tests pass.
 
 **3.1 Kinds.** A type is a `Fact`, an `Act`, a `Duty`, or an `Event`; `Bool`, `Predicate`, `Invariant`, `Var`, `Function`, and `Physical` declare facts and acts with the restrictions below. A `Fact` with no `Identified by` has the string domain. `test/spec/spec_003_1_default_string_domain.eflint`
 

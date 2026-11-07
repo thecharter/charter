@@ -1,6 +1,6 @@
 # 020 — Grammar
 
-**Status:** draft (2026-11-06). Deterministic recursive-descent grammar of the unified Charter language (`src/Charter/Surface/{Lexer,Parser}.lean`, `D2`, `D14`, `D17`), verified against `docs/spec/` by `test/gates/spec-inventory.sh` and round-trip tested by `charter fmt` (`test/spec/spec_018_4_fmt_roundtrip.charter`).
+**Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Deterministic recursive-descent grammar of the unified Charter language (`src/Charter/Surface/{Lexer,Parser}.lean`, `D2`, `D14`, `D17`–`D28`), verified against `docs/spec/` by `test/gates/spec-inventory.sh` and round-trip tested by `charter fmt` (`test/spec/spec_018_4_fmt_roundtrip.charter`).
 
 ---
 
