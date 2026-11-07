@@ -6,7 +6,7 @@
 
 **3.2 Domains.** A domain is `String`, `Int`, `Time`, `Duration` (009.2), `Money(CUR, SCALE)` or `Quantity(UNIT)` (3.14), an enumeration of atoms (`A, B`), of integers (`1, 2, 3` or `1..5`), of single-character strings (`'a'..'z'`), or a product of components (`a * b`). An enumeration is *enumerable*: `+x.` with `x` free creates every instance of the type; `String` and `Int` are not, and a free variable over them ranges over the instances that hold (004.7). `test/spec/spec_003_2_enumerations.eflint`
 
-**3.3 Products and variables.** A product's components are variables: a type name with a decoration (`person1 * person2`). An application gives arguments positionally in component order or by name (`f(a = e, b = e')`); a component not given stays free and is bound by the surrounding construct. The wrong number of positional arguments is CHR011. `test/spec/spec_003_3_products.eflint`, `spec_003_3b_arity_error.eflint`
+**3.3 Products and variables.** A product's components are variables: a type name with a decoration (`person1 * person2`). An application gives arguments positionally in component order or by name (`f(a = e, b = e')`); a component not given stays free and is bound by the surrounding construct. The wrong number of positional arguments is CHR011. A component named twice is one value in both positions (`Holder actor Claimant actor`); an application that gives it two different arguments is CHR036. `test/spec/spec_003_3_products.eflint`, `spec_003_3b_arity_error.eflint`, `spec_003_3c_repeated_component.charter`
 
 **3.4 Primitive application.** A type with a primitive domain is applied to exactly one positional argument of that domain (`x(5)`); anything else is CHR018. `test/spec/spec_003_4_primitive_application.eflint`
 

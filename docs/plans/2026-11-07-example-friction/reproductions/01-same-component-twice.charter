@@ -1,9 +1,0 @@
-// DEFECT (silent wrong answer). A product that names the same component twice is accepted and
-// the second argument is dropped. Expected: an error asking for `person * person'`.
-// Each claim below states today's wrong answer; this file passes while the defect exists.
-Fact person Identified by Iris, Wren
-Fact yes Identified by person * person
-Act vote Actor person Related to person Holds when True Creates yes(person, person).
-vote(Iris, Wren).
-?yes(Iris, Wren).
-?yes(Iris, Iris).        // WRONG: Iris voted for Wren, not herself

@@ -233,6 +233,20 @@ def warnVacuousQuantifier (kw : String) (xs : List Var) (body : Term) : Stc Unit
       | none => pure ()
   | _ => pure ()
 
+/-- Whether two argument terms are plainly two different values: both are literals, or both
+are variables (possibly projected), and they differ. Anything else is not judged. Structural,
+so that the kernel can run it (`charter prove`). -/
+def visiblyDifferent : Nat → Term → Term → Bool
+  | 0, _, _ => false
+  | fuel + 1, a, b =>
+    match a, b with
+    | .stringLit x, .stringLit y => x != y
+    | .intLit x, .intLit y => x != y
+    | .stringLit _, .intLit _ | .intLit _, .stringLit _ => true
+    | .ref x, .ref y => x != y
+    | .project t x, .project u y => x != y || visiblyDifferent fuel t u
+    | _, _ => false
+
 mutual
 
 /-- Infer the type of a term and rewrite it into checked form (eFLINT `compile_term`). -/
@@ -523,7 +537,15 @@ def compileArguments : Nat → DomId → Args → Stc Args
     | .pos ts =>
       match ← getDom d with
       | .products xs =>
-        if xs.length == ts.length then return .named (← compileMods fuel (xs.zip ts))
+        if xs.length == ts.length then
+          -- 003.3: a component named twice is one value in both positions (`Holder actor Claimant
+          -- actor`). Two different arguments for it would be bound to one of them and the other
+          -- dropped silently, so the application is refused.
+          let pairs := xs.zip ts
+          match pairs.find? (fun p => pairs.any (fun q => q.1 == p.1 && visiblyDifferent 64 q.2 p.2)) with
+          | some (x, _) =>
+            err "CHR036" s!"{d} names the component {x} twice, so both positions hold one value, and it is given two different ones; declare one of them as {x}' to tell them apart"
+          | none => return .named (← compileMods fuel pairs)
         else err "CHR011" s!"{d} has {xs.length} component(s), {ts.length} given"
       | _ => err "CHR021" s!"{d} is not a composite type and cannot take positional arguments"
 

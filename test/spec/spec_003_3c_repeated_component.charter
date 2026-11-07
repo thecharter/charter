@@ -1,0 +1,9 @@
+// 003.3: a component named twice is one value in both positions (`Holder actor Claimant actor`).
+// Giving it two different arguments would bind one and drop the other, so the application is
+// refused (CHR036); the same argument twice is accepted.
+//! expect-error: CHR036
+Fact person Identified by Iris, Wren
+Fact self Identified by person * person.
++self(Iris, Iris).
+?self(Iris, Iris).
++self(Iris, Wren).
