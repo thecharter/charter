@@ -51,6 +51,7 @@ more errors); `warning` does not.
 | CHR034 | error | defeasible `Overrides` / `Priority` rules on a type contain a priority cycle or duplicate rule ID (004.12, 007.6) | `Charter.Resolve` |
 | CHR035 | error | `charter generate` target does not support a construct in the specification (no silent rule dropping, 017.2) | `Charter.Project` |
 | CHR036 | error | an application gives two different arguments to a component its type names twice (003.3; both positions hold one value, so one argument would be dropped silently) | `Charter.Resolve` |
+| CHR037 | error | an `Amend` whose `Installs` block declares a `Param` (014.1, 014.3; an amendment installs rules and leaves state intact, so the parameter would silently keep its value) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

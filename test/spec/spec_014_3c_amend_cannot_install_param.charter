@@ -1,0 +1,11 @@
+// 014.1, 014.3: a parameter is state. An `Amend` installs rule records and leaves state as it is,
+// so `Installs { Param … }` would be valid and change nothing; it is refused (CHR037). An
+// amendment changes a parameter with `Creates name(value)`.
+//! expect-error: CHR037
+Param fee = 25
+Amend raise
+  Installs { Param fee = 50 }
+  Holds when True
+  Valid when True
+.
+raise("board").

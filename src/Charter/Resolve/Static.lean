@@ -945,6 +945,12 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | .weakUntil a b => .weakUntil <$> compileClosedBool a <*> compileClosedBool b
       modifySpec (·.insertTemporal { tp with formula := tf' })
     | .amendInstall actId body =>
+      -- 014.1, 014.3: an amendment installs rule records and leaves state intact, so a `Param`
+      -- inside `Installs` would be accepted and change nothing
+      body.forM fun bd => match bd with
+        | .param n _ _ =>
+          err "CHR037" s!"Amend {actId}: `Installs` cannot set the parameter {n}; a parameter is state, so the amendment changes it with `Creates {n}(…)` (014.1)"
+        | _ => pure ()
       let curSpec ← getSpec
       let compiledBody ← withSpec curSpec do
         let bExp ← expandUses 16 body
