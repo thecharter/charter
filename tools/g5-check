@@ -100,5 +100,13 @@ else
   bad "g5-nine-benchmark-institutions-and-cheatsheet" "benchmark suite or cheatsheet failed"
 fi
 
+# 7. Large-artifact SHA-256 / RuntimeCIR build + charter-server verify regression check (Commons: 140+ rules)
+if "$B" build Examples/AutonomousCommons/commons.charter -o "$tmp/commons.artifact" >/dev/null 2>&1 \
+   && "$SB" verify "$tmp/commons.artifact" >/dev/null 2>&1; then
+  ok "g5-large-artifact-build-and-server-verify"
+else
+  bad "g5-large-artifact-build-and-server-verify" "large artifact build/verify failed"
+fi
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

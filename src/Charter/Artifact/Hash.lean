@@ -144,9 +144,12 @@ def utf8CharBytes (c : Char) : List UInt8 :=
      ((0x80 : UInt32) ||| ((u >>> 6) &&& 0x3F)).toUInt8,
      ((0x80 : UInt32) ||| (u &&& 0x3F)).toUInt8]
 
-def stringToUtf8List : List Char → List UInt8
-  | [] => []
-  | c :: cs => utf8CharBytes c ++ stringToUtf8List cs
+def stringToUtf8Acc : List Char → List UInt8 → List UInt8
+  | [], acc => acc.reverse
+  | c :: cs, acc => stringToUtf8Acc cs ((utf8CharBytes c).reverse ++ acc)
+
+def stringToUtf8List (cs : List Char) : List UInt8 :=
+  stringToUtf8Acc cs []
 
 end Sha256
 
