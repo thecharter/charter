@@ -121,6 +121,14 @@ def digestToHex (s : DigestState) : String :=
   String.mk (wordToHex s.h0 ++ wordToHex s.h1 ++ wordToHex s.h2 ++ wordToHex s.h3 ++
              wordToHex s.h4 ++ wordToHex s.h5 ++ wordToHex s.h6 ++ wordToHex s.h7)
 
+def wordToBytes (w : UInt32) : List UInt8 := [
+  (w >>> 24).toUInt8, (w >>> 16).toUInt8, (w >>> 8).toUInt8, w.toUInt8
+]
+
+def digestToBytes (s : DigestState) : List UInt8 :=
+  wordToBytes s.h0 ++ wordToBytes s.h1 ++ wordToBytes s.h2 ++ wordToBytes s.h3 ++
+  wordToBytes s.h4 ++ wordToBytes s.h5 ++ wordToBytes s.h6 ++ wordToBytes s.h7
+
 def utf8CharBytes (c : Char) : List UInt8 :=
   let u := c.val
   if u ≤ 0x7F then [u.toUInt8]
@@ -148,9 +156,28 @@ def sha256ByteList (bs : List UInt8) : String :=
   let st := Sha256.processBlocks (padded.length / 64 + 1) {} padded
   Sha256.digestToHex st
 
+/-- Raw 32-byte SHA-256 digest of a byte list. -/
+def sha256RawBytes (bs : List UInt8) : List UInt8 :=
+  let padded := Sha256.padMessage bs
+  let st := Sha256.processBlocks (padded.length / 64 + 1) {} padded
+  Sha256.digestToBytes st
+
 /-- Lowercase 64-character hex SHA-256 digest of a UTF-8 string. -/
 def sha256String (s : String) : String :=
   sha256ByteList (Sha256.stringToUtf8List s.toList)
+
+/-- Pure-Lean RFC 2104 HMAC-SHA256 (`D27`, `G4.1`): authenticates `.artifact` certificates,
+hash-chained server log entries, and short-lived capability tokens with zero C/FFI dependencies. -/
+def hmacSha256Bytes (key msg : List UInt8) : String :=
+  let keyNorm := if 64 < key.length then sha256RawBytes key else key
+  let keyPad := keyNorm ++ List.replicate (64 - keyNorm.length) 0x00
+  let ipad := keyPad.map (fun b => b ^^^ (0x36 : UInt8))
+  let opad := keyPad.map (fun b => b ^^^ (0x5c : UInt8))
+  let inner := sha256RawBytes (ipad ++ msg)
+  sha256ByteList (opad ++ inner)
+
+def hmacSha256 (key msg : String) : String :=
+  hmacSha256Bytes (Sha256.stringToUtf8List key.toList) (Sha256.stringToUtf8List msg.toList)
 
 /-- NIST FIPS 180-4 SHA-256 test vectors (empty, single-block, and multi-block),
 verified inside the Lean kernel with zero axioms. -/
@@ -159,6 +186,13 @@ theorem sha256_nist_vectors :
     sha256String "abc" = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" ∧
     sha256String "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" =
       "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" := by
+  decide +kernel
+
+/-- RFC 4231 Test Case 2 (`key = "Jefe"`, `data = "what do ya want for nothing?"`),
+verified inside the Lean kernel via `decide +kernel`. -/
+theorem hmacSha256_rfc4231_vector :
+    hmacSha256 "Jefe" "what do ya want for nothing?" =
+      "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843" := by
   decide +kernel
 
 #print axioms sha256_nist_vectors

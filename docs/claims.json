@@ -190,9 +190,17 @@
       "id": "cir.power_requires_valid_when",
       "assurance": "proved",
       "scope": "live-evaluator",
-      "artifact": "src/Charter/Resolve/ElaborateCIR.lean",
+      "artifact": "src/Charter/Core/Derivation.lean",
       "symbol": "wellFormed_power_has_validWhen",
       "summary": "Every institutional Power declaration in a WellFormed CIR Spec carries a non-empty Valid when competence condition (005.10, D21, G3.1)."
+    },
+    {
+      "id": "artifact.hmac_sha256_rfc4231_vector",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Artifact/Hash.lean",
+      "symbol": "hmacSha256_rfc4231_vector",
+      "summary": "Pure-Lean RFC 2104 HMAC-SHA256 matches RFC 4231 Test Case 2 via decide +kernel with zero extra axioms (D27, G4.1)."
     },
     {
       "id": "evidence.tribool_conservative",
@@ -297,6 +305,14 @@
       "artifact": "src/Charter/Modules/LegalOntologies.lean",
       "symbol": "partial_performance_conserves_obligation",
       "summary": "Partial performance preserves non-negative remaining debt and exact total obligation sum (D26, G3.6, T19)."
+    },
+    {
+      "id": "server.executed_unknown_locks_capacity",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/Reservations.lean",
+      "symbol": "executedUnknown_never_auto_released",
+      "summary": "Reservations in ExecutedUnknown (PendingExternalOutcome) are never auto-expired or released by clock progression until explicit reconciliation (D27, G4.3, T35)."
     },
     {
       "id": "prove.concrete_fixtures",

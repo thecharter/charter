@@ -73,6 +73,19 @@ def prepend {β} (m : DomMap (List β)) (k : DomId) (v : β) : DomMap (List β) 
 
 end DomMap
 
+/-- Which of the answers an expectation phrase asks about (`plan` §2.2.6, `D22`, `D23`). -/
+inductive Expect where
+  | lawful
+  | valid
+  | violated
+  | undetermined
+  | conflict
+  deriving Repr, DecidableEq, Inhabited
+
+def Expect.name : Expect → String
+  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
+  | .undetermined => "undetermined" | .conflict => "conflict"
+
 /-- `Var` and `Function` restrictions: a new instance replaces the previous one
 (all instances / the one with the same first component). -/
 inductive Restriction

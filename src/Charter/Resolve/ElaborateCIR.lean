@@ -12,68 +12,6 @@ over `Core.Spec`, segments resolved phrase streams into immutable `LawVersion` e
 
 namespace Charter
 
-namespace Spec
-
-/-- Decidable structural well-formedness check on a resolved `Spec` (`CIR` snapshot):
-1. Every product component variable in every declared type's domain resolves to a declared type.
-2. Every placeholder alias resolves via `chaseAlias` to a declared type.
-3. Every `Immunity`'s `against` target and `Act`'s `exceptUnder` target names a declared `Act`.
-4. Every `Duty`'s `overriddenBy` target names a declared `Duty`.
-5. The derived-type dependency graph is stratifiable (`Stratify.strata` succeeds). -/
-def checkWellFormed (s : Spec) : Bool :=
-  let componentsOk := s.decls.all fun (_, t) =>
-    match t.domain with
-    | .products xs => xs.all fun x => (s.findDecl (s.removeDecoration x)).isSome
-    | _ => true
-  let aliasesOk := s.aliases.all fun (f, _) => (s.lookupDecl (s.chaseAlias f)).isSome
-  let actsOk := s.decls.all fun (_, t) =>
-    match t.kind with
-    | .act a =>
-      (!a.isPower || !a.validWhen.isEmpty) &&
-      a.exceptUnder.all fun target =>
-        match s.findDecl target with
-        | some tt => match tt.kind with | .act _ => true | _ => false
-        | none => false
-    | .immunity im => im.against.all fun target =>
-      target == "Amend" ||
-      match s.findDecl target with
-      | some tt => match tt.kind with | .act _ => true | _ => false
-      | none => false
-    | .duty du => du.overriddenBy.all fun target =>
-      match s.findDecl target with
-      | some tt => match tt.kind with | .duty _ => true | _ => false
-      | none => false
-    | _ => true
-  componentsOk && aliasesOk && actsOk && (Stratify.strata s).isOk
-
-/-- Propositional well-formedness of a canonical `Spec` (`CIR`). -/
-def WellFormed (s : Spec) : Prop := s.checkWellFormed = true
-
-theorem checkWellFormed_iff (s : Spec) : s.checkWellFormed = true ↔ s.WellFormed := Iff.rfl
-
-/-- Every `Power` declaration in a `WellFormed` `Spec` carries at least one explicit
-`Valid when` competence condition (`005.10`, `G3.1`). -/
-theorem wellFormed_power_has_validWhen {s : Spec} (hwf : s.WellFormed)
-    {d : DomId} {t : TypeSpec} {a : ActSpec}
-    (hmem : (d, t) ∈ s.decls) (hkind : t.kind = .act a) (hpow : a.isPower = true) :
-    a.validWhen ≠ [] := by
-  unfold WellFormed checkWellFormed at hwf
-  simp only [Bool.and_eq_true] at hwf
-  have hacts := hwf.1.2
-  rw [List.all_eq_true] at hacts
-  have ht := hacts (d, t) hmem
-  dsimp only at ht
-  rw [hkind] at ht
-  simp only [Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true'] at ht
-  cases ht.1 with
-  | inl hnp => rw [hpow] at hnp; cases hnp
-  | inr hne =>
-    intro hemp
-    rw [hemp] at hne
-    cases hne
-
-end Spec
-
 namespace CIR
 
 /-- One immutable law-version epoch of an elaborated program (`D18`). -/
@@ -202,7 +140,7 @@ theorem elaborateLoop_wellFormed :
               | inr hmem =>
                 exact elaborateLoop_wellFormed rest (ver + 1) nextSpec [] (warns ++ ws) tail w2 htail ep hmem
       | trigger _ _ | create _ _ | terminate _ _ | obfuscate _ _ | query _ | instQuery _ _ _
-      | par _ | scenario _ _ _ | expect _ _ _ _ | setTime _ | tick | why _ _
+      | par _ | scenario _ _ | expect _ _ _ _ | setTime _ | tick | why _ _
       | submitEvidence _ _ _ _ | retractEvidence _ _ _ =>
         exact elaborateLoop_wellFormed rest ver nextSpec (_ :: curPhrases) (warns ++ ws) eps warns' h
 

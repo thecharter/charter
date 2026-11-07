@@ -1,4 +1,5 @@
 import Charter.Resolve.ElaborateCIR
+import Charter.Artifact.Runtime
 import Lean.Data.Json
 
 /-!
@@ -41,12 +42,14 @@ structure SourceManifest where
   deriving Repr
 
 structure Bundle where
-  formatVersion  : Nat := 1
+  formatVersion   : Nat := 1
   languageVersion : String := "0.4.0"
-  sourceManifest : SourceManifest
-  epochHashes    : List (Nat × String)
-  cirDigest      : String
-  artifactSha256 : String
+  sourceManifest  : SourceManifest
+  epochHashes     : List (Nat × String)
+  cirDigest       : String
+  runtimeCIR      : Config := {}
+  certificate     : ArtifactCertificate
+  artifactSha256  : String
   deriving Repr
 
 def buildSourceManifestDocs (spec : Spec) (docs : List (SourceDoc × Option String)) (coverage : String := "illustrative") : SourceManifest :=
@@ -120,40 +123,58 @@ def SourceManifest.toJson (sm : SourceManifest) : Json :=
     ("clauses", Json.arr (sm.clauses.map ClauseManifest.toJson).toArray)
   ]
 
-def Bundle.payloadJson (sm : SourceManifest) (epochHashes : List (Nat × String)) (cirDigest : String) : Json :=
+def Bundle.payloadJson (sm : SourceManifest) (epochHashes : List (Nat × String))
+    (cirDigest : String) (runtimeCIR : Config) : Json :=
   Json.mkObj [
     ("formatVersion", Json.num 1),
     ("languageVersion", Json.str "0.4.0"),
     ("sourceManifest", sm.toJson),
     ("epochs", Json.arr (epochHashes.map fun (v, h) =>
       Json.mkObj [("version", Json.num v), ("specSha256", Json.str h)]).toArray),
-    ("cirDigest", Json.str cirDigest)
+    ("cirDigest", Json.str cirDigest),
+    ("runtimeCIR", Lean.toJson runtimeCIR)
   ]
 
-/-- Assemble a content-addressed `Artifact.Bundle` from an elaborated `CIR.Program` and multi-document manifest. -/
-def buildBundleDocs (prog : CIR.Program) (docs : List (SourceDoc × Option String)) (coverage : String := "illustrative") : Bundle :=
+/-- Assemble a signed, content-addressed `Artifact.Bundle` from an elaborated `CIR.Program`,
+genesis `Config`, and multi-document manifest (`D18`, `D27`, `G4.1`). -/
+def buildSignedBundleDocs (prog : CIR.Program) (genesisCfg : Config)
+    (docs : List (SourceDoc × Option String))
+    (coverage : String := "illustrative")
+    (signKey : String := defaultDevSigningKey)
+    (keyId : String := "local-dev") : Bundle :=
   let finalSpec := (prog.epochs.getLast?.map (·.spec)).getD emptySpec
   let sm := buildSourceManifestDocs finalSpec docs coverage
   let epochHashes := prog.epochs.map fun ep => (ep.version, ep.specSha256)
   let cirDigest := sha256String (reprStr prog.epochs)
-  let payload := (Bundle.payloadJson sm epochHashes cirDigest).compress
+  let payload := (Bundle.payloadJson sm epochHashes cirDigest genesisCfg).compress
   let artifactSha256 := sha256String payload
-  { sourceManifest := sm, epochHashes, cirDigest, artifactSha256 }
+  let cert := signArtifactDigest artifactSha256 signKey keyId coverage
+  { sourceManifest := sm, epochHashes, cirDigest, runtimeCIR := genesisCfg, certificate := cert, artifactSha256 }
 
-/-- Assemble a content-addressed `Artifact.Bundle` from an elaborated `CIR.Program`. -/
+def buildBundleDocs (prog : CIR.Program) (docs : List (SourceDoc × Option String)) (coverage : String := "illustrative") : Bundle :=
+  let finalEp := prog.epochs.getLast?
+  let spec := (finalEp.map (·.spec)).getD emptySpec
+  let strata := (finalEp.map (·.strata)).getD []
+  buildSignedBundleDocs prog { spec, strata } docs coverage
+
 def buildBundle (prog : CIR.Program) (docContent? : Option String) : Bundle :=
-  let finalSpec := (prog.epochs.getLast?.map (·.spec)).getD emptySpec
+  let finalEp := prog.epochs.getLast?
+  let finalSpec := (finalEp.map (·.spec)).getD emptySpec
+  let strata := (finalEp.map (·.strata)).getD []
   let sm := buildSourceManifest finalSpec docContent?
   let epochHashes := prog.epochs.map fun ep => (ep.version, ep.specSha256)
   let cirDigest := sha256String (reprStr prog.epochs)
-  let payload := (Bundle.payloadJson sm epochHashes cirDigest).compress
+  let cfg : Config := { spec := finalSpec, strata }
+  let payload := (Bundle.payloadJson sm epochHashes cirDigest cfg).compress
   let artifactSha256 := sha256String payload
-  { sourceManifest := sm, epochHashes, cirDigest, artifactSha256 }
+  let cert := signArtifactDigest artifactSha256 defaultDevSigningKey "local-dev" sm.coverage
+  { sourceManifest := sm, epochHashes, cirDigest, runtimeCIR := cfg, certificate := cert, artifactSha256 }
 
 def Bundle.toJson (b : Bundle) : Json :=
   Json.mkObj [
     ("artifactSha256", Json.str b.artifactSha256),
-    ("payload", Bundle.payloadJson b.sourceManifest b.epochHashes b.cirDigest)
+    ("certificate", Lean.toJson b.certificate),
+    ("payload", Bundle.payloadJson b.sourceManifest b.epochHashes b.cirDigest b.runtimeCIR)
   ]
 
 end Charter.Artifact

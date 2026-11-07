@@ -5,6 +5,7 @@
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 B=.lake/build/bin/charter
+SB=.lake/build/bin/charter-server
 if [ ! -x "$B" ]; then echo "FAIL law11-no-engine-in-output: $B is not built"; exit 2; fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -29,6 +30,11 @@ ESC=Examples/ServiceEscrow/service-escrow.charter
   "$B" check "$tmp/bad.charter"
   "$B" run "$tmp/bad.eflint"
   "$B" test "$tmp/bad.eflint"
+  if [ -x "$SB" ]; then
+    "$SB" help
+    "$SB" version
+    "$SB" verify "$tmp/escrow.artifact"
+  fi
 } > "$tmp/out.txt" 2>&1
 hits=$(grep -niE '\blean\b|\blake\b|olean|lakefile|\btactic\b|\bsorry\b|_lean_|lean_' "$tmp/out.txt")
 if [ -n "$hits" ]; then

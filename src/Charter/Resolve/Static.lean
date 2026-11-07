@@ -28,32 +28,6 @@ Charter's additions need a resolved AST distinct from the records.
 
 namespace Charter
 
-/-- A compiled phrase: declarations have been executed into the spec. -/
-inductive CPhrase where
-  | trigger (xs : List Var) (t : Term)
-  | create (xs : List Var) (t : Term)
-  | terminate (xs : List Var) (t : Term)
-  | obfuscate (xs : List Var) (t : Term)
-  | query (t : Term)
-  | instQuery (mustHold : Bool) (xs : List Var) (t : Term)
-  /-- Declarations executed; `init` holds the initial instances of `Param`s (D11). -/
-  | onlyDecls (init : Store := [])
-  | par (ps : List CPhrase)
-  /-- Charter: a scenario's phrases are resolved when `check` or `test` runs them. -/
-  | scenario (name : String) (ps : List Phrase) (spans : List (ClauseId × String) := [])
-  /-- Charter: `?lawful`/`?valid`/`?violated`/`?undetermined` over the instances of `t`, `xs` bound to every instance. -/
-  | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
-  /-- Charter (D7): `@ t.` and `tick.`, the clock as environment input. -/
-  | setTime (t : Term)
-  | tick
-  /-- Charter (Law 6): `?why e`, `xs` bound to every instance. -/
-  | why (xs : List Var) (t : Term)
-  /-- Charter (D22, G3.2): `SubmitEvidence [!]e [By src].` -/
-  | submitEvidence (polarity : Bool) (xs : List Var) (t : Term) (src : String := "")
-  /-- Charter (D22, G3.2): `RetractEvidence e [By src].` -/
-  | retractEvidence (xs : List Var) (t : Term) (src : String := "")
-  deriving Repr, Inhabited
-
 namespace Resolve
 
 /-- The static monad: a spec threaded through, errors as diagnostics, warnings
@@ -1077,7 +1051,7 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       modifySpec (fun s => s.insertScenario name spans)
       let s ← getSpec
       withSpec s (ps.forM fun q => do let _ ← compilePhrase fuel q; pure ())
-      return .scenario name ps spans
+      return .scenario name spans
     | .setTime t => return .setTime (← convertTerm termFuel t .time)
     | .tick =>
       let s ← getSpec

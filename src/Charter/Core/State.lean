@@ -355,4 +355,23 @@ def RuntimeError.isMissingInput : RuntimeError → Bool
   | .missingInput _ => true
   | _ => false
 
+/-- A compiled phrase in `CIR` (`G4.1` operator-blind IR: declarations already elaborated into `Spec`). -/
+inductive CPhrase where
+  | trigger (xs : List Var) (t : Term)
+  | create (xs : List Var) (t : Term)
+  | terminate (xs : List Var) (t : Term)
+  | obfuscate (xs : List Var) (t : Term)
+  | query (t : Term)
+  | instQuery (mustHold : Bool) (xs : List Var) (t : Term)
+  | onlyDecls (init : Store := [])
+  | par (ps : List CPhrase)
+  | scenario (name : String) (spans : List (ClauseId × String) := [])
+  | expect (what : Expect) (negated : Bool) (xs : List Var) (t : Term)
+  | setTime (t : Term)
+  | tick
+  | why (xs : List Var) (t : Term)
+  | submitEvidence (polarity : Bool) (xs : List Var) (t : Term) (src : String := "")
+  | retractEvidence (xs : List Var) (t : Term) (src : String := "")
+  deriving Repr, Inhabited
+
 end Charter

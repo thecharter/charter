@@ -12,19 +12,6 @@ Declarations are `Charter.Decl` records (`Charter.Core.Spec`); expressions are
 
 namespace Charter
 
-/-- Which of the answers an expectation phrase asks about (Charter, plan §2.2.6, D22). -/
-inductive Expect
-  | lawful
-  | valid
-  | violated
-  | undetermined
-  | conflict
-  deriving Repr, DecidableEq, Inhabited
-
-def Expect.name : Expect → String
-  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
-  | .undetermined => "undetermined" | .conflict => "conflict"
-
 /-- One phrase (eFLINT `Phrase`, plus Charter's scenarios, expectations, and epistemic evidence). Binders of
 `Foreach` forms are the `xs` lists. -/
 inductive Phrase where

@@ -1,6 +1,6 @@
 name = "charter"
 version = "0.4.0"
-defaultTargets = ["Charter", "charter"]
+defaultTargets = ["Charter", "charter", "charter-server"]
 
 # The Charter language: compiler, semantics, standard library, projections, and CLI (src/Charter/).
 [[lean_lib]]
@@ -9,8 +9,14 @@ srcDir = "src"
 # Charter.Prove.Kernel imports the elaborator; the generated project imports it, the executable never does.
 roots = ["Charter", "Charter.Prove.Kernel"]
 
-# Standalone `charter` executable (zero linked application companions).
+# Standalone `charter` compiler & verifier executable (zero linked application companions).
 [[lean_exe]]
 name = "charter"
 root = "Main"
+srcDir = "src"
+
+# Operator-blind `charter-server` runtime executable (links Core, Eval, Artifact, Server ONLY).
+[[lean_exe]]
+name = "charter-server"
+root = "Server"
 srcDir = "src"

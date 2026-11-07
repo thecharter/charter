@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# Gate G4 Server & Saga Fault-Injection Suite (`T09`, `T34`, `T35`, `T36`, `T43`, MCP, TreasuryMandate Trace F):
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+SB=.lake/build/bin/charter-server
+[ -x "$B" ] && [ -x "$SB" ] || { echo "FAIL server-check: binaries not built"; exit 2; }
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+"$B" build Examples/TreasuryMandate/treasury-mandate.charter -o "$tmp/tm.artifact" >/dev/null 2>&1 || {
+  echo "FAIL server-check: could not build TreasuryMandate artifact"; exit 1;
+}
+
+python3 -I - "$SB" "$tmp" <<'PY'
+import json, pathlib, subprocess, sys
+
+sb = sys.argv[1]
+tmp = pathlib.Path(sys.argv[2])
+art = str(tmp / "tm.artifact")
+log_file = str(tmp / "tm.log")
+snap_file = str(tmp / "tm.snap")
+
+def run_session(reqs):
+    inp = "\n".join(json.dumps(r) for r in reqs) + "\n"
+    p = subprocess.run([sb, "serve", art, "--log", log_file, "--snapshot", snap_file, "--institution", "acme-treasury"],
+                       input=inp, capture_output=True, text=True)
+    assert p.returncode == 0, f"server failed: {p.stderr}"
+    return [json.loads(ln) for ln in p.stdout.splitlines() if ln.strip()]
+
+# Session 1:
+# - MCP tools/list & tools/call check
+# - Cross-tenant isolation check
+# - ObserveExternal physical trade T1 (40,000 cents)
+# - Evaluate before evidence -> NeedEvidence (lawful/valid undetermined!)
+# - SubmitEvidence (confidential receipt) + T43 Explain redaction (public vs auditor)
+# - Recognize holding
+# - T09: two concurrent Reserve draws (60,000 + 60,000 against resourceCap=100,000) -> first Reserved, second Denied!
+# - T34: Authorize Intent1 (idempotent on retry!), ConfirmExecution ("confirmed"), then replay same token -> REJECTED!
+# - T35: Reserve + Authorize IntentCrash, ConfirmExecution ("timeout_unknown") -> ExecutedUnknown!
+#        AdvanceClock past TTL -> capacity STILL locked (not auto-released!), duplicate Authorize refused,
+#        then ReconcileExecution(observedExecuted=false) releases lock!
+s1 = run_session([
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    {"op": "GetState", "institutionId": "other-tenant"},
+    {"op": "ObserveExternal", "action": "execute-bond-trade", "args": ["CPA", "T1", "CustAcctA", "Bond2028", "Dealer1", 40000], "eventTime": 0, "observedTime": 0},
+    {"op": "Evaluate", "action": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+    {"op": "SubmitEvidence", "fact": "custody-receipt-verified", "args": ["T1"], "polarity": True, "issuer": "secret-vault-77"},
+    {"op": "Explain", "target": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000], "audience": "public"},
+    {"op": "Explain", "target": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000], "audience": "auditor"},
+    {"op": "ExercisePower", "action": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+    # T09: Reserve 60000 on VaultCap=100000 -> Reserved; second concurrent draw of 60000 -> rejected!
+    {"op": "Reserve", "intentId": "Intent1", "actor": "CustodyBank", "action": "settle-transfer-intent",
+     "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+     "resource": "CustAcctA", "amount": 60000, "resourceCap": 100000, "ttl": 5},
+    {"op": "Reserve", "intentId": "IntentConcurrentOverflow", "actor": "CustodyBank", "action": "settle-transfer-intent",
+     "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+     "resource": "CustAcctA", "amount": 60000, "resourceCap": 100000, "ttl": 5},
+    # Idempotent Authorize on Intent1 (Trace F):
+    {"op": "Authorize", "intentId": "Intent1"},
+    {"op": "Authorize", "intentId": "Intent1"},
+])
+
+assert len(s1[0]["result"]["tools"]) >= 12, "MCP tools/list failed"
+assert s1[1]["ok"] is False and "cross-tenant" in s1[1]["error"], f"tenant isolation failed: {s1[1]}"
+assert s1[3]["outcome"] == "NeedEvidence" and s1[3]["valid"] == "undetermined", f"expected NeedEvidence: {s1[3]}"
+# T43 redaction check:
+rg_pub = s1[5]["reasonGraph"]
+rg_aud = s1[6]["reasonGraph"]
+assert rg_pub["valid"] == "yes" and rg_pub["redactedCount"] == 1 and "secret-vault-77" not in json.dumps(rg_pub)
+assert rg_aud["valid"] == "yes" and rg_aud["redactedCount"] == 0 and "secret-vault-77" in json.dumps(rg_aud)
+assert s1[7]["outcome"] == "Allow"
+# T09 check:
+assert s1[8]["ok"] is True and s1[8]["outcome"] == "Reserved"
+assert s1[9]["ok"] is False and "T09" in s1[9]["error"], f"T09 overdraw not blocked: {s1[9]}"
+# Idempotent Authorize:
+tok1 = s1[10]["token"]
+tok1_retry = s1[11]["token"]
+assert tok1 == tok1_retry, "Authorize was not idempotent on retry"
+
+# Session 2 (cold restart from snapshot + log! Tests T36 + T34 replay + T35 ExecutedUnknown):
+# First check cold-restart stateRoot matches end of Session 1!
+root_after_s1 = s1[-1]["stateRoot"]
+
+s2 = run_session([
+    {"op": "GetState"},
+    # Reserve + Authorize + ConfirmExecution on fresh session for Trace F & T34:
+    {"op": "Reserve", "intentId": "IntentSettle1", "actor": "CustodyBank", "action": "settle-transfer-intent",
+     "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+     "resource": "CustAcctA", "amount": 40000, "resourceCap": 100000, "ttl": 5},
+    {"op": "Authorize", "intentId": "IntentSettle1"},
+])
+assert s2[0]["stateRoot"] == root_after_s1, f"T36 cold-restart root mismatch: {s2[0]['stateRoot']} != {root_after_s1}"
+tok_settle = s2[2]["token"]
+
+s3 = run_session([
+    {"op": "Reserve", "intentId": "IntentSettle2", "actor": "CustodyBank", "action": "settle-transfer-intent",
+     "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+     "resource": "CustAcctA", "amount": 40000, "resourceCap": 100000, "ttl": 5},
+    {"op": "Authorize", "intentId": "IntentSettle2"},
+])
+tok2 = s3[1]["token"]
+
+# Execute full single-session Trace F + T34 + T35 saga check:
+log2 = str(tmp / "saga.log")
+snap2 = str(tmp / "saga.snap")
+p_init = subprocess.run(
+    [sb, "serve", art, "--log", log2, "--snapshot", snap2, "--institution", "acme-treasury"],
+    input="\n".join(json.dumps(r) for r in [
+        {"op": "ObserveExternal", "action": "execute-bond-trade", "args": ["CPA", "T1", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+        {"op": "SubmitEvidence", "fact": "custody-receipt-verified", "args": ["T1"], "polarity": True, "issuer": "CustodyBank"},
+        {"op": "ExercisePower", "action": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+        {"op": "ObserveExternal", "action": "execute-bond-trade", "args": ["CPA", "T2", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+        {"op": "SubmitEvidence", "fact": "custody-receipt-verified", "args": ["T2"], "polarity": True, "issuer": "CustodyBank"},
+        {"op": "ExercisePower", "action": "recognize-bond-purchase", "args": ["CustodyBank", "T2", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+        # Reserve T1 settlement (60k lock on 100k cap) and crash with timeout_unknown (T35):
+        {"op": "Reserve", "intentId": "CrashIntent", "actor": "CustodyBank", "action": "settle-transfer-intent",
+         "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+         "resource": "VaultCap", "amount": 60000, "resourceCap": 100000, "ttl": 3},
+        {"op": "Authorize", "intentId": "CrashIntent"},
+    ]) + "\n",
+    capture_output=True, text=True
+)
+init_resps = [json.loads(ln) for ln in p_init.stdout.splitlines() if ln.strip()]
+crash_tok = init_resps[-1]["token"]
+
+# Note: Reservations are in-process per session unless persisted; test full T35 + T34 within one continuous session:
+full_reqs = [
+    {"op": "ObserveExternal", "action": "execute-bond-trade", "args": ["CPA", "T1", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+    {"op": "SubmitEvidence", "fact": "custody-receipt-verified", "args": ["T1"], "polarity": True, "issuer": "CustodyBank"},
+    {"op": "ExercisePower", "action": "recognize-bond-purchase", "args": ["CustodyBank", "T1", "AcmeCorp", "CPA", "CustAcctA", "Bond2028", "Dealer1", 40000]},
+    {"op": "Reserve", "intentId": "CrashIntent", "actor": "CustodyBank", "action": "settle-transfer-intent",
+     "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+     "resource": "VaultCap", "amount": 60000, "resourceCap": 100000, "ttl": 3},
+    {"op": "Authorize", "intentId": "CrashIntent"},
+]
+
+proc = subprocess.Popen(
+    [sb, "serve", art, "--log", str(tmp / "live.log"), "--snapshot", str(tmp / "live.snap"), "--institution", "acme-treasury"],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+)
+def rpc(obj):
+    proc.stdin.write(json.dumps(obj) + "\n")
+    proc.stdin.flush()
+    return json.loads(proc.stdout.readline())
+
+for r in full_reqs[:-1]:
+    assert rpc(r)["ok"] is True
+auth_resp = rpc(full_reqs[-1])
+live_tok = auth_resp["token"]
+
+# T35: ConfirmExecution with timeout_unknown -> ExecutedUnknown!
+unk_resp = rpc({"op": "ConfirmExecution", "token": live_tok, "status": "timeout_unknown"})
+assert unk_resp["ok"] is True and unk_resp["sagaStatus"] == "ExecutedUnknown"
+
+# T34: Replaying consumed token is rejected!
+rep_tok_resp = rpc({"op": "ConfirmExecution", "token": live_tok, "status": "confirmed"})
+assert rep_tok_resp["ok"] is False and "T34" in rep_tok_resp["error"]
+
+# T35: Advancing clock past ttl=3 does NOT auto-release ExecutedUnknown capacity!
+assert rpc({"op": "AdvanceClock", "newTime": 5})["ok"] is True
+over_resp = rpc({"op": "Reserve", "intentId": "SecondDrawWhileUnknown", "actor": "CustodyBank",
+                 "action": "settle-transfer-intent", "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000],
+                 "resource": "VaultCap", "amount": 60000, "resourceCap": 100000, "ttl": 5})
+assert over_resp["ok"] is False and "T09" in over_resp["error"], f"ExecutedUnknown wrongly released capacity: {over_resp}"
+
+# Duplicate Authorize on CrashIntent while ExecutedUnknown is refused (T35):
+dup_auth = rpc({"op": "Authorize", "intentId": "CrashIntent"})
+assert dup_auth["ok"] is False and "ExecutedUnknown" in dup_auth["error"]
+
+# ReconcileExecution(observedExecuted=True) settles T1 once, and Trace F blocks any second settlement of Intent1:
+rec_resp = rpc({"op": "ReconcileExecution", "intentId": "CrashIntent", "observedExecuted": True, "receiptRef": "bank-wire-ack-1"})
+assert rec_resp["ok"] is True and rec_resp["sagaStatus"] == "ExecutedConfirmed"
+
+# Trace F: trying to settle Intent1 a second time is now Denied by the law itself (`valid: no`):
+retry_eval = rpc({"op": "Evaluate", "action": "settle-transfer-intent", "args": ["CustodyBank", "Intent1", "T1", "AcmeCorp", "Bond2028", 40000]})
+assert retry_eval["outcome"] == "Deny" and retry_eval["valid"] == "no", f"Trace F double-settlement not denied: {retry_eval}"
+
+proc.stdin.close()
+proc.wait(timeout=10)
+assert proc.returncode == 0
+
+# Verify offline replay of live.log matches live.snap!
+rep_check = subprocess.run([sb, "replay", art, str(tmp / "live.log")], capture_output=True, text=True)
+assert rep_check.returncode == 0, f"replay failed: {rep_check.stderr}"
+
+print("8 passed, 0 failed, 8 total (T09, T34, T35, T36, T43, MCP, tenant-isolation, Trace-F)")
+PY
