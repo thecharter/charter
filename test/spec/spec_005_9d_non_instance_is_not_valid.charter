@@ -1,0 +1,12 @@
+// 003.2, 003.8, 005.9: an element outside a type's domain is not an instance of it. An act
+// "performed" by one occurs (Law 1), is not lawful, and has no effect.
+Fact court Identified by FamilyCourt
+Bool ordered
+Power order Actor court Holds when True Valid when True Creates ordered().
+?!lawful order(Nobody).
+?!valid order(Nobody).
+order(Nobody).
+?!ordered().
+?valid order(FamilyCourt).
+order(FamilyCourt).
+?ordered().

@@ -384,7 +384,10 @@ def isValid : Nat → Tagged → M Bool
     let tspec ← getTypeSpec te.2
     match tspec.kind with
     | .act a =>
-      if spec.hasEpistemicOrDefeasible then
+      -- 003.8: an element outside the act's domain is not an instance of it, so performing it
+      -- has no institutional effect (it still occurs, and is not lawful)
+      if !(← isValidInstance fuel te) then pure false
+      else if spec.hasEpistemicOrDefeasible then
         let (_, vTri, _) ← evalActTri fuel te
         pure (vTri == .yes)
       else
@@ -593,6 +596,8 @@ def evalActTri : Nat → Tagged → M (TriBool × TriBool × List (Tagged × Evi
     let tspec ← getTypeSpec te.2
     match tspec.kind with
     | .act a =>
+      -- 003.8: not an instance of the act, so neither lawful nor valid, whatever the evidence
+      if !(← isValidInstance fuel te) then pure (.no, .no, []) else
       let (vTri, vUnmet) ← withSubs (Tagged.bindings tspec.domain te) do
         let ps ← a.validWhen.mapM (evalTermTri fuel)
         let folded := ps.foldl (fun (accV, accU) (v, u) =>
