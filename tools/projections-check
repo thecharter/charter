@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Gate G5.1-G5.2 Projections Suite (`T32`, `T33`, `CHR035`, advisory prompt stamp):
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+[ -x "$B" ] || { echo "FAIL projections-check: $B missing"; exit 2; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+fail=0; pass=0
+
+check_case() { # label, want_exit, pattern, cmd...
+  local label="$1"; local want="$2"; local pat="$3"; shift 3
+  local out; out=$("$@" 2>&1); local st=$?
+  if [ "$st" -eq "$want" ] && printf '%s\n' "$out" | grep -qE "$pat"; then
+    echo "ok   $label (exit $st)"
+    pass=$((pass+1))
+  else
+    echo "FAIL $label (expected exit $want matching '$pat'; got $st)"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    fail=$((fail+1))
+  fi
+}
+
+# 1. T33: Solidity + ABI generation & differential server parity on finite-domain protocol
+check_case "t33-solidity-guard-verified" 0 "validated Solidity AST \+ ABI" \
+  "$B" generate --target solidity --verify-output -o "$tmp/SafeFencedLease.sol" test/verify/safe_fenced_lease.charter
+
+check_case "t33-json-abi-verified" 0 "validated Solidity AST \+ ABI" \
+  "$B" generate --target abi --verify-output -o "$tmp/SafeFencedLease.abi.json" test/verify/safe_fenced_lease.charter
+
+# 2. CHR035: Unbounded infinite-domain quantifier rejected loudly in Solidity target (no silent drop!)
+check_case "chr035-solidity-rejects-unbounded-quantifier" 1 "CHR035" \
+  "$B" generate --target solidity Examples/TreasuryMandate/treasury-mandate.charter
+
+# 3. T32: Quint protocol target on safe fenced lease (holds) AND broken partition lease (imports & replays counterexample in Charter.Eval!)
+check_case "t32-quint-safe-fenced-lease" 0 "validated Quint module.*reachable state\(s\) safe" \
+  "$B" generate --target quint --mode adversarial --verify-output -o "$tmp/safe_lease.qnt" test/verify/safe_fenced_lease.charter
+
+check_case "t32-quint-partition-counterexample-replayed" 0 "confirmed imported counterexample for .single-authority-fenced. in .* via Charter\.Eval replay" \
+  "$B" generate --target quint --mode adversarial --verify-output -o "$tmp/partition_lease.qnt" test/verify/t26_t27_partition_lease.charter
+
+# 4. Advisory prompt stamped authoritative=false / advisoryOnly=true (§9.7)
+check_case "prompt-advisory-stamp" 0 '"authoritative": false' \
+  "$B" generate --target prompt --actor accountant --out json Examples/TreasuryMandate/treasury-mandate.charter
+
+echo "$pass passed, $fail failed, $((pass+fail)) total"
+[ $fail -eq 0 ]

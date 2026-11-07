@@ -81,7 +81,11 @@ step verify $st "$(tail -1 "$OUT/verify.log")"
 tools/server-check > "$OUT/server.log" 2>&1; st=$?
 step server $st "$(tail -1 "$OUT/server.log")"
 
-# 10. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
+# 10. Gate G5.1-G5.2 verified projections suite (Solidity/ABI T33, Quint trace replay T32, CHR035, prompt)
+tools/projections-check > "$OUT/projections.log" 2>&1; st=$?
+step projections $st "$(tail -1 "$OUT/projections.log")"
+
+# 11. the neutral example programs written in Charter: tenancy, commons (over the eight lib/
 #     modules), service-escrow, and treasury-mandate (G3.7); `test` runs their scenarios,
 #     explores their invariants, and verifies all Law 8 provenance and completeness gates
 "$B" test --require-provenance --forbid-midstream-decls --require-complete-explore --deny-warnings "$EX1" "$EX2" "$EX3" "$EX4" > "$OUT/examples.log" 2>&1; st=$?

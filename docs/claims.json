@@ -315,6 +315,14 @@
       "summary": "Reservations in ExecutedUnknown (PendingExternalOutcome) are never auto-expired or released by clock progression until explicit reconciliation (D27, G4.3, T35)."
     },
     {
+      "id": "project.cir_guard_step_correspondence",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Project/GuardTarget.lean",
+      "symbol": "cir_guard_step_correspondence",
+      "summary": "Lowered GuardIR state-transition guards accept an event if and only if Charter.Server.evaluateServerEvent returns Allow and transition to the identical CIR configuration (D28, G5.1, T33)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

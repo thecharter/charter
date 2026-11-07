@@ -7,6 +7,7 @@ import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
 import Charter.Cli.Diff
+import Charter.Cli.Generate
 
 /-!
 # Charter.Cli.Main — Standalone Command-Line Dispatcher
@@ -29,9 +30,10 @@ def helpText : String :=
   "  test    <file.charter | dir> ...        run scenarios, provenance checks, and invariant exploration\n" ++
   "  explore [flags] <file.charter> ...      explore lawful, adversarial, or mixed state spaces\n" ++
   "  verify  [flags] <file.charter> ...      verify invariants & temporal properties (finite, smt, inductive)\n" ++
-  "  explain <expr> <file.charter> [flags]   emit audience-scoped ReasonGraph with counterfactuals\n" ++
-  "  diff    <old.charter> <new.charter>     3-view English, CIR rule, and scenario semantic diff\n" ++
-  "  trace   <clause-id> <file.charter>      print the verbatim span table for a clause\n" ++
+  "  explain  <expr> <file.charter> [flags]  emit audience-scoped ReasonGraph with counterfactuals\n" ++
+  "  diff     <old.charter> <new.charter>    3-view English, CIR rule, and scenario semantic diff\n" ++
+  "  generate --target <tgt> <file.charter>  project CIR to solidity, abi, quint, or advisory prompt\n" ++
+  "  trace    <clause-id> <file.charter>     print the verbatim span table for a clause\n" ++
   "  prove   <file.charter> ...              decide claims and invariants in the proof kernel (see --show-checker)\n" ++
   "  repl    [file.charter]                  interactive institutional session\n" ++
   "  version                                 print version\n" ++
@@ -57,6 +59,7 @@ def main (args : List String) : IO UInt32 := do
   | "verify" :: rest => verifyCommand rest
   | "explain" :: rest => explainCommand rest
   | "diff" :: rest => diffCommand rest
+  | "generate" :: rest => generateCommand rest
   | "trace" :: cid :: rest => traceCommand cid rest
   | ["trace"] =>
     IO.eprintln "usage: charter trace <clause-id> <file.charter>"

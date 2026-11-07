@@ -69,7 +69,11 @@ import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
 import Charter.Project.Diff
+import Charter.Project.GuardTarget
+import Charter.Project.QuintTarget
+import Charter.Project.PromptTarget
 import Charter.Cli.Diff
+import Charter.Cli.Generate
 import Charter.Cli.Main
 import Charter.Server.StateStore
 import Charter.Server.Reservations

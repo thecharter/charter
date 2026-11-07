@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D28 — Live `CIR` projections (`solidity`, `abi`, `quint`, `prompt`), `CHR035` fragment rejection, and truthful target boundaries (`T32`, `T33`)](2026-11-06-D28-live-cir-projections-and-target-boundaries.md)
 - [D27 — Signed content-addressed `Artifact` bundles (`B10`), operator-blind `charter-server`, and `ExecutedUnknown` saga (`T09`, `T34`–`T36`)](2026-11-06-D27-signed-artifacts-and-operator-blind-server.md)
 - [D26 — Verified standard-library legal ontologies (`contract_lifecycle`, `agency_mandate`, `monetary_estate`, `jurisdiction`) outside `Core` TCB (`D8`, `T09`, `T12`–`T20`, `T24`, `T45`)](2026-11-06-D26-standard-library-legal-ontologies.md)
 - [D25 — Rule-level `Amend` acts, reflexive `Immunity` entrenchment, `Regime` overlays, and 3-view `charter diff` (`D11`, `T23`, `T24`, `T38`)](2026-11-06-D25-rule-amendment-reflexive-ratchet-and-semantic-diff.md)

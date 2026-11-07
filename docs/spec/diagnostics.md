@@ -49,6 +49,7 @@ more errors); `warning` does not.
 | CHR032 | error | a `Power` or `Finding` declaration omits `Valid when <expr>` (institutional powers require explicit competence conditions; use `Act` when validity defaults to `True`, 005.10, 005.11) | `Charter.Resolve` |
 | CHR033 | error | `SubmitEvidence`, `RetractEvidence`, `Supports`, `Rebuts`, `Retracts`, or `Resolves` targets a type not declared `Evidenced` (003.13, 005.11, 011.14) | `Charter.Resolve` |
 | CHR034 | error | defeasible `Overrides` / `Priority` rules on a type contain a priority cycle or duplicate rule ID (004.12, 007.6) | `Charter.Resolve` |
+| CHR035 | error | `charter generate` target does not support a construct in the specification (no silent rule dropping, 017.2) | `Charter.Project` |
 
 ## Evaluation (CHR100–CHR149)
 
