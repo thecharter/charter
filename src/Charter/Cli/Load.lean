@@ -49,12 +49,45 @@ def findIncluded (dirs : List System.FilePath) (name : String) : IO (Option Syst
       if ← fSwap.pathExists then return some fSwap
   return none
 
+/-- The directory of a file; the working directory for a bare file name. -/
+def dirOf (path : System.FilePath) : System.FilePath :=
+  match path.parent with
+  | some d => if d.toString.isEmpty then "." else d
+  | none => "."
+
+/-- Drop the longest common prefix of two component lists. -/
+def stripCommonPrefix : List String → List String → List String × List String
+  | x :: xs, y :: ys => if x == y then stripCommonPrefix xs ys else (x :: xs, y :: ys)
+  | xs, ys => (xs, ys)
+
+/-- The directory `target` as a path relative to the directory `base`, or `none` when it is
+`base` itself or either cannot be resolved. -/
+def relativeDir (base target : System.FilePath) : IO (Option System.FilePath) := do
+  try
+    let b ← IO.FS.realPath base
+    let t ← IO.FS.realPath target
+    let (up, down) := stripCommonPrefix b.components t.components
+    let parts := up.map (fun _ => "..") ++ down
+    return if parts.isEmpty then none else some (System.mkFilePath parts)
+  catch _ => return none
+
+/-- 012.1: a `Document` path is relative to the file that declares it. Every later stage reads
+documents relative to the program's own directory, so a document declared in a file loaded
+from another directory has that directory (relative to the program's) put in front of it. -/
+def rebaseDocuments (rel : System.FilePath) : Phrase → Phrase
+  | .decls ds => .decls (ds.map fun
+      | .document p docId? sha? rank? =>
+        if (System.FilePath.mk p).isAbsolute then .document p docId? sha? rank?
+        else .document (rel / p).toString docId? sha? rank?
+      | d => d)
+  | ph => ph
+
 /-- Load a file and expand its directives. `seen` holds every file loaded so far
 (for `#require`); `dirs` the include directories accumulated so far (eFLINT adds the
 directory of every file it loads, so a file under `usage-control/` that requires
-`../access.eflint` can then require `simple-scenario.eflint` from the parent); `depth`
-bounds include chains. -/
-def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs : List System.FilePath) : Nat →
+`../access.eflint` can then require `simple-scenario.eflint` from the parent); `top` is
+the directory of the program's own file; `depth` bounds include chains. -/
+def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (dirs : List System.FilePath) : Nat →
     IO (List Located × List Diagnostic × List String × List System.FilePath)
   | 0 => return ([], [Diagnostic.error "CHR005" s!"include chain too deep at {path}"], seen, dirs)
   | depth + 1 => do
@@ -63,8 +96,9 @@ def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs
     if !(← path.pathExists) then
       return ([], [Diagnostic.error "CHR005" s!"cannot read {pathS}"], seen, dirs)
     let seen := seen ++ [pathS]
-    let dir := path.parent.getD "."
+    let dir := dirOf path
     let dirs := if dirs.contains dir then dirs else dirs ++ [dir]
+    let rel? ← relativeDir top dir
     match parseSource src eflint with
     | .error e => return ([], [e.withFile pathS], seen, dirs)
     | .ok items =>
@@ -74,7 +108,11 @@ def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs
       let mut dirs := dirs
       for it in items do
         match it.val with
-        | .inr _ => acc := acc ++ [⟨pathS, it⟩]
+        | .inr ph =>
+          let it' := match rel? with
+            | some rel => { it with val := .inr (rebaseDocuments rel ph) }
+            | none => it
+          acc := acc ++ [⟨pathS, it'⟩]
         | .inl d =>
           let (name, once) := match d with
             | .include n => (n, false)
@@ -85,7 +123,7 @@ def loadFile (eflint : Bool) (path : System.FilePath) (seen : List String) (dirs
             let fS := f.toString
             if once && seen.contains fS then pure ()
             else
-              let (its, ds, seen', dirs') ← loadFile eflint f seen dirs depth
+              let (its, ds, seen', dirs') ← loadFile eflint top f seen dirs depth
               acc := acc ++ its
               diags := diags ++ ds
               seen := seen'
@@ -98,7 +136,7 @@ def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Loc
   let stdDirs ← match ← locateCharterRoot with
     | some r => pure [r, r / "lib"]
     | none => pure []
-  let (its, ds, _, _) ← loadFile eflint path [] ("." :: stdDirs) 64
+  let (its, ds, _, _) ← loadFile eflint (dirOf path) path [] ("." :: stdDirs) 64
   return (its, ds)
 
 end Charter.Cli

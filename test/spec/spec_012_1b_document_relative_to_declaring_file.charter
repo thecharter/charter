@@ -1,0 +1,6 @@
+// 012.1: a `Document` path is relative to the file that declares it, so a program that
+// `#require`s a specification from another directory still finds that specification's document.
+//! require-provenance
+#require "include/document-owner.charter".
++pay-rent(T, L).
+?pay-rent(T, L).

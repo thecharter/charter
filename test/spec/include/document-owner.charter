@@ -1,0 +1,8 @@
+// Included by spec_012_1b: declares a document beside itself, in this directory.
+Document "tenancy.md"
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+Clause T.1 Approved "86b3e3ec5210d42d759e02e1685609c84eab9d45d45774634f7cbfd6e7ffa149"
+  Norm "The tenant pays the rent on the first of each month." => pay-rent
+.
