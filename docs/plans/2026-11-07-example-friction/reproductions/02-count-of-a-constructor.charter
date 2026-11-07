@@ -1,0 +1,7 @@
+// DEFECT (silent wrong answer). `Count(Foreach person: present(person))` counts every person,
+// present or not, so a quorum written this way is always met. Expected: 0, or a warning that the
+// body is a constructor and not a test (write `person When present(person)`).
+Fact person Identified by Iris, Wren, Abel
+Fact present Identified by person.
+?Count(Foreach person: present(person)) == 3.              // WRONG: nobody is present
+?Count(Foreach person: person When present(person)) == 0.

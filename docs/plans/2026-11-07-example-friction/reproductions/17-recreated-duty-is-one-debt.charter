@@ -1,0 +1,10 @@
+// DEFECT (silent). Creating a duty that already holds does nothing and says nothing, so two
+// unpaid months are one debt and one payment clears both.
+Fact p Identified by A
+Event month Creates owed(A, A)
+Duty owed Holder p Claimant p'
+Act pay Actor p Recipient p' Holds when True Terminates owed()
+.
+month(). month().
+pay(A, A).
+?!owed(A, A).            // WRONG: one month is still owed

@@ -1,0 +1,8 @@
+// DEFECT (silent no-op). An effect that reads a `Var` with no value does nothing; the act is
+// reported lawful and valid and the payment disappears. Expected: an error that `paid` has no value.
+Fact usd Identified by Money(USD, 2)
+Var paid Identified by usd
+Fact p Identified by A
+Act pay Actor p Related to usd Holds when True Creates paid(paid.usd + usd).
+pay(A, 500).
+?!(Exists paid: paid).   // WRONG: five dollars were paid

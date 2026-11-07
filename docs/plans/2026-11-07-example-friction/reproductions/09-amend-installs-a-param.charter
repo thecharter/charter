@@ -1,0 +1,10 @@
+// DEFECT (silent no-op). An `Amend` that installs a new value for a `Param` is reported lawful
+// and valid and changes nothing. Expected: fee(50), or a diagnostic.
+Param fee = 25
+Amend raise
+  Installs { Param fee = 50 }
+  Holds when True
+  Valid when True
+.
+raise("board").
+?fee(25).                // WRONG: the amendment was valid

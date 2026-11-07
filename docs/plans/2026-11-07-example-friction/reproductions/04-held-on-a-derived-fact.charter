@@ -1,0 +1,13 @@
+// DEFECT (silent wrong answer). `Held(e) For d` is true as a query and false inside a
+// `Holds when` when `e` is itself derived. Expected: all three agree.
+Fact p Identified by A
+Bool a
+Bool b Holds when a()
+Bool c Holds when Held(b()) For 5
+Act go Actor p Holds when Held(b()) For 5
+.
++a().
+@ 5.
+?Held(b()) For 5.
+?!c().                   // WRONG: the same expression holds on the line above
+?!lawful go(A).          // WRONG

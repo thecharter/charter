@@ -1,0 +1,8 @@
+// DEFECT (silent). An `Immunity` with no `Holds when` is accepted and protects no one.
+// Expected: it holds for every holder, or `check` says it can never hold.
+Fact p Identified by A
+Bool done
+Act hit Actor p Recipient p' Holds when True Creates done()
+Immunity shield Holder p Against hit
+.
+?valid hit(A, A).        // WRONG: A is shielded

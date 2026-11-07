@@ -1,0 +1,10 @@
+// DEFECT (wrong answer; matches 009.3). A fact derived from the clock is stamped at the first
+// phrase that sees it, so `Held` on it depends on which days the program visits. With `@ 7.`
+// before `@ 9.` the last claim fails.
+Param start : Time = 0
+Bool second-week Holds when Current Time - start >= 7
+Bool a-day-into-it Holds when Held(second-week()) For 1
+.
+@ 9.
+?second-week().
+?!a-day-into-it().       // WRONG: day 9 is two days into the second week

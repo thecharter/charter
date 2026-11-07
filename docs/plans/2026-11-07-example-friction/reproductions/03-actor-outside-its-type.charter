@@ -1,0 +1,8 @@
+// DEFECT (silent wrong answer). An atom that is not a member of the actor's enumerated type
+// performs the act validly and its effects apply. Expected: an error, or at least `valid: no`.
+Fact court Identified by FamilyCourt
+Bool ordered
+Power order Actor court Holds when True Valid when True Creates ordered().
+?valid order(Nobody).    // WRONG: `Nobody` is not a court
+order(Nobody).
+?ordered().              // WRONG

@@ -1,0 +1,10 @@
+// DEFECT (silent no-op). Evidence is keyed by the name of the act that tendered it, so
+// `Retracts` in a different act removes nothing. Expected: the status returns to Unresolved.
+Fact physician Identified by DrAdler
+Evidenced Bool lacks-capacity
+Act determine Actor physician Holds when True Supports lacks-capacity()
+Act withdraw Actor physician Holds when True Retracts lacks-capacity()
+.
+determine(DrAdler).
+withdraw(DrAdler).
+?Established(lacks-capacity()).   // WRONG: the determination was withdrawn

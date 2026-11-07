@@ -1,0 +1,9 @@
+// DEFECT (silent wrong answer). A binder over a money, integer or string type ranges over the
+// held instances of that type itself, of which there are none, so under `Not` the condition is
+// vacuously true. Expected: the binder sees the amounts that occur in `unrecorded`, or a warning.
+Fact person Identified by Helen, Marcus
+Fact usd Identified by Money(USD, 2)
+Fact unrecorded Identified by person * usd.
++unrecorded(Marcus, 100).
+?Not(Exists person, usd: unrecorded(person, usd)).    // WRONG: one is recorded on the line above
+?(Exists unrecorded: unrecorded).

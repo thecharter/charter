@@ -5,6 +5,43 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-07: twenty worked examples and what they cost to write
+
+## Where
+
+- `main`, pushed in three commits (the loader fix; the examples with their check; the findings).
+  `tools/battery`: PASS, all steps, including the new `worked-examples` step (20 examples, 20 roots,
+  20 case files).
+
+## What changed
+
+- **`Examples/`**: twenty new agreements in a root-and-cases layout (`Examples/README.md`): will,
+  living trust, deed, power of attorney, healthcare directive, prenup, parenting plan, home
+  purchase, promissory note, guaranty, bill of sale, employment, NDA, return policy, settlement,
+  renters insurance, roommates, homeowners' association, LLC operating agreement, club bylaws.
+  Five are split by article. 191 clauses, 166 scenarios. The English is original and fictional.
+  The clause approvals were stamped by the authors of the examples and await Eric's review.
+- **Loader fix** (`src/Charter/Cli/Load.lean`): a `Document` path is now resolved against the
+  file that declares it, so `cases/x.charter` requiring `../root.charter` finds the document.
+  Fixture `test/spec/spec_012_1b_document_relative_to_declaring_file.charter`, seen failing first.
+  Spec 012.1 says "relative to the program's file"; the wording is Eric's to confirm.
+- **Tools**: `tools/examples-check` (in the battery as step 13), `tools/examples-metrics`,
+  `tools/approve-clauses` (stands in for a missing `charter approve`).
+- **Findings**: `docs/plans/2026-11-07-example-friction/` (ranked proposals, per-example notes,
+  twelve runnable defect reproductions). Nothing in it is ruled.
+
+## Open
+
+- Every finding is filed: 77 issues, tracked in thecharter/charter#79. The accepted-and-wrong
+  defects have reproductions that pass today and fail when fixed
+  (`docs/plans/2026-11-07-example-friction/reproductions/`).
+- The proposals reopen D4 (clause blocks) and D5 (`Valid when` default) on those decisions' own
+  "reopens if" conditions, and one touches Law 7. Each needs a brief and a ruling.
+- `docs/reference/open-letter.{md,pdf}` (the letter to van Binsbergen) is deliberately not
+  committed (Eric, 2026-11-07).
+
+---
+
 # Handoff — 2026-11-06 (2): Charter 1.0 Gates `G0`–`G5` Complete (`D17`–`D28`, `T01`–`T49`)
 
 ## Where
