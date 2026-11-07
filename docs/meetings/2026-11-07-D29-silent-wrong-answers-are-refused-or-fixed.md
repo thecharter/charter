@@ -6,7 +6,7 @@
 
 ## Context
 Writing twenty worked examples (`docs/plans/2026-11-07-example-friction/`) found eleven cases
-where a natural spelling is accepted and gives a wrong answer (issues #2 to #12). Four are
+where a natural spelling is accepted and gives a wrong answer (issues #2 to #12). Five are
 settled here. Each has a fixture that was seen failing first.
 
 ## Rulings
@@ -26,11 +26,19 @@ settled here. Each has a fixture that was seen failing first.
 4. **`Installs` declares rules, not state; a `Param` inside it is CHR037** (014.1, 014.3; #10). It
    was valid and changed nothing. Fixture `spec_014_3c_amend_cannot_install_param.charter`.
 
+5. **An element outside an act's domain is not an instance of it, so performing it has no effect**
+   (003.8, 005.9; #4). `order(Nobody)` on `Actor court` was reported `lawful: no, valid: yes` and its
+   effects applied, so a stranger, or a misspelt name, could exercise a power. It now occurs, is
+   not lawful, and is not valid. Fixture `spec_005_9d_non_instance_is_not_valid.charter`.
+
 ## Alternatives weighed
 - For 2, refusing the declaration (rejected: it removes the one-party idiom and broke seven
   fixtures); a warning (rejected: the wrong answer stays).
 - For 3, refusing digits, a dot, and digits in the lexer (rejected: `Clause 1.1` is exactly that;
   it broke thirteen of the twenty examples).
+- For 5, an error on any phrase that names a non-instance (not taken yet: a query about a
+  non-instance is a legitimate "no", and `+f(Outside)` is still dropped silently; that half of #4
+  is open).
 - For 4, making `Installs { Param … }` assign the value (rejected for now: 014.3 says an amendment
   leaves state intact, and 014.1 already gives the spelling, `Creates name(v)`).
 
@@ -45,5 +53,5 @@ dropped argument or a no-op phrase is now refused.
 
 ## Reopens if
 An eFLINT program in the wild uses a repeated component with two arguments on purpose, or the
-remaining defects of the eleven (#3, #4, #6, #8, #9, #11, #12) are ruled in a way that changes
+remaining defects of the eleven (#3, #6, #8, #9, #11, #12) are ruled in a way that changes
 what "an instance" means here.

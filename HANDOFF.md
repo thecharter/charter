@@ -5,11 +5,11 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
-# Handoff — 2026-11-07 (2): four of the eleven accepted-and-wrong defects fixed (D29)
+# Handoff — 2026-11-07 (2): five of the eleven accepted-and-wrong defects fixed (D29)
 
 ## Where
 
-- `main`, pushed: four fix commits and one docs commit. `tools/battery`: PASS (25 steps) at the
+- `main`, pushed: five fix commits and their docs. `tools/battery`: PASS (25 steps) at the
   head of the series; the intermediate commits were not run through it one by one.
 
 ## What landed
@@ -20,8 +20,10 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
   The declaration stays legal: `Holder actor Claimant actor` is used on purpose. Fixture `spec_003_3c`.
 - **#7** A bare literal is not a phrase (CHR012), which is what let `10000.00.` pass. Fixture `spec_011_2b`.
 - **#10** A `Param` inside `Installs { }` is CHR037. Fixture `spec_014_3c`.
+- **#4** An act performed by an element outside its domain is not valid, in both evaluators
+  (`Eval/Eval.lean`). Fixture `spec_005_9d`. A `+fact(Outside)` is still dropped silently.
 - Decision record `docs/meetings/2026-11-07-D29-…`; four spec sentences drafted (003.3, 004.6,
-  011.2, 014.3) for Eric's review.
+  005.9, 011.2, 014.3) for Eric's review.
 
 ## Two things learned the hard way
 
@@ -31,10 +33,9 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ## Open (of the eleven)
 
-#3 count of a constructor, #4 actor outside its type, #6 `test` passes with a violated invariant,
-#8 binder over a money type, #9 evidence through a derived fact, #11 unset `Var`, #12 `Retracts`.
-#6, #9, #11 and #12 change specified behaviour and need a ruling; #3 and #8 are warnings to add;
-#4 depends on what a phrase naming a non-instance should do.
+#3 count of a constructor, #6 `test` passes with a violated invariant, #8 binder over a money
+type, #9 evidence through a derived fact, #11 unset `Var`, #12 `Retracts`. #6, #9, #11 and #12
+change specified behaviour and need a ruling; #3 and #8 are warnings to add.
 
 ---
 

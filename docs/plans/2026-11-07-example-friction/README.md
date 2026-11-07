@@ -343,7 +343,7 @@ scenario exposed it.
 |---|---|
 | 01 | `Fact yes Identified by person * person` is accepted; the second argument is dropped. **Fixed** (D29, CHR036) |
 | 02 | `Count(Foreach person: present(person))` counts everyone |
-| 03 | An atom outside the actor's type performs the act validly |
+| 03 | An atom outside the actor's type performs the act validly. **Fixed** (D29) |
 | 04 | `Held(e) For d` is false inside `Holds when` when `e` is derived. **Fixed** (D29) |
 | 05 | `charter test` exits 0 with a violated `Invariant` |
 | 06 | `10000.00` is read as one hundred dollars. **Fixed** (D29, CHR012) |
