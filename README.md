@@ -147,3 +147,21 @@ tools/
 ### Related Repositories
 
 - **[`thecharter/psa`](https://github.com/thecharter/psa)** — Standalone authoritative English specification (`psa.md`) and pure-Charter formalization (`psa.charter`) of **The Protocol of Sovereign Agency**.
+
+---
+
+## Citation
+
+If you use Charter in your work, please cite it:
+
+```bibtex
+@software{hartford2026charter,
+  author  = {Hartford, Eric},
+  title   = {Charter: An Institutional Specification and Verification Language},
+  year    = {2026},
+  version = {1.0.1},
+  url     = {https://github.com/thecharter/charter}
+}
+```
+
+Author: Eric Hartford ([ORCID 0009-0002-0159-2127](https://orcid.org/0009-0002-0159-2127), [Google Scholar](https://scholar.google.com/citations?user=SwrFngsAAAAJ&hl=en)).
