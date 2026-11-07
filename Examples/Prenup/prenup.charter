@@ -1,0 +1,83 @@
+// The prenuptial agreement of Elena Vargas and Tomas Reed (prenup.md).
+Document "prenup.md"
+
+Fact person Identified by Elena, Tomas
+Fact asset
+Fact usd Identified by Money(USD, 2)
+Param term : Duration = 3650
+
+// What each party owns, and how it came to them
+Function owner Identified by asset * person
+Function worth Identified by asset * usd
+Fact premarital Identified by asset
+Fact by-gift Identified by asset
+Bool wed
+Bool divorced
+Event acquires Related to person, asset, usd
+  Creates owner(asset, person), worth(asset, usd)
+Event receives-gift Related to person, asset, usd
+  Syncs with acquires(person, asset, usd)
+  Creates by-gift(asset)
+Event wedding
+  Creates wed(), (Foreach owner: premarital(owner.asset) When owner)
+
+// N.1 Signing and disclosure
+Fact listed Identified by asset
+Fact signed Identified by person
+Fact concealed Identified by person
+Act list Actor person Related to asset
+  Holds when owner(asset, person) && Not(signed(person))
+  Creates listed(asset)
+Act sign Actor person
+  Holds when True
+  Creates signed(person)
+        , concealed(person) When (Exists asset: owner(asset, person) && Not(listed(asset)))
+
+// N.6 Term
+Bool in-force
+  Holds when (Forall person: signed(person)) && Not(Exists person: concealed(person))
+          && Not(Held(wed()) For term)
+Bool governed
+Event divorce
+  Creates divorced(), governed() When in-force()
+
+// N.2 to N.4 What is marital
+Fact mixed Identified by asset
+Act put-in-joint-account Actor person Related to asset
+  Holds when owner(asset, person)
+  Creates mixed(asset)
+Fact marital Identified by asset
+  Default owned-before Rejects when premarital()
+  Default acquired-during Holds when Not(premarital()) && (Exists person: owner())
+  Exception gift-or-inheritance Overrides acquired-during Rejects when by-gift()
+  Exception mixing Overrides owned-before, gift-or-inheritance Holds when mixed()
+
+// N.5 Divorce
+Var pool Identified by usd
+  Derived from pool(Sum(Foreach worth: worth.usd When marital(worth.asset)))
+Fact kept Identified by person * asset
+Fact awarded Identified by person * usd
+Power keep Actor person Related to asset
+  Holds when divorced() && owner(asset, person) && Not(marital())
+  Valid when governed() && owner(asset, person) && Not(marital())
+  Creates kept()
+Power take-half Actor person
+  Holds when divorced()
+  Valid when governed()
+  Creates awarded(person, MulDivRound(pool.usd, 1, 2, Floor))
+
+Clause N.1 Approved "d7c665a183e9fa00c5bd5a9b531d100e6f1c78c017131a07aed59531889352b0"
+  Norm "Before signing, each party lists for the other the property that party owns." => list
+  Norm " This agreement binds the parties once both have signed it. It is void if a party owned property at signing that the party left off the list." => sign, keep, take-half
+Clause N.2 Approved "f2802be6633f48820aee1382d9fbc07fa8cf9b0e26300971b8fe2c6d37b29b0b"
+  Norm "Property a party owns when the parties marry is that party's separate property. A gift or inheritance one party receives during the marriage is that party's separate property." => keep
+Clause N.3 Approved "41841837d858a605cfa4faed4dfbf8100aeaa5d7bcc087eba0170bdddfdf6a06"
+  Norm "All other property either party acquires during the marriage is marital property." => take-half
+Clause N.4 Approved "af1ae40a8bdf0ec148f5537eeb1f447728dfa3c262f3d6d5a050bd9bbef22f6a"
+  Norm "Separate property that a party puts into the parties' joint account becomes marital property." => put-in-joint-account
+Clause N.5 Approved "96b1c3d60ed1821289e7b3e8ed3888a96f128fbaf1bf7f8a1cd21a5a65456980"
+  Norm "On divorce each party keeps that party's separate property." => keep
+  Norm " The marital property is divided equally between the parties." => take-half
+Clause N.6 Approved "dc943cf687a54f70d328938f75aff2b3be4a6a2d64ca5a3d637aa5bd8ffaa93a"
+  Norm "This agreement lapses when the parties have been married for ten years. It has no effect on a divorce after that." => keep, take-half
+.

@@ -1,0 +1,61 @@
+// The Ellis family: a fund of $500,000.00, two physicians, both children under twenty-five.
+#require "../trust.charter".
+Extend Fact physician Identified by DrLee, DrOrtiz.
+settle(Margaret, 50000000).
+
+Scenario the-settlor-draws-then-the-children-wait-for-twenty-five {
+  ?trustee(Margaret).
+  pay-settlor(Margaret, 10000000).
+  ?fund(40000000).
+  ?!valid pay-settlor(Margaret, 40000001).       // more than the fund holds
+  death(Margaret).
+  ?share(Anna, 20000000). ?share(Ben, 20000000). ?fund(0).
+  ?trustee(Daniel). ?!trustee(Margaret).
+  ?!valid pay-share(Daniel, Anna).               // Anna is not yet twenty-five
+  +reached-twenty-five(Anna).
+  pay-share(Daniel, Anna).
+  ?paid(Anna, 20000000). ?!share(Anna, 20000000). ?share(Ben, 20000000).
+}
+
+Scenario two-physicians-make-the-successor-trustee {
+  certify-incapacity(DrLee).
+  ?trustee(Margaret). ?!incapacitated().
+  certify-incapacity(DrOrtiz).
+  ?incapacitated(). ?trustee(Daniel). ?!trustee(Margaret).
+  ?!valid revoke(Margaret).                      // no capacity, no revocation
+  ?valid pay-settlor(Daniel, 100).               // the successor still pays her
+}
+
+Scenario revocable-in-life-irrevocable-at-death {
+  ?valid revoke(Margaret).
+  ?valid name-successor(Margaret, Anna).
+  name-successor(Margaret, Anna).
+  death(Margaret).
+  ?trustee(Anna). ?!trustee(Daniel).
+  ?!valid revoke(Margaret).
+  revoke(Margaret).
+  ?in-force().                                   // the attempt changed nothing
+}
+
+Scenario a-sale-to-the-trustee-needs-every-beneficiary {
+  ?!valid buy-from-trust(Margaret, Cottage).
+  consent-to-sale(Anna, Cottage).
+  ?!valid buy-from-trust(Margaret, Cottage).
+  consent-to-sale(Ben, Cottage).
+  ?valid buy-from-trust(Margaret, Cottage).
+}
+
+Scenario the-yearly-account-is-due-in-sixty-days {
+  year-ends().
+  ?annual-account(Margaret, Anna). ?annual-account(Margaret, Ben).
+  @ 59.
+  ?!violated annual-account(Margaret, Anna).
+  @ 60.
+  ?violated annual-account(Margaret, Anna).
+  account(Margaret).
+  ?!annual-account(Margaret, Anna). ?!annual-account(Margaret, Ben).
+}
+
+Scenario mixing-trust-property-is-a-breach {
+  ?!lawful mix-with-own-property(Margaret).
+}

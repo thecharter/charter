@@ -1,0 +1,21 @@
+// Article 2. Members and dues.
+#require "3-meetings.charter".
+Param dues : Money(USD, 2) = 3000
+Act pay-dues Actor person Related to usd
+  Holds when True
+  Valid when usd >= dues
+  Creates member(person) For 365
+
+Use motion(usd) As dues-motion
+Power set-dues Actor club Related to usd
+  Holds when True
+  Valid when dues-motion-carried(usd)
+  Creates dues(usd)
+
+Clause 2.1 Approved "962dd4ea126a4f9a87376cf7831137e71442a528c6ebeacb1fd2078e918b7868"
+  Norm "A person becomes a member by paying the annual dues. The annual dues are thirty dollars." => pay-dues
+Clause 2.2 Approved "025e6e325316ee13e878adcc3d74f72792583f99741508074a32b7f72022a99f"
+  Norm "A membership lasts one year from the payment of dues, and ends then unless the member has paid dues again." => pay-dues
+Clause 2.3 Approved "faa724fbd0c8290d3989bd05cb296bb870acdc88229ea33317908d8b4bb3297f"
+  Norm "The members may change the amount of the annual dues by a motion at a meeting." => dues-motion-vote-aye, dues-motion-vote-nay, set-dues
+.

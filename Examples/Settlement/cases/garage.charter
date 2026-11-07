@@ -1,0 +1,97 @@
+// Voss v. Northgate Parking: the lawsuit is pending and nothing has been paid.
+#require "../settlement.charter".
+
+Scenario nothing-is-owed-until-both-have-signed {
+  sign(Elena).
+  ?!in-effect().
+  ?!payment-due().
+  ?!lawful pay(usd = 1800000).
+  sign(Northgate).
+  ?in-effect().
+  ?payment-due().
+}
+
+sign(Elena). sign(Northgate).
+
+Scenario full-payment-releases-both-sides {
+  ?!released().
+  ?lawful sue(Northgate, Elena, Incident).       // until then no claim is released
+  @ 10.
+  pay(usd = 1800000).
+  ?released(). ?!payment-due().
+  ?!lawful sue(Elena, Northgate, Incident).
+  ?!lawful sue(Northgate, Elena, Incident).
+  ?lawful sue(Elena, Northgate, AnotherMatter).  // only claims arising from the incident
+  ?!valid sue(Northgate, Elena, Incident).
+  sue(Northgate, Elena, Incident).
+  ?!pending(Northgate, Elena, Incident).         // a released claim brought anyway goes nowhere
+}
+
+Scenario part-payment-releases-nothing {
+  pay(usd = 1000000).
+  ?paid(1000000).
+  ?!released(). ?payment-due().
+  ?lawful sue(Northgate, Elena, Incident).
+  ?!dismissal-due().
+  pay(usd = 800000).
+  ?released(). ?!payment-due().
+}
+
+Scenario the-lawsuit-is-dismissed-within-seven-days-of-payment {
+  ?!dismissal-due().
+  @ 10.
+  pay(usd = 1800000).
+  ?dismissal-due().
+  @ 16.
+  ?!violated dismissal-due().
+  @ 17.
+  ?violated dismissal-due().
+  dismiss-lawsuit().
+  ?!pending(Elena, Northgate, Incident).
+  ?!dismissal-due().
+}
+
+Scenario payment-in-time-leaves-nothing-to-rescind {
+  @ 13.
+  pay(usd = 1800000).
+  @ 30.
+  ?!violated payment-due().
+  ?!valid rescind().
+  rescind().
+  ?released().                                   // the attempt changed nothing
+}
+
+Scenario late-payment-lets-the-claimant-undo-the-release {
+  @ 13.
+  ?!violated payment-due().
+  ?!valid rescind().
+  @ 14.
+  ?violated payment-due().
+  ?valid rescind().
+  @ 20.
+  pay(usd = 1800000).
+  ?released().                                   // paid in full, but late
+  ?valid rescind().
+  rescind().
+  ?!in-effect(). ?!released().
+  ?lawful sue(Elena, Northgate, Incident).       // as if never released
+  ?!dismissal-due().
+  ?return-due().
+  ?!valid return-payment(usd = 1000000).         // she returns whatever was paid, not part
+  return-payment(usd = 1800000).
+  ?paid(0). ?!return-due().
+}
+
+Scenario the-terms-stay-confidential-unless-the-law-requires {
+  ?!lawful disclose-terms(Elena).
+  legal-demand(Elena).
+  ?lawful disclose-terms(Elena).
+  ?!lawful disclose-terms(Northgate).
+}
+
+Scenario paying-admits-nothing {
+  pay(usd = 1800000).
+  dismiss-lawsuit().
+  ?!admission(Northgate). ?!admission(Elena).
+  ?no-admission().
+}

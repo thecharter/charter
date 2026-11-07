@@ -1,0 +1,131 @@
+// 14 Alder Lane: both sign on day 0; price $400,000.00, earnest money $10,000.00.
+#require "../purchase.charter".
+
+Scenario the-sale-closes {
+  seller-signs(Nora).
+  ?!earnest-due(Omar, Nora).                      // one signature binds nobody
+  buyer-signs(Omar).
+  ?earnest-due(Omar, Nora). ?balance-due(Omar, Nora). ?deed-due(Nora, Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  ?in-escrow(). ?!earnest-due(Omar, Nora).
+  ?!lawful pay-seller(HarborTitle, Nora).         // not before closing
+  @ 40.
+  pay-price(Omar, Nora, 20000000).
+  ?balance-due(Omar, Nora).                       // half the balance is not the balance
+  pay-price(Omar, Nora, 19000000).
+  ?!balance-due(Omar, Nora). ?!closed().
+  deliver-deed(Nora, Omar).
+  ?closed().
+  ?lawful pay-seller(HarborTitle, Nora).
+  pay-seller(HarborTitle, Nora).
+  ?!in-escrow().
+}
+
+Scenario earnest-money-three-days-late {
+  seller-signs(Nora). buyer-signs(Omar).
+  ?!valid cancel-for-no-earnest(Nora, Omar).
+  @ 2.
+  ?!violated earnest-due(Omar, Nora).
+  @ 3.
+  ?violated earnest-due(Omar, Nora).
+  ?valid cancel-for-no-earnest(Nora, Omar).
+  cancel-for-no-earnest(Nora, Omar).
+  ?cancelled(). ?!balance-due(Omar, Nora). ?!deed-due(Nora, Omar).
+}
+
+Scenario half-the-earnest-money-is-not-the-earnest-money {
+  seller-signs(Nora). buyer-signs(Omar).
+  ?!valid pay-earnest(Omar, HarborTitle, 500000).
+  pay-earnest(Omar, HarborTitle, 500000).
+  ?!in-escrow(). ?earnest-due(Omar, Nora).
+}
+
+Scenario the-buyer-walks-away-inside-the-inspection-period {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  @ 9.
+  ?valid cancel-on-inspection(Omar, Nora).
+  cancel-on-inspection(Omar, Nora).
+  ?cancelled(). ?!balance-due(Omar, Nora).
+  ?!lawful pay-seller(HarborTitle, Nora).
+  ?lawful refund(HarborTitle, Omar).
+  refund(HarborTitle, Omar).
+  ?!in-escrow().
+}
+
+Scenario a-cancellation-on-the-eleventh-day-has-no-effect {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  lender-commits().
+  @ 10.
+  ?!valid cancel-on-inspection(Omar, Nora).
+  ?lawful cancel-on-inspection(Omar, Nora).       // not a breach to try; it just does nothing
+  cancel-on-inspection(Omar, Nora).
+  ?!cancelled(). ?balance-due(Omar, Nora).
+  ?!lawful refund(HarborTitle, Omar).
+}
+
+Scenario no-loan-by-the-thirtieth-day {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  @ 29.
+  ?valid cancel-on-financing(Omar, Nora).
+  @ 30.
+  ?!valid cancel-on-financing(Omar, Nora).
+}
+
+Scenario a-loan-commitment-ends-the-financing-contingency {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  @ 15.
+  ?valid cancel-on-financing(Omar, Nora).
+  lender-commits().
+  ?!valid cancel-on-financing(Omar, Nora).
+}
+
+Scenario the-seller-does-not-deliver-the-deed {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  @ 44.
+  pay-price(Omar, Nora, 39000000).
+  ?!valid cancel-for-no-deed(Omar, Nora).
+  @ 45.
+  ?violated deed-due(Nora, Omar). ?!violated balance-due(Omar, Nora).
+  ?!valid cancel-for-no-payment(Nora, Omar).      // the buyer is not the one in default
+  cancel-for-no-deed(Omar, Nora).
+  ?lawful refund(HarborTitle, Omar).
+}
+
+Scenario the-buyer-does-not-pay-and-the-seller-keeps-the-earnest-money {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  deliver-deed(Nora, Omar).
+  @ 45.
+  ?violated balance-due(Omar, Nora).
+  cancel-for-no-payment(Nora, Omar).
+  ?lawful pay-seller(HarborTitle, Nora).
+  ?!lawful refund(HarborTitle, Omar).
+  refund(HarborTitle, Omar).                      // the agent pays the wrong party: a breach, and the money is gone
+  ?!in-escrow().
+}
+
+Scenario the-house-burns-down-before-closing {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  lender-commits().
+  @ 20.
+  ?!valid cancel-on-loss(Omar, Nora).
+  house-destroyed().
+  ?valid cancel-on-loss(Omar, Nora).
+  cancel-on-loss(Omar, Nora).
+  ?lawful refund(HarborTitle, Omar).
+}
+
+Scenario the-house-burns-down-after-closing {
+  seller-signs(Nora). buyer-signs(Omar).
+  pay-earnest(Omar, HarborTitle, 1000000).
+  pay-price(Omar, Nora, 39000000).
+  deliver-deed(Nora, Omar).
+  house-destroyed().
+  ?!valid cancel-on-loss(Omar, Nora).             // the risk passed with the title
+}

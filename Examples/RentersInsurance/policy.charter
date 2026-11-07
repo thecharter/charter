@@ -1,0 +1,123 @@
+// A renters insurance policy between Harbor Mutual and Nora Quinn (policy.md).
+Document "policy.md"
+
+Fact insurer Identified by HarborMutual
+Fact insured Identified by Nora
+Fact party Identified by HarborMutual, Nora
+Fact adjuster Identified by Ines
+Fact usd Identified by Money(USD, 2)
+Param premium : Money(USD, 2) = 2000
+Param deductible : Money(USD, 2) = 50000
+Param limit : Money(USD, 2) = 2000000
+
+// R.1 The policy: in force until cancelled; a loss is in the policy if it happens meanwhile
+Bool in-force
+  Holds when Not(Held(cancellation-noticed()) For 10)
+Fact loss
+Fact in-policy Identified by loss
+Event loss-happens Related to loss
+  Creates loss, notice-due()
+        , in-policy(loss) When in-force()
+
+// R.2 Premium
+Event month-begins
+  Creates premium-due() When in-force()
+Duty premium-due Holder insured Claimant insurer
+  Due within 1
+  Terminated by pay-premium
+Act pay-premium Actor insured Recipient insurer Related to usd
+  Valid when usd >= premium
+  Terminates cancellation-noticed() When in-force()
+
+// R.3 What is covered; R.4 What is not covered
+Fact cause Identified by Theft, Fire, Flood, OwnAct, Wear
+Evidenced Fact caused-by Identified by loss * cause
+Fact covered Identified by loss
+  Default theft-or-fire
+    Holds when in-policy(loss) && (caused-by(loss, Theft) || caused-by(loss, Fire))
+  Exception flood Overrides theft-or-fire Rejects when caused-by(loss, Flood)
+  Exception on-purpose Overrides theft-or-fire Rejects when caused-by(loss, OwnAct)
+  Exception ordinary-wear Overrides theft-or-fire Rejects when caused-by(loss, Wear)
+  Exception late-notice Overrides theft-or-fire Rejects when Not(noticed(loss))
+  Exception cause-in-dispute Overrides theft-or-fire
+    Rejects when (Exists cause: Conflicted(caused-by(loss, cause)))
+
+// R.5 Limit and deductible
+Function value Identified by loss * usd
+Function payable Identified by loss * usd
+  Derived from payable(value.loss, value.usd - deductible)
+                 When covered(value.loss) && value.usd > deductible
+                   && value.usd - deductible <= limit
+             , payable(value.loss, limit)
+                 When covered(value.loss) && value.usd - deductible > limit
+
+// R.6 Notice and proof of loss
+Duty notice-due Holder insured Claimant insurer Related to loss
+  Due within 30
+  Terminated by give-notice
+Fact noticed Identified by loss
+Act give-notice Actor insured Recipient insurer Related to loss
+  Valid when Not(Violated(notice-due()))
+  Creates noticed()
+Fact stated Identified by party * loss * cause
+Act prove-loss Actor insured Recipient insurer Related to loss, cause, usd
+  Holds when noticed()
+  Supports caused-by()
+  Creates value(), stated(insured, loss, cause)
+
+// R.7 Payment
+Duty claim-due Holder insurer Claimant insured Related to loss
+  Holds when (Exists payable: payable.loss == loss)
+  Due within 30
+  Terminated by pay-claim
+Act pay-claim Actor insurer Recipient insured Related to loss, usd
+  Valid when payable()
+
+// R.8 Disputed cause
+Act state-cause Actor insurer Recipient insured Related to loss, cause
+  Holds when True
+  Supports caused-by()
+  Creates stated(insurer, loss, cause)
+Act dispute-cause Actor party Related to loss, cause
+  Holds when (Exists party': party' != party && stated(party', loss, cause))
+  Rebuts caused-by()
+Fact answer Identified by Yes, No
+Finding decide-cause Actor adjuster Related to loss, cause, answer
+  Resolves caused-by() When answer == Yes
+  Resolves !caused-by() When answer == No
+  Holds when Conflicted(caused-by())
+  Valid when Conflicted(caused-by())
+
+// R.9 Cancellation
+Bool cancellation-noticed
+Power give-cancellation-notice Actor insurer Recipient insured
+  Holds when Violated(premium-due())
+  Valid when Violated(premium-due())
+  Creates cancellation-noticed()
+
+Clause R.1 Approved "44bd1b68db07fa847bf633ad06fb061727d1030b80fc3b4df9a598a28cfb95a8"
+  Definition "Harbor Mutual, the insurer, insures Nora Quinn, the insured, for her personal property at Flat 4, 12 Mill Lane."
+  Norm " This policy covers a loss that happens while it is in force." => pay-claim
+Clause R.2 Approved "13f4573d17fc1c38b81a686613286bfcd1e8c2351c0ffbe5aed78d6e803fc7fb"
+  Norm "The insured pays a premium of twenty dollars for each month, due on the first day of that month." => premium-due, pay-premium
+Clause R.3 Approved "b2a09dbcbc2b63ca90536825a27361cd51664551ef694e1f418d350f2a5f2e13"
+  Norm "The insurer covers the loss of the insured's personal property by theft or by fire." => pay-claim
+Clause R.4 Approved "8d57f3763702c8d1185f622ee433493bc4465b3f543c74e3496e166001ed24b2"
+  Norm "The insurer does not cover a loss, even one by theft or fire, if flood contributed to it, if the insured caused it on purpose, or if it is ordinary wear." => pay-claim
+Clause R.5 Approved "b56d98ebaf6b9066737fe5a2b3d1e3fa00d205019eed9390331bf06617d7e1f7"
+  Norm "For a covered loss the insurer pays the value of the property lost, less a deductible of five hundred dollars. The insurer never pays more than twenty thousand dollars for one loss." => pay-claim
+Clause R.6 Approved "9214ce1eb75065f78a2e15585fdf0103b325dcf9b6dc4e745e92f8c16a28207e"
+  Norm "The insured gives the insurer notice of a loss within thirty days after it happens." => notice-due, give-notice
+  Norm " The insurer owes nothing for a loss it was not given notice of within that time." => give-notice, pay-claim
+  Norm " After giving notice the insured sends the insurer a proof of loss stating what was lost, its value, and its cause." => prove-loss
+Clause R.7 Approved "935c7d94137a75a230554685c8805df5fd85c09ef9a23ce40bc1f7fa43bac8e1"
+  Norm "The insurer pays a covered loss within thirty days after it receives the proof of loss." => claim-due, pay-claim
+Clause R.8 Approved "76c01707a45c6e1c70118fb88e9f86ad299dfde92f41f4f20696773b18d98e71"
+  Norm "Either party may dispute a cause the other has stated for a loss." => state-cause, dispute-cause
+  Norm " Ines Okafor, the adjuster, then decides whether it was a cause of the loss, and her finding binds both parties." => decide-cause
+  Norm " When a cause is disputed, the thirty days for payment run from the adjuster's finding." => claim-due
+Clause R.9 Approved "69bafbdf33a4ef68a0bc4db16a43fe0fe1b6b8bfeb0825f384c09d221966121b"
+  Norm "If a premium is unpaid after it is due, the insurer may give the insured notice of cancellation." => give-cancellation-notice
+  Norm " This policy ends ten days after that notice, unless the insured pays the overdue premium before then." => give-cancellation-notice, pay-premium
+  Norm " The insurer may not cancel this policy for any other reason." => give-cancellation-notice
+.

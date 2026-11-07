@@ -95,5 +95,10 @@ step g5-product $st "$(tail -1 "$OUT/g5.log")"
 "$B" test --require-provenance --forbid-midstream-decls --require-complete-explore --deny-warnings "$EX1" "$EX2" "$EX3" "$EX4" > "$OUT/examples.log" 2>&1; st=$?
 step examples $st "$(tail -1 "$OUT/examples.log")"
 
+# 13. the worked examples in the root-and-cases layout (Examples/README.md): every root checks
+#     with complete provenance and every case file's scenarios pass
+tools/examples-check > "$OUT/worked-examples.log" 2>&1; st=$?
+step worked-examples $st "$(tail -1 "$OUT/worked-examples.log")"
+
 if [ $fail -eq 0 ]; then echo "battery: PASS"; else echo "battery: FAIL"; fi
 exit $fail

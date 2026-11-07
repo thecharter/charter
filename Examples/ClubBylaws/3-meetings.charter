@@ -1,0 +1,70 @@
+// Article 3. Meetings.
+#require "1-purpose.charter".
+Bool called
+Bool in-session
+Fact present Identified by person
+Duty meeting-due Holder person Claimant club
+  Due within 365
+Act call-meeting Actor person
+  Holds when (Exists office: officer(office, person))
+  Creates called()
+Power open-meeting Actor person
+  Holds when (Exists office: officer(office, person))
+  Valid when Held(called()) For 7
+  Creates in-session()
+  Terminates (Foreach person': meeting-due(person', club))
+Act attend Actor person
+  Holds when member(person)
+  Valid when in-session()
+  Creates present(person)
+Event meeting-ends
+  Creates (Foreach office, person: meeting-due(person, club) When officer(office, person))
+  Terminates in-session(), called(), (Foreach person: present(person))
+
+Bool quorum
+  Holds when in-session()
+    && Count(Foreach person: person When present(person) && member(person)) * 3
+         >= Count(Foreach person: person When member(person))
+
+Module motion(subject) {
+  Fact aye Identified by person * subject
+  Fact nay Identified by person * subject
+  Act vote-aye Actor person Related to subject
+    Holds when member(person) && present(person)
+    Valid when member(person) && present(person)
+    Creates aye()
+    Terminates nay()
+  Act vote-nay Actor person Related to subject
+    Holds when member(person) && present(person)
+    Valid when member(person) && present(person)
+    Creates nay()
+    Terminates aye()
+  Fact carried Identified by subject
+    Derived from carried(aye.subject)
+      When quorum() && Count(Foreach person: person When aye(person, aye.subject))
+                         > Count(Foreach person: person When nay(person, aye.subject))
+  Fact two-thirds Identified by subject
+    Derived from two-thirds(aye.subject)
+      When quorum() && Count(Foreach person: person When aye(person, aye.subject)) * 3
+                         >= (Count(Foreach person: person When aye(person, aye.subject))
+                             + Count(Foreach person: person When nay(person, aye.subject))) * 2
+  Extend Event meeting-ends Terminates (Foreach aye: aye), (Foreach nay: nay)
+}
+
+Fact question
+Fact resolved Identified by question
+Use motion(question) As motion
+Power resolve Actor club Related to question
+  Holds when True
+  Valid when motion-carried(question)
+  Creates resolved(question)
+
+Clause 3.1 Approved "0ceea482c8c75523d2ae742c6f52d3f1b59d9c9d2bcc183d4bf9b070b6217c0a"
+  Norm "The board calls a meeting of the members at least once a year, by giving every member at least seven days' notice." => meeting-due, call-meeting, open-meeting
+Clause 3.2 Approved "6ac61d96a4e1e51e0d3cdf92512394c9bd7ac90b3b34349e06505d45b2e62477"
+  Norm "A meeting has a quorum when at least one third of the members are present." => attend
+  Norm " A meeting without a quorum decides nothing." => resolve
+Clause 3.3 Approved "f82b0f0c2134314f81e762a7741cb5c865066a21d03c1944e7bd7061828a427e"
+  Norm "Each member present has one vote on each question." => motion-vote-aye, motion-vote-nay
+  Norm " Unless these bylaws say otherwise, a motion carries when more members vote for it than against it." => resolve
+.

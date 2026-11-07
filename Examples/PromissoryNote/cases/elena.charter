@@ -1,0 +1,98 @@
+// Elena's loan: $10,000.00 lent on day 0; an instalment of $860.66 every thirty days.
+#require "../note.charter".
+lend(Marcus, Elena).
+
+Scenario paid-on-the-day-every-time {
+  ?owing(1000000). ?!instalment-due(Elena, Marcus, 1).
+  @ 30.
+  ?instalment-due(Elena, Marcus, 1). ?interest-owing(5000).   // a twelfth of 6% of $10,000.00
+  pay(Elena, Marcus, 86066).
+  ?principal(918934). ?interest-owing(0). ?!instalment-due(Elena, Marcus, 1).
+  @ 60.
+  ?interest-owing(4595).                                      // on $9,189.34, not on $10,000.00
+  pay(Elena, Marcus, 86066).
+  ?principal(837463).
+  @ 90. pay(Elena, Marcus, 86066).
+  @ 120. pay(Elena, Marcus, 86066).
+  @ 150. pay(Elena, Marcus, 86066).
+  @ 180. pay(Elena, Marcus, 86066).
+  @ 210. pay(Elena, Marcus, 86066).
+  @ 240. pay(Elena, Marcus, 86066).
+  @ 270. pay(Elena, Marcus, 86066).
+  @ 300. pay(Elena, Marcus, 86066).
+  @ 330. pay(Elena, Marcus, 86066).
+  ?principal(85642).
+  @ 360.
+  ?owing(86070).                                              // the twelfth is four cents more
+  ?!lawful pay(Elena, Marcus, 86071).
+  pay(Elena, Marcus, 86066).
+  ?instalment-due(Elena, Marcus, 12).                         // a regular instalment does not clear it
+  pay(Elena, Marcus, 4).
+  ?owing(0). ?!instalment-due(Elena, Marcus, 12). ?!late(12).
+}
+
+Scenario ten-days-of-grace {
+  @ 30.
+  ?instalment-due(Elena, Marcus, 1).
+  @ 39.
+  ?!violated instalment-due(Elena, Marcus, 1). ?fees-owing(0).
+  @ 40.
+  ?violated instalment-due(Elena, Marcus, 1). ?late(1). ?fees-owing(4303).   // 5% of $860.66
+}
+
+Scenario a-late-instalment-stays-late-and-its-fee-is-paid-first {
+  @ 30. @ 45.
+  ?owing(1009303).                                            // principal, $50.00 interest, $43.03 fee
+  pay(Elena, Marcus, 2000).
+  ?fees-owing(2303). ?interest-owing(5000). ?principal(1000000).
+  pay(Elena, Marcus, 84066).
+  ?fees-owing(0). ?interest-owing(0). ?principal(923237).     // $860.66 less the fee and the interest
+  ?late(1). ?!instalment-due(Elena, Marcus, 1).
+}
+
+Scenario paying-ahead-costs-nothing-and-covers-the-next-instalments {
+  @ 10.
+  pay(Elena, Marcus, 300000).
+  ?!lawful charge-for-early-payment(Marcus, Elena).
+  charge-for-early-payment(Marcus, Elena).                    // a breach, and it adds nothing
+  ?principal(700000). ?fees-owing(0). ?owing(700000).
+  @ 30.
+  ?interest-owing(3500).                                      // on the $7,000.00 still unpaid
+  ?!instalment-due(Elena, Marcus, 1).
+  @ 90.
+  ?!instalment-due(Elena, Marcus, 3).                         // $3,000.00 covers three instalments
+  @ 120.
+  ?instalment-due(Elena, Marcus, 4).
+}
+
+Scenario paid-off-in-one-go {
+  @ 45.
+  ?owing(1009303).
+  pay(Elena, Marcus, 1009303).
+  ?owing(0). ?principal(0).
+  @ 360.
+  ?owing(0). ?!instalment-due(Elena, Marcus, 12).
+}
+
+Scenario thirty-days-of-default-and-the-loan-is-called-in {
+  @ 30. @ 59.
+  ?!valid call-in(Marcus, Elena).
+  call-in(Marcus, Elena).
+  ?!called-in(). ?!everything-due(Elena, Marcus).             // a notice a day early does nothing
+  @ 60.
+  ?valid call-in(Marcus, Elena).
+  call-in(Marcus, Elena).
+  ?violated everything-due(Elena, Marcus).
+  ?interest-owing(10000).                                     // simple: $50.00 twice, not $50.00 then $50.25
+  ?owing(1014303).
+  pay(Elena, Marcus, 1014303).
+  ?!everything-due(Elena, Marcus). ?principal(0).
+}
+
+Scenario no-default-no-call {
+  @ 30. pay(Elena, Marcus, 86066).
+  @ 60. @ 89.
+  ?!valid call-in(Marcus, Elena).                             // the second instalment is 29 days old
+  @ 90.
+  ?valid call-in(Marcus, Elena).
+}

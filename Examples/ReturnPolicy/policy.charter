@@ -1,0 +1,72 @@
+// The return and warranty policy of Calloway Cycles (policy.md).
+Document "policy.md"
+
+Fact shop Identified by Calloway
+Fact customer
+Fact item
+Fact usd Identified by Money(USD, 2)
+Fact proof Identified by Receipt, NoReceipt
+Param return-window : Duration = 30
+Param warranty : Duration = 365
+
+// The sale: who bought what, for how much, and whether as final sale
+Fact bought Identified by customer * item
+Function price Identified by item * usd
+Fact final-sale Identified by item
+Act sell Actor shop Recipient customer Related to item, usd
+  Holds when True
+  Creates bought(), price()
+
+// 1. Returns: thirty days; a refund with the receipt, store credit without; not final sale
+Fact returnable Identified by customer * item
+  Default bought-within-thirty-days Holds when bought() && Not(Held(bought()) For return-window)
+  Exception sold-as-final-sale Overrides bought-within-thirty-days Rejects when final-sale()
+Fact store-credit Identified by customer * item
+Act return Actor customer Related to item, proof
+  Holds when True
+  Valid when returnable()
+  Creates refund-due() When proof == Receipt, store-credit() When proof == NoReceipt
+  Terminates bought()
+
+// 2. Warranty: a defect within the year is repaired or replaced within thirty days
+Fact defective Identified by item
+Fact covered Identified by item
+Event defect-found Related to item
+  Creates defective(), covered() When (Exists customer: bought() && Not(Held(bought()) For warranty))
+Act bring-in Actor customer Related to item
+  Holds when True
+  Valid when bought() && covered()
+  Creates repair-due()
+Duty repair-due Holder shop Claimant customer Related to item
+  Due within 30
+  Terminated by repair, replace
+Act repair Actor shop Recipient customer Related to item
+  Valid when Not(Violated(repair-due()))
+  Terminates defective()
+Act replace Actor shop Recipient customer Related to item
+  Valid when Not(Violated(repair-due()))
+  Terminates defective()
+
+// 3. Refunds: due on a return with the receipt, or when the repair is overdue; paid in ten days
+Duty refund-due Holder shop Claimant customer Related to item
+  Holds when Violated(repair-due())
+  Due within 10
+  Terminated by refund
+Act refund Actor shop Recipient customer Related to item, usd
+  Valid when price()
+  Terminates repair-due()
+
+Clause 1.1 Approved "17875da241220e1b77c2485f82664251cd64f527f3e2cb41af7227d54a59247c"
+  Norm "A customer may return an item to Calloway Cycles within thirty days after buying it." => sell, return
+Clause 1.2 Approved "f3972859bc4a1472b587c2d13699eb19376951deac8e0858a97f6d9c36265e58"
+  Norm "A customer who returns an item with its receipt receives a refund of the price paid." => return, refund-due, refund
+  Norm " A customer who returns an item without its receipt receives store credit for the price instead." => return
+Clause 1.3 Approved "b8ace2674fd43bdd8123cd163dc7cf9b874394f9d9f3c6996611ae0dbd468512"
+  Norm "An item sold as final sale cannot be returned." => return
+Clause 2.1 Approved "cb699c8b52587250f79e61f60ccb7fe6906df5fdd78a551aa96d5eea3dd5ac69"
+  Norm "If an item proves defective within one year after it was bought, the shop repairs or replaces it once the customer brings it in." => bring-in, repair-due, repair, replace
+Clause 2.2 Approved "48d885b4e598691e4d06ae73ad072b3079dc2cc16312ae076dbb482b28b011b6"
+  Norm "If the shop has not repaired or replaced the item within thirty days after the customer brought it in, the shop refunds the price paid." => repair, replace, refund-due, refund
+Clause 3.1 Approved "49a52ccf11a50814abe490ea1f39195ddd9cb7d48b34716b0c3088b7a3061eeb"
+  Norm "The shop pays a refund within ten days after it becomes due." => refund-due, refund
+.

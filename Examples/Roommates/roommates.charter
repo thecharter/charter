@@ -1,0 +1,118 @@
+// A roommate agreement among Asha Verma, Luis Ortega and Mei Tanaka (roommates.md).
+Document "roommates.md"
+
+// M.1 The household
+Fact person Identified by Asha, Luis, Mei
+Placeholder candidate For person
+Placeholder leaver For person
+Fact landlord Identified by Grove
+Fact roommate Identified by person
+Fact usd Identified by Money(USD, 2)
+Param rent : Money(USD, 2) = 200000
+
+// M.2 Rent: shares by floor area; Asha pays the landlord, the others pay Asha
+Function room Identified by person * int
+Function share Identified by person * usd
+  Derived from share(room.person, MulDivRound(rent, room.int, Sum(Foreach room': room'.int), Floor))
+Var rent-payer Identified by person
+Event month-begins
+  Creates (Foreach person: rent-due(person, landlord) When roommate(person))
+        , (Foreach person, person': share-due(person, person')
+             When roommate(person) && rent-payer(person') && person != person')
+Duty share-due Holder person Claimant person'
+  Due within 1
+  Terminated by pay-share
+Act pay-share Actor person Recipient person' Related to usd
+  Valid when share(person, usd)
+
+// M.3 Joint liability: every roommate owes the landlord the whole rent
+Duty rent-due Holder person Claimant landlord
+  Due within 1
+Act pay-rent Actor person Recipient landlord Related to usd
+  Holds when rent-due()
+  Valid when usd == rent
+  Terminates (Foreach person': rent-due(person', landlord))
+
+// M.4 Utilities
+Fact bill
+Duty utility-due Holder person Claimant person' Related to bill, usd
+  Due within 14
+  Terminated by pay-utility
+Act show-bill Actor person Related to bill, usd
+  Holds when roommate(person)
+  Creates (Foreach person': utility-due(person', person, bill, MulDivRound(usd, 1, 3, Floor))
+             When roommate(person') && person' != person)
+Act pay-utility Actor person Recipient person' Related to bill, usd
+
+// M.5 Leaving
+Fact leaving Identified by person
+Fact moved-out Identified by person
+Act give-notice Actor person
+  Holds when roommate(person)
+  Creates leaving(person)
+Act move-out Actor person
+  Holds when Held(leaving(person)) For 30
+  Creates moved-out(person)
+Fact approved Identified by person * candidate
+Act approve Actor person Related to candidate
+  Holds when roommate(person)
+  Creates approved()
+Power take-place Actor candidate Related to leaver
+  Holds when True
+  Valid when leaving(leaver) && Not(roommate(candidate))
+    && (Forall person: approved(person, candidate) When roommate(person) && person != leaver)
+  Creates roommate(candidate)
+        , (Foreach room: room(candidate, room.int) When room.person == leaver)
+        , rent-payer(candidate) When rent-payer(leaver)
+  Terminates roommate(leaver), leaving(leaver)
+           , (Foreach room: room When room.person == leaver)
+
+// M.6 Quiet hours
+Bool quiet-hours
+Event night-falls Creates quiet-hours()
+Event morning-comes Terminates quiet-hours()
+Act make-noise Actor person
+  Holds when Not(quiet-hours())
+
+// M.7 Guests
+Fact guest
+Fact staying Identified by guest * person
+Fact consented Identified by person * guest
+Act host Actor person Related to guest
+  Holds when roommate(person)
+  Creates guest, staying()
+Act see-off Actor person Related to guest
+  Holds when staying()
+  Terminates staying()
+Act consent-to-stay Actor person Related to guest
+  Holds when roommate(person)
+  Creates consented()
+Duty guest-leaves Holder person Claimant person' Related to guest
+  Holds when staying(guest, person) && roommate(person') && person' != person
+    && Not(consented(person', guest))
+  Due within 4
+
+Clause M.1 Approved "8ad565cf6ff61aec3bd08f5999ac975bc998f119e4054006ca01e6e40a9ced70"
+  Definition "Asha Verma, Luis Ortega and Mei Tanaka, the roommates, rent the flat at 9 Canal Street from Grove Lettings, the landlord."
+Clause M.2 Approved "553f3ed0b713486be5a87448e22aa54a6ddc2ab381ee059403398c7e3cfaf29c"
+  Norm "The rent is two thousand dollars a month." => pay-rent
+  Norm " The roommates share it in proportion to the floor area of their rooms: Asha's room is fourteen square metres, Luis's twelve and Mei's ten. A share is rounded down to the cent." => pay-share
+  Norm " Asha pays the landlord the whole rent on the first of each month, and each of the others pays Asha their share by the same day." => rent-due, pay-rent, share-due, pay-share
+Clause M.3 Approved "213559ac72e256072cfa56a8ce27def044738438c3808b0984c486d2510bd472"
+  Norm "Each roommate is liable to the landlord for the whole rent, whoever has paid a share to whom." => rent-due, pay-rent
+Clause M.4 Approved "ff03730f0d0612a022723b7319764328696c5b057b26676b31e7c2a5c8dc8af8"
+  Norm "A roommate who pays a utility bill is owed one third of it by each of the others, rounded down to the cent, within fourteen days after showing them the bill." => show-bill, utility-due, pay-utility
+Clause M.5 Approved "dc4604cfdc3ef09f79a375a4613513eda32cbc1178eea34c587b8ff3c81c132c"
+  Norm "A roommate who wants to leave gives the others thirty days' notice, and may not move out before the thirty days have passed." => give-notice, move-out
+  Norm " A replacement takes the leaving roommate's room, share and place in this agreement only when every other roommate has approved the replacement." => approve, take-place
+  Norm " Until then the leaving roommate remains a roommate, liable for rent and utilities, whether or not they have moved out." => take-place
+Clause M.6 Approved "157638a08febf46a52287d9d724712f4853eb79b53ef4c2f95cd9007823e5a45"
+  Definition "Quiet hours run from ten at night to seven in the morning."
+  Norm " During quiet hours no roommate makes noise that can be heard in another roommate's room." => make-noise
+Clause M.7 Approved "ca0ced883f0c9d13336fd649c250e14b14a786a7469298c21d04ff6c45422741"
+  Norm "A roommate's guest may stay at most three nights in a row." => host, see-off, guest-leaves
+  Norm " A longer stay needs the consent of every other roommate." => consent-to-stay, guest-leaves
+.
++roommate(Asha). +roommate(Luis). +roommate(Mei).
++room(Asha, 14). +room(Luis, 12). +room(Mei, 10).
++rent-payer(Asha).

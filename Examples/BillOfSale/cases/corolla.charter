@@ -1,0 +1,99 @@
+// The Corolla: Grace owns it on day 0; the price is $6,500.00; Mallory is a stranger.
+#require "../bill-of-sale.charter".
+Extend Fact person Identified by Mallory.
++owner(Corolla, Grace).
+
+Scenario ownership-passes-on-payment-and-delivery {
+  pay(Leo, Grace, Corolla, 650000).
+  ?owner(Corolla, Grace).                               // paid for, not yet delivered
+  deliver(Grace, Leo, Corolla).
+  ?owner(Corolla, Leo). ?!owner(Corolla, Grace).
+  ?title-due(Grace, Leo, Corolla).
+  @ 4.
+  ?!violated title-due(Grace, Leo, Corolla).
+  @ 5.
+  ?violated title-due(Grace, Leo, Corolla).
+  hand-over-title(Grace, Leo, Corolla).
+  ?!title-due(Grace, Leo, Corolla).
+}
+
+Scenario delivered-first-paid-later {
+  deliver(Grace, Leo, Corolla).
+  ?owner(Corolla, Grace). ?!title-due(Grace, Leo, Corolla).
+  ?!valid pay(Leo, Grace, Corolla, 600000).
+  pay(Leo, Grace, Corolla, 600000).                     // $500.00 short is not the price
+  ?owner(Corolla, Grace).
+  pay(Leo, Grace, Corolla, 650000).
+  ?owner(Corolla, Leo).
+}
+
+Scenario a-seller-who-does-not-own-the-car {
+  +owner(Corolla, Mallory).
+  pay(Leo, Grace, Corolla, 650000).
+  ?!lawful deliver(Grace, Leo, Corolla).
+  deliver(Grace, Leo, Corolla).                         // she hands it over all the same
+  ?owner(Corolla, Mallory). ?!owner(Corolla, Leo).
+  ?!title-due(Grace, Leo, Corolla).
+  ?valid cancel(Leo, Grace, Corolla).
+  cancel(Leo, Grace, Corolla).
+  ?owner(Corolla, Mallory).
+  ?refund-due(Grace, Leo, Corolla).
+  @ 9.
+  ?!violated refund-due(Grace, Leo, Corolla).
+  @ 10.
+  ?violated refund-due(Grace, Leo, Corolla).
+  refund(Grace, Leo, Corolla).
+  ?!refund-due(Grace, Leo, Corolla).
+}
+
+Scenario a-lien-on-the-car {
+  SubmitEvidence lien(Corolla) By Registry.
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?owner(Corolla, Leo).
+  cancel(Leo, Grace, Corolla).
+  ?owner(Corolla, Grace).                               // the car goes back
+  ?refund-due(Grace, Leo, Corolla). ?!title-due(Grace, Leo, Corolla).
+}
+
+Scenario the-seller-knew-the-odometer-was-wrong {
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?!valid cancel(Leo, Grace, Corolla).
+  SubmitEvidence knew-reading-wrong(Grace, Corolla) By Mechanic.
+  ?valid cancel(Leo, Grace, Corolla).
+}
+
+Scenario second-thoughts-are-not-a-ground {
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?!valid cancel(Leo, Grace, Corolla).
+  cancel(Leo, Grace, Corolla).
+  ?owner(Corolla, Leo). ?!refund-due(Grace, Leo, Corolla).
+}
+
+Scenario as-is-means-no-claim-for-a-worn-clutch {
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?lawful demand-repair(Leo, Grace, Corolla, "worn clutch").
+  ?!valid demand-repair(Leo, Grace, Corolla, "worn clutch").
+  demand-repair(Leo, Grace, Corolla, "worn clutch").
+  ?!repair-due(Grace, Leo, Corolla, "worn clutch").
+}
+
+Scenario a-cracked-frame-the-seller-knew-of-and-hid {
+  SubmitEvidence known("cracked frame") By Mechanic.
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?valid demand-repair(Leo, Grace, Corolla, "cracked frame").
+  demand-repair(Leo, Grace, Corolla, "cracked frame").
+  ?repair-due(Grace, Leo, Corolla, "cracked frame").
+  @ 29.
+  ?!violated repair-due(Grace, Leo, Corolla, "cracked frame").
+  @ 30.
+  ?violated repair-due(Grace, Leo, Corolla, "cracked frame").
+  pay-for-repair(Grace, Leo, Corolla, "cracked frame").
+  ?!repair-due(Grace, Leo, Corolla, "cracked frame").
+}
+
+Scenario a-known-defect-the-seller-told-the-buyer-about {
+  SubmitEvidence known("cracked frame") By Mechanic.
+  disclose(Grace, Leo, "cracked frame").
+  pay(Leo, Grace, Corolla, 650000). deliver(Grace, Leo, Corolla).
+  ?!valid demand-repair(Leo, Grace, Corolla, "cracked frame").
+}

@@ -1,0 +1,8 @@
+// The rules of the Larch Court Homeowners' Association (rules.md): the articles, in the document's order.
+Document "rules.md".
+#require "1-association.charter".
+#require "2-assessments.charter".
+#require "3-fines.charter".
+#require "4-architecture.charter".
+#require "5-amendment.charter".
+#require "A-proposed-amendment.charter".

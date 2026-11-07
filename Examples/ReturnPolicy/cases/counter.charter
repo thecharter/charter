@@ -1,0 +1,99 @@
+// A week at the counter: Ines buys a helmet, Tomas a lamp and a clearance jersey.
+#require "../policy.charter".
+Extend Fact customer Identified by Ines, Tomas.
+Extend Fact item Identified by Helmet, Lamp, Jersey.
++final-sale(Jersey).
+sell(Calloway, Ines, Helmet, 4500).
+sell(Calloway, Tomas, Lamp, 2000).
+sell(Calloway, Tomas, Jersey, 3000).
+
+Scenario a-return-with-the-receipt-is-refunded-within-ten-days {
+  @ 29.
+  ?valid return(Ines, Helmet, Receipt).
+  return(Ines, Helmet, Receipt).
+  ?refund-due(Calloway, Ines, Helmet).
+  ?!store-credit(Ines, Helmet).
+  ?!valid refund(Calloway, Ines, Helmet, 4000).   // not the price paid
+  refund(Calloway, Ines, Helmet, 4000).
+  ?refund-due(Calloway, Ines, Helmet).            // the short refund discharged nothing
+  @ 38.
+  ?!violated refund-due(Calloway, Ines, Helmet).
+  @ 39.
+  ?violated refund-due(Calloway, Ines, Helmet).
+  refund(Calloway, Ines, Helmet, 4500).
+  ?!refund-due(Calloway, Ines, Helmet).
+}
+
+Scenario without-the-receipt-it-is-store-credit {
+  return(Tomas, Lamp, NoReceipt).
+  ?store-credit(Tomas, Lamp).
+  ?!refund-due(Calloway, Tomas, Lamp).
+  ?!valid return(Tomas, Lamp, Receipt).           // it has been returned already
+}
+
+Scenario day-thirty-is-too-late {
+  @ 30.
+  ?lawful return(Ines, Helmet, Receipt).          // she may ask
+  ?!valid return(Ines, Helmet, Receipt).
+  return(Ines, Helmet, Receipt).
+  ?!refund-due(Calloway, Ines, Helmet).           // and nothing comes of it
+  ?bought(Ines, Helmet).
+}
+
+Scenario a-final-sale-item-cannot-be-returned {
+  ?!returnable(Tomas, Jersey).
+  ?!valid return(Tomas, Jersey, Receipt).
+  return(Tomas, Jersey, Receipt).
+  ?!refund-due(Calloway, Tomas, Jersey).
+  ?!valid return(Ines, Lamp, Receipt).            // nor an item someone else bought
+}
+
+Scenario a-defect-within-the-year-is-repaired {
+  @ 200.
+  ?!valid bring-in(Tomas, Lamp).                  // nothing is wrong with it
+  defect-found(Lamp).
+  bring-in(Tomas, Lamp).
+  ?repair-due(Calloway, Tomas, Lamp).
+  @ 229.
+  ?!violated repair-due(Calloway, Tomas, Lamp).
+  replace(Calloway, Tomas, Lamp).
+  ?!repair-due(Calloway, Tomas, Lamp). ?!defective(Lamp).
+  @ 230.
+  ?!refund-due(Calloway, Tomas, Lamp).
+}
+
+Scenario not-repaired-in-thirty-days-means-a-refund {
+  @ 200.
+  defect-found(Lamp).
+  bring-in(Tomas, Lamp).
+  @ 229.
+  ?!refund-due(Calloway, Tomas, Lamp).
+  @ 230.
+  ?violated repair-due(Calloway, Tomas, Lamp).
+  ?refund-due(Calloway, Tomas, Lamp).
+  ?!valid repair(Calloway, Tomas, Lamp).          // too late to repair instead
+  repair(Calloway, Tomas, Lamp).
+  ?refund-due(Calloway, Tomas, Lamp).
+  @ 239.
+  ?!violated refund-due(Calloway, Tomas, Lamp).
+  @ 240.
+  ?violated refund-due(Calloway, Tomas, Lamp).
+  refund(Calloway, Tomas, Lamp, 2000).
+  ?!refund-due(Calloway, Tomas, Lamp). ?!repair-due(Calloway, Tomas, Lamp).
+}
+
+Scenario a-defect-after-the-year-is-not-covered {
+  @ 365.
+  defect-found(Lamp).
+  ?defective(Lamp). ?!covered(Lamp).
+  ?!valid bring-in(Tomas, Lamp).
+  bring-in(Tomas, Lamp).
+  ?!repair-due(Calloway, Tomas, Lamp).
+}
+
+Scenario a-defect-found-in-the-year-is-covered-whenever-it-is-brought-in {
+  @ 364.
+  defect-found(Lamp).
+  @ 500.
+  ?valid bring-in(Tomas, Lamp).
+}

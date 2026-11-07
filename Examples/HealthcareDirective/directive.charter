@@ -1,0 +1,96 @@
+// The advance healthcare directive of Walter Okafor (directive.md).
+Document "directive.md"
+
+Fact person Identified by Walter, Grace, Samuel
+Placeholder agent For person
+Fact physician
+Fact attending Identified by physician
+Fact committee Identified by EthicsCommittee
+Fact treatment Identified by LifeSupport
+Fact choice Identified by Consent, Refuse
+
+// H.1, H.6: in effect, and who the agent is
+Bool signed
+Bool revoked
+Bool in-effect
+  Holds when signed() && Not(revoked())
+Act sign Actor person
+  Holds when person == Walter
+  Creates signed()
+Power revoke Actor person
+  Holds when person == Walter
+  Valid when person == Walter
+  Creates revoked()
+Fact out Identified by agent
+Act decline Actor agent
+  Holds when True
+  Creates out()
+Event becomes-unable Related to agent
+  Creates out()
+Power dismiss Actor person Related to agent
+  Holds when person == Walter
+  Valid when person == Walter
+  Creates out()
+Fact serving Identified by agent
+  Holds when in-effect() && agent == Grace && Not(out(Grace))
+           , in-effect() && agent == Samuel && out(Grace) && Not(out(Samuel))
+
+// H.3: capacity is a question of evidence
+Evidenced Bool lacks-capacity
+Act determine-incapacity Actor physician
+  Holds when attending()
+  Supports lacks-capacity()
+Act disagree Actor physician
+  Holds when Not(attending())
+  Rebuts lacks-capacity()
+Finding withdraw-determination Actor physician
+  Resolves !lacks-capacity()
+  Holds when attending()
+  Valid when attending()
+Finding find-incapacity Actor committee
+  Resolves lacks-capacity()
+  Holds when Conflicted(lacks-capacity())
+  Valid when Conflicted(lacks-capacity())
+Finding find-capacity Actor committee
+  Resolves !lacks-capacity()
+  Holds when Conflicted(lacks-capacity())
+  Valid when Conflicted(lacks-capacity())
+
+// H.4, H.5: what the agent may choose
+Bool terminal
+Act diagnose-terminal Actor physician
+  Holds when attending()
+  Creates terminal()
+Fact open-to-agent Identified by treatment * choice
+  Default agent-chooses Holds when True
+  Exception my-instruction Overrides agent-chooses
+    Rejects when treatment == LifeSupport && choice == Consent && terminal()
+
+// H.2: who decides
+Function decision Identified by treatment * choice
+Power decide Actor person Related to treatment, choice
+  Holds when (person == Walter && (Unresolved(lacks-capacity()) || Not(lacks-capacity())))
+          || (serving(person) && Not(Unresolved(lacks-capacity())) && lacks-capacity() && open-to-agent())
+  Valid when (person == Walter && (Unresolved(lacks-capacity()) || Not(lacks-capacity())))
+          || (serving(person) && Not(Unresolved(lacks-capacity())) && lacks-capacity() && open-to-agent())
+  Creates decision()
+
+Clause H.1 Approved "d2af0be6d267088b4e3ea70ee0bb866442d39f8e7ff71cd3a3cfe0d4ac2984ea"
+  Definition "I, Walter Okafor, appoint my daughter Grace Okafor as my healthcare agent."
+  Norm " If Grace is unable or unwilling to act, my brother Samuel Okafor is my agent in her place." => decline, decide
+  Norm " This directive takes effect when I sign it." => sign
+Clause H.2 Approved "62d384cb2ad26c8ffac21d7c2e43322ac5301b136a0530d53e87f5b39f8a44da"
+  Norm "While I have capacity, I make my own treatment decisions. My agent decides for me only while I lack capacity." => decide
+Clause H.3 Approved "e318b10b2e111e23540095d798091502a6ff286325cc95e74cbf479c1dd437da"
+  Norm "I am presumed to have capacity." => decide
+  Norm " I lack capacity when my attending physician determines in writing that I cannot understand or communicate a treatment decision." => determine-incapacity
+  Norm " If another physician disagrees in writing, the hospital ethics committee decides the question, and until it decides neither my decisions nor my agent's are acted on." => disagree, find-incapacity, find-capacity, decide
+  Norm " If my attending physician withdraws the determination, I have capacity again." => withdraw-determination
+Clause H.4 Approved "a3c48820fb7d418255a5b75b840ccb65fcd8d5cd43bf5408a1b08a18fecb51d8"
+  Norm "While my agent decides for me, my agent may consent to or refuse any treatment, except as H.5 says." => decide
+Clause H.5 Approved "c2d30eb9efc88d82621af338a8c7f21b37ae1a424d0a2971f007bcdbaab5b8d0"
+  Norm "If my attending physician has diagnosed me as terminally ill, I do not want life support." => diagnose-terminal
+  Norm " This instruction overrides my agent's choice: my agent's consent to life support then has no effect." => decide
+Clause H.6 Approved "c99fb30decdb743ece9684b835aa77d34a819521dffc89b97036cd97b4504434"
+  Norm "I may revoke this directive, or dismiss an agent, at any time, whether or not I have capacity." => revoke, dismiss
+.

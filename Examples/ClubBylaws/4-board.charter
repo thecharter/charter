@@ -1,0 +1,39 @@
+// Article 4. The board.
+#require "3-meetings.charter".
+Placeholder candidate For person
+Placeholder incumbent For person
+
+Fact choice Identified by person * office * candidate
+Act vote-for Actor person Recipient candidate Related to office
+  Holds when member(person) && present(person) && member(candidate)
+  Valid when member(person) && present(person) && member(candidate)
+  Creates choice()
+  Terminates (Foreach candidate': choice(person, office, candidate'))
+Extend Event meeting-ends Terminates (Foreach choice: choice)
+Fact leads Identified by office * candidate
+  Holds when Count(Foreach person: person When choice()) > 0
+    && Not(Exists candidate': candidate' != candidate
+             && Count(Foreach person: person When choice(candidate = candidate'))
+                  >= Count(Foreach person: person When choice()))
+Power elect Actor club Recipient candidate Related to office
+  Holds when True
+  Valid when quorum() && leads() && Not(Exists office': office' != office && officer(office', candidate))
+  Creates officer(office, candidate) For 365
+
+Use motion(incumbent) As removal
+Power remove Actor club Recipient incumbent
+  Holds when True
+  Valid when removal-two-thirds(incumbent)
+  Terminates (Foreach office: officer(office, incumbent))
+
+Clause 4.1 Approved "6b37625ab7836008c22f5ec9f245f2ac2bcac87829ff444115a53494579f185c"
+  Definition "The board has three offices: president, secretary and treasurer."
+  Norm " No member holds two offices." => elect
+Clause 4.2 Approved "75827ca1b5b8a79d652c521fb4438cb12f5944c0dd7650e2d4e8b3c83625e96d"
+  Norm "At a meeting the members elect a member to each office." => vote-for, elect
+  Norm " The candidate who receives the most votes for an office is elected." => elect
+Clause 4.3 Approved "6c6ec3536a85847fd536c130799ad93fd16c7a9512e35f0c3fd55c6c4338a5b1"
+  Norm "An officer serves for one year from election." => elect
+Clause 4.4 Approved "9d44830ce466e2320a216a9dfb8cf68d5f6b976eaa5f982e73a0094ee26e9c45"
+  Norm "The members may remove an officer by a vote of two thirds of the members voting." => removal-vote-aye, removal-vote-nay, remove
+.

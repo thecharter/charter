@@ -1,0 +1,10 @@
+// Operating Agreement of Tidewater Kayak LLC (agreement.md): the articles, in the document's order.
+Document "agreement.md".
+#require "1-members.charter".
+#require "2-decisions.charter".
+#require "3-distributions.charter".
+#require "4-sale.charter".
+#require "5-withdrawal.charter".
+#require "6-dissolution.charter".
+#require "7-amendment.charter".
+#require "A-first-amendment.charter".

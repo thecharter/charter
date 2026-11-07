@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Stamp `Approved "<sha256>"` on every clause of a .charter file that `charter check`
+reports as not yet approved.
+
+    tools/approve-clauses [--restamp] FILE.charter ...
+
+Without --restamp only clauses that have never been approved are stamped. With --restamp,
+clauses whose text has drifted from their approval are stamped again; use it only after
+reviewing the drifted clause (spec 012.8: an approval is a record of review).
+
+This exists because the language has no `charter approve`: the author otherwise copies each
+64-character digest out of the check report by hand.
+"""
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+CHARTER = ROOT / ".lake" / "build" / "bin" / "charter"
+
+NEW = re.compile(r'STALE (\S+): not yet approved; once reviewed, declare `Approved "([0-9a-f]{64})"`')
+DRIFT = re.compile(r'STALE (\S+): text differs from the approved text \(current sha256 "([0-9a-f]{64})"')
+HEADER = re.compile(r'^(Clause\s+(\S+)(?:\s+In\s+\S+)?)(?:\s+Approved\s+(?:"[0-9a-f]{64}"|\d+))?\s*$')
+
+
+def stamp(path: pathlib.Path, restamp: bool) -> int:
+    out = subprocess.run([str(CHARTER), "check", str(path)], capture_output=True, text=True)
+    report = out.stdout + out.stderr
+    wanted = dict(NEW.findall(report))
+    if restamp:
+        wanted.update(dict(DRIFT.findall(report)))
+    if not wanted:
+        return 0
+    lines = path.read_text(encoding="utf-8").split("\n")
+    done = 0
+    for i, line in enumerate(lines):
+        m = HEADER.match(line)
+        if m and m.group(2) in wanted:
+            lines[i] = f'{m.group(1)} Approved "{wanted.pop(m.group(2))}"'
+            done += 1
+    # Clauses left in `wanted` are declared in a file this one `#require`s; stamp that file.
+    if done:
+        path.write_text("\n".join(lines), encoding="utf-8")
+    return done
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    restamp = "--restamp" in args
+    files = [a for a in args if a != "--restamp"]
+    if not files:
+        sys.exit(__doc__)
+    for f in files:
+        n = stamp(pathlib.Path(f), restamp)
+        print(f"{f}: stamped {n} clause(s)")
+
+
+if __name__ == "__main__":
+    main()

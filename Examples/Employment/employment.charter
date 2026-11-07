@@ -1,0 +1,122 @@
+// The employment agreement between Harborlight Bakery and Nadia Okafor (employment.md).
+Document "employment.md"
+
+Fact party Identified by Harborlight, Nadia
+Fact employer Identified by Harborlight
+Fact employee Identified by Nadia
+Fact usd Identified by Money(USD, 2)
+Param salary : Money(USD, 2) = 600000
+Param notice-period : Duration = 14
+Param release-window : Duration = 21
+Param non-solicit-period : Duration = 365
+
+// 1. Employment: begins when both have signed; at will; fourteen days' notice
+Fact signed Identified by party
+Bool ended
+Bool employed
+  Holds when (Forall party: signed()) && Not(ended())
+Act sign Actor party
+  Holds when True
+  Creates signed()
+
+Bool dismissed
+Bool dismissed-for-cause
+Power dismiss Actor employer Recipient employee
+  Holds when employed()
+  Valid when employed()
+  Creates ended(), dismissed(), dismissed-for-cause() When cause()
+
+Bool notice-given
+Act give-notice Actor employee Recipient employer
+  Holds when employed()
+  Creates notice-given()
+Power leave Actor employee Recipient employer
+  Holds when employed() && Held(notice-given()) For notice-period
+  Valid when employed()
+  Creates ended()
+
+// 2. Pay: a month's salary five days after the month; an expense thirty days after submission
+Fact month Identified by Int
+Event month-ends Related to month
+  Creates salary-due() When employed()
+Duty salary-due Holder employer Claimant employee Related to month
+  Due within 5
+  Terminated by pay-salary
+Act pay-salary Actor employer Recipient employee Related to month, usd
+  Valid when usd == salary
+
+Fact expense
+Act submit-expense Actor employee Recipient employer Related to expense
+  Holds when employed()
+Duty reimbursement-due Holder employer Claimant employee Related to expense
+  Due within 30
+  Created by submit-expense
+  Terminated by reimburse
+Act reimburse Actor employer Recipient employee Related to expense
+
+// 3. Cause, and severance on a release signed within twenty-one days
+Bool warned
+Act warn Actor employer Recipient employee
+  Holds when employed()
+  Creates warned()
+Bool cause
+Event theft Creates cause()
+Event felony-conviction Creates cause()
+Event neglect Creates cause() When warned()
+
+Bool released
+Bool released-in-time
+Act sign-release Actor employee Recipient employer
+  Holds when dismissed()
+  Creates released(), released-in-time() When dismissed() && Not(Held(dismissed()) For release-window)
+Bool severance-earned
+  Default timely-release Holds when released-in-time()
+  Exception for-cause Overrides timely-release Rejects when dismissed-for-cause()
+Duty severance-due Holder employer Claimant employee
+  Holds when severance-earned()
+  Due within 10
+  Terminated by pay-severance
+Act pay-severance Actor employer Recipient employee Related to usd
+  Valid when usd == salary * 2
+
+// 4. After employment: confidentiality and the twelve months without soliciting
+Fact secret
+Fact consented Identified by secret
+Act consent-to-disclosure Actor employer Recipient employee Related to secret
+  Holds when True
+  Creates consented()
+Act disclose Actor employee Related to secret
+  Holds when consented()
+
+Fact staff
+Act solicit Actor employee Related to staff
+  Holds when Not(staff) || Not(ended()) || Held(ended()) For non-solicit-period
+
+Clause 1.1 Approved "0dc1f1d5cc4d851355ea6cc8e7c343495ec524fc4f24d8531aee7eada76af10e"
+  Definition "Harborlight Bakery, the employer, employs Nadia Okafor, the employee, as head baker."
+  Norm " Employment begins when both have signed this agreement." => sign
+Clause 1.2 Approved "0cfbffcf39e40a667f776aad1d8eea00a6d1d7a71ce249e88e7166b7b954bdc7"
+  Norm "Employment is at will. Either party may end it at any time, with or without cause." => dismiss, leave
+Clause 1.3 Approved "9d1c0b921eafc5f2bb3427732cefa5dc39973ae67120b186e60d329a4bffc9c9"
+  Norm "The employee gives the employer fourteen days' notice before she leaves." => give-notice, leave
+  Norm " Leaving without that notice is a breach of this agreement, but it still ends the employment." => leave
+Clause 2.1 Approved "dc1415409b1bf9dd447f9825bad7d9ee861073bed0f5457b96e2a034dee5cb10"
+  Definition "The salary is six thousand dollars a month."
+  Norm " The employer pays each month's salary within five days after the month ends." => salary-due, pay-salary
+Clause 2.2 Approved "001a1ff9ebe7b037272886f164d0e359da6bbfe391803339f099fc8f5902f37e"
+  Norm "The employer reimburses a business expense within thirty days after the employee submits it." => submit-expense, reimbursement-due, reimburse
+Clause 3.1 Approved "502a84026877abd9b0d3d102ad490f2f03bedb8ade744b846a2b61dd7ad21e78"
+  Norm "The employer has cause to terminate when the employee has stolen from the employer, has been convicted of a felony, or has neglected her duties after a written warning." => warn, dismiss
+Clause 3.2 Approved "f49c9d6d14016ad576f1aad77d0ab542884e7026c74f97405706ba0616434ef1"
+  Norm "If the employer terminates the employment and the employee signs a release of claims within twenty-one days after the termination, the employer pays her severance of two months' salary within ten days after she signs." => sign-release, severance-due, pay-severance
+  Norm " A release signed later than that earns no severance." => sign-release
+Clause 3.3 Approved "f405e0e4b1322771aaaed972d7603b4b5c513b169366ce46e268994c091a8c9a"
+  Norm "A termination for cause carries no severance." => dismiss, severance-due
+Clause 4.1 Approved "acd098078b143d005cebb15a9ed0fa7f6415f4c929fa3444f8844f26154e3c41"
+  Norm "The employee discloses the employer's confidential information only with the employer's written consent." => disclose, consent-to-disclosure
+  Norm " This clause continues to bind her after the employment ends." => disclose
+Clause 4.2 Approved "dd38532ef50e1255cad4d88ed149ce4145b0ebedbe5b4e843acbd5fdd1322653"
+  Norm "For twelve months after the employment ends, the employee does not solicit any member of the employer's staff to leave the employer." => solicit
+Clause 4.3 Approved "39451e37d7ebd00c1887e4cf5e35ff30f78455bd08b8564eabdec1e8cfaa95a4"
+  Norm "Salary and expenses that fell due before the employment ended remain payable after it." => salary-due, reimbursement-due
+.

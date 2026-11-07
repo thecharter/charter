@@ -1,0 +1,94 @@
+// The settlement and mutual release between Elena Voss and Northgate Parking (settlement.md).
+Document "settlement.md"
+
+Fact party Identified by Elena, Northgate
+Fact claimant Identified by Elena
+Fact defendant Identified by Northgate
+Fact matter Identified by Incident, AnotherMatter
+Fact usd Identified by Money(USD, 2)
+Param settlement-sum : Money(USD, 2) = 1800000
+Param payment-window : Duration = 14
+
+// 1. The lawsuit, and effect on both signatures
+Fact pending Identified by party * party' * matter
+Fact signed Identified by party
+Bool rescinded
+Bool in-effect
+  Holds when (Forall party: signed()) && Not(rescinded())
+Act sign Actor party
+  Holds when True
+  Creates signed()
+
+// 2. Payment: the whole sum within fourteen days of taking effect
+Var paid Identified by usd
+Bool paid-in-full
+  Holds when paid.usd >= settlement-sum
+Bool paid-late
+Act pay Actor defendant Recipient claimant Related to usd
+  Holds when in-effect()
+  Creates paid(paid.usd + usd), paid-late() When Held(in-effect()) For payment-window
+Duty payment-due Holder defendant Claimant claimant
+  Holds when in-effect() && Not(paid-in-full())
+  Due within payment-window
+
+// 3. Release: only on full payment; then no released claim is brought, and the lawsuit is dismissed
+Bool released
+  Holds when in-effect() && paid-in-full()
+Power sue Actor party Recipient party' Related to matter
+  Holds when Not(released() && matter == Incident)
+  Valid when Not(released() && matter == Incident)
+  Creates pending()
+Duty dismissal-due Holder claimant Claimant defendant
+  Holds when released() && pending(claimant, defendant, Incident)
+  Due within 7
+Act dismiss-lawsuit Actor claimant Recipient defendant
+  Holds when pending(claimant, defendant, Incident)
+  Terminates pending(claimant, defendant, Incident)
+
+// 4. Late payment: the claimant may rescind, and then returns what was paid
+Bool payment-late
+  Holds when Violated(payment-due()) || paid-late()
+Power rescind Actor claimant Recipient defendant
+  Holds when payment-late()
+  Valid when payment-late()
+  Creates rescinded()
+Duty return-due Holder claimant Claimant defendant
+  Holds when rescinded() && paid.usd > 0
+Act return-payment Actor claimant Recipient defendant Related to usd
+  Holds when rescinded()
+  Valid when usd == paid.usd
+  Creates paid(0)
+
+// 5. Confidentiality
+Fact compelled Identified by party
+Event legal-demand Related to party Creates compelled()
+Act disclose-terms Actor party
+  Holds when compelled()
+
+// 6. No admission
+Fact admission Identified by party
+Invariant no-admission When Not(Exists party: admission())
+
+Clause 1.1 Approved "d3e62c809f6964e117d22b3590e038e7b0274a6b31db981244fb0738b672c102"
+  Definition "Elena Voss, the claimant, has sued Northgate Parking, the defendant, over the collapse of a garage gate onto her car, which this agreement calls the incident."
+Clause 1.2 Approved "c8eab7b3047e92f5ebdca073cb6592e19cb6d79726ed8b43bf01e0c0d73dd0b1"
+  Norm "This agreement takes effect when both parties have signed it." => sign
+Clause 2.1 Approved "fce093f4fdd9a5c434db71992ff5a31fa612230acca1518e20cd368170653707"
+  Norm "The defendant pays the claimant eighteen thousand dollars within fourteen days after this agreement takes effect." => payment-due, pay
+Clause 3.1 Approved "3d7331c32d07aa7732ec881bef596f67d10110b2bb786e507a72a436365e5dcd"
+  Norm "When the defendant has paid in full, each party releases the other from every claim arising from the incident." => pay, sue
+  Norm " Until then no claim is released." => sue
+Clause 3.2 Approved "1932bed618aa94b8995e6e2f7805507060ef1913ac25a4dfb17759694577c5fa"
+  Norm "Neither party brings a claim that it has released." => sue
+Clause 3.3 Approved "d8e5d60224ccc9f6bc6ea43168d890208c3ba28d8fed712c0ea3d550343f7351"
+  Norm "The claimant dismisses the lawsuit within seven days after the defendant has paid in full." => dismissal-due, dismiss-lawsuit
+Clause 4.1 Approved "ef794762439ec36f5dfb212e4ba35b8c95277443e67174d1efce6393abe4152b"
+  Norm "If the defendant has not paid in full within the fourteen days, the claimant may rescind this agreement." => rescind
+  Norm " After rescission the release is treated as never having taken effect, and the claimant returns whatever the defendant has paid." => rescind, sue, return-due, return-payment
+Clause 5.1 Approved "a3170acebefee30b65e783b5efae09b13da6dae4f23b7c428ee7f74a506012db"
+  Norm "Neither party discloses the terms of this agreement." => disclose-terms
+  Norm " A party may disclose them where the law requires it." => disclose-terms
+Clause 6.1 Approved "8ab0342dab328ead00739c6aaf804a753a1ea56c8bddaccce3ce77c70ebd0e3a"
+  Invariant "Nothing in this agreement is an admission of fault by either party." => no-admission
+.
++paid(0). +pending(Elena, Northgate, Incident).

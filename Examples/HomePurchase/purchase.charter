@@ -1,0 +1,125 @@
+// A purchase agreement for 14 Alder Lane between Nora Whitfield and Omar Reyes (purchase.md).
+Document "purchase.md"
+
+Fact seller Identified by Nora
+Fact buyer Identified by Omar
+Fact escrow-agent Identified by HarborTitle
+Fact usd Identified by Money(USD, 2)
+Param price : Money(USD, 2) = 40000000
+Param earnest : Money(USD, 2) = 1000000
+
+// 1. Sale: binding once both have signed; open until closed or cancelled
+Bool seller-signed
+Bool buyer-signed
+Act seller-signs Actor seller Holds when True Creates seller-signed()
+Act buyer-signs Actor buyer Holds when True Creates buyer-signed()
+Bool signed Holds when seller-signed() && buyer-signed()
+Bool cancelled
+Bool open Holds when signed() && Not(cancelled()) && Not(closed())
+
+// 2. Earnest money: due in three days, held in escrow, paid out only as the agreement says
+Bool in-escrow
+Bool refundable
+Bool forfeited
+Duty earnest-due Holder buyer Claimant seller
+  Holds when open() && Not(in-escrow())
+  Due within 3
+Act pay-earnest Actor buyer Recipient escrow-agent Related to usd
+  Holds when open()
+  Valid when usd == earnest
+  Creates in-escrow()
+Act refund Actor escrow-agent Recipient buyer
+  Holds when in-escrow() && refundable()
+  Terminates in-escrow()
+Act pay-seller Actor escrow-agent Recipient seller
+  Holds when in-escrow() && (closed() || forfeited())
+  Terminates in-escrow()
+Power cancel-for-no-earnest Actor seller Recipient buyer
+  Holds when True
+  Valid when Violated(earnest-due())
+  Creates cancelled()
+
+// 3. Inspection: ten days
+Power cancel-on-inspection Actor buyer Recipient seller
+  Holds when True
+  Valid when open() && Not(Held(signed()) For 10)
+  Creates cancelled(), refundable()
+
+// 4. Financing: thirty days
+Bool loan-committed
+Event lender-commits Creates loan-committed()
+Power cancel-on-financing Actor buyer Recipient seller
+  Holds when True
+  Valid when open() && Not(loan-committed()) && Not(Held(signed()) For 30)
+  Creates cancelled(), refundable()
+
+// 5. Closing: the rest of the price and the deed, within forty-five days
+Var paid Identified by Money(USD, 2)
+Bool deed-delivered
+Duty balance-due Holder buyer Claimant seller
+  Holds when open() && paid < price - earnest
+  Due within 45
+Act pay-price Actor buyer Recipient seller Related to usd
+  Holds when open()
+  Creates paid(paid + usd)
+Duty deed-due Holder seller Claimant buyer
+  Holds when open() && Not(deed-delivered())
+  Due within 45
+Act deliver-deed Actor seller Recipient buyer
+  Holds when open()
+  Creates deed-delivered()
+Bool closed Holds when deed-delivered() && paid >= price - earnest
+
+// 6. Default
+Power cancel-for-no-deed Actor buyer Recipient seller
+  Holds when True
+  Valid when Violated(deed-due())
+  Creates cancelled(), refundable()
+Power cancel-for-no-payment Actor seller Recipient buyer
+  Holds when True
+  Valid when Violated(balance-due())
+  Creates cancelled(), forfeited()
+
+// 7. Risk of loss
+Bool destroyed
+Event house-destroyed Creates destroyed()
+Power cancel-on-loss Actor buyer Recipient seller
+  Holds when True
+  Valid when open() && destroyed()
+  Creates cancelled(), refundable()
+
+Clause 1.1 Approved "03735c1e471b23c65ecb1eabc37020fe68035388af1cc7f44ae824d194751722"
+  Norm "Nora Whitfield, the seller, sells the house at 14 Alder Lane to Omar Reyes, the buyer, for four hundred thousand dollars." => pay-price, deliver-deed
+Clause 1.2 Approved "9a0e8644163d8dbbf61182ef9af4efc7ea9386adf089c95253fd534d4048be46"
+  Norm "This agreement binds the parties once both of them have signed it." => seller-signs, buyer-signs
+  Definition " The day the second of them signs is the signing day."
+Clause 2.1 Approved "83524afaa747d26994bc1023622e8b8837d65cda34b40799c1c01e501606a978"
+  Norm "Within three days after the signing day the buyer pays earnest money of ten thousand dollars to Harbor Title, the escrow agent." => earnest-due, pay-earnest
+Clause 2.2 Approved "e2a5b5fd21c107e1de19df8245e347fc2693545ec076eae321f62e885d622e14"
+  Norm "The escrow agent holds the earnest money and pays it out only as this agreement says." => refund, pay-seller
+Clause 2.3 Approved "288f37cf205954a56ad8839c9389540d351c53b575d911019e9de8a6654da755"
+  Norm "If the earnest money is not paid in time, the seller may cancel this agreement." => cancel-for-no-earnest
+Clause 3.1 Approved "c5d7066813ace4d511d469f589277ae357a447ad2fd3696b7f1a7a68c6f17462"
+  Norm "For ten days after the signing day the buyer may have the house inspected and may cancel this agreement for any reason." => cancel-on-inspection
+  Norm " If the buyer cancels under this section, the earnest money is returned to the buyer." => cancel-on-inspection, refund
+Clause 4.1 Approved "2ca4df1b14f59bfc9b901897c4fc73b215366b0ae70f229e9a4d014472cdf154"
+  Definition "This sale depends on the buyer obtaining a loan."
+  Norm " For thirty days after the signing day the buyer may cancel this agreement if no lender has committed to make the loan." => cancel-on-financing
+  Norm " If the buyer cancels under this section, the earnest money is returned to the buyer." => cancel-on-financing, refund
+Clause 5.1 Approved "da0e19817d9651d7293c746b8bfbe6cbb1eb28418e852efbd4aa0fd474737048"
+  Norm "Closing takes place within forty-five days after the signing day." => balance-due, deed-due
+  Norm " At closing the buyer pays the seller the rest of the price and the seller delivers the deed to the buyer." => pay-price, deliver-deed
+Clause 5.2 Approved "43bb1d5158aca990fc409b841c7013665ed7222849d30bda197a6bf6956d4e34"
+  Norm "When both have been done the sale is closed: title to the house passes to the buyer, and the earnest money is paid to the seller as part of the price." => pay-seller
+Clause 6.1 Approved "ede0f6e0c7036a77abf774e6ee8a615c49ee196f1660d98557dd6589f18cc84b"
+  Norm "If the seller does not deliver the deed in time, the buyer may cancel this agreement and the earnest money is returned to the buyer." => cancel-for-no-deed, refund
+Clause 6.2 Approved "9a47e41d0217e9a3574faa1a57a227e8209eefe7a7fcd55f31c9eaa5526e4b56"
+  Norm "If the buyer does not pay the rest of the price in time, the seller may cancel this agreement and keeps the earnest money." => cancel-for-no-payment, pay-seller
+Clause 7.1 Approved "98f936840cb12954b6e29c581e29fe37996114f5a2e10a3e78d935485e684d7d"
+  Definition "Until closing the risk of loss stays with the seller."
+  Norm " If the house is destroyed before closing, the buyer may cancel this agreement and the earnest money is returned to the buyer." => cancel-on-loss, refund
+Clause 8.1 Approved "88a129567686665d1d7b1da6abeb840faca56ba2973d239abc2b3a0c84fec725"
+  Norm "A cancellation that this agreement does not allow has no effect." => cancel-for-no-earnest, cancel-on-inspection, cancel-on-financing, cancel-for-no-deed, cancel-for-no-payment, cancel-on-loss
+  Norm " Once this agreement is cancelled, neither party owes the other anything more under it." => earnest-due, balance-due, deed-due
+.
++paid(0).

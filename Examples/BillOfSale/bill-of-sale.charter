@@ -1,0 +1,84 @@
+// A bill of sale for Grace Tanaka's 2015 Corolla, sold to Leo Varga (bill-of-sale.md).
+Document "bill-of-sale.md"
+
+Fact person Identified by Grace, Leo
+Placeholder seller For person
+Placeholder buyer For person
+Fact car Identified by Corolla
+Fact usd Identified by Money(USD, 2)
+Param price : Money(USD, 2) = 650000
+
+// 1 and 2.1. Payment and delivery; ownership passes when both are done
+Function owner Identified by car * person
+Fact paid Identified by seller * buyer * car
+Fact delivered Identified by seller * buyer * car
+Act pay Actor buyer Recipient seller Related to car, usd
+  Holds when True
+  Valid when usd == price
+  Creates paid(), owner(car, buyer) When delivered() && owner(car, seller)
+Act deliver Actor seller Recipient buyer Related to car
+  Holds when owner(car, seller)
+  Creates delivered(), owner(car, buyer) When paid() && owner(car, seller)
+
+// 2.2 The signed title, within five days
+Fact title-handed Identified by seller * buyer * car
+Duty title-due Holder seller Claimant buyer Related to car
+  Holds when paid() && delivered() && owner(car, buyer) && Not(title-handed())
+  Due within 5
+Act hand-over-title Actor seller Recipient buyer Related to car
+  Holds when True
+  Creates title-handed()
+
+// 3. Ownership, liens, the odometer: the buyer may cancel and is refunded in ten days
+Evidenced Fact lien Identified by car
+Evidenced Fact knew-reading-wrong Identified by seller * car
+Fact cancelled Identified by seller * buyer * car
+Power cancel Actor buyer Recipient seller Related to car
+  Holds when True
+  Valid when paid() && Not(cancelled())
+    && ((Not(owner(car, seller)) && Not(owner(car, buyer))) || lien() || knew-reading-wrong())
+  Creates cancelled(), owner(car, seller) When owner(car, buyer)
+Duty refund-due Holder seller Claimant buyer Related to car
+  Due within 10
+  Created by cancel
+  Terminated by refund
+Act refund Actor seller Recipient buyer Related to car
+
+// 4. As is, unless the seller knew of the defect and concealed it
+Fact defect
+Evidenced Fact known Identified by defect
+Fact disclosed Identified by defect
+Act disclose Actor seller Recipient buyer Related to defect
+  Holds when True
+  Creates disclosed()
+Immunity as-is Holder seller Related to defect Against demand-repair
+  Holds when True
+  Unless known() && Not(disclosed())
+Act demand-repair Actor buyer Recipient seller Related to car, defect
+  Holds when delivered()
+Duty repair-due Holder seller Claimant buyer Related to car, defect
+  Due within 30
+  Created by demand-repair
+  Terminated by pay-for-repair
+Act pay-for-repair Actor seller Recipient buyer Related to car, defect
+
+Clause 1.1 Approved "a13f8589eb42df13f6f1af48d67cffcb6bf70235b66cc7bd558f784c100f7a0b"
+  Norm "Grace Tanaka, the seller, sells her 2015 Corolla to Leo Varga, the buyer, for six thousand five hundred dollars." => pay, deliver
+Clause 2.1 Approved "3a3953d55ea771e87726ef1ee4585698ff06c66891ed366e192e67d54c39fd9f"
+  Norm "Ownership of the car passes to the buyer when the buyer has paid the price and the seller has delivered the car." => pay, deliver
+  Norm " A seller passes only the ownership she has." => pay, deliver
+Clause 2.2 Approved "abdd88990260b4069415e7c9817db3057820f41a94ef0f3c9e53edecfd2261db"
+  Norm "The seller hands the signed certificate of title to the buyer within five days after ownership passes." => title-due, hand-over-title
+Clause 3.1 Approved "11235defae0eaba3550ee36d1a22189213a237abfa6d1aedbd32ca1c0b9b580a"
+  Norm "The seller warrants that she owns the car and that there is no lien on it." => deliver, cancel
+Clause 3.2 Approved "0002748988386efd48cc4241338c481de3baa58801a9daf81ac16d552b05d765"
+  Definition "The seller states that the odometer reads 84,210 miles and that she knows of no reason why that is not the distance the car has travelled."
+Clause 3.3 Approved "ba52354ecf677c328b68f55d6e4f5d982fe9fd62266b412cee80515426ebc49c"
+  Norm "If the seller did not own the car, or there is a lien on it, or the seller knew the odometer reading was wrong, the buyer may cancel the sale." => cancel
+  Norm " The car then goes back to the seller, and the seller refunds the price within ten days after the cancellation." => cancel, refund-due, refund
+Clause 4.1 Approved "fdd583ee979661838e426f4f714e175e7205379baa89427e72ee868fbb62a918"
+  Norm "The car is sold as is. The seller gives no warranty of its condition, and the buyer has no claim against the seller for a defect." => as-is, demand-repair
+Clause 4.2 Approved "9b81ea4bcf1f878b70699bc4886757f468885bee9834e7cc2b0206b297ce2bf5"
+  Norm "That does not protect a seller who knew of a defect and concealed it from the buyer." => as-is, disclose
+  Norm " The seller pays for the repair of such a defect within thirty days after the buyer demands it." => demand-repair, repair-due, pay-for-repair
+.

@@ -1,0 +1,8 @@
+// The parenting plan for Mia Castellan (plan.md): the articles, in the document's order.
+Document "plan.md".
+#require "1-schedule.charter".
+#require "2-holidays.charter".
+#require "3-missed-time.charter".
+#require "4-support.charter".
+#require "5-relocation.charter".
+#require "6-changes.charter".

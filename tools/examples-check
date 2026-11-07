@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Check every worked example under Examples/ that follows the root-and-cases layout
+# (Examples/README.md): a directory with a `cases/` subdirectory.
+#
+#   - each root (a .charter file beside `cases/` that declares a `Document`) must pass
+#     `charter check --require-provenance --deny-warnings` with coverage `complete`;
+#   - each `cases/*.charter` must pass `charter test --deny-warnings`.
+#
+#     tools/examples-check            every example
+#     tools/examples-check Deed Will  only the named directories
+#
+# Prints one line per file and a summary; exits non-zero if anything failed.
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B=.lake/build/bin/charter
+[ -x "$B" ] || { echo "FAIL examples-check: $B is not built"; exit 2; }
+
+if [ $# -gt 0 ]; then
+  dirs=(); for n in "$@"; do dirs+=("Examples/$n"); done
+else
+  dirs=(); for d in Examples/*/; do [ -d "${d}cases" ] && dirs+=("${d%/}"); done
+fi
+
+examples=0; roots=0; cases=0; failed=0
+for d in "${dirs[@]}"; do
+  examples=$((examples+1))
+  found_root=0
+  for f in "$d"/*.charter; do
+    grep -q '^Document ' "$f" 2>/dev/null || continue
+    found_root=1; roots=$((roots+1))
+    out=$("$B" check --require-provenance --deny-warnings "$f" 2>&1); st=$?
+    last=$(printf '%s\n' "$out" | tail -1)
+    if [ $st -eq 0 ] && printf '%s' "$last" | grep -q 'coverage complete'; then
+      echo "ok    $f"
+    else
+      echo "FAIL  $f: $last"; failed=$((failed+1))
+    fi
+  done
+  [ $found_root -eq 1 ] || { echo "FAIL  $d: no root file declares a Document"; failed=$((failed+1)); }
+  found_case=0
+  for c in "$d"/cases/*.charter; do
+    [ -e "$c" ] || continue
+    found_case=1; cases=$((cases+1))
+    out=$("$B" test --deny-warnings "$c" 2>&1); st=$?
+    if [ $st -eq 0 ]; then
+      echo "ok    $c"
+    else
+      echo "FAIL  $c: $(printf '%s\n' "$out" | grep -v '^ok' | head -3 | tr '\n' ' ')"; failed=$((failed+1))
+    fi
+  done
+  [ $found_case -eq 1 ] || { echo "FAIL  $d: no case files"; failed=$((failed+1)); }
+done
+
+echo "$examples example(s), $roots root(s), $cases case file(s), $failed failed"
+[ $failed -eq 0 ]

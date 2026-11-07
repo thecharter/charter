@@ -1,0 +1,73 @@
+// The estate of Margaret Ellis: two witnesses, one earlier will, one debt.
+#require "../will.charter".
+Extend Fact person Identified by Wendy, Walt.
++earlier-will("will of 2015").
++debt("mortgage").
+
+Scenario distributed-as-written {
+  sign(Margaret). attest(Wendy). attest(Walt).
+  ?in-effect(). ?revoked("will of 2015").
+  death(Margaret).
+  ?acting(Daniel). ?!acting(Priya).
+  @ 29.
+  ?!valid distribute(Daniel, Anna, House).     // the thirty days have not run
+  @ 30.
+  ?valid distribute(Daniel, Anna, House).
+  ?!lawful distribute(Daniel, Anna, House).    // debts come first
+  pay-debt(Daniel, "mortgage").
+  ?lawful distribute(Daniel, Anna, House).
+  distribute(Daniel, Anna, House).
+  distribute(Daniel, Ben, Cash).
+  ?received(House, Anna). ?received(Cash, Ben).
+}
+
+Scenario one-witness-is-not-enough {
+  sign(Margaret). attest(Wendy).
+  ?!in-effect(). ?!revoked("will of 2015").
+  death(Margaret).
+  @ 30.
+  pay-debt(Daniel, "mortgage").
+  ?!valid distribute(Daniel, Anna, House).
+  distribute(Daniel, Anna, House).
+  ?!received(House, Anna).
+}
+
+Scenario a-beneficiary-who-dies-within-thirty-days {
+  sign(Margaret). attest(Wendy). attest(Walt).
+  death(Margaret).
+  @ 10.
+  death(Ben).
+  @ 30.
+  ?!valid distribute(Daniel, Ben, Cash).
+  ?valid distribute(Daniel, Shelter, Cash).    // the gift fell into the residue
+  ?valid distribute(Daniel, Anna, House).
+}
+
+Scenario a-gift-to-a-witness-is-void {
+  sign(Margaret). attest(Wendy). attest(Anna).
+  ?in-effect().
+  death(Margaret).
+  @ 30.
+  ?!valid distribute(Daniel, Anna, House).
+  ?valid distribute(Daniel, Shelter, House).
+}
+
+Scenario the-substitute-executor-acts {
+  sign(Margaret). attest(Wendy). attest(Walt).
+  death(Margaret).
+  decline(Daniel).
+  ?acting(Priya). ?!acting(Daniel).
+  @ 30.
+  ?!valid distribute(Daniel, Anna, House).
+  ?valid distribute(Priya, Anna, House).
+}
+
+Scenario a-gift-before-the-debts-is-a-breach-that-still-passes {
+  sign(Margaret). attest(Wendy). attest(Walt).
+  death(Margaret).
+  @ 30.
+  ?!lawful distribute(Daniel, Anna, House).
+  ?valid distribute(Daniel, Anna, House).
+  distribute(Daniel, Anna, House).
+  ?received(House, Anna).
+}

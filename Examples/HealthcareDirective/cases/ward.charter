@@ -1,0 +1,107 @@
+// Walter in hospital: Dr Adler attends him, Dr Bose is a second physician.
+#require "../directive.charter".
+Extend Fact physician Identified by DrAdler, DrBose.
+Extend Fact treatment Identified by Surgery.
++attending(DrAdler).
+sign(Walter).
+
+Scenario capacity-is-presumed {
+  ?Unresolved(lacks-capacity()).
+  ?valid decide(Walter, Surgery, Consent).
+  ?!valid decide(Grace, Surgery, Consent).
+  ?!undetermined decide(Grace, Surgery, Consent).
+  decide(Grace, Surgery, Refuse).
+  ?!decision(Surgery, Refuse).                     // it occurred and decided nothing
+  decide(Walter, Surgery, Consent).
+  ?decision(Surgery, Consent).
+}
+
+Scenario the-agent-decides-once-the-attending-physician-determines-incapacity {
+  ?!lawful determine-incapacity(DrBose).           // not the attending physician
+  determine-incapacity(DrAdler).
+  ?Established(lacks-capacity()).
+  ?valid decide(Grace, Surgery, Consent).
+  ?!valid decide(Walter, Surgery, Refuse).
+  ?!valid decide(Samuel, Surgery, Consent).        // Grace is serving
+  decide(Grace, Surgery, Consent).
+  ?decision(Surgery, Consent).
+}
+
+Scenario physicians-disagree-and-the-committee-decides {
+  determine-incapacity(DrAdler).
+  disagree(DrBose).
+  ?Conflicted(lacks-capacity()).
+  ?undetermined decide(Grace, Surgery, Consent).
+  ?undetermined decide(Walter, Surgery, Consent).
+  ?!valid decide(Grace, Surgery, Consent).
+  ?!valid decide(Walter, Surgery, Consent).
+  find-incapacity(EthicsCommittee).
+  ?Established(lacks-capacity()).
+  ?valid decide(Grace, Surgery, Consent).
+  ?!valid find-capacity(EthicsCommittee).          // nothing is in dispute now
+}
+
+Scenario the-committee-finds-capacity {
+  determine-incapacity(DrAdler).
+  ?!valid find-capacity(EthicsCommittee).          // no one has disagreed
+  disagree(DrBose).
+  find-capacity(EthicsCommittee).
+  ?Refuted(lacks-capacity()).
+  ?valid decide(Walter, Surgery, Refuse).
+  ?!valid decide(Grace, Surgery, Consent).
+}
+
+Scenario the-determination-is-withdrawn {
+  determine-incapacity(DrAdler).
+  ?valid decide(Grace, Surgery, Consent).
+  withdraw-determination(DrAdler).
+  ?valid decide(Walter, Surgery, Consent).
+  ?!valid decide(Grace, Surgery, Consent).
+}
+
+Scenario the-instruction-overrides-the-agent {
+  determine-incapacity(DrAdler).
+  ?valid decide(Grace, LifeSupport, Consent).      // not terminal
+  diagnose-terminal(DrAdler).
+  ?!valid decide(Grace, LifeSupport, Consent).
+  ?!conflict open-to-agent(LifeSupport, Consent).
+  decide(Grace, LifeSupport, Consent).
+  ?!decision(LifeSupport, Consent).
+  ?valid decide(Grace, LifeSupport, Refuse).
+  ?valid decide(Grace, Surgery, Consent).          // every other choice is still hers
+}
+
+Scenario the-instruction-does-not-bind-walter-himself {
+  diagnose-terminal(DrAdler).
+  ?valid decide(Walter, LifeSupport, Consent).
+}
+
+Scenario the-alternate-agent-steps-in {
+  determine-incapacity(DrAdler).
+  ?serving(Grace). ?!serving(Samuel).
+  decline(Grace).
+  ?serving(Samuel). ?!serving(Grace).
+  ?valid decide(Samuel, Surgery, Consent).
+  ?!valid decide(Grace, Surgery, Consent).
+}
+
+Scenario when-neither-agent-can-act-no-one-decides-for-walter {
+  determine-incapacity(DrAdler).
+  becomes-unable(Grace).
+  ?serving(Samuel).
+  decline(Samuel).
+  ?!serving(Samuel). ?!serving(Grace).
+  ?!valid decide(Samuel, Surgery, Consent).
+}
+
+Scenario revocable-even-without-capacity {
+  determine-incapacity(DrAdler).
+  ?valid dismiss(Walter, Grace).
+  dismiss(Walter, Grace).
+  ?serving(Samuel).
+  ?valid revoke(Walter).
+  revoke(Walter).
+  ?!serving(Samuel).
+  ?!valid decide(Samuel, Surgery, Consent).
+  ?!valid revoke(Grace).
+}

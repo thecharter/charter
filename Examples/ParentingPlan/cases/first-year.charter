@@ -1,0 +1,119 @@
+// Mia's first year under the plan. Day 0 is the first day of Rosa's first week and of a month.
+#require "../plan.charter".
+
+Scenario weeks-alternate {
+  ?regular-week(Daniel, Rosa). ?with(Rosa).
+  ?!violated regular-week(Daniel, Rosa).
+  @ 7.
+  ?regular-week(Rosa, Daniel). ?!regular-week(Daniel, Rosa).
+  ?!violated regular-week(Rosa, Daniel).           // the handover day itself
+  hand-over(Rosa, Daniel).
+  ?with(Daniel).
+  @ 14.
+  ?regular-week(Daniel, Rosa).
+  @ 15.
+  ?violated regular-week(Daniel, Rosa).            // Daniel kept Mia a day into Rosa's week
+}
+
+Scenario kept-past-the-handover-then-made-up {
+  @ 9.
+  ?violated regular-week(Rosa, Daniel).            // two days into Daniel's week
+  hand-over(Rosa, Daniel).
+  ?!violated regular-week(Rosa, Daniel).
+  ?make-up-due(Rosa, Daniel).
+  @ 68.
+  ?!violated make-up-due(Rosa, Daniel).
+  @ 69.
+  ?violated make-up-due(Rosa, Daniel).
+  give-make-up-time(Rosa, Daniel).
+  ?!make-up-due(Rosa, Daniel).
+}
+
+Scenario a-handover-on-time-owes-nothing {
+  @ 7.
+  hand-over(Rosa, Daniel).
+  ?!make-up-due(Rosa, Daniel).
+  ?!lawful hand-over(Rosa, Daniel).                // Mia is not with Rosa
+}
+
+Scenario the-holiday-overrides-the-regular-week {
+  @ 7.
+  hand-over(Rosa, Daniel).
+  @ 10.
+  holiday-begins(Winter).                          // Daniel's holiday; Mia is already with him
+  ?holiday-time(Rosa, Daniel).
+  @ 15.
+  ?regular-week(Daniel, Rosa).                     // it is Rosa's regular week
+  ?!violated regular-week(Daniel, Rosa).           // but the holiday overrides it
+  @ 17.
+  holiday-ends(Winter).
+  ?!violated regular-week(Daniel, Rosa).           // the day the holiday ends is a handover day
+  @ 18.
+  ?violated regular-week(Daniel, Rosa).            // the regular schedule is back
+  hand-over(Daniel, Rosa).
+  ?!violated regular-week(Daniel, Rosa).
+  ?make-up-due(Daniel, Rosa).
+}
+
+Scenario the-holiday-parent-is-owed-the-holiday {
+  @ 2.
+  holiday-begins(Winter).                          // Rosa's regular week, Daniel's holiday
+  ?!violated holiday-time(Rosa, Daniel).
+  @ 3.
+  ?violated holiday-time(Rosa, Daniel).            // Rosa kept Mia a day into the holiday
+  hand-over(Rosa, Daniel).
+  ?make-up-due(Rosa, Daniel).
+}
+
+Scenario support-is-due-by-the-fifth-with-three-days-of-grace {
+  month-begins(1).
+  ?support-due(Daniel, Rosa, 1).
+  @ 7.
+  ?!violated support-due(Daniel, Rosa, 1).         // inside the grace period
+  @ 8.
+  ?violated support-due(Daniel, Rosa, 1).
+  ?!valid pay-support(Daniel, Rosa, 1, 60000).     // not the amount
+  pay-support(Daniel, Rosa, 1, 60000).
+  ?support-due(Daniel, Rosa, 1).                   // it occurred and discharged nothing
+  pay-support(Daniel, Rosa, 1, 65000).
+  ?!support-due(Daniel, Rosa, 1).
+}
+
+Scenario two-months-unpaid-are-two-debts {
+  month-begins(1).
+  @ 30.
+  month-begins(2).
+  pay-support(Daniel, Rosa, 1, 65000).
+  ?!support-due(Daniel, Rosa, 1).
+  ?support-due(Daniel, Rosa, 2).                   // the second month is still owed
+  @ 37.
+  ?!violated support-due(Daniel, Rosa, 2).
+  @ 38.
+  ?violated support-due(Daniel, Rosa, 2).
+}
+
+Scenario relocation-needs-sixty-days-notice {
+  ?!lawful move-home(Daniel).
+  give-move-notice(Daniel, Rosa).
+  @ 59.
+  ?!lawful move-home(Daniel).
+  @ 60.
+  ?lawful move-home(Daniel).
+  ?!lawful move-home(Rosa).                        // Rosa gave no notice
+  move-home(Rosa).
+  ?moved(Rosa).                                    // a breach, and she has still moved
+}
+
+Scenario only-the-court-changes-the-support-amount {
+  agree-to-change(Rosa, Daniel, 50000).
+  agree-to-change(Daniel, Rosa, 50000).
+  ?support(65000).                                 // the agreement changed nothing
+  month-begins(1).
+  ?!valid pay-support(Daniel, Rosa, 1, 50000).
+  ?!valid order-support(Rosa, 50000).              // a parent is not the court
+  order-support(Rosa, 50000).
+  ?support(65000).
+  order-support(FamilyCourt, 50000).
+  ?support(50000). ?!support(65000).
+  ?valid pay-support(Daniel, Rosa, 1, 50000).
+}

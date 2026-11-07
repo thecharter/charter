@@ -1,0 +1,59 @@
+// Lot 7: a tax lien on the land, and a second buyer, Victor.
+#require "../deed.charter".
+Extend Fact person Identified by Victor, Mallory.
++lien(Lot7, "county tax lien").
+
+Scenario delivery-passes-title {
+  ?!valid deliver(Robert, Sofia, Lot7).          // not yet signed
+  sign(Robert, Sofia, Lot7).
+  ?title(Lot7, Robert).                          // signing alone passes nothing
+  deliver(Robert, Sofia, Lot7).
+  ?title(Lot7, Sofia). ?!title(Lot7, Robert).
+}
+
+Scenario a-stranger-conveys-nothing {
+  sign(Mallory, Victor, Lot7).
+  ?!valid deliver(Mallory, Victor, Lot7).
+  deliver(Mallory, Victor, Lot7).
+  ?title(Lot7, Robert).
+}
+
+Scenario the-grantor-pays-off-the-old-lien {
+  sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
+  demand-payoff(Sofia, Robert, Lot7, "county tax lien").
+  ?payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  @ 29.
+  ?!violated payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  @ 30.
+  ?violated payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  pay-off(Robert, Sofia, Lot7, "county tax lien").
+  ?!lien(Lot7, "county tax lien").
+  ?!payoff-due(Robert, Sofia, Lot7, "county tax lien").
+}
+
+Scenario an-unrecorded-deed-loses-to-a-later-buyer-without-notice {
+  sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
+  sign(Robert, Victor, Lot7).
+  ?!valid deliver(Robert, Victor, Lot7).         // Victor has not paid
+  +paid-value(Victor, Lot7).
+  ?valid deliver(Robert, Victor, Lot7).
+  deliver(Robert, Victor, Lot7).
+  ?title(Lot7, Victor). ?!title(Lot7, Sofia).
+}
+
+Scenario a-recorded-deed-binds-the-later-buyer {
+  sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
+  record(Sofia, Lot7).
+  sign(Robert, Victor, Lot7).
+  +paid-value(Victor, Lot7).
+  ?!valid deliver(Robert, Victor, Lot7).
+  deliver(Robert, Victor, Lot7).
+  ?title(Lot7, Sofia).
+}
+
+Scenario a-later-buyer-with-notice-takes-nothing {
+  sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
+  sign(Robert, Victor, Lot7).
+  +paid-value(Victor, Lot7). +notice(Victor, Lot7).
+  ?!valid deliver(Robert, Victor, Lot7).
+}

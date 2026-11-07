@@ -1,0 +1,10 @@
+// Article 6. Adoption: the founding members and the first board.
+#require "2-members.charter".
+Clause 6.1 Approved "65a268de8d88df8a66fa8606c2ca9bcb398a977f5359f785f2a7d0fc38912d84"
+  Definition "Ada Okafor, Bram Visser and Carmen Diaz, the founding members, adopt these bylaws and have each paid the first year's dues."
+Clause 6.2 Approved "282d43458e6fcc38b4cae47a9315f10b938bccd3e528aa3769835d7f776a853f"
+  Definition "Until the first election Ada is president, Bram is secretary and Carmen is treasurer."
+.
+pay-dues(Ada, 3000). pay-dues(Bram, 3000). pay-dues(Carmen, 3000).
++officer(President, Ada). +officer(Secretary, Bram). +officer(Treasurer, Carmen).
++meeting-due(Ada, GardenClub). +meeting-due(Bram, GardenClub). +meeting-due(Carmen, GardenClub).

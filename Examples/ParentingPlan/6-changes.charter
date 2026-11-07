@@ -1,0 +1,13 @@
+// Article 6. Changes.
+#require "4-support.charter".
+Fact court Identified by FamilyCourt
+Act agree-to-change Actor parent Recipient other Related to usd
+  Holds when True
+Power order-support Actor court Related to usd
+  Holds when True
+  Valid when court == FamilyCourt
+  Creates support(usd)
+
+Clause 6.1 Approved "beae0b05c5be858cc85cf2fd2a0d411eef4fffbf854122af5a6fc47eea8288ff"
+  Norm "This plan changes only by order of the family court. An agreement between the parents to change the support amount has no effect until the court orders it." => order-support, agree-to-change
+.

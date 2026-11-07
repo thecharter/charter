@@ -1,0 +1,31 @@
+// Article 4. The trustee's duties.
+#require "3-incapacity.charter".
+Fact asset Identified by Cottage
+
+Act mix-with-own-property Actor person Holds when False
+
+Event year-ends
+Duty annual-account Holder person Claimant person'
+  Due within 60
+Act account Actor person
+  Holds when trustee(person)
+  Terminates (Foreach person': annual-account(person, person'))
+Extend Event year-ends
+  Creates (Foreach person, person': annual-account(person, person')
+             When trustee(person) && (person' == Anna || person' == Ben))
+
+Fact consented Identified by person * asset
+Act consent-to-sale Actor person Related to asset Creates consented(person, asset)
+Fact sold-to-trustee Identified by asset
+Power buy-from-trust Actor person Related to asset
+  Holds when trustee(person)
+  Valid when trustee(person) && consented(Anna, asset) && consented(Ben, asset)
+  Creates sold-to-trustee(asset)
+
+Clause 4.1 Approved "ce0ea48fa1fb84ef4504840dfc2ad3076668ac0d623743beaef940df906b421a"
+  Norm "The trustee may not mix trust property with the trustee's own property." => mix-with-own-property
+Clause 4.2 Approved "cb785d91166d3641244b36cd216a799968c6abfeeda813e9137e407c846b1400"
+  Norm "The trustee accounts to the beneficiaries within sixty days after the end of each year." => annual-account, account
+Clause 4.3 Approved "a3a1e7a80d832abcc337e0eb56a8210ec8731b1d75cb9cd4d4818bf14dbba86a"
+  Norm "A sale of trust property to the trustee is void unless every beneficiary consents to it." => buy-from-trust, consent-to-sale
+.

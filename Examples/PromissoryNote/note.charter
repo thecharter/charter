@@ -1,0 +1,93 @@
+// A promissory note from Elena Brooks to Marcus Dunn (note.md).
+Document "note.md"
+
+Fact lender Identified by Marcus
+Fact borrower Identified by Elena
+Fact usd Identified by Money(USD, 2)
+Fact instalment Identified by 1..12
+Param loan : Money(USD, 2) = 1000000
+Param regular : Money(USD, 2) = 86066
+Param period : Duration = 30
+Param grace : Duration = 10
+Param default-after : Duration = 30
+
+// 1. The loan
+Bool lent
+Var principal Identified by Money(USD, 2)
+Act lend Actor lender Recipient borrower
+  Holds when Not(lent())
+  Creates lent(), principal(loan), interest(0), charged(0), paid(0), fees-paid(0)
+
+// 2. Interest: a twelfth of six percent of the unpaid principal for every thirty days gone by
+Fact fallen-due Identified by instalment
+  Holds when Held(lent()) For period * instalment
+Var interest Identified by Money(USD, 2)
+Var charged Identified by Int
+Fact interest-owing Identified by Money(USD, 2)
+  Derived from interest-owing(interest + MulDivRound(principal, 6, 1200, NearestEven)
+                 * (Count(Foreach instalment: instalment When fallen-due(instalment)) - charged))
+
+// 3. Instalments, and 6.1: money paid ahead counts toward the next ones
+Var paid Identified by Money(USD, 2)
+Fact covered Identified by instalment
+  Holds when instalment < 12 && paid >= regular * instalment
+  Holds when principal == 0
+Duty instalment-due Holder borrower Claimant lender Related to instalment
+  Holds when fallen-due() && Not(covered())
+  Violated when Held(lent()) For period * instalment + grace
+
+// 4. Late fee: five percent of a regular instalment for each late instalment
+Fact late Identified by instalment
+  Holds when Violated(instalment-due())
+Var fees-paid Identified by Money(USD, 2)
+Fact fees-owing Identified by Money(USD, 2)
+  Derived from fees-owing(MulDivRound(regular, 5, 100, NearestEven)
+                 * Count(Foreach instalment: instalment When late(instalment)) - fees-paid)
+Fact owing Identified by Money(USD, 2)
+  Derived from owing(fees-owing + interest-owing + principal)
+
+// 5 and 6. Payment, at any time, applied to fees, then interest, then principal
+Act pay Actor borrower Recipient lender Related to usd
+  Holds when lent() && usd <= owing
+  Creates paid(paid + usd)
+        , charged(Count(Foreach instalment: instalment When fallen-due(instalment)))
+        , (Foreach instalment: late(instalment) When Violated(instalment-due()))
+        , fees-paid(fees-paid + usd)                   When usd <= fees-owing
+        , fees-paid(fees-paid + fees-owing)            When usd >  fees-owing
+        , interest(interest-owing)                     When usd <= fees-owing
+        , interest(fees-owing + interest-owing - usd)  When usd >  fees-owing && usd <= fees-owing + interest-owing
+        , interest(0)                                  When usd >  fees-owing + interest-owing
+        , principal(owing - usd)                       When usd >  fees-owing + interest-owing
+Act charge-for-early-payment Actor lender Recipient borrower Holds when False
+
+// 7. Default: thirty days unpaid, then the lender may call in everything
+Bool called-in
+Power call-in Actor lender Recipient borrower
+  Holds when True
+  Valid when (Exists instalment: instalment-due() && Held(lent()) For period * instalment + default-after)
+  Creates called-in()
+Duty everything-due Holder borrower Claimant lender
+  Holds when called-in() && owing > 0
+  Violated when True
+
+Clause 1.1 Approved "97c6ec77d92784b06a5c8498785da9175f8cea5e21ea608e080e3d67cac50f51"
+  Norm "Marcus Dunn, the lender, lends ten thousand dollars to Elena Brooks, the borrower, who promises to repay it with interest as this note says." => lend, pay
+Clause 2.1 Approved "59b3cf60cde3fd86e275b935bd5961b2ebfb4ffaa4cfeec97e41eee59b4d289b"
+  Definition "The unpaid principal bears simple interest at six percent a year. At the end of every thirty days after the loan is made, one twelfth of a year's interest on the principal then unpaid is added to the interest owing. Unpaid interest does not itself bear interest."
+Clause 3.1 Approved "18bb909c47418e64c507deb53013e5da7fc828d85c2db2ec5897aad103669259"
+  Norm "The borrower pays twelve instalments of eight hundred sixty dollars and sixty-six cents. The first falls due thirty days after the loan is made, and each of the others thirty days after the one before." => instalment-due, pay
+Clause 3.2 Approved "91a83855b4a6d44af68dc0baaf124253c09ee22815316a6970ae8a7c96cfa2cb"
+  Norm "The twelfth instalment is whatever is then owing, whether that is more or less than the others." => instalment-due
+Clause 4.1 Approved "d5e126a8e0afd6e3978235e8e34712c691dc6eb534ebe16b189035aded5e3205"
+  Norm "An instalment that is not paid in full within ten days after it falls due is late." => instalment-due
+  Definition " For each late instalment the borrower owes a late fee of five percent of a regular instalment."
+Clause 5.1 Approved "30ca8c6548073cec6b872056d30c99b177d9cae947694e3d30546e25fd961fd8"
+  Norm "Every payment is applied first to late fees, then to interest, and then to principal." => pay
+Clause 6.1 Approved "6355e48fad6196517852a37f2a8ba500fb23432151bf6f1c2312d87e79b27c6a"
+  Norm "The borrower may pay all or part of what is owing ahead of time." => pay
+  Norm " The lender charges nothing for early payment." => charge-for-early-payment
+  Norm " Money paid ahead of time counts toward the instalments that fall due next." => instalment-due
+Clause 7.1 Approved "0316c45a37510d8b59aad968c5fc3ababf93b0b609ac852bf6715891620a1fd8"
+  Norm "If an instalment is still unpaid thirty days after it falls due, the lender may, by notice to the borrower, declare everything owing due at once." => call-in, everything-due
+  Norm " A notice given before then has no effect." => call-in
+.

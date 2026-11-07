@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Count, per worked example, how much of the program is English retyped, approval digests,
+and the recurring patterns an author writes only because the language asks for them
+(AGENTS.md, "Ceremony is a design defect").
+
+    tools/examples-metrics            a Markdown table over every Examples/*/ with cases/
+    tools/examples-metrics --totals   the totals row only
+
+The counts are textual and approximate; they are for watching a trend, not for proof.
+"""
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SPAN = re.compile(r'^\s+(Norm|Definition|Invariant|Acceptance|Commentary|Text)\s+"')
+QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
+DECL = re.compile(r'^(?:Evidenced |Entrenched |Open |Closed )?(Fact|Function|Var|Bool|Act|Power|Finding|Amend|Duty|Immunity|Event|Physical|Param|Invariant|Predicate)\s+([A-Za-z][A-Za-z0-9-]*)')
+RULE_KINDS = {"Act", "Power", "Finding", "Amend", "Duty", "Immunity", "Invariant"}
+
+
+def blocks(lines):
+    """Yield (header_line, body_lines) for each top-level declaration."""
+    cur = None
+    for line in lines:
+        if line and not line[0].isspace() and not line.startswith("//"):
+            if cur:
+                yield cur
+            cur = (line, [])
+        elif cur and line.strip():
+            cur[1].append(line)
+    if cur:
+        yield cur
+
+
+def clause_of(text, key):
+    """The expression after `key` in a declaration's text, up to the next clause keyword."""
+    m = re.search(key + r'\s+(.*?)(?=\n\s*(?:Holds when|Valid when|Creates|Terminates|Obfuscates|Due within|Created by|Terminated by|Conditioned by|From|Syncs with|Except under|Supports|Rebuts|Resolves|Standard)\b|\Z)', text, re.S)
+    return re.sub(r'\s+', ' ', m.group(1)).strip() if m else None
+
+
+def conjuncts(expr):
+    return {c.strip() for c in expr.split("&&")}
+
+
+def measure(d: pathlib.Path):
+    m = dict.fromkeys(
+        ["english_words", "rule_lines", "clause_lines", "retyped_chars", "digest_chars", "case_lines",
+         "facts", "rules", "placeholders", "holds_true", "role_eq", "count_foreach", "empty_app",
+         "powers", "power_dup", "scenario_plus", "scenarios", "unlinked_spans"], 0)
+    for md in d.glob("*.md"):
+        m["english_words"] += len(md.read_text(encoding="utf-8").split())
+    for f in sorted(d.glob("*.charter")):
+        text = f.read_text(encoding="utf-8")
+        lines = text.split("\n")
+        in_clause = False
+        for line in lines:
+            s = line.strip()
+            if line.startswith("Clause "):
+                in_clause = True
+                m["clause_lines"] += 1
+                m["digest_chars"] += len(re.findall(r'Approved "[0-9a-f]{64}"', line)) * 75
+                continue
+            if in_clause and SPAN.match(line):
+                m["clause_lines"] += 1
+                m["retyped_chars"] += sum(len(q) for q in QUOTED.findall(line)[:1])
+                if s.startswith(("Norm", "Definition")) and "=>" not in line:
+                    m["unlinked_spans"] += 1
+                continue
+            in_clause = False
+            if not s or s.startswith("//") or s == "." or s.startswith("#require") or s.startswith("Document "):
+                continue
+            m["rule_lines"] += 1
+        code = "\n".join(l.split("//")[0] for l in lines if not l.startswith("Clause ") and not SPAN.match(l))
+        m["placeholders"] += len(re.findall(r'^Placeholder ', code, re.M))
+        m["holds_true"] += len(re.findall(r'Holds when True\b', code))
+        m["role_eq"] += len(re.findall(r"[a-z][a-z0-9'-]*\s*[!=]=\s*[A-Z][A-Za-z0-9]*\b", code))
+        m["count_foreach"] += len(re.findall(r'Count\(Foreach', code))
+        m["empty_app"] += len(re.findall(r'[a-z0-9]\(\)', code))
+        for header, body in blocks(code.split("\n")):
+            dm = DECL.match(header)
+            if not dm:
+                continue
+            if dm.group(1) in RULE_KINDS:
+                m["rules"] += 1
+            else:
+                m["facts"] += 1
+            if dm.group(1) == "Power":
+                m["powers"] += 1
+                whole = header + "\n" + "\n".join(body)
+                h, v = clause_of(whole, "Holds when"), clause_of(whole, "Valid when")
+                if h and v and (conjuncts(h) <= conjuncts(v) or conjuncts(v) <= conjuncts(h)):
+                    m["power_dup"] += 1
+    for c in sorted((d / "cases").glob("*.charter")):
+        depth = 0
+        for line in c.read_text(encoding="utf-8").split("\n"):
+            s = line.split("//")[0].strip()
+            if not s:
+                continue
+            m["case_lines"] += 1
+            if s.startswith("Scenario "):
+                m["scenarios"] += 1
+            if depth > 0:
+                m["scenario_plus"] += len(re.findall(r'(?:^|\.\s*)\+[a-z]', s))
+            depth += s.count("{") - s.count("}")
+    return m
+
+
+COLS = [("english_words", "English words"), ("rule_lines", "rule lines"), ("clause_lines", "clause lines"),
+        ("retyped_chars", "English retyped (chars)"), ("digest_chars", "digests (chars)"),
+        ("case_lines", "case lines"), ("scenarios", "scenarios"), ("facts", "facts"), ("rules", "rules"),
+        ("unlinked_spans", "spans naming nothing"), ("powers", "powers"), ("power_dup", "powers repeating a condition"),
+        ("holds_true", "`Holds when True`"), ("role_eq", "`x == Name`"), ("count_foreach", "`Count(Foreach`"),
+        ("empty_app", "`f()`"), ("placeholders", "placeholders"), ("scenario_plus", "`+fact` in scenarios")]
+
+
+def main():
+    dirs = sorted(p for p in (ROOT / "Examples").iterdir() if (p / "cases").is_dir())
+    rows = [(d.name, measure(d)) for d in dirs]
+    total = {k: sum(r[1][k] for r in rows) for k, _ in COLS}
+    if "--totals" not in sys.argv:
+        print("| Example | " + " | ".join(t for _, t in COLS) + " |")
+        print("|---|" + "---:|" * len(COLS))
+        for name, m in rows:
+            print(f"| {name} | " + " | ".join(str(m[k]) for k, _ in COLS) + " |")
+    print(f"| **Total ({len(rows)})** | " + " | ".join(f"**{total[k]}**" for k, _ in COLS) + " |")
+
+
+if __name__ == "__main__":
+    main()

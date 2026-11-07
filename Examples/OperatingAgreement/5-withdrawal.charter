@@ -1,0 +1,27 @@
+// Article 5. Withdrawal.
+#require "1-members.charter".
+Var book-value Identified by usd
+Fact withdrawing Identified by person
+Act give-notice Actor person
+  Holds when member(person)
+  Creates withdrawing(person)
+Power buy-out Actor company Recipient person
+  Holds when True
+  Valid when Held(withdrawing(person)) For 90
+  Creates buyout-due(company, person, MulDivRound(book-value.usd,
+              9 * Sum(Foreach capital: capital.int When capital.person == person), 10 * total-capital.int, Floor))
+        , capital(person, 0)
+  Terminates member(person), withdrawing(person)
+Duty buyout-due Holder company Claimant person Related to usd
+  Due within 60
+  Terminated by pay-buyout
+Act pay-buyout Actor company Recipient person Related to usd
+  Creates cash(cash.usd - usd)
+
+Clause 5.1 Approved "96161fc996bbdaaf2813d0f27ed52eb3ac6b50dc5c0e3c3d07514ed4c420312b"
+  Norm "A member may withdraw from the company by giving the other members ninety days' notice." => give-notice
+Clause 5.2 Approved "7f5f21a40f76ebc020599c4ea14e12b1e34b6f264d656c73c1fdf3ca3328dca0"
+  Norm "When the notice period ends, the company buys the withdrawing member's interest. The price is the member's percentage interest in the book value of the company, less ten percent." => buy-out
+Clause 5.3 Approved "943207c948459329bf7ef085e417df5983c3291fac9c898ca4124e349a3af9dc"
+  Norm "The company pays the price within sixty days after the notice period ends." => buyout-due, pay-buyout
+.

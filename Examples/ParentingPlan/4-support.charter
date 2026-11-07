@@ -1,0 +1,19 @@
+// Article 4. Child support.
+#require "1-schedule.charter".
+Fact usd Identified by Money(USD, 2)
+Param support : Money(USD, 2) = 65000
+Param grace : Duration = 3
+Fact month Identified by Int
+Event month-begins Related to month
+  Creates support-due(Daniel, Rosa, month)
+Duty support-due Holder parent Claimant other Related to month
+  Due within 5 + grace
+  Terminated by pay-support
+Act pay-support Actor parent Recipient other Related to month, usd
+  Valid when usd == support
+
+Clause 4.1 Approved "964fcea93c293bcc533e5b41329d193ed324160da2c15f778855f6215ebe551d"
+  Norm "Daniel pays Rosa six hundred and fifty dollars of child support for each month." => support-due, pay-support
+Clause 4.2 Approved "b06a726506d633cd573e067527e8cb5907d1a9fc3bfcfe979f0a29dbd565e964"
+  Norm "Each payment is due by the fifth day of the month. A payment made within a grace period of three more days is not a breach." => support-due
+.

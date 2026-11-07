@@ -1,0 +1,16 @@
+// Article 1. Purpose; and the people, offices and money the other articles share.
+Fact person Identified by Ada, Bram, Carmen
+Fact club Identified by GardenClub
+Fact usd Identified by Money(USD, 2)
+Fact member Identified by person
+Fact office Identified by President, Secretary, Treasurer
+Function officer Identified by office * person
+
+Act pay-profit Actor club Recipient person Related to usd
+  Holds when Not(member(person))
+
+Clause 1.1 Approved "3668c591d5e93eef6e3c057c558e01216e22a014fdd974def395a3e457afe860"
+  Definition "The Elm Street Garden Club is a non-profit association. Its purpose is to keep the community garden on Elm Street."
+Clause 1.2 Approved "a47f61788b6972a6103e43eba6d373dfbfe89fe8c9d30c6c947063c35566d5b0"
+  Norm "The club pays no part of its funds to any member as profit." => pay-profit
+.

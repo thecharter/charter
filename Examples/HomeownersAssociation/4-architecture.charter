@@ -1,0 +1,31 @@
+// Article 4. Architectural changes: approval, and approval by silence.
+#require "1-association.charter".
+Fact committee Identified by ArchitecturalCommittee
+Fact change
+Fact applied Identified by owner * change
+Fact approved Identified by owner * change
+Fact refused Identified by owner * change
+
+Act apply Actor owner Recipient committee Related to change
+  Holds when True
+  Creates change, applied()
+Act approve Actor committee Recipient owner Related to change
+  Holds when applied()
+  Creates approved()
+Power refuse Actor committee Recipient owner Related to change
+  Holds when applied()
+  Valid when Not(Held(applied()) For 30)
+  Creates refused()
+Fact permitted Identified by owner * change
+  Holds when approved() || (Held(applied()) For 30 && Not(refused()))
+Act make-change Actor owner Related to change
+  Holds when permitted()
+
+Clause 4.1 Approved "c2fdea41b0abaf9fb0d0d8b4b3432c51f33b41f7a23dcd4f76becb531d8375a1"
+  Norm "An owner may not change the outside of a house without the approval of the architectural committee." => make-change, approve
+Clause 4.2 Approved "50bfa6fed25c726fd8a050c332173d78122eec4f71a27b39712bc8842af2e230"
+  Norm "The owner applies to the committee in writing." => apply
+  Norm " If the committee has neither approved nor refused an application thirty days after it was made, the application is deemed approved." => make-change, refuse
+Clause 4.3 Approved "e8a0cc28d47753d6ce87871ee2536dbdb79278c6f33cc158dc714ddde4fb73a8"
+  Norm "A refusal made after those thirty days has no effect." => refuse
+.

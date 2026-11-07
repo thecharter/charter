@@ -1,0 +1,125 @@
+// Nadia Okafor at Harborlight Bakery: one colleague on the staff, one recipe, one expense.
+#require "../employment.charter".
++staff("Omar").
+
+Scenario employment-begins-when-both-have-signed {
+  sign(Harborlight).
+  ?!employed().
+  ?!valid dismiss().                             // nobody is employed yet
+  month-ends(1).
+  ?!salary-due(month = 1).                       // and no salary runs
+  sign(Nadia).
+  ?employed().
+  ?valid dismiss().
+}
+
+sign(Harborlight). sign(Nadia).
+
+Scenario salary-is-due-five-days-after-the-month {
+  @ 30.
+  month-ends(1).
+  ?salary-due(month = 1).
+  @ 34.
+  ?!violated salary-due(month = 1).
+  ?!valid pay-salary(month = 1, usd = 500000).   // less than the salary
+  pay-salary(month = 1, usd = 500000).
+  ?salary-due(month = 1).                        // the short payment discharged nothing
+  @ 35.
+  ?violated salary-due(month = 1).
+  pay-salary(month = 1, usd = 600000).
+  ?!salary-due(month = 1).
+}
+
+Scenario fourteen-days-notice-before-leaving {
+  give-notice().
+  @ 13.
+  ?!lawful leave().
+  @ 14.
+  ?lawful leave().
+  leave().
+  ?ended(). ?!employed().
+}
+
+Scenario leaving-without-notice-is-a-breach-that-still-ends-the-employment {
+  ?!lawful leave().
+  ?valid leave().
+  leave().
+  ?ended(). ?!employed().
+  ?!dismissed().
+  sign-release().
+  ?!severance-due().                             // she left; she was not dismissed
+}
+
+Scenario a-release-within-twenty-one-days-earns-two-months-salary {
+  ?lawful dismiss().                             // at will: no cause is needed
+  dismiss().
+  ?!severance-due().                             // not until she signs the release
+  theft().                                       // cause that arises later changes nothing
+  @ 20.
+  sign-release().
+  ?severance-due().
+  @ 29.
+  ?!violated severance-due().
+  ?!valid pay-severance(usd = 600000).           // one month is not two
+  @ 30.
+  ?violated severance-due().
+  pay-severance(usd = 1200000).
+  ?!severance-due().
+}
+
+Scenario a-release-signed-on-day-twenty-one-earns-nothing {
+  dismiss().
+  @ 21.
+  sign-release().
+  ?released().
+  ?!severance-due().
+}
+
+Scenario a-dismissal-for-cause-carries-no-severance {
+  neglect().
+  ?!cause().                                     // no written warning came first
+  warn().
+  neglect().
+  ?cause().
+  dismiss().
+  sign-release().
+  ?released().
+  ?!severance-due().
+}
+
+Scenario confidentiality-outlives-the-employment {
+  ?!lawful disclose(secret = "starter recipe").
+  dismiss().
+  @ 400.
+  ?!lawful disclose(secret = "starter recipe").
+  consent-to-disclosure(secret = "starter recipe").
+  ?lawful disclose(secret = "starter recipe").
+  ?!lawful disclose(secret = "supplier prices").  // consent is to one thing
+}
+
+Scenario no-soliciting-the-staff-for-twelve-months {
+  ?lawful solicit(staff = "Omar").               // the clause runs from the end of employment
+  dismiss().
+  ?!lawful solicit(staff = "Omar").
+  ?lawful solicit(staff = "Petra").              // Petra is not on the staff
+  @ 364.
+  ?!lawful solicit(staff = "Omar").
+  @ 365.
+  ?lawful solicit(staff = "Omar").
+}
+
+Scenario what-fell-due-before-the-end-is-still-owed-after-it {
+  month-ends(1).
+  submit-expense(expense = "oven thermometer").
+  dismiss().
+  month-ends(2).
+  ?!salary-due(month = 2).                       // no salary for a month after the end
+  ?!lawful submit-expense(expense = "taxi home").
+  @ 5.
+  ?violated salary-due(month = 1).
+  pay-salary(month = 1, usd = 600000).
+  @ 30.
+  ?violated reimbursement-due(expense = "oven thermometer").
+  reimburse(expense = "oven thermometer").
+  ?!reimbursement-due(expense = "oven thermometer").
+}

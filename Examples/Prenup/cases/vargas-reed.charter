@@ -1,0 +1,115 @@
+// Elena and Tomas: a flat and a boat owned before the wedding; salary, a bequest and a car after.
+#require "../prenup.charter".
+Extend Fact asset Identified by Flat, Boat, Savings, Bequest, Car.
+acquires(Elena, Flat, 30000000).
+acquires(Tomas, Boat, 4000000).
+
+Scenario divided-as-written {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  ?in-force().
+  wedding().
+  acquires(Tomas, Savings, 9000001).
+  receives-gift(Elena, Bequest, 5000000).
+  ?!marital(Flat). ?!marital(Boat). ?marital(Savings). ?!marital(Bequest).
+  ?!marital(Car).                                  // nobody owns a car
+  @ 2000.
+  ?!lawful keep(Elena, Flat).                      // not divorced
+  divorce().
+  ?valid keep(Elena, Flat). ?valid keep(Tomas, Boat). ?valid keep(Elena, Bequest).
+  ?!valid keep(Tomas, Savings).                    // marital
+  ?!valid keep(Tomas, Flat).                       // not his
+  ?pool(9000001).                                  // the savings are the only marital property
+  take-half(Elena). take-half(Tomas).
+  ?awarded(Elena, 4500000). ?awarded(Tomas, 4500000).
+}
+
+Scenario a-void-claim-occurs-and-changes-nothing {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  wedding().
+  acquires(Tomas, Savings, 9000001).
+  divorce().
+  keep(Tomas, Savings).
+  ?!kept(Tomas, Savings).
+  keep(Tomas, Boat).
+  ?kept(Tomas, Boat).
+}
+
+Scenario property-left-off-the-list-voids-the-agreement {
+  list(Elena, Flat).
+  sign(Elena). sign(Tomas).                        // Tomas did not list the boat
+  ?concealed(Tomas). ?!concealed(Elena).
+  ?!in-force().
+  ?!lawful list(Tomas, Boat).                      // too late
+  list(Tomas, Boat).
+  ?!in-force().
+  wedding().
+  divorce().
+  ?!valid keep(Elena, Flat).
+  ?!valid take-half(Elena).
+}
+
+Scenario one-signature-binds-nobody {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena).
+  ?!in-force().
+  wedding().
+  divorce().
+  ?!valid take-half(Tomas).
+  take-half(Tomas).
+  ?!awarded(Tomas, 0).                             // the claim occurred and awarded nothing
+}
+
+Scenario a-bequest-put-in-the-joint-account-becomes-marital {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  wedding().
+  receives-gift(Elena, Bequest, 5000000).
+  ?!marital(Bequest).
+  ?!lawful put-in-joint-account(Tomas, Bequest).   // it is Elena's to move
+  put-in-joint-account(Elena, Bequest).
+  ?marital(Bequest). ?!conflict marital(Bequest).
+  put-in-joint-account(Tomas, Boat).
+  ?marital(Boat).
+  divorce().
+  ?!valid keep(Elena, Bequest).
+  ?!valid keep(Tomas, Boat).
+  take-half(Tomas).
+  ?awarded(Tomas, 4500000).                        // half of the bequest and the boat
+}
+
+Scenario the-agreement-lapses-after-ten-years {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  wedding().
+  @ 3649.
+  ?in-force().
+  @ 3650.
+  ?!in-force().
+  divorce().
+  ?!valid keep(Elena, Flat).
+  ?!valid take-half(Elena).
+}
+
+Scenario a-divorce-inside-the-term-stays-governed {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  wedding().
+  @ 3649.
+  divorce().
+  @ 5000.
+  ?!in-force().
+  ?valid keep(Elena, Flat).
+  ?valid take-half(Elena).
+}
+
+Scenario an-odd-cent-goes-to-neither {
+  list(Elena, Flat). list(Tomas, Boat).
+  sign(Elena). sign(Tomas).
+  wedding().
+  acquires(Elena, Car, 1500001).
+  divorce().
+  take-half(Elena). take-half(Tomas).
+  ?awarded(Elena, 750000). ?awarded(Tomas, 750000).
+}

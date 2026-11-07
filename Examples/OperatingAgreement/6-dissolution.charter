@@ -1,0 +1,27 @@
+// Article 6. Dissolution.
+#require "3-distributions.charter".
+Extend Fact matter Identified by Dissolve
+Bool dissolved
+  Holds when Count(Foreach person: person When member(person)) == 1
+Power dissolve Actor company
+  Holds when True
+  Valid when matter-unanimous(Dissolve)
+  Creates dissolved()
+Fact debt Identified by string * usd
+Act pay-debt Actor company Related to string, usd
+  Holds when debt()
+  Creates cash(cash.usd - usd)
+  Terminates debt()
+Power wind-up Actor company
+  Holds when dissolved() && Not(Exists debt: debt)
+  Valid when dissolved()
+  Creates (Foreach capital: paid(capital.person, MulDivRound(cash.usd, capital.int, total-capital.int, Floor)))
+        , cash(cash.usd - Sum(Foreach capital: MulDivRound(cash.usd, capital.int, total-capital.int, Floor)))
+Extend Act distribute Valid when Not(dissolved())
+
+Clause 6.1 Approved "92498a890f3a9bf856c85c3406139078fffa4d4b3633285dfc8c6f96a0c14eea"
+  Norm "The company is dissolved when all the members decide to dissolve it, or when only one member remains." => dissolve
+Clause 6.2 Approved "6e3b228a885b2c5c8cd3088cbf1e97355916cf08f62ada7e8056cfa736e3e550"
+  Norm "On dissolution the company pays its debts and then distributes what remains to the members in proportion to their percentage interests." => pay-debt, wind-up
+  Norm " After dissolution the company makes no other distribution." => distribute
+.

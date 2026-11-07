@@ -1,0 +1,16 @@
+// Article 2. Revocation and amendment.
+#require "3-incapacity.charter".
+Power revoke Actor person
+  Holds when person == Margaret && in-force()
+  Valid when person == Margaret && Not(deceased(Margaret)) && Not(incapacitated())
+  Terminates in-force()
+Power name-successor Actor person Related to person'
+  Holds when person == Margaret
+  Valid when person == Margaret && Not(deceased(Margaret)) && Not(incapacitated())
+  Creates successor(person')
+
+Clause 2.1 Approved "9625c2e5eeecf38d560e4d6438534d23cc90fb73e1f53c60b7705a9da56f16b8"
+  Norm "While she is alive and has capacity, the settlor may revoke this trust or name a different successor trustee." => revoke, name-successor
+Clause 2.2 Approved "dc069ae1112f6a94ec14d51446fd00eb0794a9a34ef06c9fe4f61698a84a543c"
+  Norm "On the settlor's death this trust becomes irrevocable." => revoke, name-successor
+.

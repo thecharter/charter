@@ -1,0 +1,21 @@
+// Schedule A. First Amendment: the buy-out price loses its ten percent reduction.
+#require "5-withdrawal.charter".
+#require "7-amendment.charter".
+Extend Fact amendment Identified by FirstAmendment
+Amend first-amendment Actor company
+  Repeals buy-out
+  Installs {
+    Power buy-out Actor company Recipient person
+      Holds when True
+      Valid when Held(withdrawing(person)) For 90
+      Creates buyout-due(company, person, MulDivRound(book-value.usd,
+                  Sum(Foreach capital: capital.int When capital.person == person), total-capital.int, Floor))
+            , capital(person, 0)
+      Terminates member(person), withdrawing(person)
+  }
+  Holds when True
+  Valid when amendment-three-quarters(FirstAmendment)
+
+Clause A.1 Approved "241d292482d9885a04bea7126d24928beae53498a1a095f80e2c7fa264511815"
+  Norm "Clause 5.2 is amended to read: When the notice period ends, the company buys the withdrawing member's interest. The price is the member's percentage interest in the book value of the company." => first-amendment
+.

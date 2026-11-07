@@ -1,0 +1,121 @@
+// Larch Court: one year's assessments, Farid's fence, Elif's boat, and a vote on the late fee.
+#require "../rules.charter".
+
+Scenario an-assessment-paid-late-bears-the-late-fee {
+  month-begins(1).
+  ?assessment-due(Ada, LarchCourt, 1). ?assessment-due(Farid, LarchCourt, 1).
+  pay-assessment(Ada, LarchCourt, 1, 15000).
+  ?!assessment-due(Ada, LarchCourt, 1).
+  @ 14.
+  ?valid pay-assessment(Boris, LarchCourt, 1, 15000).
+  @ 15.
+  ?!valid pay-assessment(Boris, LarchCourt, 1, 15000).         // the late fee is now part of it
+  pay-assessment(Boris, LarchCourt, 1, 15000).
+  ?assessment-due(Boris, LarchCourt, 1).
+  pay-assessment(Boris, LarchCourt, 1, 17500).
+  ?!assessment-due(Boris, LarchCourt, 1).
+}
+
+Scenario an-unpaid-assessment-becomes-a-lien {
+  month-begins(1).
+  @ 29.
+  ?!lien(Carmen).
+  @ 30.
+  ?lien(Carmen).
+  month-begins(2).
+  pay-assessment(Carmen, LarchCourt, 2, 15000).
+  ?lien(Carmen).                                               // the first month is still unpaid
+  pay-assessment(Carmen, LarchCourt, 1, 17500).
+  ?!lien(Carmen).
+}
+
+Scenario no-fine-without-notice-and-a-hearing {
+  ?!valid fine(Board, Elif, "boat on the lawn", 5000).
+  ?undetermined fine(Board, Elif, "boat on the lawn", 5000).   // nothing has been found either way
+  fine(Board, Elif, "boat on the lawn", 5000).
+  ?!fine-due(Elif, LarchCourt, "boat on the lawn", 5000).
+  give-notice(Board, Elif, "boat on the lawn").
+  @ 9.
+  ?!valid hear(Board, Elif, "boat on the lawn", Yes).          // too soon after the notice
+  hear(Board, Elif, "boat on the lawn", Yes).
+  ?Unresolved(committed(Elif, "boat on the lawn")).
+  @ 10.
+  hear(Board, Elif, "boat on the lawn", Yes).
+  ?Established(committed(Elif, "boat on the lawn")).
+  ?!valid fine(Board, Elif, "boat on the lawn", 15000).        // more than one hundred dollars
+  fine(Board, Elif, "boat on the lawn", 10000).
+  ?fine-due(Elif, LarchCourt, "boat on the lawn", 10000).
+  @ 39.
+  ?!violated fine-due(Elif, LarchCourt, "boat on the lawn", 10000).
+  @ 40.
+  ?violated fine-due(Elif, LarchCourt, "boat on the lawn", 10000).
+  pay-fine(Elif, LarchCourt, "boat on the lawn", 10000).
+  ?!fine-due(Elif, LarchCourt, "boat on the lawn", 10000).
+}
+
+Scenario a-hearing-that-finds-no-violation-ends-the-matter {
+  give-notice(Board, Elif, "boat on the lawn").
+  @ 10.
+  hear(Board, Elif, "boat on the lawn", No).
+  ?Refuted(committed(Elif, "boat on the lawn")).
+  ?!valid fine(Board, Elif, "boat on the lawn", 5000).
+  ?!undetermined fine(Board, Elif, "boat on the lawn", 5000).
+}
+
+Scenario silence-for-thirty-days-is-approval {
+  ?!lawful make-change(Farid, "cedar fence").
+  apply(Farid, ArchitecturalCommittee, "cedar fence").
+  @ 29.
+  ?!lawful make-change(Farid, "cedar fence").
+  @ 30.
+  ?lawful make-change(Farid, "cedar fence").
+  ?!valid refuse(ArchitecturalCommittee, Farid, "cedar fence").
+  refuse(ArchitecturalCommittee, Farid, "cedar fence").
+  ?permitted(Farid, "cedar fence").                            // the late refusal changed nothing
+}
+
+Scenario a-refusal-in-time-stands-and-building-anyway-can-be-fined {
+  apply(Farid, ArchitecturalCommittee, "cedar fence").
+  @ 12.
+  refuse(ArchitecturalCommittee, Farid, "cedar fence").
+  @ 30.
+  ?!lawful make-change(Farid, "cedar fence").
+  make-change(Farid, "cedar fence").
+  give-notice(Board, Farid, "fence without approval").
+  @ 40.
+  hear(Board, Farid, "fence without approval", Yes).
+  fine(Board, Farid, "fence without approval", 10000).
+  ?fine-due(Farid, LarchCourt, "fence without approval", 10000).
+}
+
+Scenario the-committee-approves {
+  apply(Dev, ArchitecturalCommittee, "skylight").
+  ?!lawful approve(ArchitecturalCommittee, Dev, "porch").      // nobody applied for a porch
+  approve(ArchitecturalCommittee, Dev, "skylight").
+  ?lawful make-change(Dev, "skylight").
+}
+
+Scenario two-thirds-of-the-owners-amend-the-late-fee {
+  month-begins(1).
+  pay-assessment(Ada, LarchCourt, 1, 15000). pay-assessment(Boris, LarchCourt, 1, 15000).
+  pay-assessment(Carmen, LarchCourt, 1, 15000). pay-assessment(Dev, LarchCourt, 1, 15000).
+  pay-assessment(Elif, LarchCourt, 1, 15000).
+  @ 30.
+  ?lien(Farid).
+  vote(Ada, A1). vote(Boris, A1). vote(Carmen, A1).
+  ?!carried(A1).                                               // three of six is not two thirds
+  ?!valid vote(Farid, A1).                                     // his house is under a lien
+  vote(Farid, A1).
+  ?!carried(A1).
+  ?!valid late-fee-fifty(Board).
+  late-fee-fifty(Board).
+  ?late-fee(2500).
+  vote(Dev, A1).
+  ?carried(A1).
+  late-fee-fifty(Board).
+  ?late-fee(5000).
+  month-begins(2).
+  @ 45.
+  ?!valid pay-assessment(Elif, LarchCourt, 2, 17500).          // the late fee is fifty dollars now
+  ?valid pay-assessment(Elif, LarchCourt, 2, 20000).
+}

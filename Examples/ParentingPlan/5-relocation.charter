@@ -1,0 +1,14 @@
+// Article 5. Relocation.
+#require "1-schedule.charter".
+Fact noticed-move Identified by parent
+Fact moved Identified by parent
+Act give-move-notice Actor parent Recipient other
+  Holds when True
+  Creates noticed-move(parent)
+Act move-home Actor parent
+  Holds when Held(noticed-move(parent)) For 60
+  Creates moved(parent)
+
+Clause 5.1 Approved "3af61f853af8f2a9148a4cd57df804a6237cc360bdc9718ab109ab505d1fc4fa"
+  Norm "A parent who intends to move Mia's home gives the other parent sixty days' notice. A move without that notice is a breach of this plan." => give-move-notice, move-home
+.

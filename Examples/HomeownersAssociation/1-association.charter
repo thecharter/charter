@@ -1,0 +1,11 @@
+// Article 1. The association: its members, and the board that acts for it.
+Fact owner Identified by Ada, Boris, Carmen, Dev, Elif, Farid
+Fact association Identified by LarchCourt
+Fact board Identified by Board
+Fact usd Identified by Money(USD, 2)
+
+Clause 1.1 Approved "95509943b862db8f24980ca1688e1ae9a77e3b415baaac8d35aa9dd1f6397c51"
+  Definition "The members of the Larch Court Homeowners' Association are the owners of the six houses in Larch Court: Ada Okoye, Boris Lindqvist, Carmen Ruiz, Dev Patel, Elif Kaya and Farid Haddad."
+Clause 1.2 Approved "2c7d1f47c8ce94de843fd0b3803657ec910da82971a87cb9d69a18ccd7cd25b4"
+  Definition "The board manages the association and acts for it under these rules."
+.

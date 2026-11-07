@@ -1,0 +1,57 @@
+// A warranty deed of Lot 7 from Robert Hale to Sofia Marin (deed.md).
+Document "deed.md"
+
+Fact person Identified by Robert, Sofia
+Placeholder grantor For person
+Placeholder grantee For person
+Fact parcel Identified by Lot7
+Function title Identified by parcel * person
+Fact lien Identified by parcel * string
+
+// D.1 to D.3, D.5: signing, delivery, and what a delivery can pass
+Fact signed Identified by grantor * grantee * parcel
+Fact deed Identified by grantor * grantee * parcel
+Fact recorded Identified by grantee * parcel
+Fact paid-value Identified by grantee * parcel
+Fact notice Identified by grantee * parcel
+Act sign Actor grantor Recipient grantee Related to parcel
+  Holds when True
+  Creates signed()
+Power deliver Actor grantor Recipient grantee Related to parcel
+  Holds when signed()
+  Valid when signed()
+    && (title(parcel, grantor)
+        || (paid-value() && Not(notice())
+            && (Exists grantee': deed(grantee = grantee') && title(parcel, grantee')
+                  && Not(recorded(grantee = grantee')))))
+  Creates title(parcel, grantee), deed()
+        , (Foreach string: warranted() When lien())
+Act record Actor grantee Related to parcel
+  Holds when (Exists grantor: deed())
+  Creates recorded()
+
+// D.4 Warranty against liens
+Fact warranted Identified by grantor * grantee * parcel * string
+Duty payoff-due Holder grantor Claimant grantee Related to parcel, string
+  Due within 30
+  Created by demand-payoff
+  Terminated by pay-off
+Act demand-payoff Actor grantee Recipient grantor Related to parcel, string
+  Holds when warranted() && lien()
+Act pay-off Actor grantor Recipient grantee Related to parcel, string
+  Holds when lien()
+  Terminates lien()
+
+Clause D.1 Approved "23dfabca7f9a7ceb5fdee1cdb64161db84bbb446ec6acf58f848429633db9968"
+  Norm "Robert Hale, the grantor, conveys Lot 7 to Sofia Marin, the grantee." => sign, deliver
+Clause D.2 Approved "9162c7698aa0bfec4e6f722ab61dee39451362e8901a0bb14043b528e5ddb08f"
+  Norm "This deed takes effect when the grantor has signed it and delivers it to the grantee." => sign, deliver
+Clause D.3 Approved "f1e2eddee6bd322dd2e65670ac326fd36dece032fcd26d83b2b50ce4b537a473"
+  Norm "A grantor conveys only the title the grantor holds." => deliver
+Clause D.4 Approved "6028588e106296f73b863b8913d038d74667c47afb199ae44f2b5608e4162e77"
+  Definition "The grantor warrants that the land is free of liens."
+  Norm " The grantor pays off any lien that was on the land at delivery within thirty days of the grantee's demand." => demand-payoff, payoff-due, pay-off
+Clause D.5 Approved "c4677f4e29cc695728320fcb974ca7f4500732327791c536e8c7596bfcc8698f"
+  Norm "Until it is recorded, a deed does not bind a later buyer who pays for the land without notice of the deed." => deliver, record
+.
++title(Lot7, Robert).

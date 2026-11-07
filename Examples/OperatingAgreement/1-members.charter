@@ -1,0 +1,24 @@
+// Article 1. Members and capital.
+Fact person Identified by Iris, Jonah, Kemal
+Fact company Identified by Tidewater
+Fact usd Identified by Money(USD, 2)
+Fact member Identified by person
+Function capital Identified by person * int
+Var total-capital Identified by int
+  Derived from total-capital(Sum(Foreach capital: capital.int))
+Var cash Identified by usd
+
+Power call-capital Actor company Recipient person Related to usd
+  Holds when True
+  Valid when False
+
+Clause 1.1 Approved "ce7ad9b420239251cc5a1cd80a27d6300651df7ec5cdeb3871ce8eba5b61fb8e"
+  Definition "Iris Nakamura, Jonah Pratt and Kemal Aydin are the members of Tidewater Kayak LLC, the company."
+Clause 1.2 Approved "628582d03d431b1636ce27d0536ff697ee5b49b79aba502f0fd3eb112174d978"
+  Definition "Iris has contributed $50,000, Jonah $30,000 and Kemal $20,000."
+  Norm " No member is required to contribute more." => call-capital
+Clause 1.3 Approved "1795e49ebd006395c1db9ff0ee2a07cb18642ff7dae08b11c8cf7604e265952d"
+  Definition "A member's percentage interest is that member's capital as a share of the capital of all the members."
+.
++member(Iris). +member(Jonah). +member(Kemal).
++capital(Iris, 50000). +capital(Jonah, 30000). +capital(Kemal, 20000).

@@ -1,0 +1,86 @@
+// The venture talks: Tidewater hands over a sensor design, Juniper a pricing model.
+#require "../nda.charter".
+Extend Fact item Identified by SensorDesign, PricingModel, Roadmap.
+
+Scenario each-keeps-the-others-secret {
+  ?lawful hand-over(Tidewater, Juniper, SensorDesign).
+  hand-over(Tidewater, Juniper, SensorDesign).
+  hand-over(Juniper, Tidewater, PricingModel).
+  ?confidential(Tidewater, Juniper, SensorDesign).
+  ?!lawful disclose(Juniper, Tidewater, SensorDesign).
+  ?!lawful disclose(Tidewater, Juniper, PricingModel).
+  ?lawful disclose(Tidewater, Tidewater, SensorDesign).   // its own design is its own to tell
+  ?lawful disclose(Juniper, Tidewater, Roadmap).          // never handed over in confidence
+  disclose(Juniper, Tidewater, SensorDesign).             // it happens, and it is a breach
+}
+
+Scenario use-only-for-the-purpose {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  ?lawful use(Juniper, Tidewater, SensorDesign, ConsideringTheVenture).
+  ?!lawful use(Juniper, Tidewater, SensorDesign, AnythingElse).
+}
+
+Scenario public-information-is-free {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  publication(SensorDesign).
+  ?!confidential(Tidewater, Juniper, SensorDesign).
+  ?lawful disclose(Juniper, Tidewater, SensorDesign).
+  ?lawful use(Juniper, Tidewater, SensorDesign, AnythingElse).
+}
+
+Scenario what-the-recipient-already-knew {
+  learns-elsewhere(Juniper, SensorDesign).
+  hand-over(Tidewater, Juniper, SensorDesign).
+  ?lawful disclose(Juniper, Tidewater, SensorDesign).
+  hand-over(Juniper, Tidewater, PricingModel).
+  learns-elsewhere(Tidewater, PricingModel).              // too late: after it was handed over
+  ?!lawful disclose(Tidewater, Juniper, PricingModel).
+}
+
+Scenario what-the-recipient-developed-independently {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  ?!lawful use(Juniper, Tidewater, SensorDesign, AnythingElse).
+  independent-development(Juniper, SensorDesign).
+  ?lawful use(Juniper, Tidewater, SensorDesign, AnythingElse).
+  ?lawful disclose(Juniper, Tidewater, SensorDesign).
+}
+
+Scenario a-court-order-permits-disclosure-only-after-notice {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  court-order(Juniper, SensorDesign).
+  ?!lawful disclose(Juniper, Tidewater, SensorDesign).    // the discloser has not been told
+  notify-of-order(Juniper, Tidewater, SensorDesign).
+  ?lawful disclose(Juniper, Tidewater, SensorDesign).
+  ?confidential(Tidewater, Juniper, SensorDesign).        // it is still confidential
+  ?!lawful use(Juniper, Tidewater, SensorDesign, AnythingElse).
+}
+
+Scenario three-years-and-not-after {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  @ 100.
+  hand-over(Juniper, Tidewater, PricingModel).
+  @ 1094.
+  ?!lawful disclose(Juniper, Tidewater, SensorDesign).
+  @ 1095.
+  ?lawful disclose(Juniper, Tidewater, SensorDesign).
+  ?!lawful disclose(Tidewater, Juniper, PricingModel).    // its three years began on day 100
+  @ 1195.
+  ?lawful disclose(Tidewater, Juniper, PricingModel).
+}
+
+Scenario returned-or-destroyed-within-ten-days-of-the-request {
+  hand-over(Tidewater, Juniper, SensorDesign).
+  ?!valid request-return(Tidewater, Juniper, Roadmap).    // nothing to return
+  request-return(Tidewater, Juniper, Roadmap).
+  ?!return-due(Juniper, Tidewater, Roadmap).
+  @ 50.
+  request-return(Tidewater, Juniper, SensorDesign).
+  ?return-due(Juniper, Tidewater, SensorDesign).
+  @ 59.
+  ?!violated return-due(Juniper, Tidewater, SensorDesign).
+  @ 60.
+  ?violated return-due(Juniper, Tidewater, SensorDesign).
+  return-or-destroy(Juniper, Tidewater, SensorDesign).
+  ?!return-due(Juniper, Tidewater, SensorDesign).
+  ?!lawful disclose(Juniper, Tidewater, SensorDesign).    // returning it does not end the secrecy
+}
