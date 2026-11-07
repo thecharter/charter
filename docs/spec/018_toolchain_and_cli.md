@@ -8,9 +8,15 @@
 
 | Command | Does |
 |---|---|
+| `charter init [<dir>]` | scaffold a reproducible Charter project (`agreement.md`, `main.charter`, `charter.toml`, `charter.lock`, `uat/smoke.sh`) (`G5.4`) |
 | `charter check <file.charter> …` | resolve every phrase in order without evaluating; report diagnostics and, for a program with `Document`/`Clause`s, the Law 8 provenance checks (012) |
-| `charter build <file.charter> [-o <artifact>]` | elaborate into validated `CIR` `LawVersion` epochs and emit a SHA-256 content-addressed `Artifact` bundle (`D18`, `test/spec/spec_018_5_cir_elaboration.charter`) |
+| `charter build <file.charter> [-o <artifact>] [--sign-key <key>]` | elaborate into validated `CIR` epochs and emit a signed SHA-256 content-addressed `Artifact` bundle (`D18`, `D27`) |
 | `charter fmt [--check] [--stdout] <file.charter> …` | format files canonically while preserving `//!` directives and verifying round-trip AST equality (`020`, `test/spec/spec_018_4_fmt_roundtrip.charter`) |
+| `charter doc <file.charter> [-o <out.md>] [--out json]` | generate a consolidated institutional rulebook with clause tables and `Default`/`Exception` decision tables (`G5.4`) |
+| `charter lsp` | run the stdio JSON-RPC Language Server Protocol (`initialize`, live `CHR` diagnostics, `hover`, `definition` to Markdown clauses, `formatting`) (`G5.3`) |
+| `charter doctor [--claims <path>] [--fail-on-unbacked] [--lock [<dir>]]` | verify `claims.json` theorem/gate backing, `charter.lock` SHA-256 digests, and optional external solver availability (`G5.4`) |
+| `charter explore [flags] <file.charter> …` | explore `lawful`, `adversarial`, or `mixed` state spaces with counterexample minimization and `--regime` overlays (`G2.1`, `G3.5`) |
+| `charter verify [flags] <file.charter> …` | verify `Invariant`s and temporal `Property`s via `--backend finite \| smt \| inductive` (`D20`, `G2.3`–`G2.5`) |
 | `charter run <file.charter>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
 | `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`, `explore-domain`) |
 | `charter repl [file.eflint]` | load the file, then run phrases typed at `charter> ` (`:display`, `:help`, `:quit`) |
@@ -26,4 +32,4 @@ Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diag
 
 **18.4 Diagnostics and claims are data (plan §3).** Every error and warning is a record with a CHR code (016); every claim carries a tag (*checked* today; *decided* and *proved* with `prove`) and the question it answers (*holds*, *lawful*, *valid*, *violated*, *provenance*, *invariants*).
 
-**18.5 Pending (plan §6).** `init`, `fmt`, `lsp`, `doc`; `why <fact>` as a command (the phrase `?why` exists, 004.10); `prove`'s managed toolchain (13.4, D9: fetched by digest into `~/.charter/toolchains/<digest>/`, `--offline` refusing rather than searching PATH; today `prove` runs inside the repository with its own toolchain); the projections `render`, `prompt`, `abi`, `views`, `explain`, `veil`, `diff`, `explore`; `import x.eflint`; `--itf`; and the second binary `charter-server` (plan §3a: `serve`, `replay`, `verify`).
+**18.5 Second executable: `charter-server` (`D27`, `G4`).** `charter-server` (`verify`, `replay`, `serve`) loads signed `.artifact` bundles with zero `Surface/`, `Resolve/`, or `Prove/` dependencies (`test/gates/operator-blind.sh`), enforces `Reserve` → `Authorize` → `ConfirmExecution` / `ExecutedUnknown` capability sagas over a hash-chained durable log, and verifies offline state-root determinism (`test/gates/replay.sh`, `test/gates/certificate-at-office.sh`).

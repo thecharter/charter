@@ -1,0 +1,47 @@
+// Benchmark 7 (`docs/rfc.md` §7.8): Ratification and versioned `Amend` across law versions with reflexive ratchet.
+//! explore: 1
+Fact senate Identified by S1.
+Fact citizen Identified by Cit1.
+Fact supermajority Identified by senate.
+Fact timelock-passed Identified by senate.
+Fact exited Identified by citizen.
+Fact tax-active Identified by citizen.
+
+Power exercise-exit Actor citizen
+  Holds when True
+  Valid when True
+  Creates exited(citizen).
+
+Power levy-tax Actor senate Recipient citizen
+  Holds when True
+  Valid when True
+  Creates tax-active(citizen).
+
+Entrenched Invariant exit-entrenched When True.
+
+Immunity exit-ratchet Holder citizen
+  Against Amend
+  Protects exercise-exit
+  Holds when True.
+
+Amend repeal-tax Actor senate
+  Repeals levy-tax
+  Holds when supermajority(senate)
+  Valid when supermajority(senate) && timelock-passed(senate).
+
+Amend repeal-exit Actor senate
+  Repeals exercise-exit
+  Holds when supermajority(senate)
+  Valid when supermajority(senate) && timelock-passed(senate).
+
++supermajority(S1).
++timelock-passed(S1).
+
+Scenario non-protected-amended-while-entrenched-ratchet-holds {
+  ?valid repeal-tax(S1).
+  repeal-tax(S1).
+  ?!valid levy-tax(S1, Cit1).
+  ?!valid repeal-exit(S1).
+  repeal-exit(S1).
+  ?valid exercise-exit(Cit1).
+}

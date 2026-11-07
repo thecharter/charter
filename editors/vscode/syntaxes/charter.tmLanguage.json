@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Charter",
+  "scopeName": "source.charter",
+  "patterns": [
+    { "name": "comment.line.double-slash.charter", "match": "//.*$" },
+    { "name": "comment.block.charter", "begin": "/\\*", "end": "\\*/" },
+    { "name": "string.quoted.double.charter", "begin": "\"", "end": "\"", "patterns": [{ "name": "constant.character.escape.charter", "match": "\\\\." }] },
+    {
+      "name": "keyword.declaration.charter",
+      "match": "\\b(Document|Clause|Approved|In|SHA256|Rank|Fact|Var|Function|Bool|Open|Closed|Evidenced|Confidential|Act|Power|Finding|Amend|Physical|Event|Duty|Immunity|Invariant|Entrenched|Predicate|Property|Param|Regime|Module|Use|As|Scenario|Extend|Placeholder)\\b"
+    },
+    {
+      "name": "keyword.control.charter",
+      "match": "\\b(Identified by|Holds when|Valid when|Violated when|Rejects when|Conditioned by|Derived from|Creates|Terminates|Obfuscates|Syncs with|Except under|Overridden by|Against|Protects|Unless|Due within|From|Text|Norm|Definition|Acceptance|Commentary|Default|Exception|Overrides|Priority|Over|Yields|Resolves|Standard|Supports|Rebuts|Retracts|SubmitEvidence|RetractEvidence|Repeals|Installs|Assumes|Always|Next|Eventually|EventuallyWithin|Until|WeakUntil|Foreach|Exists|Forall|When|Where|For|Actor|Recipient|Holder|Claimant|Related to)\\b"
+    },
+    {
+      "name": "support.function.builtin.charter",
+      "match": "\\b(Holds|Present|Enabled|Violated|Held|Established|Refuted|Unresolved|Conflicted|Conflict|MulDivRound|Sum|Count|Max|Min)\\b"
+    },
+    {
+      "name": "storage.type.charter",
+      "match": "\\b(Int|String|Time|Duration|Money|Quantity|True|False|Floor|Ceil|NearestEven|ExactOrReject)\\b"
+    },
+    { "name": "constant.numeric.charter", "match": "\\b[0-9]+\\b" }
+  ]
+}

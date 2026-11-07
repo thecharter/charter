@@ -1,0 +1,25 @@
+// Benchmark 5 (`docs/rfc.md` §7.8): Tiered fees, collateral bounds, and intercompany consolidation.
+//! explore: 1
+//! explore-domain: int = 5000, 10000
+#require "../lib/monetary_estate.charter".
+
+Fact acct Identified by LoanAcct.
+Fact lender Identified by BankA, BankB.
+Fact collat Identified by Receivable1.
+Fact corp Identified by ParentCo, SubCo.
+
+Use monetary-estate(acct, lender, collat, corp) As fin.
+
++fin-balance(LoanAcct, 10000).
++fin-collateral-value(Receivable1, 10000).
++fin-standalone-assets(ParentCo, 80000).
++fin-standalone-assets(SubCo, 50000).
++fin-controls-subsidiary(ParentCo, SubCo).
++fin-intercompany-equity(SubCo, 30000).
+
+Scenario exact-tiered-fee-and-consolidation {
+  ?(MulDivRound(2000, 2, 100, ExactOrReject) + MulDivRound(28000, 5, 100, ExactOrReject) == 1440).
+  fin-pledge-collateral(BankA, Receivable1, 6000).
+  ?!valid fin-pledge-collateral(BankB, Receivable1, 5000).
+  ?fin-consolidated-net-assets(ParentCo, SubCo, 100000).
+}

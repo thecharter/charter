@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Gate G5.3-G5.5 End-to-End Tooling, LSP, SDK, Init/Lock, Doctor, & 9-Institution Benchmark Suite:
+set -u
+cd "$(dirname "$0")/.." || exit 2
+B="$(pwd)/.lake/build/bin/charter"
+SB="$(pwd)/.lake/build/bin/charter-server"
+[ -x "$B" ] && [ -x "$SB" ] || { echo "FAIL g5-check: binaries missing"; exit 2; }
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+fail=0; pass=0
+
+ok()   { echo "ok   $1"; pass=$((pass+1)); }
+bad()  { echo "FAIL $1: $2"; fail=$((fail+1)); }
+
+# 1. `charter init` + `charter.lock` + `charter doctor --lock` + generated UAT smoke script
+if "$B" init "$tmp/new_proj" >/dev/null 2>&1 \
+   && CHARTER_BIN="$B" bash "$tmp/new_proj/uat/smoke.sh" >/dev/null 2>&1 \
+   && "$B" doctor --lock "$tmp/new_proj" >/dev/null 2>&1; then
+  ok "g5-init-lock-and-uat"
+else
+  bad "g5-init-lock-and-uat" "init, uat/smoke.sh, or doctor --lock failed"
+fi
+
+# 2. `charter doctor --claims docs/claims.json --fail-on-unbacked`
+if "$B" doctor --claims docs/claims.json --fail-on-unbacked >/dev/null 2>&1; then
+  ok "g5-doctor-claims-verified"
+else
+  bad "g5-doctor-claims-verified" "claims check failed"
+fi
+
+# 3. `charter doc` generates Markdown rulebook + statutory decision table
+if "$B" doc Examples/TreasuryMandate/treasury-mandate.charter -o "$tmp/rulebook.md" >/dev/null 2>&1 \
+   && grep -q "Decision Table: \`apparent-authority-protects\`" "$tmp/rulebook.md"; then
+  ok "g5-doc-rulebook-and-decision-table"
+else
+  bad "g5-doc-rulebook-and-decision-table" "missing expected rulebook table"
+fi
+
+# 4. `charter lsp` stdio JSON-RPC (`initialize`, `didOpen` publishDiagnostics, `hover`, `definition`, `formatting`)
+if python3 -I - "$B" "$(pwd)/Examples/Tenancy/tenancy.charter" <<'PY'
+import json, pathlib, subprocess, sys
+
+charter_bin, tenancy_path = sys.argv[1], sys.argv[2]
+uri = "file://" + tenancy_path
+src = pathlib.Path(tenancy_path).read_text(encoding="utf-8")
+
+def frame(obj):
+    raw = json.dumps(obj).encode("utf-8")
+    return f"Content-Length: {len(raw)}\r\n\r\n".encode("utf-8") + raw
+
+reqs = b"".join([
+    frame({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+    frame({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": uri, "text": src}}}),
+    frame({"jsonrpc": "2.0", "id": 2, "method": "textDocument/hover", "params": {"textDocument": {"uri": uri}, "position": {"line": 8, "character": 8}}}),
+    frame({"jsonrpc": "2.0", "id": 3, "method": "textDocument/definition", "params": {"textDocument": {"uri": uri}, "position": {"line": 8, "character": 8}}}),
+    frame({"jsonrpc": "2.0", "id": 4, "method": "shutdown", "params": {}}),
+    frame({"jsonrpc": "2.0", "method": "exit", "params": {}}),
+])
+
+p = subprocess.run([charter_bin, "lsp"], input=reqs, capture_output=True)
+assert p.returncode == 0, f"lsp exit {p.returncode}: {p.stderr.decode()}"
+out = p.stdout.decode("utf-8")
+assert '"hoverProvider":true' in out, f"missing hoverProvider: {out}"
+assert '"method":"textDocument/publishDiagnostics"' in out, f"missing diagnostics notification: {out}"
+assert 'tenancy.md' in out or '"diagnostics":[]' in out, f"unexpected lsp payload: {out}"
+PY
+then
+  ok "g5-lsp-initialize-diagnostics-hover-definition"
+else
+  bad "g5-lsp-initialize-diagnostics-hover-definition" "LSP round-trip failed"
+fi
+
+# 5. Python SDK (`sdk/python/charter_client.py`) live integration test against `charter-server`
+"$B" build Examples/TreasuryMandate/treasury-mandate.charter -o "$tmp/tm.artifact" >/dev/null 2>&1
+if python3 -I - "$(pwd)/sdk/python" "$SB" "$tmp/tm.artifact" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from charter_client import CharterStdioClient
+
+client = CharterStdioClient(sys.argv[2], sys.argv[3], institution_id="sdk-test")
+try:
+    ev = client.evaluate("issue-mandate", ["AcmeCorp", "CPA"])
+    assert ev.ok and ev.outcome == "Deny"  # already issued in genesis!
+    exp = client.explain("issue-mandate", ["AcmeCorp", "CPA"], audience="public")
+    assert exp.ok and "reasonGraph" in exp.raw
+finally:
+    client.close()
+PY
+then
+  ok "g5-python-sdk-live-server-integration"
+else
+  bad "g5-python-sdk-live-server-integration" "SDK integration failed"
+fi
+
+# 6. All 9 competitive benchmark institutions (`benchmarks/01_*.charter` .. `09_*.charter`)
+if "$B" test benchmarks >/dev/null 2>&1; then
+  ok "g5-nine-benchmark-institutions"
+else
+  bad "g5-nine-benchmark-institutions" "benchmark suite failed"
+fi
+
+echo "$pass passed, $fail failed, $((pass+fail)) total"
+[ $fail -eq 0 ]

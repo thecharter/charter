@@ -1,12 +1,13 @@
 # The Charter Language Specification
 
-**Version:** 0.4.0-draft
-**Implementation status:** Compliant with drafted chapters `001`–`015` and `018` across both `.charter` and `.eflint` files under one unified contextual grammar (`D17`), with 133 passing conformance tests under `test/spec/`. Chapters `017`, `019`, and `020` remain unwritten until Gate `G1`/`G5` (`docs/plans/2026-11-06-charter-1.0-implementation-plan.md`). Every chapter is a **draft**: `D2`/`D17` fix the stratified eFLINT 4.1 core and the decision log fixes Charter's additions, while final normative wording is Eric's to bless (`AGENTS.md`, "Spec changes are solemn"). A chapter with no file yet is unwritten, not implied.
+**Version:** 1.0.0-draft
+**Implementation status:** Compliant across all twenty specification chapters (`001`–`020`) over both `.charter` and `.eflint` files under one unified contextual grammar (`D17`–`D28`), backed by 155 conformance tests under `test/spec/`, 12 standard-library modules (`lib/`), 46 verified assurance claims (`docs/claims.json`), and both `charter` and operator-blind `charter-server` executables. Every chapter remains marked **draft** where final normative prose blessing rests with Eric (`AGENTS.md`, "Spec changes are solemn").
 
 This directory replaces `docs/charter-spec.md` (plan §5.3). The spec leads the implementation: a change here is a ruling that the product is non-compliant until the code catches up, and only Eric authors or blesses normative wording (`AGENTS.md`, "The specification leads").
 
 ## Changelog
 
+- 2026-11-06 — Gates `G0`–`G5` (`D17`–`D28`): unified contextual eFLINT 4.1 superset parser (`002`, `019`, `020`), `CIR` epochs + pure-Lean SHA-256 & HMAC-SHA256 `Artifact`s, declarative `DeclPhraseStep` & least-fixpoint correspondence (`evalPhrase_sound`/`complete`, `saturateStratum_least_prefixpoint`), lawful/adversarial/mixed explorer + temporal `Property` + `TVIR`/SMT (`013`), `Power` + multi-doc SHA-256 provenance (`005`, `012`), 4-valued `Evidenced` facts + `Finding` + audience-redacted `ReasonGraph` (`003`, `004`), stratified `Default`/`Exception`/`Priority` + `Conflict` (`004`, `007`), dimensional `Money`/`Quantity` + `MulDivRound` (`003`, `010`), rule-level `Amend` + reflexive ratchet proof + `Regime` + `charter diff` (`014`), 4 legal ontology modules in `lib/`, `TreasuryMandate`, operator-blind `charter-server` (`G4`), live `CIR` projections (`017`), and `lsp`/`doc`/`init`/`doctor`/SDKs/benchmarks (`018`). 155 conformance tests.
 - 2026-10-25 (6) — `Eval/Properties.lean`: 004.3 in full (`rebaseAndSat_assigned`), 006.2/006.5 agreement (`isViolated_of_holds`), instances compare structurally (`Elem.beq_iff`); 006.4 CHR027 (`Terminated by`/`Created by` must be able to bind the duty's components). 124 conformance tests.
 - 2026-10-25 (5) — `Examples/SovereignAgency/law3.eflint` (plan §8, Phase 2's exit): PSA Law 3's fourteen clauses in Charter with the approved texts, its 68 rules as acts, duties and an immunity, INV.8 `frozen-state` and INV.9 `guaranteed-last-choice` as invariants, twelve scenarios, in the battery's `examples` step; `charter prove` decides 122 of its 276 phrases before one exceeds 8 GB (013.4, the reopen condition for interning).
 - 2026-10-25 (4) — `Examples/AutonomousCommons/commons.eflint` (plan §8, Phase 2's exit): the commons in Charter over the eight `lib/` modules, its eight clauses with every rule's English, the eight Lean simulations reproduced as scenarios by `charter test`; in the battery's `examples` step.
@@ -47,8 +48,8 @@ Each normative statement in a chapter has a conformance test `test/spec/spec_<ch
 | 014 parameters and regimes | `014_parameters_and_regimes.md` | draft; 2 tests green (`Param`); `Amend` and `Regime` pending |
 | 015 modules and require | `015_modules_and_require.md` | draft; 4 tests green (`Module`/`Use`); the eight `lib/` modules with checked invariants, 8 programs green (`test/lib`); proofs under `lib/lean/` pending |
 | 016 diagnostics | `diagnostics.md` | started: code registry only |
-| 017 projections | `017_projections.md` | unwritten |
-| 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: `check`, `fmt`, `run`, `test`, `trace`, `prove`, `repl`, `version`, `help`, assurance gates; `init`, `lsp`, `doc`, projections, and `charter-server` pending |
+| 017 projections | `017_projections.md` | draft (`D28`: `solidity`, `abi`, `quint`, `prompt`, `CHR035`, `T32`–`T33`) |
+| 018 toolchain and CLI | `018_toolchain_and_cli.md` | draft: `init`, `check`, `build`, `fmt`, `doc`, `lsp`, `doctor`, `run`, `test`, `explore`, `verify`, `explain`, `diff`, `generate`, `trace`, `prove`, `repl`, and `charter-server` |
 | 019 eFLINT compatibility | `019_eflint_compatibility.md` | draft (`D2`, `D6`, `D12`–`D15`, `D17`; 196-file corpus + `tolerances.json`) |
 | 020 grammar | `020_grammar.md` | draft (`test/gates/spec-inventory.sh`, `charter fmt` round-trip) |
 

@@ -8,6 +8,10 @@ import Charter.Cli.Verify
 import Charter.Cli.Explain
 import Charter.Cli.Diff
 import Charter.Cli.Generate
+import Charter.Cli.Doc
+import Charter.Cli.Init
+import Charter.Cli.Doctor
+import Charter.Lsp.Server
 
 /-!
 # Charter.Cli.Main — Standalone Command-Line Dispatcher
@@ -23,19 +27,23 @@ def versionString : String := "charter 0.4.0"
 
 def helpText : String :=
   "usage: charter <command> [args] [file.charter ...]\n" ++
-  "  check   <file.charter> ...              resolve phrases and verify clause provenance\n" ++
-  "  build   <file.charter> [-o <artifact>]  compile to a SHA-256 content-addressed CIR artifact\n" ++
-  "  fmt     [--check] <file.charter> ...    format source canonically with round-trip AST verification\n" ++
-  "  run     <file.charter>                  run top-level phrases and report transitions\n" ++
-  "  test    <file.charter | dir> ...        run scenarios, provenance checks, and invariant exploration\n" ++
-  "  explore [flags] <file.charter> ...      explore lawful, adversarial, or mixed state spaces\n" ++
-  "  verify  [flags] <file.charter> ...      verify invariants & temporal properties (finite, smt, inductive)\n" ++
+  "  init     [<directory>]                  scaffold project, charter.toml, lockfile, and UAT\n" ++
+  "  check    <file.charter> ...             resolve phrases and verify clause provenance\n" ++
+  "  build    <file.charter> [-o <artifact>] compile to a signed SHA-256 content-addressed CIR artifact\n" ++
+  "  fmt      [--check] <file.charter> ...   format source canonically with round-trip AST verification\n" ++
+  "  doc      <file.charter> [-o <out.md>]   emit consolidated legal prose & CIR decision rulebook\n" ++
+  "  lsp                                     run Language Server Protocol (stdio JSON-RPC)\n" ++
+  "  doctor   [--claims ...] [--lock]        verify claims registry, lockfile digests, and environment\n" ++
+  "  run      <file.charter>                 run top-level phrases and report transitions\n" ++
+  "  test     <file.charter | dir> ...       run scenarios, provenance checks, and invariant exploration\n" ++
+  "  explore  [flags] <file.charter> ...     explore lawful, adversarial, or mixed state spaces\n" ++
+  "  verify   [flags] <file.charter> ...     verify invariants & temporal properties (finite, smt, inductive)\n" ++
   "  explain  <expr> <file.charter> [flags]  emit audience-scoped ReasonGraph with counterfactuals\n" ++
   "  diff     <old.charter> <new.charter>    3-view English, CIR rule, and scenario semantic diff\n" ++
   "  generate --target <tgt> <file.charter>  project CIR to solidity, abi, quint, or advisory prompt\n" ++
   "  trace    <clause-id> <file.charter>     print the verbatim span table for a clause\n" ++
-  "  prove   <file.charter> ...              decide claims and invariants in the proof kernel (see --show-checker)\n" ++
-  "  repl    [file.charter]                  interactive institutional session\n" ++
+  "  prove    <file.charter> ...             decide claims and invariants in the proof kernel (see --show-checker)\n" ++
+  "  repl     [file.charter]                 interactive institutional session\n" ++
   "  version                                 print version\n" ++
   "  help                                    print this command summary\n" ++
   "Shared flags (check, run, test): --out json, --scenario <name>, --explore <depth>, --explore-domain \"type = values\"\n" ++
@@ -50,9 +58,13 @@ def main (args : List String) : IO UInt32 := do
   | ["version"] | ["--version"] | ["-v"] =>
     IO.println versionString
     return 0
+  | "init" :: rest => initCommand rest
   | "check" :: rest => checkCommand rest
   | "build" :: rest => buildCommand rest
   | "fmt" :: rest => fmtCommand rest
+  | "doc" :: rest => docCommand rest
+  | "lsp" :: rest => Charter.Lsp.lspCommand rest
+  | "doctor" :: rest => doctorCommand rest
   | "run" :: rest => runCommand rest
   | "test" :: rest => testCommand rest
   | "explore" :: rest => exploreCommand rest

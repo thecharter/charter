@@ -1,0 +1,49 @@
+// Benchmark 6 (`docs/rfc.md` §7.8): Lawful-void, unlawful-valid, and proved `Immunity ... Unless` triad.
+//! explore: 1
+Fact host Identified by Host1.
+Fact tenant Identified by Tenant1.
+Fact panel Identified by Panel1.
+Fact quorum Identified by panel.
+Fact emergency Identified by tenant.
+Fact power-cut Identified by tenant.
+Fact lease-terminated Identified by tenant.
+
+// Unlawful physical act that still takes factual effect (`lawful = no, valid = yes`):
+Act cut-power Actor host Recipient tenant
+  Holds when emergency(tenant)
+  Creates power-cut(tenant).
+
+// Institutional power gated by `Valid when` and `Immunity` (`lawful = yes, valid = no` when immune):
+Power terminate-lease Actor panel Recipient tenant
+  Holds when True
+  Valid when quorum(panel)
+  Creates lease-terminated(tenant).
+
+Immunity quiet-enjoyment Holder tenant
+  Against terminate-lease
+  Holds when True
+  Unless emergency(tenant).
+
+Invariant immune-tenant-not-terminated When (Forall tenant: emergency(tenant) When lease-terminated(tenant)).
+
++quorum(Panel1).
+
+Scenario triad-orthogonality {
+  // 1. Unlawful but factually effective:
+  ?!lawful cut-power(Host1, Tenant1).
+  ?valid cut-power(Host1, Tenant1).
+  cut-power(Host1, Tenant1).
+  ?power-cut(Tenant1).
+
+  // 2. Lawful to propose, but void under quiet-enjoyment Immunity:
+  ?lawful terminate-lease(Panel1, Tenant1).
+  ?!valid terminate-lease(Panel1, Tenant1).
+  terminate-lease(Panel1, Tenant1).
+  ?!lease-terminated(Tenant1).
+
+  // 3. Emergency lifts Unless condition -> both lawful and valid:
+  +emergency(Tenant1).
+  ?valid terminate-lease(Panel1, Tenant1).
+  terminate-lease(Panel1, Tenant1).
+  ?lease-terminated(Tenant1).
+}

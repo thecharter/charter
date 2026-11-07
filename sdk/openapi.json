@@ -1,0 +1,84 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Charter Operator-Blind Institutional Decision API",
+    "version": "1.0.0",
+    "description": "Canonical JSON/RPC and MCP schema for `charter-server` (`docs/server-protocol.md`)."
+  },
+  "paths": {
+    "/rpc": {
+      "post": {
+        "operationId": "dispatchInstitutionRequest",
+        "summary": "Execute a typed institutional query, reservation, capability authorization, or state transition",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ServerRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed deterministic institutional response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServerResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ServerRequest": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "GetLaw", "GetState", "GetCoverageManifest", "Evaluate",
+              "Reserve", "Authorize", "ConfirmExecution", "ReconcileExecution",
+              "ExercisePower", "ObserveExternal", "SubmitEvidence",
+              "AdvanceClock", "Explain", "AmendLaw"
+            ]
+          },
+          "institutionId": { "type": "string" },
+          "action": { "type": "string" },
+          "args": { "type": "array", "items": { "oneOf": [{ "type": "string" }, { "type": "integer" }] } },
+          "intentId": { "type": "string" },
+          "actor": { "type": "string" },
+          "resource": { "type": "string" },
+          "amount": { "type": "integer" },
+          "resourceCap": { "type": "integer" },
+          "ttl": { "type": "integer" },
+          "audience": { "type": "string" }
+        }
+      },
+      "ServerResponse": {
+        "type": "object",
+        "required": ["ok", "op", "institutionId", "lawHash", "stateVersion"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "op": { "type": "string" },
+          "institutionId": { "type": "string" },
+          "lawHash": { "type": "string" },
+          "lawVersion": { "type": "integer" },
+          "stateVersion": { "type": "integer" },
+          "stateRoot": { "type": "string" },
+          "outcome": {
+            "type": "string",
+            "enum": ["Allow", "Deny", "NeedEvidence", "ReferForFinding", "Conflict", "Observed", "Reserved"]
+          },
+          "lawful": { "type": "string", "enum": ["yes", "no", "undetermined"] },
+          "valid": { "type": "string", "enum": ["yes", "no", "undetermined"] },
+          "serverSignature": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

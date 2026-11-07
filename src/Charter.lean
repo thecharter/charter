@@ -74,6 +74,10 @@ import Charter.Project.QuintTarget
 import Charter.Project.PromptTarget
 import Charter.Cli.Diff
 import Charter.Cli.Generate
+import Charter.Cli.Doc
+import Charter.Cli.Init
+import Charter.Cli.Doctor
+import Charter.Lsp.Server
 import Charter.Cli.Main
 import Charter.Server.StateStore
 import Charter.Server.Reservations

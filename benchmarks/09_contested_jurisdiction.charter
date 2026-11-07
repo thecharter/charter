@@ -1,0 +1,22 @@
+// Benchmark 9 (`docs/rfc.md` §7.8): Conflicting jurisdictions, superior entrenchment, and explicit unresolved priority.
+//! explore: 1
+#require "../lib/jurisdiction.charter".
+
+Fact realm Identified by TreatyUnion, MemberStateA, MemberStateB.
+Fact firm Identified by CarrierX.
+Fact rule-topic Identified by DataPortability, LocalTariff.
+
+Use jurisdiction(realm, firm, rule-topic) As jx.
+
++jx-subordinate-to(MemberStateA, TreatyUnion).
++jx-superior-entrenched(TreatyUnion, DataPortability).
++jx-nexus(TreatyUnion, CarrierX).
++jx-nexus(MemberStateA, CarrierX).
++jx-nexus(MemberStateB, CarrierX).
+
+Scenario treaty-supremacy-and-peer-conflict {
+  ?!valid jx-enact-prohibition(MemberStateA, CarrierX, DataPortability).
+  jx-enact-mandate(MemberStateA, CarrierX, LocalTariff).
+  jx-enact-prohibition(MemberStateB, CarrierX, LocalTariff).
+  ?jx-contested-jurisdiction(CarrierX, LocalTariff).
+}

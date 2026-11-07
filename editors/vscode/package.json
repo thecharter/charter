@@ -1,0 +1,26 @@
+{
+  "name": "charter-language",
+  "displayName": "Charter Institutional Language",
+  "description": "Syntax highlighting, formatting, Clause hover provenance, and LSP diagnostics for Charter (.charter, .eflint)",
+  "version": "1.0.0",
+  "publisher": "thecharter",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages", "Linters"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "charter",
+        "aliases": ["Charter", "eFLINT", "charter"],
+        "extensions": [".charter", ".eflint"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "charter",
+        "scopeName": "source.charter",
+        "path": "./syntaxes/charter.tmLanguage.json"
+      }
+    ]
+  }
+}

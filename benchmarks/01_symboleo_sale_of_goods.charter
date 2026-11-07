@@ -1,0 +1,32 @@
+// Benchmark 1 (`docs/rfc.md` §7.8): Symboleo-style sale-of-goods lifecycle, partial delivery, and novation.
+//! explore: 1
+//! explore-domain: int = 50, 100
+#require "../lib/contract_lifecycle.charter".
+
+Fact contract Identified by Sale1.
+Fact trader Identified by Seller, Buyer, Carrier, ReplacementSeller.
+Fact delivery-ob Identified by ObGoods.
+
+Use contract-lifecycle(contract, trader, delivery-ob) As sg.
+
++sg-contract-status(Sale1, Draft).
++sg-contract-of(ObGoods, Sale1).
++sg-obligor-of(ObGoods, Seller).
++sg-claimant-of(ObGoods, Buyer).
++sg-remaining-debt(ObGoods, 100).
++sg-performed-total(ObGoods, 0).
+
+Scenario sale-of-goods-partial-delivery-and-novation {
+  sg-offer-contract(Seller, Sale1).
+  sg-accept-contract(Buyer, Sale1).
+  sg-activate-contract(Seller, Sale1).
+  ?sg-contract-status(Sale1, InForce).
+  sg-appoint-subcontractor(Seller, Carrier, ObGoods).
+  sg-perform-obligation(Carrier, ObGoods, 50).
+  ?sg-remaining-debt(ObGoods, 50).
+  +sg-novation-consent(ObGoods, Buyer).
+  sg-novate-obligation(Seller, ReplacementSeller, ObGoods).
+  ?sg-obligor-of(ObGoods, ReplacementSeller).
+  sg-perform-obligation(ReplacementSeller, ObGoods, 50).
+  ?sg-obligation-satisfied(ObGoods).
+}

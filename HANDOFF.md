@@ -5,6 +5,29 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-06 (2): Charter 1.0 Gates `G0`–`G5` Complete (`D17`–`D28`, `T01`–`T49`)
+
+## Where
+
+- `main`, pushed directly in atomic fast-forward commits (`05b6635` → `fa7d06a` + this `G5.3`–`G5.5` exit commit). `tools/battery`: PASS across all 23 steps (zero build warnings across 183 jobs, all 13 Law-14 gates green, 46 backed assurance claims, 196/196 unified eFLINT corpus without `--eflint`, 155/155 spec conformance tests, 12/12 standard-library modules, zero-axiom `charter prove`, `verify`, `server`, `projections`, `g5-product`, and 4 in-tree examples).
+
+## What landed across Gates `G0`–`G5`
+
+- **Gate `G0` (`efe5c01`–`5c8c6ff`, `D17`)**: retired Phase-0 linked Lean companions (`D10`, `g0-independence.sh`), unified `.charter`/`.eflint` contextual keyword parser (196/196 upstream eFLINT corpus passes without `--eflint`, `tolerances.json`), opt-in static assurance gates (`CHR029`–`CHR031`), `docs/trust.md`, `docs/assurance-levels.md`, and `docs/claims.json` (`claims-backed.sh`).
+- **Gate `G1` (`0703f08`–`edec4ba`, `D18`–`D19`)**: normative grammar (`019`, `020`), `charter fmt` (`spec-inventory.sh`), `CIR` epochs + `Spec.WellFormed` + kernel-verified SHA-256, Tarski least pre-fixpoint (`saturateStratum_least_prefixpoint`), `DeclPhraseStep` correspondence (`evalPhrase_sound`, `evalPhrase_complete`, `replay_trace_deterministic`, `frame_preservation_unrestricted`, `mutant-eval-check.sh`), `SymbolTable` interning (`T42`), and structured `ClaimCertificate` (`T44`).
+- **Gate `G2` (`a9ea89d`–`1aff3e3`, `D20`)**: `lawful`/`adversarial`/`mixed` native explorer + counterexample minimization + proved disjoint-store POR (`T28`, `T29`), temporal `Property` syntax + fairness-gated liveness (`T26`, `T27`, `T31`), `TVIR`/SMT bounded model checker with native `Eval` counterexample replay (`T30`), and `charter verify`.
+- **Gate `G3` (`5f65ce9`–`32e340a`, `D21`–`D26`)**:
+  - `G3.1`: `Power` competence check (`CHR032`, `wellFormed_power_has_validWhen`), multi-document `Document [ID] "path" [SHA256 "..."] [Rank n]`, SHA-256 clause approvals, Markdown anchors, and `complete | partial | illustrative` provenance coverage (`T08`, `T37`, `T39`).
+  - `G3.2`: 4-valued `Evidenced` facts (`Established | Refuted | Unresolved | Conflicted`), institutional `Finding` acts (`Law 3`), Kleene 3-valued `TriBool` guard propagation (`T06`, `T07`), `charter explain` over `ReasonGraph` with proved verdict-preserving audience redaction (`redactForAudience_preserves_verdict`, `T43`), advisory `Note` irrelevance (`advisory_note_irrelevant`, `T04`), and `charter test --metamorphic` (`T05`).
+  - `G3.3`: Catala-style `Default` / `Exception ... Overrides` / `Priority ... Over` calculus (`Fact`/`Bool` + `Yields ... When` on `Function`/`Var`), static cycle rejection (`CHR034`), explicit normative `Conflict` (`T21`), and proved `evalCompiledDAG_eq_spec` (`T22`).
+  - `G3.4`: static dimensional `Money(CUR, SCALE)` & `Quantity(UNIT)` over exact `Int` minor units and proved `MulDivRound` (`Floor`, `Ceil`, `NearestEven`, `ExactOrReject`, `CHR108`, `T10`, `T11`).
+  - `G3.5`: rule-level `Amend` (`Repeals` / `Installs`), reflexive `Immunity ... Against Amend` ratchet proof (`cir_ratchet_trajectory_preserves_entrenched`, `T23`, `T24`), `Regime` overlays, 3-view `charter diff` (`T38`), and `D11` gates (`amend-is-an-act`, `amend-reflexive`, `extend-never-at-runtime`).
+  - `G3.6`–`G3.7`: standard-library `contract_lifecycle`, `agency_mandate`, `monetary_estate`, and `jurisdiction` modules (`D8`, `LegalOntologies.lean`), plus `Examples/TreasuryMandate` across Traces A–F (30/30 claims & invariants decided in the kernel with zero axioms).
+- **Gate `G4` (`effc39f`, `D27`, resolves `B10`)**: pure-Lean RFC 2104 HMAC-SHA256 (`hmacSha256_rfc4231_vector`) signed `.artifact` bundles, standalone operator-blind `charter-server` executable (`operator-blind.sh` verifying zero `Surface`/`Resolve`/`Prove` modules or symbols), hash-chained durable JSONL log + canonical `computeStateRoot` + offline `replay` (`replay.sh`, `T36`), `certificate-at-office.sh`, and `Reserve` → `Authorize` → `ConfirmExecution` / `ExecutedUnknown` saga + MCP/JSON-RPC API (`T09`, `T34`, `T35`, `T43`).
+- **Gate `G5` (`fa7d06a` + this commit, `D28`)**: live `CIR` `charter generate --target solidity|abi|quint|prompt` (`CHR035`, `cir_guard_step_correspondence`, `T32`, `T33`), `charter lsp` + Tree-sitter/VS Code grammars, `charter doc`, `charter init` (`charter.toml` + `charter.lock`), `charter doctor`, TypeScript/Python/Rust SDKs (`sdk/`), and the 9-institution competitive benchmark suite (`benchmarks/`, `docs/benchmarks.md`, `docs/migrations.md`).
+
+---
+
 # Handoff — 2026-11-06: Kernel-unfoldable radix indexing (`DomMap`), `--scenario` filtering, and `CHR028`
 
 ## Where

@@ -1,0 +1,35 @@
+// Benchmark 4 (`docs/rfc.md` §7.8): Veil/Quint-style fenced distributed lease handover under partitions.
+//! explore: 2
+Fact node Identified by Primary, Backup.
+Fact coordinator Identified by Coord.
+Fact active-lease Identified by node.
+Fact epoch-fenced Identified by node.
+
+Power grant-initial-lease Actor coordinator Recipient node
+  Holds when !(Exists node': active-lease(node'))
+  Valid when !(Exists node': active-lease(node'))
+  Creates active-lease(node).
+
+Act confirm-fence Actor node
+  Holds when active-lease(node)
+  Creates epoch-fenced(node)
+  Terminates active-lease(node).
+
+Power activate-successor Actor coordinator Recipient node
+  Holds when (Exists node': epoch-fenced(node') && node' != node) && !(Exists node'': active-lease(node''))
+  Valid when (Exists node': epoch-fenced(node') && node' != node) && !(Exists node'': active-lease(node''))
+  Creates active-lease(node).
+
+Invariant single-authority When !(Exists node, node': node != node' && active-lease(node) && active-lease(node')).
+Property bounded-handover-safety When WeakUntil(single-authority(), False).
+
+grant-initial-lease(Coord, Primary).
+
+Scenario fenced-handover-preserves-single-authority {
+  ?!valid activate-successor(Coord, Backup).
+  confirm-fence(Primary).
+  ?valid activate-successor(Coord, Backup).
+  activate-successor(Coord, Backup).
+  ?active-lease(Backup).
+  ?!active-lease(Primary).
+}

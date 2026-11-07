@@ -1,0 +1,22 @@
+// Benchmark 3 (`docs/rfc.md` §7.8): InstAL-style multi-institution access control & delegation.
+//! explore: 1
+//! explore-domain: int = 30, 80
+#require "../lib/agency_mandate.charter".
+
+Fact mand Identified by M_Vault.
+Fact org Identified by HospitalA.
+Fact clinician Identified by DrLee.
+Fact registry Identified by RecordsHub.
+Fact access-op Identified by ReadRec1.
+
+Use agency-mandate(mand, org, clinician, registry, access-op) As ac.
+
+ac-grant-mandate(HospitalA, DrLee, M_Vault, 50).
+
+Scenario delegated-access-within-and-above-scope {
+  ac-execute-delegate-trade(DrLee, ReadRec1, M_Vault, RecordsHub, 30).
+  ?valid ac-recognize-on-principal(RecordsHub, ReadRec1, M_Vault, HospitalA, DrLee, 30).
+  ac-recognize-on-principal(RecordsHub, ReadRec1, M_Vault, HospitalA, DrLee, 30).
+  ?ac-principal-bound-trade(ReadRec1, HospitalA, RecordsHub, 30).
+  ac-submit-trade-confirmation(DrLee, ReadRec1, M_Vault).
+}

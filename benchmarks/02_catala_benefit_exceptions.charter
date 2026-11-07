@@ -1,0 +1,23 @@
+// Benchmark 2 (`docs/rfc.md` §7.8): Catala-style statutory family-benefit default/exception DAG.
+//! explore: 1
+Fact household Identified by H1, H2, H3.
+Fact eligible-residency Identified by household.
+Fact high-earner Identified by household.
+Fact disabled-dependent Identified by household.
+
+Function benefit-cents Identified by household * int
+  Default base-benefit Yields 50000 When eligible-residency(household)
+  Exception phaseout Overrides base-benefit Yields 0 When eligible-residency(household) && high-earner(household)
+  Exception hardship-restore Overrides phaseout Yields 35000 When eligible-residency(household) && high-earner(household) && disabled-dependent(household).
+
+Invariant benefit-non-negative When (Forall benefit-cents: benefit-cents.int >= 0).
+
++eligible-residency(H1).
++eligible-residency(H2). +high-earner(H2).
++eligible-residency(H3). +high-earner(H3). +disabled-dependent(H3).
+
+Scenario three-tier-statutory-calculation {
+  ?benefit-cents(H1, 50000).
+  ?benefit-cents(H2, 0).
+  ?benefit-cents(H3, 35000).
+}

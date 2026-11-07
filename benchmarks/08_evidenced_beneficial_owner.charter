@@ -1,0 +1,37 @@
+// Benchmark 8 (`docs/rfc.md` §7.8): Unknown beneficial-owner fact, conflicting filings, and adjudicated `Finding`.
+//! explore: 1
+Fact officer Identified by Off1.
+Fact tribunal Identified by Trib1.
+Fact account Identified by Acc9.
+Fact person Identified by Ubo1.
+Fact tribunal-quorum Identified by tribunal.
+Evidenced Fact verified-ubo Identified by account
+  Confidential To auditor, tribunal.
+Fact transfer-cleared Identified by account.
+
+Power clear-transfer Actor officer Related to account
+  Holds when verified-ubo(account)
+  Valid when verified-ubo(account)
+  Creates transfer-cleared(account).
+
+Finding rule-ubo Actor tribunal Related to account
+  Resolves verified-ubo(account)
+  Standard clear-and-convincing
+  Holds when Conflicted(verified-ubo(account)) || Unresolved(verified-ubo(account))
+  Valid when tribunal-quorum(tribunal).
+
+Invariant cleared-requires-established-ubo When (Forall account: Established(verified-ubo(account)) When transfer-cleared(account)).
+
+Scenario unresolved-to-conflicted-to-adjudicated-finding {
+  ?Unresolved(verified-ubo(Acc9)).
+  ?undetermined clear-transfer(Off1, Acc9).
+  SubmitEvidence verified-ubo(Acc9) By "registry-A".
+  SubmitEvidence !verified-ubo(Acc9) By "whistleblower-B".
+  ?Conflicted(verified-ubo(Acc9)).
+  ?!valid clear-transfer(Off1, Acc9).
+  +tribunal-quorum(Trib1).
+  rule-ubo(Trib1, Acc9).
+  ?Established(verified-ubo(Acc9)).
+  clear-transfer(Off1, Acc9).
+  ?transfer-cleared(Acc9).
+}
