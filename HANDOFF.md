@@ -5,6 +5,39 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-07 (2): four of the eleven accepted-and-wrong defects fixed (D29)
+
+## Where
+
+- `main`, pushed: four fix commits and one docs commit. `tools/battery`: PASS (25 steps) at the
+  head of the series; the intermediate commits were not run through it one by one.
+
+## What landed
+
+- **#5** `Held(e) For d` now counts as a read of `e` in stratification (`Core/Derivation.lean`,
+  one line). Fixture `spec_004_6d`.
+- **#2** An application that gives two different arguments to a component named twice is CHR036.
+  The declaration stays legal: `Holder actor Claimant actor` is used on purpose. Fixture `spec_003_3c`.
+- **#7** A bare literal is not a phrase (CHR012), which is what let `10000.00.` pass. Fixture `spec_011_2b`.
+- **#10** A `Param` inside `Installs { }` is CHR037. Fixture `spec_014_3c`.
+- Decision record `docs/meetings/2026-11-07-D29-…`; four spec sentences drafted (003.3, 004.6,
+  011.2, 014.3) for Eric's review.
+
+## Two things learned the hard way
+
+- Refusing digits-dot-digits in the lexer broke thirteen examples: `Clause 1.1` is that shape.
+- A static check must be structural. `reprStr` in `compileArguments` made `charter prove`
+  disagree with the evaluator, because the kernel re-runs resolution and cannot reduce `Repr`.
+
+## Open (of the eleven)
+
+#3 count of a constructor, #4 actor outside its type, #6 `test` passes with a violated invariant,
+#8 binder over a money type, #9 evidence through a derived fact, #11 unset `Var`, #12 `Retracts`.
+#6, #9, #11 and #12 change specified behaviour and need a ruling; #3 and #8 are warnings to add;
+#4 depends on what a phrase naming a non-instance should do.
+
+---
+
 # Handoff — 2026-11-07: twenty worked examples and what they cost to write
 
 ## Where

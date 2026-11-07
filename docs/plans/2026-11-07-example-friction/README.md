@@ -14,8 +14,9 @@ why, ranks what would fix it, and lists the defects found on the way.
 - `notes/<Example>.md`: one file per example. What was hard, in order, with the diagnostics;
   five to ten improvements each, with the lines as written and the lines as wished; tool
   defects; what a lay author would have guessed first.
-- `reproductions/`: eighteen defects as runnable files. Each passes today because its claims
-  state the wrong answer; when a defect is fixed its file fails.
+- `reproductions/`: the open defects as runnable files. Each passes today because its claims
+  state the wrong answer; when a defect is fixed its file is removed and a fixture under
+  `test/spec/` takes its place.
 - `brief.md`: the brief the example writers worked from.
 - `tools/examples-metrics`: the counts below, recomputed on demand.
 
@@ -340,15 +341,15 @@ scenario exposed it.
 
 | # | What happens |
 |---|---|
-| 01 | `Fact yes Identified by person * person` is accepted; the second argument is dropped |
+| 01 | `Fact yes Identified by person * person` is accepted; the second argument is dropped. **Fixed** (D29, CHR036) |
 | 02 | `Count(Foreach person: present(person))` counts everyone |
 | 03 | An atom outside the actor's type performs the act validly |
-| 04 | `Held(e) For d` is false inside `Holds when` when `e` is derived |
+| 04 | `Held(e) For d` is false inside `Holds when` when `e` is derived. **Fixed** (D29) |
 | 05 | `charter test` exits 0 with a violated `Invariant` |
-| 06 | `10000.00` is read as one hundred dollars |
+| 06 | `10000.00` is read as one hundred dollars. **Fixed** (D29, CHR012) |
 | 07 | A binder over a money, integer or string type is silently empty |
 | 08 | An unresolved evidenced premise becomes "yes" through one derived fact |
-| 09 | `Amend … Installs { Param … }` is valid and does nothing |
+| 09 | `Amend … Installs { Param … }` is valid and does nothing. **Fixed** (D29, CHR037) |
 | 11 | An effect that reads an unset `Var` does nothing |
 | 12 | `Retracts` in another act removes nothing; two physicians are one piece of evidence |
 | 13 | `Holds when` beside `Except under` is ignored |
