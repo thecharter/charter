@@ -1,0 +1,15 @@
+// 004.6, 009.3: `Held(e) For d` reads the type of `e`, so a rule that says it is derived after the
+// rules that derive `e`. Inside a fact's or an act's `Holds when` it answers as it does in a query.
+Fact p Identified by A
+Bool a
+Bool b Holds when a()
+Bool c Holds when Held(b()) For 5
+Act go Actor p Holds when Held(b()) For 5
+.
++a().
+@ 4.
+?!c(). ?!lawful go(A).
+@ 5.
+?Held(b()) For 5.
+?c().
+?lawful go(A).

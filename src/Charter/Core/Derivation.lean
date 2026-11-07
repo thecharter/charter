@@ -66,7 +66,9 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
     | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b =>
       deps spec fuel bound p a ++ deps spec fuel bound p b
-    | .heldFor t d => deps spec fuel bound p t ++ deps spec fuel bound p d
+    -- `Held(e) For d` reads whether `e` holds and since when (009.3), as `.present` does
+    | .heldFor t d =>
+      (typeOf spec t).toList.map (·, p) ++ deps spec fuel bound p t ++ deps spec fuel bound p d
     | .evStatus want t =>
       let pol := if want == .established then p else .neg
       (typeOf spec t).toList.map (·, pol) ++ deps spec fuel bound pol t
