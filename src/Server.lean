@@ -80,7 +80,7 @@ def serverMain (args : List String) : IO UInt32 := do
     IO.println serverHelp
     return 0
   | ["version"] | ["--version"] | ["-v"] =>
-    IO.println "charter-server 0.4.0"
+    IO.println "charter-server 1.0.0"
     return 0
   | "verify" :: rest =>
     match parseServerOpts rest {} with

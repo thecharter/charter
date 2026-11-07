@@ -43,7 +43,7 @@ structure SourceManifest where
 
 structure Bundle where
   formatVersion   : Nat := 1
-  languageVersion : String := "0.4.0"
+  languageVersion : String := "1.0.0"
   sourceManifest  : SourceManifest
   epochHashes     : List (Nat × String)
   cirDigest       : String
@@ -127,7 +127,7 @@ def Bundle.payloadJson (sm : SourceManifest) (epochHashes : List (Nat × String)
     (cirDigest : String) (runtimeCIR : Config) : Json :=
   Json.mkObj [
     ("formatVersion", Json.num 1),
-    ("languageVersion", Json.str "0.4.0"),
+    ("languageVersion", Json.str "1.0.0"),
     ("sourceManifest", sm.toJson),
     ("epochs", Json.arr (epochHashes.map fun (v, h) =>
       Json.mkObj [("version", Json.num v), ("specSha256", Json.str h)]).toArray),

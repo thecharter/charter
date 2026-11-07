@@ -23,7 +23,7 @@ user-visible output (`Law 11`).
 
 namespace Charter.Cli
 
-def versionString : String := "charter 0.4.0"
+def versionString : String := "charter 1.0.0"
 
 def helpText : String :=
   "usage: charter <command> [args] [file.charter ...]\n" ++

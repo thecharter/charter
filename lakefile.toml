@@ -1,5 +1,5 @@
 name = "charter"
-version = "0.4.0"
+version = "1.0.0"
 defaultTargets = ["Charter", "charter", "charter-server"]
 
 # The Charter language: compiler, semantics, standard library, projections, and CLI (src/Charter/).
