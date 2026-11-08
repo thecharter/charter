@@ -5,6 +5,24 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-08: all 27 ergonomics proposals (`#35`–`#61`) + stdlib provenance (`#62`) implemented (`D34`–`D38`)
+
+## Where
+
+- `main`, pushed across five atomic, battery-green commits (`D34`–`D38`).
+- `tools/battery`: **PASS** across all 25 steps (195 spec conformance tests, 13 standard-library suites over 15 modules, 4/4 zero-axiom `prove`, 14/14 `verify`, 196/196 eFLINT corpus, 20/20 worked examples); `/Users/eric/psa/tools/verify-psa`: **PASS** across all 6 stages.
+- All 18 runnable defect reproductions (`01`–`18`) and all 28 language ergonomics / stdlib-provenance issues (`#35`–`#62`) are now resolved and closed.
+
+## What landed (`D34`–`D38`)
+
+- **`D34` (`7795f8c`)**: `Clause <ID> => ...` heading/sentence extraction by reference (`#35`), `charter approve [--lock]` rule-aware `charter.lock` approvals (`#23`, `#31`, `#32`), spans citing `Fact`/`Param`/`Event`/`Default`/`Exception` + ground initializers (`#36`), template `{param}` blanks (`#59`), and `Use ... From <CLAUSE>` stdlib provenance + `lib/{debt,ballot,succession}.charter` (`#62`).
+- **`D35` (`da95b30`)**: `Power` `Holds when` defaults to `Valid when` (`#37`), `Valid when` comma rejection (`#38`), `Prohibited`/`Forbidden when`/`Void when` (`#51`), `Protection` dual of `Immunity` (`#52`), `Presumed` & `Decides` (`#53`), `Amend Procedure` & `Protects Clause` (`#54`), `Input Fact` (`#55`), Duty `Overrides` & `Excused when` (`#57`), `Qualifies as` (`#60`), and `CHR032`/`CHR041`/`CHR042` (`#13`, `#15`, `#26`).
+- **`D36` (`773ae72`)**: `Role`s (`Is`, `Where`, `First of ... Unless` succession, fixed claimants), status-fact actors, `(Forall|Exists) ... Except`, `Duration %` (`#39`, `#40`), `Var` enumeration fix (`#14`), `f(k)` `Function` lookup, `Count(pred)`, `Amount`, `Decided by` ballots, bare `Bool`, multi-name powers, single-party duties (`#46`, `#50`, `#61`), and `Scenario ... After` / `Let` / singleton `Role` elision (`#41`).
+- **`D37` (`1679283`)**: `$10,000.00` money literals, `: USD`/`Rate` shorthands, `Var ... = init` (`#42`), `6%` & `bps` rates (`#58`), `010.4` dimensional ratios (`#22`), `Share` & `ProRata` with required `Remainder To` (`#56`), `If` & 2-arg `Min`/`Max`, `Debt` with independent per-raising deadlines (`#45`, `#17`), and `Applies ... To` waterfalls.
+- **`D38` (`HEAD`)**: `Done(e)` & `?occurred` (`#49`), `Since`/`Age`/`Overdue`/`Before`/`Within ... Of`/`At` (`#43`), `Grace` & `?late` + `Due within ... After` (`#44`), exact clock-threshold stamps (`#16`), `Every <period>` recurring duties & `On breach Creates` (`#47`), and ISO `YYYY-MM-DD` civil calendar + `days`/`weeks` + `Year`/`Month`/`Day`/`Weekday`/`AddMonths`/`AddYears` (`#48`).
+
+---
+
 # Handoff — 2026-11-07 (3): remaining six of the eleven accepted-and-wrong defects fixed (`D30`–`D33`)
 
 ## Where

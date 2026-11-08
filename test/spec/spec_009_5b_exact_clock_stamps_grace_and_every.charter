@@ -1,0 +1,55 @@
+// 009.3, 006.7, 009.5 (D38, #16, #44, #47): exact clock-threshold stamps on derived facts,
+// `Due within d Grace g` with `?late` vs `?violated`, `Due within d After event`, and `Every p`.
+Param start : Time = 0
+Bool second-week Holds when Current Time - start >= 7
+Bool a-day-into-it Holds when Held(second-week) For 1
+
+Role tenant Is Tess
+Role landlord Is Lou
+Duty rent-due Holder tenant Claimant landlord Due within 5 Grace 3
+
+Event notice-given
+Duty cure-due Holder tenant Claimant landlord Holds when Done(notice-given) Due within 10 After notice-given
+
+Role payer Is Daniel
+Role payee Is Rosa
+Act pay-period Actor payer Recipient payee Related to int Holds when True
+Duty monthly-support Holder payer Claimant payee
+  Every 30
+  Due within 5
+  Paid by pay-period
+  On breach Creates support-breached
+Bool support-breached
+.
+// 1. Jump straight from t=0 to t=9 without visiting t=7 (#16): `second-week` is stamped at 7!
++rent-due(Tess, Lou).
+@ 5.
+?late rent-due(Tess, Lou).
+?!violated rent-due(Tess, Lou).
+@ 8.
+?late rent-due(Tess, Lou).
+?violated rent-due(Tess, Lou).
+
+@ 9.
+?second-week.
+?a-day-into-it.
+
+// 2. `Due within 10 After notice-given`:
+@ 12.
+notice-given().
+@ 21.
+?!violated cure-due(Tess, Lou).
+@ 22.
+?violated cure-due(Tess, Lou).
+
+// 3. `Every 30 Due within 5 Paid by pay-period On breach Creates support-breached` (#47):
+// Period 0 (t=0) breached by t=22 -> `support-breached` holds; pay period 0, then jump to @ 32:
+?support-breached.
+pay-period(0).
+?!monthly-support(Daniel, Rosa, 0).
+@ 32.
+// Period 1 arose at t=30 (stamped 30): at t=32 it holds and is NOT yet violated (32 - 30 < 5)!
+?monthly-support(Daniel, Rosa, 1).
+?!violated monthly-support(Daniel, Rosa, 1).
+@ 35.
+?violated monthly-support(Daniel, Rosa, 1).

@@ -75,15 +75,18 @@ end DomMap
 
 /-- Which of the answers an expectation phrase asks about (`plan` §2.2.6, `D22`, `D23`). -/
 inductive Expect where
+  | occurred
   | lawful
   | valid
   | violated
+  | late
   | undetermined
   | conflict
   deriving Repr, DecidableEq, Inhabited
 
 def Expect.name : Expect → String
-  | .lawful => "lawful" | .valid => "valid" | .violated => "violated"
+  | .occurred => "occurred" | .lawful => "lawful" | .valid => "valid"
+  | .violated => "violated" | .late => "late"
   | .undetermined => "undetermined" | .conflict => "conflict"
 
 /-- `Var` and `Function` restrictions: a new instance replaces the previous one
@@ -209,6 +212,11 @@ structure DutySpec where
   overriddenBy    : List DomId := []
   /-- Charter (D35, `#57`): conditions that excuse violation while leaving the duty holding. -/
   excusedWhen     : List Term := []
+  /-- Charter (D38, `#44`): `Late` conditions (`Due within d` before `Grace g` expires) and base due duration. -/
+  lateWhen        : List Term := []
+  dueDuration     : Option Term := none
+  /-- Charter (D38, `#47`): period length for recurring `Every <period>` duties. -/
+  everyPeriod     : Option Int := none
   deriving Repr, Inhabited
 
 structure EventSpec where
@@ -289,6 +297,9 @@ inductive ModClause where
   | unlessCond (ts : List Term)
   /-- Charter (D7): `Due within d` on a duty: violated once held for `d`. -/
   | dueWithin (d : Term)
+  | dueWithinGrace (d : Term) (grace : Term)
+  | dueWithinAfter (d : Term) (afterEv : Term)
+  | lateWhen (ts : List Term)
   /-- Charter (D4): `From CLAUSE "span"`: the English this rule is the meaning of. -/
   | fromSpan (clause : ClauseId) (text : String)
   /-- Charter (D22, G3.2): `Evidenced` and `Confidential [To ...]` on a fact. -/
@@ -441,6 +452,8 @@ structure Spec where
   regimes : List RegimeSpec := []
   /-- Charter (D35, `#54`): default `Valid when` competence conditions declared by `Amend Procedure`. -/
   amendProcedure : List Term := []
+  /-- Charter (D38, `#49`, `#43`): `true` when `Done`/`Since`/`Before`/`Within`/`?occurred` is used, enabling `$occ` transition stamping. -/
+  tracksHistory : Bool := false
   deriving Repr, Inhabited
 
 namespace Spec
@@ -770,7 +783,16 @@ where
         | k => k }
     -- `Due within d` is desugared by the resolver into a `Violated when Held(d()) For d`
     -- clause (006.7); it never reaches a record unresolved
-    | .dueWithin _ => t
+    | .dueWithin d =>
+      { t with kind := match t.kind with
+          | .duty ds => .duty { ds with dueDuration := some d }
+          | k => k }
+    | .dueWithinGrace _ _ => t
+    | .dueWithinAfter _ _ => t
+    | .lateWhen ls =>
+      { t with kind := match t.kind with
+          | .duty d => .duty { d with lateWhen := ls ++ d.lateWhen }
+          | k => k }
     | .fromSpan c text => { t with spans := t.spans ++ [(c, text)] }
     | .evidenced =>
       { t with
@@ -880,7 +902,9 @@ def Kind.mapDom (f : DomId → DomId) : Kind → Kind
       creatingActs := d.creatingActs.map f
       violatedWhen := d.violatedWhen.map (Term.mapDom f)
       overriddenBy := d.overriddenBy.map f
-      excusedWhen := d.excusedWhen.map (Term.mapDom f) }
+      excusedWhen := d.excusedWhen.map (Term.mapDom f)
+      lateWhen := d.lateWhen.map (Term.mapDom f)
+      dueDuration := d.dueDuration.map (·.mapDom f) }
   | .event e => .event { e with effects := e.effects.map (Effect.mapDom f), syncs := e.syncs.map (Sync.mapDom f) }
   | .immunity i => .immunity { i with against := i.against.map f, unlessConds := i.unlessConds.map (Term.mapDom f), protects := i.protects.map f }
 
@@ -908,6 +932,9 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .against as => .against (as.map f)
   | .unlessCond ts => .unlessCond (ts.map (Term.mapDom f))
   | .dueWithin d => .dueWithin (d.mapDom f)
+  | .dueWithinGrace d g => .dueWithinGrace (d.mapDom f) (g.mapDom f)
+  | .dueWithinAfter d ev => .dueWithinAfter (d.mapDom f) (ev.mapDom f)
+  | .lateWhen ts => .lateWhen (ts.map (Term.mapDom f))
   | .resolves pol t => .resolves pol (t.mapDom f)
   | .decides tgt cnd => .decides (tgt.mapDom f) (cnd.mapDom f)
   | .evEffect op ts src? => .evEffect op (ts.map fun (xs, t) => (xs.map (Var.mapDom f), t.mapDom f)) (src?.map (·.mapDom f))

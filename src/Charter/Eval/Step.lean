@@ -147,10 +147,69 @@ def saturateStratum (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagge
     | .error e => .error e
     | .ok (s', changed) => if changed then saturateStratum spec specIdx prev types fuel s' else .ok s'
 
+/-- Infer exact threshold clock timestamps (`D38`, `#16`, `#47`) for newly derived facts
+and recurring `Every <period>` duties so `Held(e) For d` and `Due within` do not depend on
+which intermediate clock instants a scenario happens to visit. -/
+def clockThresholdSeeds (spec : Spec) (specIdx : Spec.SpecIndex) (acc : State) (layer : List DomId) :
+    List (Tagged × Info) :=
+  let evalConstInt (tm : Term) : Option Int :=
+    match runM spec specIdx acc (whenInt (eval M.fuel tm) pure) with
+    | .ok (k :: _) => some k
+    | _ => none
+  let evalConstTag (tm : Term) : Option Tagged :=
+    match runM spec specIdx acc (whenTagged (eval M.fuel tm) pure) with
+    | .ok (te :: _) => some te
+    | _ => none
+  let clauseThreshold : Derivation → Option Int
+    | .holdsWhen (.geq .currentTime kTm) => evalConstInt kTm
+    | .holdsWhen (.ge .currentTime kTm) => (evalConstInt kTm).map (· + 1)
+    | .holdsWhen (.geq (.sub .currentTime t0Tm) durTm) =>
+      Option.bind (evalConstInt t0Tm) fun t0 => (evalConstInt durTm).map (t0 + ·)
+    | .holdsWhen (.ge (.sub .currentTime t0Tm) durTm) =>
+      Option.bind (evalConstInt t0Tm) fun t0 => (evalConstInt durTm).map (t0 + · + 1)
+    | .holdsWhen (.heldFor innerTm durTm) =>
+      Option.bind (evalConstTag innerTm) fun teIn =>
+      Option.bind (acc.lookup teIn) fun iIn =>
+      (evalConstInt durTm).map (iIn.since + ·)
+    | .holdsWhen (.present innerTm) =>
+      Option.bind (evalConstTag innerTm) fun teIn =>
+      (acc.lookup teIn).map (·.since)
+    | _ => none
+  layer.flatMap fun d =>
+    match (specIdx.lookup d).map (·.1) with
+    | none => []
+    | some tspec =>
+      match tspec.kind with
+      | .duty { everyPeriod := some perLen, .. } =>
+        tspec.derivation.flatMap fun c =>
+          match runM spec specIdx acc (deriveClause d tspec c) with
+          | .ok ress =>
+            ress.flatten.filterMap fun te =>
+              match te.1 with
+              | .prod args =>
+                match args.getLast? with
+                | some (.int k, _) =>
+                  let t0 := k * perLen
+                  if t0 <= acc.time then some (te, ⟨true, true, t0, none, .derived d acc.step⟩)
+                  else none
+                | _ => none
+              | _ => none
+          | .error _ => []
+      | _ =>
+        match tspec.domain with
+        | .products [] =>
+          let candTs := tspec.derivation.filterMap clauseThreshold |>.filter (· <= acc.time)
+          match candTs with
+          | [] => []
+          | t0 :: rest =>
+            let earliest := rest.foldl min t0
+            [((.prod [], d), ⟨true, true, earliest, none, .derived d acc.step⟩)]
+        | _ => []
+
 /-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6). -/
 def rebaseAndSatWithIdx (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
   let prev := state.derivedFacts
-  strata.foldlM (fun s layer => saturateStratum spec specIdx prev layer 100000 s) state.rebase
+  strata.foldlM (fun s layer => saturateStratum spec specIdx (prev ++ clockThresholdSeeds spec specIdx s layer) layer 100000 s) state.rebase
 
 def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
   rebaseAndSatWithIdx spec spec.buildIndex strata state
@@ -264,9 +323,15 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
     | .tick => (some [], [])
     | .expect w neg xs t =>
       let ask (te : Tagged) : M Bool := match w with
+        | .occurred => do
+          let now ← getTime
+          match ← lookupState (.prod [te], "$occ") with
+          | some i => pure (i.live now)
+          | none => pure false
         | .lawful => isEnabled M.fuel te
         | .valid => isValid M.fuel te
         | .violated => isViolated M.fuel te
+        | .late => isLate M.fuel te
         | .undetermined => do
           let (lTri, vTri, _) ← evalActTri M.fuel te
           pure (lTri == .undetermined || vTri == .undetermined)

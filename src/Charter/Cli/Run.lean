@@ -101,9 +101,10 @@ def diagJson (d : Diagnostic) : Json :=
 
 /-- The fact changes between two states (eFLINT `display_fact_changes`). -/
 def factChanges (before after : State) : List (String × Tagged) :=
-  let gone := before.contents.filter (fun (te, _) => (after.lookup te).isNone) |>.map fun (te, _) => ("~", te)
-  let nowFalse := after.notHoldsList.filter (fun te => !(before.notHoldsList.contains te)) |>.map fun te => ("-", te)
-  let nowTrue := after.holdsList.filter (fun te => !(before.holdsList.contains te)) |>.map fun te => ("+", te)
+  let visible (te : Tagged) : Bool := !te.2.startsWith "$"
+  let gone := before.contents.filter (fun (te, _) => visible te && (after.lookup te).isNone) |>.map fun (te, _) => ("~", te)
+  let nowFalse := after.notHoldsList.filter (fun te => visible te && !(before.notHoldsList.contains te)) |>.map fun te => ("-", te)
+  let nowTrue := after.holdsList.filter (fun te => visible te && !(before.holdsList.contains te)) |>.map fun te => ("+", te)
   gone ++ nowFalse ++ nowTrue
 
 def emit (o : RunOpts) (j : Json) (text : String) (toErr : Bool := false) : IO Unit :=

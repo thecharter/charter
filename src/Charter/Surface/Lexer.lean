@@ -1,4 +1,5 @@
 import Charter.Surface.Diagnostics
+import Charter.Core.Calendar
 
 /-!
 # Charter.Surface.Lexer — Tokens of the eFLINT core
@@ -37,6 +38,7 @@ inductive TokKind where
   | int (n : Nat)
   | moneyLit (cents : Nat)
   | pctLit (bps : Nat)
+  | dateLit (days : Int)
   | chr (c : Char)
   /-- A projection dot (see the module header). -/
   | projDot
@@ -56,6 +58,7 @@ def TokKind.describe : TokKind → String
   | .int n => s!"integer {n}"
   | .moneyLit c => s!"money literal ({c} cents)"
   | .pctLit b => s!"rate literal ({b} bps)"
+  | .dateLit d => s!"date literal ({d} days)"
   | .chr c => s!"character '{c}'"
   | .projDot => "`.`"
   | .eof => "end of input"
@@ -72,7 +75,7 @@ lexes as `.ident "tick"`, matched contextually by `Parser` / `Resolve` (D17). -/
 def wordKeywords : List String :=
   [ "Derived externally", "Conditioned by", "Forbidden when", "Identified by", "Terminated by", "Violated when", "Overridden by",
     "Present when", "Current Time", "Derived from", "Except under", "Excused when", "Qualifies as", "Rejects when", "Weighted by", "Enforced by", "Related to", "Syncs with",
-    "Decided by", "Valid when", "Created by", "Due within", "Holds when", "Raised by", "Void when", "At least", "First of", "Paid by",
+    "Decided by", "Valid when", "Created by", "Due within", "Holds when", "On breach", "Raised by", "Void when", "At least", "First of", "Paid by",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",
     "Physical", "Claimant", "Function", "Violated", "Enabled", "Creates", "Current", "Derived",
     "Present", "Foreach", "Exists", "Forall", "Extend", "Closed", "Domain", "Holder", "String",
@@ -84,8 +87,8 @@ def wordKeywords : List String :=
 non-terminator token, so `?valid(5)` and `?valid .` still query a fact named `valid` while
 `?valid do(x)` is the claim (D17). -/
 def claimKeywords : List String :=
-  [ "?!undetermined", "?undetermined", "?!conflict", "?conflict",
-    "?!violated", "?!lawful", "?!valid", "?violated", "?lawful", "?valid", "?why" ]
+  [ "?!undetermined", "?undetermined", "?!occurred", "?occurred", "?!conflict", "?conflict",
+    "?!violated", "?!lawful", "?!valid", "?!late", "?violated", "?lawful", "?valid", "?late", "?why" ]
 
 /-- Symbol keywords, longest first. -/
 def symbolKeywords : List String :=
@@ -271,6 +274,26 @@ def step (s : St) : Except Diagnostic St := do
     else if c.isDigit then
       let j := takeWhileFrom s.cs s.i Char.isDigit
       let n := (sliceStr s.cs s.i j).toNat!
+      -- Check ISO date `YYYY-MM-DD` (`D38`, `#48`): 4-digit year, `-`, 2-digit month, `-`, 2-digit day
+      let isoDate? : Option Int :=
+        if j - s.i == 4 && s.i + 10 <= s.cs.size then
+          let sep1 := if h1 : s.i + 4 < s.cs.size then s.cs[s.i + 4] == '-' else false
+          let sep2 := if h2 : s.i + 7 < s.cs.size then s.cs[s.i + 7] == '-' else false
+          let mOk := (if h3 : s.i + 5 < s.cs.size then s.cs[s.i + 5].isDigit else false)
+                  && (if h4 : s.i + 6 < s.cs.size then s.cs[s.i + 6].isDigit else false)
+          let dOk := (if h5 : s.i + 8 < s.cs.size then s.cs[s.i + 8].isDigit else false)
+                  && (if h6 : s.i + 9 < s.cs.size then s.cs[s.i + 9].isDigit else false)
+          let endBnd := boundaryAt s.cs (s.i + 10)
+          if sep1 && sep2 && mOk && dOk && endBnd then
+            let yr : Int := (sliceStr s.cs s.i (s.i + 4)).toNat!
+            let mo : Int := (sliceStr s.cs (s.i + 5) (s.i + 7)).toNat!
+            let dy : Int := (sliceStr s.cs (s.i + 8) (s.i + 10)).toNat!
+            if Calendar.validYmd yr mo dy then some (Calendar.daysFromCivil yr mo dy)
+            else none
+          else none
+        else none
+      if let some epochDays := isoDate? then
+        return (s.advance 10).push (.dateLit epochDays) p
       -- Check `6%` or `5.25%` (`D37`, `#58`): exact basis points (`1% = 100 bps`)
       let hasDotPct :=
         if (if h : j < s.cs.size then s.cs[j] == '.' else false)

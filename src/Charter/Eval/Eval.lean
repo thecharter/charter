@@ -285,7 +285,7 @@ def everyValidSubs : Nat → Var → M Tagged
       -- `D36` (`#14`): reading a `Var` binds to its holding value, never every element of its domain
       let trues ← trueInstancesOf d
       nd trues
-    else if isEnum then
+    else if isEnum || d == "_clk_time" then
       let e ← instantiateDomain fuel d dom
       let te : Tagged := (e, d)
       if filter.isTrueLit then pure te
@@ -579,6 +579,18 @@ def isViolated : Nat → Tagged → M Bool
     else evalViolationCondition fuel te ((← getSpec).findViolationCond te.2)
 termination_by structural n => n
 
+/-- Charter (D38, `#44`): whether a duty instance is past its base `Due within` deadline (even if within `Grace`). -/
+def isLate : Nat → Tagged → M Bool
+  | 0, _ => err (.fuelExhausted "deciding whether a duty is late")
+  | fuel + 1, te => do
+    if !(← isHolds fuel te) then pure false
+    else
+      let tspec ← getTypeSpec te.2
+      let lcs : Option (List Term) := match tspec.kind with
+        | .duty ds => if ds.lateWhen.isEmpty then some ds.violatedWhen else some ds.lateWhen
+        | _ => none
+      evalViolationCondition fuel te lcs
+
 /-- Three-valued Kleene guard evaluation (`D22`, `G3.2`): propagates `undetermined` and
 collects `unmetEvidence` whenever an `Unresolved` or `Conflicted` `Evidenced` premise can
 influence the guard outcome (`T06`, `T07`). -/
@@ -734,7 +746,12 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
           let stores := pairs.map (·.1)
           let warns := pairs.flatMap (·.2)
           -- Law 6: the act is the origin of what its effects assign
-          let own : Store := (Store.unions stores).map fun (x, a) => (x, a.byAct te)
+          let own0 : Store := (Store.unions stores).map fun (x, a) => (x, a.byAct te)
+          let occEntry : Store :=
+            if valid && spec.tracksHistory then
+              [((.prod [te], "$occ"), Assignment.holdsTrue none (some te))]
+            else []
+          let own : Store := occEntry ++ own0
           let ass := Store.union own ssAss
           let disabled := anyF || !enabled
           let forced := anyF || (lTri == .no && !physical)
@@ -986,6 +1003,63 @@ def eval : Nat → Term → M Value
     | .ite c t e =>
       whenBool (eval fuel c) fun b =>
         if b then eval fuel t else eval fuel e
+    | .doneAt inner =>
+      whenTagged (eval fuel inner) fun te => do
+        let tspec ← getTypeSpec te.2
+        match tspec.kind with
+        | .act _ | .event _ =>
+          let now ← getTime
+          match ← lookupState (.prod [te], "$occ") with
+          | some i => pure (.bool (i.live now))
+          | none => pure (.bool false)
+        | _ =>
+          let b ← isHolds fuel te
+          pure (.bool b)
+    | .stampOf inner =>
+      whenTagged (eval fuel inner) fun te => do
+        let tspec ← getTypeSpec te.2
+        let now ← getTime
+        match tspec.kind with
+        | .act _ | .event _ =>
+          match ← lookupState (.prod [te], "$occ") with
+          | some i => if i.live now then pure (.int i.since) else empty
+          | none => empty
+        | _ =>
+          if !(← isHolds fuel te) then empty
+          else match ← lookupState te with
+            | some i => pure (.int i.since)
+            | none => pure (.int now)
+    | .overdueOf inner =>
+      whenTagged (eval fuel inner) fun te => do
+        if !(← isHolds fuel te) then pure (.int 0)
+        else
+          let tspec ← getTypeSpec te.2
+          match tspec.kind with
+          | .duty { dueDuration := some dueTm, .. } =>
+            let now ← getTime
+            let sinceT ← match ← lookupState te with
+              | some i => pure i.since
+              | none => pure now
+            withSubs (Tagged.bindings tspec.domain te) do
+              whenInt (eval fuel dueTm) fun dueDur =>
+                let elapsed := now - sinceT
+                pure (.int (if elapsed > dueDur then elapsed - dueDur else 0))
+          | _ => pure (.int 0)
+    | .calOp1 op t =>
+      whenInt (eval fuel t) fun days => do
+        match op with
+        | .year => let (y, _, _) := Calendar.civilFromDays days; pure (.int y)
+        | .month => let (_, m, _) := Calendar.civilFromDays days; pure (.int m)
+        | .day => let (_, _, d) := Calendar.civilFromDays days; pure (.int d)
+        | .weekday => pure (.int (Calendar.isoWeekday days))
+        | _ => empty
+    | .calOp2 op t mTm =>
+      whenInt (eval fuel t) fun days =>
+      whenInt (eval fuel mTm) fun m => do
+        match op with
+        | .addMonths => pure (.int (Calendar.addMonthsClamped days m))
+        | .addYears => pure (.int (Calendar.addYearsClamped days m))
+        | _ => empty
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

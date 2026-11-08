@@ -169,6 +169,9 @@ def termStrConsts : Term → List String
   | .fnApp _ k => termStrConsts k
   | .dimLit _ _ => []
   | .ite c t e => termStrConsts c ++ termStrConsts t ++ termStrConsts e
+  | .doneAt t | .stampOf t | .overdueOf t => termStrConsts t
+  | .calOp1 _ t => termStrConsts t
+  | .calOp2 _ t a => termStrConsts t ++ termStrConsts a
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => termStrConsts t
   | .app _ args => argsStrConsts args
   | .boolLit _ | .intLit _ | .ref _ | .currentTime => []
@@ -237,6 +240,11 @@ def permuteTerm (perm : List (String × String)) : Term → Term
   | .mulDivRound x n d m => .mulDivRound (permuteTerm perm x) (permuteTerm perm n) (permuteTerm perm d) m
   | .fnApp d k => .fnApp d (permuteTerm perm k)
   | .ite c t e => .ite (permuteTerm perm c) (permuteTerm perm t) (permuteTerm perm e)
+  | .doneAt t => .doneAt (permuteTerm perm t)
+  | .stampOf t => .stampOf (permuteTerm perm t)
+  | .calOp1 op t => .calOp1 op (permuteTerm perm t)
+  | .calOp2 op t a => .calOp2 op (permuteTerm perm t) (permuteTerm perm a)
+  | .overdueOf t => .overdueOf (permuteTerm perm t)
   | t => t
 
 def permuteArgs (perm : List (String × String)) : Args → Args

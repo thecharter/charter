@@ -79,7 +79,7 @@ Requires Lean `v4.24.0` (pinned in `lean-toolchain`; zero Mathlib or external Le
 lake build
 
 # Run the full PR verification battery: the build, 13 gates, the 196-file eFLINT corpus,
-# 171 spec conformance tests, 12 standard-library modules, kernel proof fixtures, the server
+# 195 spec conformance tests, 15 standard-library modules, kernel proof fixtures, the server
 # and projection suites, and every example
 ./tools/battery
 ```
@@ -136,10 +136,9 @@ Charter 1.0.1. The twenty worked agreements pass, and they were not easy to writ
 
 Known limits worth reading before relying on a result:
 
-- All eleven of the initial silent wrong-answer defects found while writing the twenty examples ([#2](https://github.com/thecharter/charter/issues/2)–[#12](https://github.com/thecharter/charter/issues/12)) are fixed (`D29`–`D33`); seven secondary edge-case reproductions (such as normative conflict propagation through intermediate derived facts, [#80](https://github.com/thecharter/charter/issues/80), and clock-derived fact timestamps, [#16](https://github.com/thecharter/charter/issues/16)) remain in `docs/plans/2026-11-07-example-friction/reproductions/`.
+- All eighteen runnable defect reproductions from the twenty-example audit (`#2`–`#18`, `#26`) and all twenty-eight language ergonomics and stdlib-provenance items (`#35`–`#62`) are resolved (`D29`–`D38`); transitive normative conflict propagation through intermediate derived facts (`004.12`, [#80](https://github.com/thecharter/charter/issues/80)) remains tracked in [#79](https://github.com/thecharter/charter/issues/79).
 - `evalPhrase_sound` and `evalPhrase_complete` relate the evaluator to a step relation that is itself stated in terms of the evaluator's functions ([#65](https://github.com/thecharter/charter/issues/65)).
 - The Solidity, Quint and prompt targets are generated, not proved: `cir_guard_step_correspondence` concerns an intermediate guard step, not the emitted text ([#66](https://github.com/thecharter/charter/issues/66)).
-- There is no calendar: time is counted in whole steps (spec 9.6).
 
 ---
 
@@ -162,12 +161,12 @@ src/
     Lsp/                           Language server
     Cli/                           One file per `charter` subcommand
   Server.lean                      Standalone `charter-server` entry point
-lib/                               12 reusable institutional standard-library modules (`*.charter`)
+lib/                               15 reusable institutional standard-library modules (`*.charter`)
 Examples/                          24 agreements with their English and cases (`Examples/README.md`)
 benchmarks/                        Nine benchmark institutions (`docs/benchmarks.md`)
 sdk/, editors/                     TypeScript, Python and Rust clients; Tree-sitter and VS Code grammars
 test/
-  spec/                            171 normative conformance tests mapped to `docs/spec/` chapters
+  spec/                            195 normative conformance tests mapped to `docs/spec/` chapters
   lib/                             Test harnesses & bounded invariant exploration for `lib/*.charter`
   prove/                           End-to-end zero-axiom kernel-decision fixtures for `charter prove`
   eflint-corpus/                   Vendored upstream Haskell eFLINT 4.1.0.1 corpus (196 files) + `tolerances.json`
@@ -179,7 +178,7 @@ docs/
   assurance-levels.md              Normative `proved` / `decided` / `checked` / `assumed` + scope taxonomy
   claims.json                      Machine-checked assurance claim inventory
   plans/                           Implementation plans, and `2026-11-07-example-friction/` (what the examples cost to write)
-  meetings/                        Architectural decision records (`D1`–`D33`)
+  meetings/                        Architectural decision records (`D1`–`D38`)
   spec/                            Charter 1.0 language specification (`001`–`020`, approved) + `diagnostics.md`
 tools/
   battery                          Full verification suite required before landing changes on `main`

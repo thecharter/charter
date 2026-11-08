@@ -1,5 +1,6 @@
 import Charter.Core.Evidence
 import Charter.Core.Scale
+import Charter.Core.Calendar
 
 /-!
 # Charter.Core.Term — Values, domains, and the term language of the eFLINT core
@@ -132,6 +133,15 @@ def Domain.isDimensionalInt : Domain → Bool
   | .time | .duration | .money _ _ | .quantity _ | .rate => true
   | _ => false
 
+/-- Pure civil-calendar operations (`D38`, `#48`). -/
+inductive CalOp where
+  | year | month | day | weekday | addMonths | addYears
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+def CalOp.kwName : CalOp → String
+  | .year => "Year" | .month => "Month" | .day => "Day" | .weekday => "Weekday"
+  | .addMonths => "AddMonths" | .addYears => "AddYears"
+
 mutual
 /-- The term language (eFLINT `Term`). `tag`/`untag` are inserted by resolution. -/
 inductive Term where
@@ -182,6 +192,15 @@ inductive Term where
   | dimLit (dom : Domain) (val : Int)
   /-- Charter (D37, `#45`, `#56`): conditional expression `If(cond, then_, else_)`. -/
   | ite (cond : Term) (then_ : Term) (else_ : Term)
+  /-- Charter (D38, `#49`, `#43`): `Done(t)` valid-occurrence / holding test. -/
+  | doneAt (t : Term)
+  /-- Charter (D38, `#43`): `Since(t)` timestamp (`Time`) of occurrence or establishment. -/
+  | stampOf (t : Term)
+  /-- Charter (D38, `#48`): calendar inspector (`Year`, `Month`, `Day`, `Weekday`) or date offset (`AddMonths`, `AddYears`). -/
+  | calOp1 (op : CalOp) (t : Term)
+  | calOp2 (op : CalOp) (t : Term) (arg : Term)
+  /-- Charter (D38, `#43`): `Overdue(duty)` elapsed overdue duration beyond `Due within`. -/
+  | overdueOf (t : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -289,6 +308,11 @@ def Term.pp : Term → String
   | .dimLit .rate n => s!"{n} bps"
   | .dimLit _ n => toString n
   | .ite c t e => s!"If({c.pp}, {t.pp}, {e.pp})"
+  | .doneAt t => s!"Done({t.pp})"
+  | .stampOf t => s!"Since({t.pp})"
+  | .calOp1 op t => s!"{op.kwName}({t.pp})"
+  | .calOp2 op t a => s!"{op.kwName}({t.pp}, {a.pp})"
+  | .overdueOf t => s!"Overdue({t.pp})"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -348,6 +372,11 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .fnApp d k => .fnApp (f d) (k.mapDom f)
   | .dimLit dom n => .dimLit dom n
   | .ite c t e => .ite (c.mapDom f) (t.mapDom f) (e.mapDom f)
+  | .doneAt t => .doneAt (t.mapDom f)
+  | .stampOf t => .stampOf (t.mapDom f)
+  | .calOp1 op t => .calOp1 op (t.mapDom f)
+  | .calOp2 op t a => .calOp2 op (t.mapDom f) (a.mapDom f)
+  | .overdueOf t => .overdueOf (t.mapDom f)
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)
@@ -407,6 +436,11 @@ def Term.substVars (sub : List (Var × Var)) : Term → Term
   | .fnApp d k => .fnApp d (k.substVars sub)
   | .dimLit dom n => .dimLit dom n
   | .ite c t e => .ite (c.substVars sub) (t.substVars sub) (e.substVars sub)
+  | .doneAt t => .doneAt (t.substVars sub)
+  | .stampOf t => .stampOf (t.substVars sub)
+  | .calOp1 op t => .calOp1 op (t.substVars sub)
+  | .calOp2 op t a => .calOp2 op (t.substVars sub) (a.substVars sub)
+  | .overdueOf t => .overdueOf (t.substVars sub)
 def Args.substVars (sub : List (Var × Var)) : Args → Args
   | .pos ts => .pos (Term.substVarsList sub ts)
   | .named ms => .named (Term.substVarsMods sub ms)
@@ -461,6 +495,11 @@ def Term.substAlias : Term → String → Term → Term
   | .fnApp d k, name, val => .fnApp d (k.substAlias name val)
   | .dimLit dom n, _, _ => .dimLit dom n
   | .ite c t e, name, val => .ite (c.substAlias name val) (t.substAlias name val) (e.substAlias name val)
+  | .doneAt t, name, val => .doneAt (t.substAlias name val)
+  | .stampOf t, name, val => .stampOf (t.substAlias name val)
+  | .calOp1 op t, name, val => .calOp1 op (t.substAlias name val)
+  | .calOp2 op t a, name, val => .calOp2 op (t.substAlias name val) (a.substAlias name val)
+  | .overdueOf t, name, val => .overdueOf (t.substAlias name val)
 termination_by structural x => x
 
 def Args.substAlias : Args → String → Term → Args

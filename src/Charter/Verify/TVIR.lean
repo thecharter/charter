@@ -23,6 +23,9 @@ def termIntConsts : Term → List Int
   | .fnApp _ k => termIntConsts k
   | .dimLit _ n => [n]
   | .ite c t e => termIntConsts c ++ termIntConsts t ++ termIntConsts e
+  | .doneAt t | .stampOf t | .overdueOf t => termIntConsts t
+  | .calOp1 _ t => termIntConsts t
+  | .calOp2 _ t a => termIntConsts t ++ termIntConsts a
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => termIntConsts t
   | .app _ args => argsIntConsts args
   | .boolLit _ | .stringLit _ | .ref _ | .currentTime => []
@@ -51,6 +54,7 @@ def hasSymbolicVar : Term → Bool
   | .fnApp _ _ => true
   | .dimLit _ _ => false
   | .ite c t e => hasSymbolicVar c || hasSymbolicVar t || hasSymbolicVar e
+  | .doneAt _ | .stampOf _ | .overdueOf _ | .calOp1 .. | .calOp2 .. => true
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => hasSymbolicVar t
   | .app _ args => argsHasVar args
   | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => false
@@ -80,6 +84,7 @@ def hasComplexArith : Term → Bool
   | .fnApp _ _ => true
   | .dimLit _ _ => false
   | .ite c t e => hasComplexArith c || hasComplexArith t || hasComplexArith e
+  | .doneAt _ | .stampOf _ | .overdueOf _ | .calOp1 .. | .calOp2 .. => true
   | .exists_ _ t | .forall_ _ t | .max _ t | .min _ t => hasComplexArith t
   | .app _ args => argsComplex args
   | .boolLit _ | .intLit _ | .stringLit _ | .ref _ | .currentTime => false

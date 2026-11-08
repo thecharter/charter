@@ -200,6 +200,21 @@ def cmpExpr : Nat → P Term
     | .kw ">=" => advance; return .geq a (← addExpr fuel)
     | .kw "<" => advance; return .le a (← addExpr fuel)
     | .kw ">" => advance; return .ge a (← addExpr fuel)
+    | .atom "Before" =>
+      advance
+      let b ← addExpr fuel
+      return .and (.doneAt a) (.or (.not (.doneAt b)) (.le (.stampOf a) (.stampOf b)))
+    | .atom "Within" =>
+      advance
+      let dur ← addExpr fuel
+      if !(← isCtxAtom "Of") then fail "CHR003" "expected `Of` in `<a> Within <dur> Of <b>`"
+      advance
+      let b ← addExpr fuel
+      return .and (.doneAt a) (.and (.doneAt b) (.and (.geq (.stampOf a) (.stampOf b)) (.leq (.sub (.stampOf a) (.stampOf b)) dur)))
+    | .atom "At" =>
+      advance
+      let b ← addExpr fuel
+      return .app "$at_snap" (.pos [a, b])
     | _ => return a
 
 def addExpr : Nat → P Term
@@ -344,13 +359,47 @@ def primary : Nat → P Term
     | .kw "Current Time" => advance; return .currentTime
     | .int n =>
       advance
-      if (← peek) == .ident "bps" then
-        advance
-        return .dimLit .rate n
-      else return .intLit n
+      match ← peek with
+      | .ident "bps" => advance; return .dimLit .rate n
+      | .ident "day" | .ident "days" => advance; return .dimLit .duration n
+      | .ident "week" | .ident "weeks" => advance; return .dimLit .duration (n * 7)
+      | _ => return .intLit n
+    | .dateLit epochDays => advance; return .dimLit .time epochDays
     | .moneyLit cents => advance; return .dimLit (.money "USD" 2) cents
     | .pctLit bps => advance; return .dimLit .rate bps
     | .str s => advance; return .stringLit s
+    | .atom "Done" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("; let t ← expr fuel; expectKw ")"; return .doneAt t
+      else advance; return .stringLit "Done"
+    | .atom "Since" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("; let t ← expr fuel; expectKw ")"; return .stampOf t
+      else advance; return .stringLit "Since"
+    | .atom "Age" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("; let t ← expr fuel; expectKw ")"
+        return .ite (.doneAt t) (.sub .currentTime (.stampOf t)) (.dimLit .duration 0)
+      else advance; return .stringLit "Age"
+    | .atom "Overdue" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("; let t ← expr fuel; expectKw ")"; return .overdueOf t
+      else advance; return .stringLit "Overdue"
+    | .atom "Year" | .atom "Month" | .atom "Day" | .atom "Weekday" =>
+      if (← peekAt 1) == .kw "(" then
+        let op : CalOp := match ← peek with
+          | .atom "Year" => .year | .atom "Month" => .month | .atom "Day" => .day | _ => .weekday
+        advance; expectKw "("; let t ← expr fuel; expectKw ")"
+        return .calOp1 op t
+      else
+        let s ← atom; return .stringLit s
+    | .atom "AddMonths" | .atom "AddYears" =>
+      if (← peekAt 1) == .kw "(" then
+        let op : CalOp := if (← peek) == .atom "AddMonths" then .addMonths else .addYears
+        advance; expectKw "("; let t ← expr fuel; expectKw ","; let m ← expr fuel; expectKw ")"
+        return .calOp2 op t m
+      else
+        let s ← atom; return .stringLit s
     | .atom "If" =>
       if (← peekAt 1) == .kw "(" then
         advance; expectKw "("
@@ -950,7 +999,18 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     advance; return some (.overriddenBy (← idList))
   | .kw "Due within" =>
     if k != .duty then return none
-    advance; return some (.dueWithin (← expression))
+    advance
+    let dur ← expression
+    if ← isCtxAtom "Grace" then
+      advance
+      let gr ← expression
+      return some (.dueWithinGrace dur gr)
+    else if ← isCtxAtom "After" then
+      advance
+      let ev ← expression
+      return some (.dueWithinAfter dur ev)
+    else
+      return some (.dueWithin dur)
   | .atom "From" | .kw "From" =>
     -- `From CLAUSE ["span"]` on an act, duty, immunity, event, or fact (`D34`)
     if !(match ← peekAt 1 with | .atom _ | .ident _ | .int _ => true | _ => false) then return none
@@ -1524,13 +1584,67 @@ def frame : Nat → P (List Decl)
           return (c, [])
       else
         return (holder, []))
-    let objs ← relatedTo
+    let (objs, relCarriers) ← relatedToWithCarriers
     let filter ← domainConstraint
+    -- Check optional `Every <period>` recurring duty (`D38`, `#47`)
+    let everyPeriod? ← (do
+      if ← isCtxAtom "Every" then
+        advance
+        let n ← intLit
+        let mult ← (do match ← peek with
+          | .ident "week" | .ident "weeks" => advance; return (7 : Int)
+          | .ident "day" | .ident "days" => advance; return (1 : Int)
+          | _ => return (1 : Int))
+        return some (n * mult)
+      else return none)
     let cls ← clauses .duty 1000
-    return extraDecls ++
-           [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
-                           domainConstraint := filter, closed := if isClosed then none else some false },
-             .typeExt d cls ]
+    let paidBy ← (do if ← isKw "Paid by" then advance; idList else return [])
+    let breachTarget? ← (do
+      if ← isKw "On breach" then
+        advance; expectKw "Creates"
+        return some (← ident)
+      else return none)
+    let clsAfter ← clauses .duty 1000
+    let allCls := cls ++ clsAfter
+    match everyPeriod? with
+    | none =>
+      let breachExts := match breachTarget? with
+        | none => []
+        | some bt =>
+          let dVar : Var := ⟨d, ""⟩
+          [Decl.typeExt bt [.derivation [.holdsWhen (.exists_ [dVar] (.violated (.ref dVar)))]] "Fact"]
+      return extraDecls ++ relCarriers ++
+             [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
+                             domainConstraint := filter, closed := if isClosed then none else some false },
+               .typeExt d allCls ] ++ breachExts
+    | some perLen =>
+      let clkDom := "_clk_time"
+      let clkV : Var := ⟨clkDom, ""⟩
+      let intV : Var := ⟨"int", ""⟩
+      let paidDom := d ++ "-paid"
+      let elapsed := Term.sub (.ref clkV) (.dimLit .time 0)
+      let perDur := Term.dimLit .duration perLen
+      let periodExpr := Term.div elapsed perDur
+      let aligned := Term.eq (.mod elapsed perDur) (.dimLit .duration 0)
+      let notPaid := Term.not (.present (.app paidDom (.pos [.ref holder, .ref claimant, periodExpr])))
+      let dvTerm := Term.when (.app d (.pos ([.ref holder, .ref claimant] ++ objs.map .ref ++ [periodExpr])))
+                              (.and aligned notPaid)
+      let dvClause := ModClause.derivation [.dv (holder :: claimant :: clkV :: objs) dvTerm]
+      let payExts := paidBy.map fun pAct =>
+        let markPaid := Effect.cAll [] (.app paidDom (.pos [.ref holder, .ref claimant, .ref intV])) none
+        Decl.typeExt pAct [.postCond [markPaid]] "Act"
+      let breachExts := match breachTarget? with
+        | none => []
+        | some bt =>
+          let dVar : Var := ⟨d, ""⟩
+          [Decl.typeExt bt [.derivation [.holdsWhen (.exists_ [dVar] (.violated (.ref dVar)))]] "Fact"]
+      return extraDecls ++ relCarriers ++
+             [ .ensureCarrier clkDom .time,
+               .typeDecl paidDom { kind := .fact {}, domain := .products [holder, claimant, intV] },
+               .typeDecl d { kind := .duty { everyPeriod := some perLen },
+                             domain := .products (holder :: claimant :: objs ++ [intV]),
+                             domainConstraint := filter, closed := if isClosed then none else some false },
+               .typeExt d (dvClause :: allCls) ] ++ payExts ++ breachExts
   | .atom "Immunity" | .kw "Immunity" | .atom "Protection" =>
     let isProt := (← peek) == .atom "Protection"
     advance
@@ -1640,14 +1754,29 @@ def frame : Nat → P (List Decl)
       let val : Int := if neg then -(bps : Int) else (bps : Int)
       let dom := if explicitColon then dom0 else .rate
       return [.param name dom val]
+    | .dateLit epochDays =>
+      advance
+      let dom := if explicitColon then dom0 else .time
+      return [.param name dom epochDays]
     | _ =>
       let n ← intLit
-      if (← peek) == .ident "bps" then
+      match ← peek with
+      | .ident "bps" =>
         advance
         let val : Int := if neg then -n else n
         let dom := if explicitColon then dom0 else .rate
         return [.param name dom val]
-      else
+      | .ident "day" | .ident "days" =>
+        advance
+        let val : Int := if neg then -n else n
+        let dom := if explicitColon then dom0 else .duration
+        return [.param name dom val]
+      | .ident "week" | .ident "weeks" =>
+        advance
+        let val : Int := (if neg then -n else n) * 7
+        let dom := if explicitColon then dom0 else .duration
+        return [.param name dom val]
+      | _ =>
         let val : Int := if neg then -n else n
         return [.param name dom0 val]
   | .atom "Regime" | .kw "Regime" =>
@@ -1787,14 +1916,18 @@ def phrase : P Phrase := do
   | .kw "!?" => advance; return .query (.not (← expression))
   | .kw "?-" => advance; let (xs, t) ← optForeach; return .instQuery false xs t
   | .kw "?--" => advance; let (xs, t) ← optForeach; return .instQuery true xs t
+  | .kw "?occurred" => advance; return .expect .occurred false (← expression)
   | .kw "?lawful" => advance; return .expect .lawful false (← expression)
   | .kw "?valid" => advance; return .expect .valid false (← expression)
   | .kw "?violated" => advance; return .expect .violated false (← expression)
+  | .kw "?late" => advance; return .expect .late false (← expression)
   | .kw "?undetermined" => advance; return .expect .undetermined false (← expression)
   | .kw "?conflict" => advance; return .expect .conflict false (← expression)
+  | .kw "?!occurred" => advance; return .expect .occurred true (← expression)
   | .kw "?!lawful" => advance; return .expect .lawful true (← expression)
   | .kw "?!valid" => advance; return .expect .valid true (← expression)
   | .kw "?!violated" => advance; return .expect .violated true (← expression)
+  | .kw "?!late" => advance; return .expect .late true (← expression)
   | .kw "?!undetermined" => advance; return .expect .undetermined true (← expression)
   | .kw "?!conflict" => advance; return .expect .conflict true (← expression)
   | .kw "@" => advance; return .setTime (← expression)

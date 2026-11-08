@@ -20,6 +20,7 @@ deriving instance ToJson, FromJson for Var
 deriving instance ToJson, FromJson for EvidenceStatus
 deriving instance ToJson, FromJson for TriBool
 deriving instance ToJson, FromJson for EvidenceOp
+deriving instance ToJson, FromJson for CalOp
 deriving instance ToJson, FromJson for RoundingMode
 deriving instance ToJson, FromJson for Domain
 
@@ -95,6 +96,11 @@ partial def termToJson : Term → Json
   | .fnApp d k => Json.mkObj [("op", "fna"), ("d", Json.str d), ("k", termToJson k)]
   | .dimLit dom n => Json.mkObj [("op", "dl"), ("dom", toJson dom), ("n", Json.num n)]
   | .ite c t e => Json.mkObj [("op", "ite"), ("c", termToJson c), ("t", termToJson t), ("e", termToJson e)]
+  | .doneAt t => Json.mkObj [("op", "dn"), ("t", termToJson t)]
+  | .stampOf t => Json.mkObj [("op", "st"), ("t", termToJson t)]
+  | .calOp1 op t => Json.mkObj [("op", "cal1"), ("co", toJson op), ("t", termToJson t)]
+  | .calOp2 op t a => Json.mkObj [("op", "cal2"), ("co", toJson op), ("t", termToJson t), ("a", termToJson a)]
+  | .overdueOf t => Json.mkObj [("op", "ovd"), ("t", termToJson t)]
 
 partial def argsToJson : Args → Json
   | .pos ts => Json.mkObj [("pos", Json.arr (ts.map termToJson).toArray)]
@@ -149,6 +155,11 @@ partial def termFromJson (j : Json) : Except String Term := do
   | "fna" => .fnApp <$> j.getObjValAs? String "d" <*> ga "k"
   | "dl" => .dimLit <$> j.getObjValAs? Domain "dom" <*> j.getObjValAs? Int "n"
   | "ite" => .ite <$> ga "c" <*> ga "t" <*> ga "e"
+  | "dn" => .doneAt <$> ga "t"
+  | "st" => .stampOf <$> ga "t"
+  | "cal1" => .calOp1 <$> j.getObjValAs? CalOp "co" <*> ga "t"
+  | "cal2" => .calOp2 <$> j.getObjValAs? CalOp "co" <*> ga "t" <*> ga "a"
+  | "ovd" => .overdueOf <$> ga "t"
   | other => .error s!"unknown Term op `{other}`"
 
 partial def argsFromJson (j : Json) : Except String Args :=

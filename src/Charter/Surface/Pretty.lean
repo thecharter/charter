@@ -87,6 +87,11 @@ def fmtTerm : Term → String
   | .dimLit .rate n => s!"{n} bps"
   | .dimLit _ n => toString n
   | .ite c t e => s!"If({fmtTerm c}, {fmtTerm t}, {fmtTerm e})"
+  | .doneAt t => s!"Done({fmtTerm t})"
+  | .stampOf t => s!"Since({fmtTerm t})"
+  | .calOp1 op t => s!"{op.kwName}({fmtTerm t})"
+  | .calOp2 op t a => s!"{op.kwName}({fmtTerm t}, {fmtTerm a})"
+  | .overdueOf t => s!"Overdue({fmtTerm t})"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -195,6 +200,9 @@ def fmtModClause : ModClause → String
   | .against as => "Against " ++ ", ".intercalate as
   | .unlessCond ts => "Unless " ++ fmtTermList ts
   | .dueWithin d => "Due within " ++ fmtTerm d
+  | .dueWithinGrace d g => "Due within " ++ fmtTerm d ++ " Grace " ++ fmtTerm g
+  | .dueWithinAfter d ev => "Due within " ++ fmtTerm d ++ " After " ++ fmtTerm ev
+  | .lateWhen _ => ""
   | .fromSpan cid txt => if txt.isEmpty then "From " ++ cid else "From " ++ cid ++ " " ++ showString txt
   | .evidenced => ""
   | .confidential [] => "Confidential"

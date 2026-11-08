@@ -109,6 +109,11 @@ def freeVars (spec : Spec) : Term → List Var
   | .ref x => if isZeroArityBoolVar spec x then [] else [x]
   | .fnApp _ k => freeVars spec k
   | .ite c t e => union (freeVars spec c) (union (freeVars spec t) (freeVars spec e))
+  | .doneAt (.ref v) =>
+    -- Bare `Done(sign)` (`#49`) existentially binds `sign`'s components locally, leaving none free
+    if v.dec.isEmpty && (spec.findDecl v.dom).isSome then [] else [v]
+  | .doneAt t | .stampOf t | .overdueOf t | .calOp1 _ t => freeVars spec t
+  | .calOp2 _ t a => union (freeVars spec t) (freeVars spec a)
   | .app d args =>
     match spec.findDecl d with
     | some t =>
@@ -345,6 +350,70 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         else if tt2 == .ints && literalArith t2 && te2.isDimensionalInt then return (.ite c' t2 e2, te2)
         else if te2 == .ints && literalArith e2 && tt2.isDimensionalInt then return (.ite c' t2 e2, tt2)
         else convErr te1 tt1
+    | .doneAt inner =>
+      modifySpec fun s => { s with tracksHistory := true }
+      match inner with
+      | .ref v =>
+        if v.dec.isEmpty then
+          match spec.findDecl v.dom with
+          | some { kind := .act _, domain := .products xs, .. }
+          | some { kind := .event _, domain := .products xs, .. } =>
+            let appTm := Term.app (spec.chaseAlias v.dom) (.named (xs.map fun x => (x, .ref x)))
+            if xs.isEmpty then return (.doneAt appTm, .bool)
+            else return (.exists_ xs (.doneAt appTm), .bool)
+          | _ =>
+            let (u, tyU) ← compileTerm fuel inner
+            match tyU with
+            | .tagged _ => return (.doneAt u, .bool)
+            | _ => err "CHR015" s!"`Done(...)` needs an act, event, or fact instance, not {tyU}"
+        else
+          let (u, tyU) ← compileTerm fuel inner
+          match tyU with
+          | .tagged _ => return (.doneAt u, .bool)
+          | _ => err "CHR015" s!"`Done(...)` needs an act, event, or fact instance, not {tyU}"
+      | _ =>
+        let (u, tyU) ← compileTerm fuel inner
+        match tyU with
+        | .tagged _ => return (.doneAt u, .bool)
+        | _ => err "CHR015" s!"`Done(...)` needs an act, event, or fact instance, not {tyU}"
+    | .stampOf inner =>
+      modifySpec fun s => { s with tracksHistory := true }
+      match inner with
+      | .ref v =>
+        if v.dec.isEmpty then
+          match spec.findDecl v.dom with
+          | some { kind := .event _, domain := .products [], .. } =>
+            return (.stampOf (.app (spec.chaseAlias v.dom) (.named [])), .time)
+          | _ =>
+            let (u, tyU) ← compileTerm fuel inner
+            match tyU with
+            | .tagged _ => return (.stampOf u, .time)
+            | _ => err "CHR015" s!"`Since(...)` needs an act, event, or fact instance, not {tyU}"
+        else
+          let (u, tyU) ← compileTerm fuel inner
+          match tyU with
+          | .tagged _ => return (.stampOf u, .time)
+          | _ => err "CHR015" s!"`Since(...)` needs an act, event, or fact instance, not {tyU}"
+      | _ =>
+        let (u, tyU) ← compileTerm fuel inner
+        match tyU with
+        | .tagged _ => return (.stampOf u, .time)
+        | _ => err "CHR015" s!"`Since(...)` needs an act, event, or fact instance, not {tyU}"
+    | .overdueOf inner =>
+      let (u, tyU) ← compileTerm fuel inner
+      match tyU with
+      | .tagged d =>
+        match spec.findDecl d with
+        | some { kind := .duty _, .. } => return (.overdueOf u, .duration)
+        | _ => err "CHR026" s!"`Overdue(...)` needs a Duty instance, not `{d}`"
+      | _ => err "CHR015" s!"`Overdue(...)` needs a Duty instance, not {tyU}"
+    | .calOp1 op t =>
+      let t' ← convertTerm fuel t .time
+      return (.calOp1 op t', .ints)
+    | .calOp2 op t m =>
+      let t' ← convertTerm fuel t .time
+      let m' ← convertTerm fuel m .ints
+      return (.calOp2 op t' m', .time)
     | .ref x =>
       checkKnownType [x]
       if isZeroArityBoolVar spec x then
@@ -359,6 +428,28 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
         return (.fnApp (spec.chaseAlias d) k', .tagged (spec.removeDecoration vVar))
       | _ => err "CHR012" s!"`{d}` is not a `Function`"
     | .app d args =>
+      if d == "$at_snap" then
+        -- `cond At ev` (`D38`, `#43`): synthesize a snapshot latch on `ev` capturing `cond` when `ev` occurs!
+        match args with
+        | .pos [rawCond, rawEv] =>
+          let evDom? : Option DomId := match rawEv with
+            | .ref v => if v.dec.isEmpty then some (spec.chaseAlias v.dom) else none
+            | .app ed _ => some (spec.chaseAlias ed)
+            | _ => none
+          match evDom? with
+          | none => err "CHR012" s!"`At` requires an act or event on the right-hand side"
+          | some evDom =>
+            let cond' ← convertTerm fuel rawCond .bool
+            let snapDom := s!"$snap_{evDom}_{rawCond.pp.hash}"
+            let curS ← getSpec
+            if (curS.lookupDecl snapDom).isNone then
+              let snapEff := Effect.cAll [] (.when (.app snapDom (.named [])) cond') none []
+              modifySpec fun s =>
+                let s1 := s.insertDecl snapDom { kind := .fact {}, domain := .products [] }
+                s1.adjustDecl evDom (TypeSpec.applyExt [.postCond [snapEff]])
+            return (.present (.app snapDom (.named [])), .bool)
+        | _ => err "CHR003" "malformed `At` expression"
+      else do
       checkKnownType [⟨d, ""⟩]
       match spec.findDecl d, args with
       | some { restriction := some .function, domain := .products [kVar, vVar], .. }, .pos [keyArg] =>
@@ -689,6 +780,9 @@ def compileScale : Nat → Bool → Term → Term → Stc (Term × Term × Ty)
       else return (a', b', tb)
     else if ta == .time || tb == .time then
       err "CHR012" s!"cannot use an instant in `{op}` (D16: a time is never scaled)"
+    else if isDiv && ta == tb && ta.isScalableDim then
+      -- Dividing two values of the same dimension (`30 days / 15 days`, `$100 / $25`) yields a dimensionless `Int`!
+      return (a', b', .ints)
     else if ta.isScalableDim && tb.isScalableDim then
       err "CHR012" s!"cannot {if isDiv then "divide" else "multiply"} {ta} by {tb} in `{op}`"
     else if ta == .ints || ta.isScalableDim then convErr tb .ints
@@ -803,6 +897,8 @@ def bareEvidenced (spec : Spec) : Nat → Term → List DomId
     | .ref x => evidencedType spec (spec.removeDecoration x)
     | .app _ args => bareEvidencedArgs spec fuel args
     | .ite c t e => bareEvidenced spec fuel c ++ bareEvidenced spec fuel t ++ bareEvidenced spec fuel e
+    | .doneAt t | .stampOf t | .overdueOf t | .calOp1 _ t => bareEvidenced spec fuel t
+    | .calOp2 _ t a => bareEvidenced spec fuel t ++ bareEvidenced spec fuel a
     | .present u | .violated u | .enabled u =>
       ((headTypeOf spec u).toList.flatMap (evidencedType spec)) ++ bareEvidenced spec fuel u
     | .heldFor u d =>
@@ -1202,8 +1298,32 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         | .duty _ =>
           let d' ← convertTerm termFuel d .duration
           let v ← compileViolationCondition ty (.heldFor (.app ty (.named [])) d')
-          return [(ty, [.violation [v]])]
+          return [(ty, [.dueWithin d', .lateWhen [v], .violation [v]])]
         | k => err "CHR003" s!"`Due within` applies to a Duty, not {k.lowerName}"
+      | .dueWithinGrace d g =>
+        -- `Due within d Grace g` (`D38`, `#44`): `?late` at `d`, `?violated` at `d + g`
+        match tspec.kind with
+        | .duty _ =>
+          let d' ← convertTerm termFuel d .duration
+          let g' ← convertTerm termFuel g .duration
+          let lateCond ← compileViolationCondition ty (.heldFor (.app ty (.named [])) d')
+          let violCond ← compileViolationCondition ty (.heldFor (.app ty (.named [])) (.add d' g'))
+          return [(ty, [.dueWithin d', .lateWhen [lateCond], .violation [violCond]])]
+        | k => err "CHR003" s!"`Due within ... Grace` applies to a Duty, not {k.lowerName}"
+      | .dueWithinAfter d ev =>
+        -- `Due within d After ev` (`D38`, `#44`): deadline counted from when `ev` occurred
+        match tspec.kind with
+        | .duty _ =>
+          modifySpec fun s => { s with tracksHistory := true }
+          let d' ← convertTerm termFuel d .duration
+          let rawViol := Term.and (.doneAt ev) (.geq (.sub .currentTime (.stampOf ev)) d')
+          let violCond ← compileViolationCondition ty rawViol
+          return [(ty, [.dueWithin d', .lateWhen [violCond], .violation [violCond]])]
+        | k => err "CHR003" s!"`Due within ... After` applies to a Duty, not {k.lowerName}"
+      | .lateWhen ls =>
+        match tspec.kind with
+        | .duty _ => return [(ty, [.lateWhen (← ls.mapM (compileViolationCondition ty))])]
+        | k => err "CHR003" s!"`lateWhen` applies to a Duty, not {k.lowerName}"
     let parts ← clauses.mapM one
     return parts.flatten
 
@@ -1635,6 +1755,7 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       else
         return .tick
     | .expect w neg t =>
+      if w == .occurred then modifySpec fun s => { s with tracksHistory := true }
       let (t', ty) ← compileTerm termFuel t
       match ty with
       | .tagged _ =>

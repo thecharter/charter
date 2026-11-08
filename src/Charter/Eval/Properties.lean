@@ -337,10 +337,11 @@ theorem saturateStratum_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : 
       · exact saturateStratum_lookup spec specIdx prev types fuel s1 s' te i hs1 hs
       · simp only [Except.ok.injEq] at hs; rw [← hs]; exact hs1
 
-theorem foldl_saturate_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) :
+theorem foldl_saturate_lookup (spec : Spec) (specIdx : Spec.SpecIndex)
+    (prevFn : State → List DomId → List (Tagged × Info)) :
     ∀ (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info),
       s.lookup te = some i →
-      strata.foldlM (fun s layer => saturateStratum spec specIdx prev layer 100000 s) s = .ok s' →
+      strata.foldlM (fun s layer => saturateStratum spec specIdx (prevFn s layer) layer 100000 s) s = .ok s' →
       s'.lookup te = some i
   | [], s, s', te, i, h, hf => by
     simp only [List.foldlM, pure, Except.pure, Except.ok.injEq] at hf
@@ -350,15 +351,16 @@ theorem foldl_saturate_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (prev : L
     split at hf
     · cases hf
     · next s1 h1 =>
-      exact foldl_saturate_lookup spec specIdx prev rest s1 s' te i
-        (saturateStratum_lookup spec specIdx prev layer 100000 s s1 te i h h1) hf
+      exact foldl_saturate_lookup spec specIdx prevFn rest s1 s' te i
+        (saturateStratum_lookup spec specIdx (prevFn s layer) layer 100000 s s1 te i h h1) hf
 
 /-- 004.3, in full: an assigned fact is exactly what the state holds after saturation,
 with its stamp, expiry and origin. -/
 theorem rebaseAndSat_assigned (spec : Spec) (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info)
     (h : s.lookup te = some i) (hi : i.fromSat = false) (hs : rebaseAndSat spec strata s = .ok s') :
     s'.lookup te = some i :=
-  foldl_saturate_lookup spec spec.buildIndex s.derivedFacts strata s.rebase s' te i (State.rebase_lookup s te i h hi) hs
+  foldl_saturate_lookup spec spec.buildIndex (fun acc layer => s.derivedFacts ++ clockThresholdSeeds spec spec.buildIndex acc layer)
+    strata s.rebase s' te i (State.rebase_lookup s te i h hi) hs
 
 end Saturate
 
@@ -1489,7 +1491,7 @@ theorem rebaseAndSatWithIdx_time (spec : Spec) (specIdx : Spec.SpecIndex)
     s'.time = s.time := by
   unfold rebaseAndSatWithIdx at h
   have hfold : ∀ (layers : List (List DomId)) (st st' : State),
-      layers.foldlM (fun acc layer => saturateStratum spec specIdx s.derivedFacts layer 100000 acc) st = .ok st' →
+      layers.foldlM (fun acc layer => saturateStratum spec specIdx (s.derivedFacts ++ clockThresholdSeeds spec specIdx acc layer) layer 100000 acc) st = .ok st' →
       st'.time = st.time := by
     intro layers
     induction layers with
@@ -1503,7 +1505,7 @@ theorem rebaseAndSatWithIdx_time (spec : Spec) (specIdx : Spec.SpecIndex)
       split at hf
       · cases hf
       · next st1 h1 =>
-        rw [ih st1 st' hf, saturateStratum_time spec specIdx s.derivedFacts layer 100000 st st1 h1]
+        rw [ih st1 st' hf, saturateStratum_time spec specIdx _ layer 100000 st st1 h1]
   exact hfold strata s.rebase s' h
 
 end Saturate

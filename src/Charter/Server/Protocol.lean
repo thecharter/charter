@@ -45,6 +45,9 @@ def collectApps : Term → List (DomId × Args)
   | .fnApp _ k => collectApps k
   | .dimLit _ _ => []
   | .ite c t e => collectApps c ++ collectApps t ++ collectApps e
+  | .doneAt t | .stampOf t | .overdueOf t => collectApps t
+  | .calOp1 _ t => collectApps t
+  | .calOp2 _ t a => collectApps t ++ collectApps a
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t =>
     collectApps t
   | .boolLit _ | .intLit _ | .stringLit _ | .ref _ | .currentTime => []

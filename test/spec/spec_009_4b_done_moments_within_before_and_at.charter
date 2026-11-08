@@ -1,0 +1,55 @@
+// 009.4 (D38, #43, #49): `Done(act)`, `?occurred`, `Before`, `Within d Of`, `At`, `Age`, `Overdue`.
+Fact person Identified by Helen, Elena, Sam
+Role principal Is Helen
+Act sign Actor person Holds when person == Helen
+Act revoke Actor person Holds when person == Helen
+Event death
+Bool authority Holds when Done(sign) && !Done(revoke) && !Done(death)
+
+Bool knew-prior
+Event hand-over
+Bool exempt Holds when knew-prior Before hand-over
+
+Event dismiss
+Act sign-release Actor person Holds when True
+Bool severance-earned Holds when sign-release(Elena) Within 21 Of dismiss
+
+Bool in-force Holds when Current Time < 100
+Event divorce
+Bool half-awarded
+Power claim-half Actor person
+  Valid when (in-force At divorce) && Done(divorce)
+  Creates half-awarded
+
+Duty hand-child Holder person Claimant person' Due within 2
+.
+?!occurred sign(Helen).
+?!authority.
++knew-prior.
+@ 5.
+sign(Helen).
+?occurred sign(Helen).
+?!occurred revoke(Helen).
+?authority.
+hand-over().
+?exempt.
+?(Age(knew-prior) == 5).
+
+// Release signed within 21 days of dismissal:
+@ 10.
+dismiss().
+@ 25.
+sign-release(Elena).
+?severance-earned.
+
+// Divorce at t=50 (while `in-force` holds!), claimed at t=150 (after `in-force` ended!):
+@ 50.
+divorce().
+@ 150.
+?!in-force.
+?valid claim-half(Elena).
+
+// Overdue duration on a duty (`Due within 2`): created at 150, at 155 overdue by 3!
++hand-child(Elena, Sam).
+@ 155.
+?(Overdue(hand-child(Elena, Sam)) == 3).

@@ -1,0 +1,17 @@
+// 009.6 (D38, #48): ISO `YYYY-MM-DD` date literals, `days`/`weeks` duration units,
+// `Year`, `Month`, `Day`, `Weekday` (1=Mon..7=Sun), `AddMonths`, and `AddYears`.
+Param lease-start : Time = 2026-01-31
+Param notice-period : Duration = 2 weeks
+Param cure-period : Duration = 14 days
+.
+?(notice-period == cure-period).
+?(Year(2026-11-08) == 2026).
+?(Month(2026-11-08) == 11).
+?(Day(2026-11-08) == 8).
+// 2026-11-08 is Sunday (ISO weekday 7):
+?(Weekday(2026-11-08) == 7).
+// Catala-style month-end clamping: Jan 31 + 1 month = Feb 28; leap day 2024-02-29 + 10 years = 2034-02-28:
+?(AddMonths(lease-start, 1) == 2026-02-28).
+?(AddYears(2024-02-29, 10) == 2034-02-28).
+@(2026-11-08).
+?(Weekday(Current Time) == 7).
