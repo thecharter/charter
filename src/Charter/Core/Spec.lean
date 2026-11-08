@@ -150,6 +150,9 @@ structure FactSpec where
   presumed     : Option Bool := none
   /-- Charter (D35, `#55`): declared with `Input` as an exogenous environment input (`Law 6`). -/
   isInput      : Bool := false
+  /-- Charter (D36, `#39`, `#40`): declared with `Role`, optionally refining `roleBase`. -/
+  isRole       : Bool := false
+  roleBase     : Option DomId := none
   deriving Repr, Inhabited
 
 /-- Charter (D22, G3.2, Law 3): institutional `Finding` target and named proof standard. -/
@@ -308,6 +311,8 @@ inductive ModClause where
   | presumed (polarity : Bool)
   | excusedWhen (ts : List Term)
   | overridesDuties (targets : List (DomId × Option Args))
+  /-- Charter (D36, `#50`): `Decided by <voter> [Weighted by <fn>] At least <num>/<den> In <voteFact>`. -/
+  | decidedBy (voter : Var) (weightFn : Option DomId) (num den : Int) (voteFact : DomId)
   deriving Repr, Inhabited
 
 /-- Temporal property formulae (`docs/rfc.md` §7.4, `D20`), verified in `Charter.Verify`
@@ -369,6 +374,8 @@ inductive Decl where
   | regime (r : RegimeSpec)
   /-- Charter (D35, `#54`): `Amend Procedure ... Valid when <cond>` default competence rule. -/
   | amendProcedure (conds : List Term)
+  /-- Charter (D36, `#46`): `Amount <name> [: <Dom>] Is <expr>` named derived scalar value. -/
+  | amountDef (name : DomId) (dom? : Option Domain) (expr : Term)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
@@ -385,6 +392,7 @@ def Decl.isInitial : Decl → Bool
   | .amendInstall .. => false
   | .regime .. => false
   | .amendProcedure .. => true
+  | .amountDef .. => true
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
@@ -400,6 +408,7 @@ def Decl.name : Decl → DomId
   | .amendInstall a _ => a
   | .regime r => r.name
   | .amendProcedure _ => ""
+  | .amountDef n _ _ => n
 
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
@@ -821,6 +830,7 @@ where
           | .duty d => .duty { d with excusedWhen := ts ++ d.excusedWhen }
           | k => k }
     | .overridesDuties _ => t
+    | .decidedBy _ _ _ _ _ => t
 
 /-! ## Renaming (module instantiation, D8) -/
 
@@ -896,6 +906,7 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .protects ps => .protects (ps.map f)
   | .excusedWhen ts => .excusedWhen (ts.map (Term.mapDom f))
   | .overridesDuties targets => .overridesDuties (targets.map fun (d, args?) => (f d, args?.map (·.mapDom f)))
+  | .decidedBy v wf num den vf => .decidedBy (v.mapDom f) (wf.map f) num den (f vf)
   | c => c
 
 -- Rename the type names a declaration mentions and declares.
@@ -911,6 +922,7 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .amendInstall a ds => .amendInstall (f a) (Decl.mapDomList f ds)
   | .regime r => .regime { r with params := r.params.map fun (n, v) => (f n, v) }
   | .amendProcedure conds => .amendProcedure (conds.map (Term.mapDom f))
+  | .amountDef n dom? e => .amountDef (f n) (dom?.map (·.mapDom f)) (e.mapDom f)
   | d => d
 
 def Decl.mapDomList (f : DomId → DomId) : List Decl → List Decl
@@ -924,6 +936,7 @@ def declaredNames (ds : List Decl) : List DomId :=
     | .typeDecl d _ => some d
     | .placeholder a _ => some a
     | .param n _ _ => some n
+    | .amountDef n _ _ => some n
     | .property tp => some tp.name
     | _ => none
 

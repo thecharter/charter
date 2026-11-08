@@ -41,7 +41,19 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
           checkTrue (eval M.fuel t)
           checkSat (whenTagged (eval M.fuel (.app d (.named []))) pure)
       else dyn xs (.when (.app d (.named [])) t)
-    | _ => dyn [⟨d, ""⟩] (.when (.ref ⟨d, ""⟩) t)
+    | _ =>
+      results do
+        let (_, isEnum, _) ← getTypeEntry d
+        let te ← if isEnum then do
+          let e ← instantiateDomain M.fuel d tspec.domain
+          let cand : Tagged := (e, d)
+          if !tspec.domainConstraint.isTrueLit then
+            withSubs (Tagged.bindings tspec.domain cand) (checkTrue (eval M.fuel tspec.domainConstraint))
+          pure cand
+        else everyValidSubs M.fuel ⟨d, ""⟩
+        withSubs [(⟨d, ""⟩, te)] do
+          checkTrue (eval M.fuel t)
+          checkSat (pure te)
   | .dv xs t => dyn xs t
   | .defeasibleDAG dag rules =>
     let evalActiveRules : M (List (String × DefeasibleVal)) := do

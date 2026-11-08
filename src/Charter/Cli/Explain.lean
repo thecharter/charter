@@ -54,6 +54,7 @@ def collectTermApps : Term → List (DomId × Args)
     collectTermApps a ++ collectTermApps b
   | .mulDivRound x n d _ =>
     collectTermApps x ++ collectTermApps n ++ collectTermApps d
+  | .fnApp _ k => collectTermApps k
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t =>
     collectTermApps t
   | .boolLit _ | .intLit _ | .stringLit _ | .ref _ | .currentTime => []

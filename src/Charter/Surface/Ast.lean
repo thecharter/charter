@@ -64,4 +64,25 @@ structure Item where
 
 instance : Inhabited Item := ⟨⟨{}, "", .inr (.query (.boolLit true))⟩⟩
 
+mutual
+def Phrase.substAlias (name : String) (val : Term) : Phrase → Phrase
+  | .trigger xs t n => .trigger xs (t.substAlias name val) n
+  | .create xs t => .create xs (t.substAlias name val)
+  | .terminate xs t => .terminate xs (t.substAlias name val)
+  | .obfuscate xs t => .obfuscate xs (t.substAlias name val)
+  | .query t => .query (t.substAlias name val)
+  | .instQuery b xs t => .instQuery b xs (t.substAlias name val)
+  | .par ps => .par (Phrase.substAliasList name val ps)
+  | .scenario s ps sps => .scenario s (Phrase.substAliasList name val ps) sps
+  | .expect w neg t => .expect w neg (t.substAlias name val)
+  | .setTime t => .setTime (t.substAlias name val)
+  | .why t => .why (t.substAlias name val)
+  | .submitEvidence pol t src => .submitEvidence pol (t.substAlias name val) src
+  | .retractEvidence t src => .retractEvidence (t.substAlias name val) src
+  | p => p
+def Phrase.substAliasList (name : String) (val : Term) : List Phrase → List Phrase
+  | [] => []
+  | p :: ps => p.substAlias name val :: Phrase.substAliasList name val ps
+end
+
 end Charter

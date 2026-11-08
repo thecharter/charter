@@ -292,22 +292,41 @@ def postfixTail : Nat → Term → P Term
     | _ => return t
 
 /-- After `(` and a binder keyword: `xs : body )`. -/
-def binderForm : Nat → (List Var → Term → Term) → P Term
+def binderForm (isForall : Bool) : Nat → (List Var → Term → Term) → P Term
   | 0, _ => fail "CHR003" "expression too deeply nested"
   | fuel + 1, mk => do
     let xs ← vars
+    let exc? ← (do
+      -- `primary fuel` avoids eating `:` as eFLINT's postfix `e:t` tag operator before `: body`
+      if ← isCtxAtom "Except" then advance; return some (← primary fuel)
+      else return none)
     expectKw ":"
     let body ← expr fuel
     expectKw ")"
-    return mk xs body
+    let body' := match exc?, xs with
+      | some ex, v :: _ =>
+        let guard := Term.and (.present (.ref v)) (Term.neq (.ref v) ex)
+        if isForall then Term.when body guard else Term.and guard body
+      | _, _ => body
+    return mk xs body'
 
-/-- `Sum`/`Count`/`Max`/`Min` `(Foreach xs : body)`. -/
-def aggregate : Nat → (List Var → Term → Term) → P Term
+/-- `Sum`/`Count`/`Max`/`Min` `(Foreach xs : body)` and `Count(pred)` (`D36`, `#46`). -/
+def aggregate (isCount : Bool := false) : Nat → (List Var → Term → Term) → P Term
   | 0, _ => fail "CHR003" "expression too deeply nested"
   | fuel + 1, mk => do
     expectKw "("
-    expectKw "Foreach"
-    binderForm fuel mk
+    if ← isKw "Foreach" then
+      advance
+      binderForm false fuel mk
+    else if isCount then
+      let p ← expr fuel
+      expectKw ")"
+      match p with
+      | .ref v => return .count [v] (.when (.ref v) (.present (.ref v)))
+      | _ => fail "CHR003" "expected `Foreach` or a fact name inside `Count(...)`"
+    else
+      expectKw "Foreach"
+      binderForm false fuel mk
 
 def primary : Nat → P Term
   | 0 => fail "CHR003" "expression too deeply nested"
@@ -340,15 +359,15 @@ def primary : Nat → P Term
       else
         advance; return .stringLit "MulDivRound"
     | .atom s => advance; return .stringLit s
-    | .kw "Sum" => advance; aggregate fuel .sum
-    | .kw "Count" => advance; aggregate fuel .count
-    | .kw "Max" => advance; aggregate fuel .max
-    | .kw "Min" => advance; aggregate fuel .min
+    | .kw "Sum" => advance; aggregate false fuel .sum
+    | .kw "Count" => advance; aggregate true fuel .count
+    | .kw "Max" => advance; aggregate false fuel .max
+    | .kw "Min" => advance; aggregate false fuel .min
     | .kw "(" =>
       advance
       match ← peek with
-      | .kw "Exists" => advance; binderForm fuel .exists_
-      | .kw "Forall" => advance; binderForm fuel .forall_
+      | .kw "Exists" => advance; binderForm false fuel .exists_
+      | .kw "Forall" => advance; binderForm true fuel .forall_
       | _ => let t ← expr fuel; expectKw ")"; return t
     | .ident _ =>
       let x ← var
@@ -593,7 +612,7 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Protection", "Prohibited", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
+    if ["Immunity", "Protection", "Prohibited", "Role", "Amount", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
       return (match ← peekAt (idx + 1) with
         | .ident _ => true
         | .atom "Procedure" => s == "Amend"
@@ -892,6 +911,22 @@ def clause (k : FrameKind) : P (Option ModClause) := do
       else
         fail "CHR003" "expected `By <component>` or `When <cond>` after `Decides <fact>`")
     return some (.decides target cond)
+  | .kw "Decided by" =>
+    if k != .act then return none
+    advance
+    let voter ← var
+    let weightFn ← (do
+      if ← isKw "Weighted by" then advance; return some (← ident)
+      else return none)
+    expectKw "At least"
+    let num ← intLit
+    expectKw "/"
+    let den ← intLit
+    if den == 0 then fail "CHR003" "denominator in `At least n/d` cannot be 0"
+    if !(← isCtxAtom "In") then fail "CHR003" "expected `In <vote-fact>` after `At least n/d`"
+    advance
+    let voteFact ← ident
+    return some (.decidedBy voter weightFn num den voteFact)
   | .atom "Repeals" =>
     if k != .act then return none
     advance
@@ -1147,7 +1182,7 @@ def frame : Nat → P (List Decl)
       let e ← expression
       return [.amendProcedure [e]]
     advance
-    let d ← ident
+    let ds ← sepBy1 ident "," 100
     let _ ← optKw "With"
     let actor ← (do if ← isKw "Actor" then advance; return some (← var) else return none)
     let recip ← (do if ← isKw "Recipient" then advance; return some (← var) else return none)
@@ -1155,11 +1190,90 @@ def frame : Nat → P (List Decl)
     let filter ← domainConstraint
     let (cls, instBody) ← parseActExtras fuel 1000
     let actorV := actor.getD ⟨"actor", ""⟩
-    let instDecls := if instBody.isEmpty then [] else [Decl.amendInstall d instBody]
-    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind, isAmend := isAm },
-                           domain := .products (actorV :: (recip.toList ++ objs)),
-                           domainConstraint := filter, closed := if isClosed then none else some false },
-             .typeExt d cls ] ++ instDecls
+    let mkOne (d : DomId) : List Decl :=
+      let instDecls := if instBody.isEmpty then [] else [Decl.amendInstall d instBody]
+      [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind, isAmend := isAm },
+                      domain := .products (actorV :: (recip.toList ++ objs)),
+                      domainConstraint := filter, closed := if isClosed then none else some false },
+        .typeExt d cls ] ++ instDecls
+    return ds.flatMap mkOne
+  | .atom "Role" =>
+    advance
+    let d ← ident
+    let base? ← (do if ← isKw "For" then advance; return some (← ident) else return none)
+    if ← isCtxAtom "Is" then
+      advance
+      let who ← atom
+      let cls ← clauses .fact 1000
+      match base? with
+      | none =>
+        return [ .typeDecl d { kind := .fact { isRole := true }, domain := .strings [who],
+                               derivation := [.holdsWhen (.boolLit true)], closed := none },
+                 .typeExt d cls ]
+      | some base =>
+        let pVar : Var := ⟨base, ""⟩
+        let eqCond := Term.eq (.ref pVar) (.stringLit who)
+        return [ .typeDecl d { kind := .fact { isRole := true, roleBase := some base },
+                               domain := .products [pVar], domainConstraint := eqCond,
+                               derivation := [.holdsWhen eqCond], closed := none },
+                 .typeExt d cls ]
+    else if ← isKw "First of" then
+      advance
+      let base ← match base? with
+        | some b => pure b
+        | none => fail "CHR003" s!"`Role {d} First of ...` requires `For <base-type>` before `First of`"
+      let pVar : Var := ⟨base, ""⟩
+      let pVarAlt : Var := ⟨base, "'"⟩
+      let cands ← sepBy1 atom "," 100
+      if !(← isCtxAtom "Unless") && !(← isKw "Unless") then
+        fail "CHR003" s!"expected `Unless <condition>` after `First of` in `Role {d}`"
+      advance
+      let unavail ← expression
+      let cls ← clauses .fact 1000
+      -- Build Default/Exception ordered succession rules over `cands`
+      let rec mkChain (idx : Nat) (priorAtoms : List String) : List String → List ModClause
+        | [] => []
+        | cAtom :: rest =>
+          let isMe := Term.eq (.ref pVar) (.stringLit cAtom)
+          let priorsUnavail := priorAtoms.foldr (fun pa acc =>
+            let sub := unavail.substVars [(pVar, pVarAlt)]
+            let ex := Term.exists_ [pVarAlt] (.and (.eq (.ref pVarAlt) (.stringLit pa)) sub)
+            Term.and ex acc) (.boolLit true)
+          let defId := s!"cand-{idx}"
+          let excId := s!"unavail-{idx}"
+          let defRule : DefeasibleRule :=
+            { id := defId, isDefault := true, overrides := [], cond := .and isMe priorsUnavail, conseq := .holdsBool true }
+          let excRule : DefeasibleRule :=
+            { id := excId, isDefault := false, overrides := [defId], cond := .and isMe unavail, conseq := .holdsBool false }
+          .defeasibleRule defRule :: .defeasibleRule excRule :: mkChain (idx + 1) (priorAtoms ++ [cAtom]) rest
+      return [ .typeDecl d { kind := .fact { isRole := true, roleBase := some base },
+                             domain := .products [pVar], closed := none },
+               .typeExt d (mkChain 0 [] cands ++ cls) ]
+    else if (← isKw "Where") || (← isKw "When") then
+      advance
+      let base ← match base? with
+        | some b => pure b
+        | none => fail "CHR003" s!"`Role {d} Where ...` requires `For <base-type>`"
+      let cond ← expression
+      let cls ← clauses .fact 1000
+      return [ .typeDecl d { kind := .fact { isRole := true, roleBase := some base },
+                             domain := .products [⟨base, ""⟩], domainConstraint := cond,
+                             derivation := [.holdsWhen cond], closed := none },
+               .typeExt d cls ]
+    else
+      fail "CHR003" s!"expected `Is <Name>`, `Where <cond>`, or `First of ... Unless <cond>` in `Role {d}`"
+  | .atom "Amount" =>
+    advance
+    let d ← ident
+    let dom? ← (do
+      if ← isKw ":" then
+        let dm ← paramDomain
+        return some dm
+      else return none)
+    if ← isCtxAtom "Is" then advance
+    else expectKw "="
+    let e ← expression
+    return [.amountDef d dom? e]
   | .atom "Prohibited" =>
     advance
     let d ← ident
@@ -1213,12 +1327,26 @@ def frame : Nat → P (List Decl)
     let _ ← optKw "With"
     expectKw "Holder"
     let holder ← var
-    expectKw "Claimant"
-    let claimant ← var
+    let (claimant, extraDecls) ← (do
+      if ← isKw "Claimant" then
+        advance
+        match ← peek with
+        | .atom fixedParty =>
+          advance
+          let rDom := "_party_" ++ fixedParty
+          let rDecl := Decl.typeDecl rDom { kind := .fact { isRole := true }, domain := .strings [fixedParty],
+                                            derivation := [.holdsWhen (.boolLit true)], closed := none }
+          return (⟨rDom, ""⟩, [rDecl])
+        | _ =>
+          let c ← var
+          return (c, [])
+      else
+        return (holder, []))
     let objs ← relatedTo
     let filter ← domainConstraint
     let cls ← clauses .duty 1000
-    return [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
+    return extraDecls ++
+           [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
   | .atom "Immunity" | .kw "Immunity" | .atom "Protection" =>
@@ -1457,7 +1585,7 @@ def phrase : P Phrase := do
   | .kw "!" => advance; let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
   | _ => let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
 
-/-- The body of `Scenario name { … }`: phrases and parallel blocks, as at top level. -/
+/-- The body of `Scenario name { … }`: phrases, `Let alias = expr.`, and parallel blocks. -/
 def scenarioBody : Nat → P (List Phrase)
   | 0 => return []
   | fuel + 1 => do
@@ -1466,6 +1594,17 @@ def scenarioBody : Nat → P (List Phrase)
       advance
       let ps ← parBlockFuel fuel
       return .par ps :: (← scenarioBody fuel)
+    if (← isCtxAtom "Let") && (match ← peekAt 2 with | .kw "=" => true | _ => false) then
+      advance
+      let aliasName ← (do match ← peek with
+        | .atom s => advance; return s
+        | .ident s => advance; return s
+        | k => fail "CHR003" s!"expected alias name after `Let` but found {k.describe}")
+      expectKw "="
+      let val ← expression
+      expectKw "."
+      let rest ← scenarioBody fuel
+      return Phrase.substAliasList aliasName val rest
     let p ← phrase
     match ← peek with
     | .kw "." => advance; return p :: (← scenarioBody fuel)
@@ -1508,7 +1647,7 @@ where
 
 /-- The whole file: directives and phrases, each terminated by `.` except a
 parallel block and an optional last phrase. -/
-def items (lineOf : Pos → String) : Nat → P (List Item)
+def items (lineOf : Pos → String) (seenScenarios : List (String × List Phrase) := []) : Nat → P (List Item)
   | 0 => fail "CHR003" "file too long to parse"
   | fuel + 1 => do
     if (← peek) == .eof then return []
@@ -1516,12 +1655,12 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
     match ← directive with
     | some d =>
       expectKw "."
-      return ⟨p, lineOf p, .inl d⟩ :: (← items lineOf fuel)
+      return ⟨p, lineOf p, .inl d⟩ :: (← items lineOf seenScenarios fuel)
     | none =>
     if ← isKw "{" then
       advance
       let ps ← parBlock 10000
-      return ⟨p, lineOf p, .inr (.par ps)⟩ :: (← items lineOf fuel)
+      return ⟨p, lineOf p, .inr (.par ps)⟩ :: (← items lineOf seenScenarios fuel)
     else if (← isCtxAtom "Scenario") && (match ← peekAt 1 with | .ident _ | .atom _ | .str _ => true | _ => false) then
       advance
       let name ← (do match ← peek with
@@ -1529,14 +1668,30 @@ def items (lineOf : Pos → String) : Nat → P (List Item)
         | .atom s => advance; return s
         | .str s => advance; return s
         | k => fail "CHR003" s!"expected a scenario name but found {k.describe}")
+      let after? ← (do
+        if ← isCtxAtom "After" then
+          advance
+          match ← peek with
+          | .ident s => advance; return some s
+          | .atom s => advance; return some s
+          | .str s => advance; return some s
+          | k => fail "CHR003" s!"expected base scenario name after `After` but found {k.describe}"
+        else return none)
       let fs ← fromClauses 100
       expectKw "{"
-      let ps ← scenarioBody 10000
-      return ⟨p, lineOf p, .inr (.scenario name ps fs)⟩ :: (← items lineOf fuel)
+      let ownPs ← scenarioBody 10000
+      let fullPs ← match after? with
+        | none => pure ownPs
+        | some baseName =>
+          match seenScenarios.find? (·.1 == baseName) with
+          | some (_, basePs) => pure (basePs ++ ownPs)
+          | none => fail "CHR010" s!"Scenario `{name}` After `{baseName}`: unknown prior scenario `{baseName}`"
+      let seen' := (name, fullPs) :: seenScenarios.filter (·.1 != name)
+      return ⟨p, lineOf p, .inr (.scenario name fullPs fs)⟩ :: (← items lineOf seen' fuel)
     else
       let ph ← phrase
       match ← peek with
-      | .kw "." => advance; return ⟨p, lineOf p, .inr ph⟩ :: (← items lineOf fuel)
+      | .kw "." => advance; return ⟨p, lineOf p, .inr ph⟩ :: (← items lineOf seenScenarios fuel)
       | .eof => return [⟨p, lineOf p, .inr ph⟩]
       | k => fail "CHR004" s!"expected `.` to end the phrase but found {k.describe}"
 
@@ -1548,7 +1703,7 @@ def parseSource (src : String) (eflint : Bool := false) : Except Diagnostic (Lis
   let lines := src.splitOn "\n" |>.toArray
   let lineOf (p : Pos) : String :=
     if h : p.line - 1 < lines.size then lines[p.line - 1].trim else ""
-  match Parser.items lineOf (toks.size + 2) { toks } with
+  match Parser.items lineOf [] (toks.size + 2) { toks } with
   | .ok (its, _) => return its
   | .error e => throw e
 

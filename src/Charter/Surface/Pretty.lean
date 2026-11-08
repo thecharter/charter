@@ -76,6 +76,7 @@ def fmtTerm : Term → String
   | .evStatus want t => want.kwName ++ "(" ++ fmtTerm t ++ ")"
   | .hasConflict t => "Conflict(" ++ fmtTerm t ++ ")"
   | .mulDivRound x n d m => "MulDivRound(" ++ fmtTerm x ++ ", " ++ fmtTerm n ++ ", " ++ fmtTerm d ++ ", " ++ m.kwName ++ ")"
+  | .fnApp d k => d ++ "(" ++ fmtTerm k ++ ")"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -216,6 +217,9 @@ def fmtModClause : ModClause → String
   | .overridesDuties targets =>
     "Overrides " ++ ", ".intercalate (targets.map fun (d, args?) =>
       match args? with | none => d | some a => fmtTerm (.app d a))
+  | .decidedBy v wf num den vf =>
+    let wPart := match wf with | some w => s!" Weighted by {w}" | none => ""
+    s!"Decided by {v}{wPart} At least {num}/{den} In {vf}"
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
   let rendered := (cls.map fmtModClause).filter (!·.isEmpty)
@@ -436,6 +440,15 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     s!"{indent}Regime {fmtAtomOrStr r.name} \{{bodyStr}}" :: fmtDecls indent fuel rest
   | fuel + 1, .amendProcedure conds :: rest =>
     s!"{indent}Amend Procedure Valid when {fmtTermList conds}" :: fmtDecls indent fuel rest
+  | fuel + 1, .amountDef name dom? e :: rest =>
+    let tyPart := match dom? with
+      | some .time => " : Time"
+      | some .duration => " : Duration"
+      | some (.money cur sc) => s!" : Money({cur}, {sc})"
+      | some (.quantity unit) => s!" : Quantity({unit})"
+      | some .anyInt => " : Int"
+      | _ => ""
+    s!"{indent}Amount {name}{tyPart} Is {fmtTerm e}" :: fmtDecls indent fuel rest
 
 mutual
 

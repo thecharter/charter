@@ -174,6 +174,8 @@ inductive Term where
   | hasConflict (t : Term)
   /-- Charter (D24, G3.4): `MulDivRound(x, num, den, mode)` exact scaled integer division. -/
   | mulDivRound (x : Term) (num : Term) (den : Term) (mode : RoundingMode)
+  /-- Charter (D36, `#46`): `f(key)` 1-argument `Function` value lookup. -/
+  | fnApp (d : DomId) (key : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -268,6 +270,7 @@ def Term.pp : Term → String
   | .evStatus want t => want.kwName ++ "(" ++ t.pp ++ ")"
   | .hasConflict t => "Conflict(" ++ t.pp ++ ")"
   | .mulDivRound x n d m => "MulDivRound(" ++ x.pp ++ ", " ++ n.pp ++ ", " ++ d.pp ++ ", " ++ m.kwName ++ ")"
+  | .fnApp d k => d ++ "(" ++ k.pp ++ ")"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -324,6 +327,7 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .evStatus want t => .evStatus want (t.mapDom f)
   | .hasConflict t => .hasConflict (t.mapDom f)
   | .mulDivRound x n d m => .mulDivRound (x.mapDom f) (n.mapDom f) (d.mapDom f) m
+  | .fnApp d k => .fnApp (f d) (k.mapDom f)
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)
@@ -380,6 +384,7 @@ def Term.substVars (sub : List (Var × Var)) : Term → Term
   | .evStatus want t => .evStatus want (t.substVars sub)
   | .hasConflict t => .hasConflict (t.substVars sub)
   | .mulDivRound x n d m => .mulDivRound (x.substVars sub) (n.substVars sub) (d.substVars sub) m
+  | .fnApp d k => .fnApp d (k.substVars sub)
 def Args.substVars (sub : List (Var × Var)) : Args → Args
   | .pos ts => .pos (Term.substVarsList sub ts)
   | .named ms => .named (Term.substVarsMods sub ms)
@@ -389,6 +394,65 @@ def Term.substVarsList (sub : List (Var × Var)) : List Term → List Term
 def Term.substVarsMods (sub : List (Var × Var)) : List (Var × Term) → List (Var × Term)
   | [] => []
   | (x, t) :: ms => (x, t.substVars sub) :: Term.substVarsMods sub ms
+end
+
+mutual
+/-- Substitute a scenario `Let` alias (`name`) with `val` (`D36`, `#41`). -/
+def Term.substAlias : Term → String → Term → Term
+  | .not t, name, val => .not (t.substAlias name val)
+  | .and a b, name, val => .and (a.substAlias name val) (b.substAlias name val)
+  | .or a b, name, val => .or (a.substAlias name val) (b.substAlias name val)
+  | .boolLit b, _, _ => .boolLit b
+  | .leq a b, name, val => .leq (a.substAlias name val) (b.substAlias name val)
+  | .geq a b, name, val => .geq (a.substAlias name val) (b.substAlias name val)
+  | .ge a b, name, val => .ge (a.substAlias name val) (b.substAlias name val)
+  | .le a b, name, val => .le (a.substAlias name val) (b.substAlias name val)
+  | .sub a b, name, val => .sub (a.substAlias name val) (b.substAlias name val)
+  | .add a b, name, val => .add (a.substAlias name val) (b.substAlias name val)
+  | .mult a b, name, val => .mult (a.substAlias name val) (b.substAlias name val)
+  | .mod a b, name, val => .mod (a.substAlias name val) (b.substAlias name val)
+  | .div a b, name, val => .div (a.substAlias name val) (b.substAlias name val)
+  | .intLit n, _, _ => .intLit n
+  | .stringLit s, name, val => if s == name then val else .stringLit s
+  | .eq a b, name, val => .eq (a.substAlias name val) (b.substAlias name val)
+  | .neq a b, name, val => .neq (a.substAlias name val) (b.substAlias name val)
+  | .exists_ xs t, name, val => if xs.any (fun x => toString x == name) then .exists_ xs t else .exists_ xs (t.substAlias name val)
+  | .forall_ xs t, name, val => if xs.any (fun x => toString x == name) then .forall_ xs t else .forall_ xs (t.substAlias name val)
+  | .count xs t, name, val => if xs.any (fun x => toString x == name) then .count xs t else .count xs (t.substAlias name val)
+  | .sum xs t, name, val => if xs.any (fun x => toString x == name) then .sum xs t else .sum xs (t.substAlias name val)
+  | .max xs t, name, val => if xs.any (fun x => toString x == name) then .max xs t else .max xs (t.substAlias name val)
+  | .min xs t, name, val => if xs.any (fun x => toString x == name) then .min xs t else .min xs (t.substAlias name val)
+  | .when a b, name, val => .when (a.substAlias name val) (b.substAlias name val)
+  | .present t, name, val => .present (t.substAlias name val)
+  | .violated t, name, val => .violated (t.substAlias name val)
+  | .enabled t, name, val => .enabled (t.substAlias name val)
+  | .project t x, name, val => .project (t.substAlias name val) x
+  | .tag t d, name, val => .tag (t.substAlias name val) d
+  | .untag t, name, val => .untag (t.substAlias name val)
+  | .ref x, name, val => if x.dec.isEmpty && x.dom == name then val else .ref x
+  | .app d args, name, val => .app d (args.substAlias name val)
+  | .currentTime, _, _ => .currentTime
+  | .heldFor t d, name, val => .heldFor (t.substAlias name val) (d.substAlias name val)
+  | .evStatus want t, name, val => .evStatus want (t.substAlias name val)
+  | .hasConflict t, name, val => .hasConflict (t.substAlias name val)
+  | .mulDivRound x n d m, name, val => .mulDivRound (x.substAlias name val) (n.substAlias name val) (d.substAlias name val) m
+  | .fnApp d k, name, val => .fnApp d (k.substAlias name val)
+termination_by structural x => x
+
+def Args.substAlias : Args → String → Term → Args
+  | .pos ts, name, val => .pos (Term.substAliasList ts name val)
+  | .named ms, name, val => .named (Term.substAliasMods ms name val)
+termination_by structural x => x
+
+def Term.substAliasList : List Term → String → Term → List Term
+  | [], _, _ => []
+  | t :: ts, name, val => t.substAlias name val :: Term.substAliasList ts name val
+termination_by structural x => x
+
+def Term.substAliasMods : List (Var × Term) → String → Term → List (Var × Term)
+  | [], _, _ => []
+  | (x, t) :: ms, name, val => (x, t.substAlias name val) :: Term.substAliasMods ms name val
+termination_by structural x => x
 end
 
 end Charter

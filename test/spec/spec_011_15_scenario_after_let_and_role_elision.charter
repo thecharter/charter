@@ -1,0 +1,23 @@
+// 011.15 (D36, #41): `Scenario b After a`, `Let alias = expr.`, and singleton `Role` elision.
+Role borrower Is Elena
+Role lender Is Marcus
+Fact usd Identified by Money(USD, 2)
+Var balance Identified by usd
+Act lend Actor lender Recipient borrower Related to usd Holds when True Creates balance(usd)
+Act repay Actor borrower Recipient lender Related to usd
+  Holds when usd <= balance
+  Creates balance(balance - usd)
+.
+Scenario loan-opened {
+  lend(1000).
+  ?(balance == 1000).
+}
+
+Scenario half-repaid After loan-opened {
+  Let Half = repay(Elena, Marcus, 400).
+  ?lawful Half.
+  Half.
+  ?(balance == 600).
+  repay(600).
+  ?(balance == 0).
+}

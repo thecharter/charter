@@ -280,7 +280,11 @@ def everyValidSubs : Nat → Var → M Tagged
     let (tspec, isEnum, _) ← getTypeEntry d
     let dom := tspec.domain
     let filter := tspec.domainConstraint
-    if isEnum then
+    if tspec.restriction == some .var && tspec.isClosed then
+      -- `D36` (`#14`): reading a `Var` binds to its holding value, never every element of its domain
+      let trues ← trueInstancesOf d
+      nd trues
+    else if isEnum then
       let e ← instantiateDomain fuel d dom
       let te : Tagged := (e, d)
       if filter.isTrueLit then pure te
@@ -964,6 +968,19 @@ def eval : Nat → Term → M Value
         match mulDivRound vx vnum vden mode with
         | .ok res => pure (.int res)
         | .error msg => err (.arithmeticError msg)
+    | .fnApp d kTerm =>
+      whenTagged (eval fuel kTerm) fun kVal => do
+        let (tspec, _, _) ← getTypeEntry d
+        let trues ← trueInstancesOf d
+        let matching := trues.filterMap fun (el, _) =>
+          match el with
+          | .prod [k, v] => if k == kVal then some v else none
+          | _ => none
+        match matching with
+        | v :: _ => pure (.tagged v)
+        | [] =>
+          if !tspec.isClosed then err (.missingInput (.unassignedFunction d (some kVal)))
+          else empty
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

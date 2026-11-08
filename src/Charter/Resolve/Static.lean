@@ -88,21 +88,48 @@ def getDecl (d : DomId) : Stc TypeSpec := do
 def union (a b : List Var) : List Var := a ++ b.filter (fun x => !a.contains x)
 def diff (a b : List Var) : List Var := a.filter (fun x => !b.contains x)
 
+/-- Whether `x` is a singleton `Role` (`Role r Is Name`), returning its unique string literal. -/
+def singletonRoleLit (spec : Spec) (x : Var) : Option String :=
+  let d := spec.removeDecoration x
+  match spec.findDecl d with
+  | some { kind := .fact fs, domain := .strings [s], .. } =>
+    if fs.isRole then some s else none
+  | _ => none
+
+/-- Whether `x` (undecorated) names a 0-arity `Bool` / `Predicate` / `Invariant` (`#61`). -/
+def isZeroArityBoolVar (spec : Spec) (x : Var) : Bool :=
+  if !x.dec.isEmpty then false
+  else match spec.findDecl x.dom with
+    | some { kind := .fact _, domain := .products [], .. } => true
+    | _ => false
+
 mutual
 def freeVars (spec : Spec) : Term → List Var
   | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => []
-  | .ref x => [x]
+  | .ref x => if isZeroArityBoolVar spec x then [] else [x]
+  | .fnApp _ k => freeVars spec k
   | .app d args =>
     match spec.findDecl d with
     | some t =>
-      match t.domain with
-      | .products xs =>
-        -- components not given as arguments stay free (eFLINT binds them by name)
+      match t.restriction, t.domain, args with
+      | some .function, .products [_, _], .pos [_] =>
+        -- 1-argument `Function` lookup `f(k)` (`D36`, `#46`): `vVar` is the returned value, not free
+        freeVarsArgs spec args
+      | _, .products xs, _ =>
+        -- components not given as arguments stay free (unless elided singleton `Role`s, `#41`)
         let named : List Var := match args with
           | .named ms => ms.map (·.1)
-          | .pos ts => xs.take ts.length
+          | .pos ts =>
+            if xs.length == ts.length then xs
+            else
+              let dedupXs := xs.eraseDups
+              if dedupXs.length == ts.length then xs
+              else
+                let nonSing := xs.filter fun x => (singletonRoleLit spec x).isNone
+                if nonSing.length == ts.length then xs
+                else xs.take ts.length
         union (diff xs named) (freeVarsArgs spec args)
-      | _ => freeVarsArgs spec args
+      | _, _, _ => freeVarsArgs spec args
     | none => freeVarsArgs spec args
   | .not t | .present t | .violated t | .enabled t | .evStatus _ t | .hasConflict t | .project t _ | .tag t _ | .untag t => freeVars spec t
   | .mulDivRound x n d _ => union (freeVars spec x) (union (freeVars spec n) (freeVars spec d))
@@ -292,16 +319,30 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
     | .stringLit _ => return (t0, .strings)
     | .intLit _ => return (t0, .ints)
     | .boolLit _ => return (t0, .bool)
-    | .ref x => checkKnownType [x]; return (t0, .tagged (spec.removeDecoration x))
+    | .ref x =>
+      checkKnownType [x]
+      if isZeroArityBoolVar spec x then
+        let d := spec.chaseAlias x.dom
+        return (.app d (.named []), .tagged d)
+      else
+        return (t0, .tagged (spec.removeDecoration x))
+    | .fnApp d k =>
+      match spec.findDecl d with
+      | some { restriction := some .function, domain := .products [kVar, vVar], .. } =>
+        let k' ← convertTerm fuel k (.tagged (spec.removeDecoration kVar))
+        return (.fnApp (spec.chaseAlias d) k', .tagged (spec.removeDecoration vVar))
+      | _ => err "CHR012" s!"`{d}` is not a `Function`"
     | .app d args =>
       checkKnownType [⟨d, ""⟩]
-      let isProduct := match spec.findDecl d with
-        | some t => match t.domain with | .products _ => true | _ => false
-        | none => false
-      if isProduct then
+      match spec.findDecl d, args with
+      | some { restriction := some .function, domain := .products [kVar, vVar], .. }, .pos [keyArg] =>
+        -- `D36` (`#46`): 1-argument `Function` lookup `f(key)`
+        let k' ← convertTerm fuel keyArg (.tagged (spec.removeDecoration kVar))
+        return (.fnApp (spec.chaseAlias d) k', .tagged (spec.removeDecoration vVar))
+      | some { domain := .products _, .. }, _ =>
         let args' ← compileArguments fuel d args
         return (.app d args', .tagged d)
-      else compilePrimitiveApplication fuel d args
+      | _, _ => compilePrimitiveApplication fuel d args
     | .tag _ _ => err "CHR003" "tagging `e:t` is an internal operation and cannot be written"
     | .untag t => do
       let (t', ty) ← compileTerm fuel t
@@ -326,7 +367,19 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
     | .le a b => do let (a', b') ← compileCompare fuel a b; return (.le a' b', .bool)
     | .ge a b => do let (a', b') ← compileCompare fuel a b; return (.ge a' b', .bool)
     | .mult a b => do let (a', b', ty) ← compileScale fuel false a b; return (.mult a' b', ty)
-    | .mod a b => do let a' ← convertTerm fuel a .ints; let b' ← convertTerm fuel b .ints; return (.mod a' b', .ints)
+    | .mod a b => do
+      let (a1, ta1) ← compileTerm fuel a
+      let (b1, tb1) ← compileTerm fuel b
+      let (a2, ta2) ← asNumber a1 ta1
+      let (b2, tb2) ← asNumber b1 tb1
+      if ta2 == .duration && (tb2 == .duration || (tb2 == .ints && literalArith b2)) then
+        return (.mod a2 b2, .duration)
+      else if ta2 == .ints && tb2 == .ints then
+        return (.mod a2 b2, .ints)
+      else
+        let a' ← convertTerm fuel a .ints
+        let b' ← convertTerm fuel b .ints
+        return (.mod a' b', .ints)
     | .div a b => do let (a', b', ty) ← compileScale fuel true a b; return (.div a' b', ty)
     | .sub a b => do let (a', b', ty) ← compileArith fuel true a b; return (.sub a' b', ty)
     | .add a b => do let (a', b', ty) ← compileArith fuel false a b; return (.add a' b', ty)
@@ -450,10 +503,49 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | .tagged _ => return .present t'
       | _ => convErr ty' ty
     | .tagged d =>
+      let spec ← getSpec
       let dom ← getDom d
       if ← matchType ty' dom then return .tag t' d
       else if ty' == .ints && literalArith t' && dom.isDimensionalInt then return .tag t' d
-      else convErr ty' ty
+      else
+        match ty', dom with
+        | .tagged srcD, .products [v] =>
+          -- Wrap a base value into a 1-component `Role` or status `Fact` (`Actor roommate`, `Actor executor`)
+          let vBase := spec.removeDecoration v
+          if spec.chaseAlias srcD == vBase then
+            return .app d (.named [(v, t')])
+          else
+            match ← getDom srcD with
+            | .strings _ | .anyString =>
+              let vDom ← getDom vBase
+              if matchDomain vDom .anyString then
+                return .app d (.named [(v, .tag (.untag t') vBase)])
+              else convErr ty' ty
+            | _ => convErr ty' ty
+        | .strings, .products [v] =>
+          let vBase := spec.removeDecoration v
+          let vDom ← getDom vBase
+          if matchDomain vDom .anyString then
+            return .app d (.named [(v, .tag t' vBase)])
+          else convErr ty' ty
+        | .tagged srcD, _ =>
+          -- Unwrap a 1-component `Role` / status `Fact` (`roommate` -> `person`) or singleton string `Role` (`agent` -> `person`)
+          match ← getDom srcD with
+          | .products [v] =>
+            if spec.removeDecoration v == spec.chaseAlias d then
+              return .project t' v
+            else convErr ty' ty
+          | .strings _ =>
+            if matchDomain dom .anyString then
+              return .tag (.untag t') d
+            else convErr ty' ty
+          | _ => convErr ty' ty
+        | _, .products [v] =>
+          -- Wrap dimensional/numeric value into 1-component carrier product (`Var balance Identified by usd`)
+          let vBase := spec.removeDecoration v
+          let wrapped ← convertTerm fuel t (.tagged vBase)
+          return .app d (.named [(v, wrapped)])
+        | _, _ => convErr ty' ty
     | .time =>
       match ty' with
       | .ints => if literalArith t' then return t' else convErr ty' ty
@@ -475,7 +567,8 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | .tagged d => if matchDomain (← getDom d) (.quantity u) then return .untag t' else convErr ty' ty
       | _ => convErr ty' ty
 
-/-- An instance of an integer, time, duration, money, or quantity type used as its value. -/
+/-- An instance of an integer, time, duration, money, or quantity type (or a 1-component
+wrapper such as `Var balance Identified by usd`, `D36`, `#22`, `#46`) used as its value. -/
 def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
   match ty with
   | .tagged d => match ← getDom d with
@@ -484,6 +577,17 @@ def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
     | .duration => pure (Term.untag t, Ty.duration)
     | .money c s => pure (Term.untag t, Ty.money c s)
     | .quantity u => pure (Term.untag t, Ty.quantity u)
+    | .products [v] =>
+      let spec ← getSpec
+      let vDomId := spec.removeDecoration v
+      let inner := Term.project t v
+      match ← getDom vDomId with
+      | .anyInt | .ints _ => pure (Term.untag inner, Ty.ints)
+      | .time => pure (Term.untag inner, Ty.time)
+      | .duration => pure (Term.untag inner, Ty.duration)
+      | .money c s => pure (Term.untag inner, Ty.money c s)
+      | .quantity u => pure (Term.untag inner, Ty.quantity u)
+      | _ => convErr ty .ints
     | _ => convErr ty .ints
   | _ => pure (t, ty)
 
@@ -574,6 +678,7 @@ def compileArguments : Nat → DomId → Args → Stc Args
     | .pos ts =>
       match ← getDom d with
       | .products xs =>
+        let spec ← getSpec
         if xs.length == ts.length then
           -- 003.3: a component named twice is one value in both positions (`Holder actor Claimant
           -- actor`). Two different arguments for it would be bound to one of them and the other
@@ -583,7 +688,26 @@ def compileArguments : Nat → DomId → Args → Stc Args
           | some (x, _) =>
             err "CHR036" s!"{d} names the component {x} twice, so both positions hold one value, and it is given two different ones; declare one of them as {x}' to tell them apart"
           | none => return .named (← compileMods fuel pairs)
-        else err "CHR011" s!"{d} has {xs.length} component(s), {ts.length} given"
+        else
+          -- Single-party duty (`Holder h` with `Claimant` omitted -> `xs = h :: h :: objs`)
+          let dedupXs := xs.eraseDups
+          if ts.length < xs.length && dedupXs.length == ts.length then
+            return .named (← compileMods fuel (dedupXs.zip ts))
+          else
+            -- `D36` (`#41`): elide singleton `Role` components (`Role borrower Is Elena`) when unambiguous
+            let nonSing := xs.filter fun x => (singletonRoleLit spec x).isNone
+            if ts.length < xs.length && nonSing.length == ts.length then
+              let rec zipWithSingletons : List Var → List Term → List (Var × Term)
+                | [], _ => []
+                | x :: xsRest, remTs =>
+                  match singletonRoleLit spec x with
+                  | some lit => (x, .stringLit lit) :: zipWithSingletons xsRest remTs
+                  | none =>
+                    match remTs with
+                    | t :: tsRest => (x, t) :: zipWithSingletons xsRest tsRest
+                    | [] => []
+              return .named (← compileMods fuel (zipWithSingletons xs ts))
+            else err "CHR011" s!"{d} has {xs.length} component(s), {ts.length} given"
       | _ => err "CHR021" s!"{d} is not a composite type and cannot take positional arguments"
 
 def compileMods : Nat → List (Var × Term) → Stc (List (Var × Term))
@@ -643,6 +767,7 @@ def bareEvidenced (spec : Spec) : Nat → Term → List DomId
       bareEvidenced spec fuel a ++ bareEvidenced spec fuel b
     | .mulDivRound x n d _ =>
       bareEvidenced spec fuel x ++ bareEvidenced spec fuel n ++ bareEvidenced spec fuel d
+    | .fnApp d k => evidencedType spec d ++ bareEvidenced spec fuel k
     | .exists_ xs u | .forall_ xs u | .count xs u | .sum xs u | .max xs u | .min xs u =>
       (xs.flatMap fun x => evidencedType spec (spec.removeDecoration x)) ++ bareEvidenced spec fuel u
 def bareEvidencedArgs (spec : Spec) : Nat → Args → List DomId
@@ -802,7 +927,7 @@ def checkBinds (what : String) (d : DomId) (xs : List Var) (as : List DomId) : S
     | none => pure () -- CHR010 is reported where the act is used
     | some _ =>
       let ys := spec.components a
-      match xs.find? (fun x => !ys.contains x) with
+      match xs.find? (fun x => !ys.contains x && (singletonRoleLit spec x).isNone) with
       | some x => err "CHR027" s!"`{what} {a}` on {d}: the component {x} of {d} is not a component of {a}, so {a} cannot bind it"
       | none => pure ()
 
@@ -877,11 +1002,14 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         return (ty, [.enforcingActs as]) :: viols
       | .terminatedBy as =>
         checkBinds "Terminated by" ty xs as
+        let curS ← getSpec
+        let singMods := xs.filterMap fun x =>
+          (singletonRoleLit curS x).map fun s => (x, Term.stringLit s)
         let posts ← as.mapM fun a => do
-          let e ← compileEffect' (fun ys imp u => .tAll ys u imp) xs [] (.app ty (.named []))
+          let e ← compileEffect' (fun ys imp u => .tAll ys u imp) (curS.components a) [] (.app ty (.named singMods))
           return (a, [ModClause.postCond [e]])
         let holds ← as.mapM fun a => do
-          let dv ← compileDerivation xs a (.holdsWhen (.present (.app ty (.named []))))
+          let dv ← compileDerivation (curS.components a) a (.holdsWhen (.present (.app ty (.named singMods))))
           return (a, [ModClause.derivation [dv]])
         return (ty, [.terminatedBy as]) :: (posts ++ holds)
       | .overriddenBy ds =>
@@ -889,8 +1017,11 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         return [(ty, [.overriddenBy ds])]
       | .createdBy as =>
         checkBinds "Created by" ty xs as
+        let curS ← getSpec
+        let singMods := xs.filterMap fun x =>
+          (singletonRoleLit curS x).map fun s => (x, Term.stringLit s)
         let posts ← as.mapM fun a => do
-          let e ← compileEffect' (fun ys imp u => .cAll ys u none imp) xs [] (.app ty (.named []))
+          let e ← compileEffect' (fun ys imp u => .cAll ys u none imp) (curS.components a) [] (.app ty (.named singMods))
           return (a, [ModClause.postCond [e]])
         return (ty, [.createdBy as]) :: posts
       | .strings ss =>
@@ -964,6 +1095,20 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         | k => err "CHR003" s!"`Overrides` on a duty applies to a Duty, not {k.lowerName}"
       | .protectsClauses cids =>
         return [(ty, [.protectsClauses cids])]
+      | .decidedBy voter weightFn? num den voteFact =>
+        let voteCheck := Term.present (.app voteFact (.pos [.ref voter]))
+        let voteExpr ← match weightFn? with
+          | none =>
+            let yesCnt := Term.count [voter] (.when (.ref voter) voteCheck)
+            let totCnt := Term.count [voter] (.ref voter)
+            pure (Term.geq (.mult yesCnt (.intLit den)) (.mult totCnt (.intLit num)))
+          | some wf =>
+            let wVal := Term.fnApp wf (.ref voter)
+            let yesSum := Term.sum [voter] (.when wVal voteCheck)
+            let totSum := Term.sum [voter] wVal
+            pure (Term.geq (.mult yesSum (.intLit den)) (.mult totSum (.intLit num)))
+        let vc ← convertPrecon ty tspec voteExpr
+        return [(ty, [.validWhen [vc]])]
       | .standard s => return [(ty, [.standard s])]
       | .evEffect op ts src? =>
         let opLabel := match op with
@@ -1134,18 +1279,35 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .regime .. => pure ()
     | .spanInit .. => pure ()
     | .amendProcedure conds => modifySpec fun s => { s with amendProcedure := conds }
+    | .amountDef n dom? _ =>
+      let dom := dom?.getD .anyInt
+      setSpec ((← getSpec).insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
     match d with
     | .placeholder _ t => checkKnownType [⟨t, ""⟩]
     | _ => pure ()
-  -- 2. compile each new type's own terms
+  -- 2. compile each new type's own terms (and `Amount` definitions, `#46`)
   inits.forM fun d => do
     match d with
     | .typeDecl ty tspec =>
       let compiled ← compileTypeSpec ty tspec
       modifySpec (·.insertDecl ty compiled)
+    | .amountDef n dom? rawExpr =>
+      let (e', tyE) ← compileTerm termFuel rawExpr
+      let (_, tyNum) ← asNumber e' tyE
+      let inferredDom : Domain := match dom? with
+        | some explicitDom => explicitDom
+        | none => match tyNum with
+          | .money c s => .money c s
+          | .quantity u => .quantity u
+          | .duration => .duration
+          | .time => .time
+          | _ => .anyInt
+      modifySpec (·.insertDecl n { kind := .fact {}, domain := inferredDom, restriction := some .var })
+      let dv ← compileDerivation [⟨n, ""⟩] n (.dv [] (.app n (.pos [rawExpr])))
+      modifySpec fun s => s.adjustDecl n fun ts => { ts with derivation := [dv] }
     | _ => pure ()
   -- 3. extensions and temporal properties, in order
   exts.forM fun d => do
@@ -1224,6 +1386,23 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .typeDecl ty _ =>
       match (← getSpec).lookupDecl ty with
       | some ts@{ kind := .act a, .. } => do
+        -- Status fact or derived `Role` used as `Actor` (`#39`, `#40`): require `Holds(actorVar)` for both lawfulness and validity
+        let a ← match ts.domain with
+          | .products (actorVar :: _) => do
+            let curS ← getSpec
+            let actorDom := curS.removeDecoration actorVar
+            let needsActorHold := match curS.findDecl actorDom with
+              | some { kind := .fact fs, domain := .products [_], defeasibleRules := drs, .. } =>
+                !fs.isRole || !drs.isEmpty
+              | _ => false
+            if needsActorHold then do
+              let holdGuard := Term.present (.ref actorVar)
+              let aUpd := { a with validWhen := holdGuard :: a.validWhen }
+              modifySpec fun s => s.adjustDecl ty fun ts' =>
+                { ts' with conditions := holdGuard :: ts'.conditions, kind := .act aUpd }
+              pure aUpd
+            else pure a
+          | _ => pure a
         -- Warn `CHR042` (`#13`) if an `Act` declares both `Except under` and `Holds when`
         if !a.exceptUnder.isEmpty && !ts.derivation.isEmpty then
           warn "CHR042" s!"{ty} declares both `Except under` and `Holds when`; `Holds when` on `{ty}` is ignored when `Except under` is present (007.2)"

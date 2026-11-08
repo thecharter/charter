@@ -1,0 +1,46 @@
+// 010.13 (D36, #46, #50, #61): `Function` application `f(k)`, `Count(pred)`, `Amount name Is expr`,
+// `Decided by ... At least n/d`, `Bool` without `()`, multi-name powers, and single-party duties.
+Fact member Identified by Alice, Bob, Carol
+Fact asset Identified by Flat, Boat
+Fact usd Identified by Money(USD, 2)
+Bool active
+Function worth Identified by asset * usd
+Function owner Identified by asset * member
+Fact marital Identified by asset
+Fact present Identified by member
+Function weight Identified by member * int
+Fact yes-vote Identified by member
+
+Amount marital-pool Is Sum(Foreach asset: worth(asset) When marital(asset))
+
+Power pay, transfer Actor member Related to usd
+  Valid when active && usd <= marital-pool
+
+Duty keep-minutes Holder member
+
+Power adopt-budget Actor member
+  Decided by member Weighted by weight At least 2/3 In yes-vote
+.
++active.
+?active.
++worth(Flat, 30000). +worth(Boat, 10000).
++marital(Flat).
++owner(Boat, Bob).
+?(worth(Flat) == 30000).
+?(owner(Boat) == Bob).
+?(marital-pool == 30000).
+?valid pay(Alice, 20000).
+?valid transfer(Alice, 20000).
+?!valid pay(Alice, 40000).
+
++present(Alice). +present(Carol).
+?(Count(present) == 2).
+
++keep-minutes(Alice).
+?keep-minutes(Alice).
+
++weight(Alice, 50). +weight(Bob, 30). +weight(Carol, 20).
++yes-vote(Alice).
+?!valid adopt-budget(Alice).
++yes-vote(Bob).
+?valid adopt-budget(Alice).

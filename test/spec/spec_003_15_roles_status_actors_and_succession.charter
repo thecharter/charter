@@ -1,0 +1,58 @@
+// 003.15 (D36, #39, #40, #14): `Role ... Is ...`, status facts as actors, `Except` in quantifiers,
+// fixed duty claimants, ordered succession `First of ... Unless`, `%` on `Duration`, and `Var`
+// projection over an enumerated domain.
+Fact person Identified by Helen, Marcus, Asha, Luis, Mei, Daniel, Priya
+Role principal Is Helen
+Role agent Is Marcus
+Fact reported Identified by agent
+Duty report-due Holder agent Claimant Helen Created by deal
+Power deal Actor agent Recipient person Valid when True Creates reported(agent)
+
+Fact roommate Identified by person
+Fact approved Identified by person * person'
+Act approve-candidate Actor roommate Related to person' Holds when True Creates approved(roommate, person')
+
+Var rent-payer Identified by person
+Fact owes-payer Identified by person * person'
+  Derived from (Foreach roommate: owes-payer(roommate.person, rent-payer.person)
+    When roommate.person != rent-payer.person)
+
+Fact unavailable Identified by person
+Role executor For person First of Daniel, Priya Unless unavailable(person)
+Bool estate-closed
+Power close-estate Actor executor Valid when True Creates estate-closed()
+
+Param epoch : Time = 0
+Bool daniel-week Holds when ((Current Time - epoch) % 14) < 7
+.
+// 1. Role agent Is Marcus: Helen cannot validly exercise `deal`; Marcus can, and creates `report-due(Marcus, Helen)`!
+?!valid deal(Helen, Asha).
+?valid deal(Marcus, Asha).
+deal(Marcus, Asha).
+?report-due(Marcus, Helen).
+
+// 2. Status fact as actor + `Forall ... Except`:
++roommate(Asha). +roommate(Luis).
+?!valid approve-candidate(Mei, Priya).
+?valid approve-candidate(Asha, Priya).
+approve-candidate(Asha, Priya).
+?(Forall roommate Except Luis: approved(roommate, Priya)).
+
+// 3. Var projection over enumerated type (`#14`): only Asha is `rent-payer`, never Mei!
++rent-payer(Asha).
+?owes-payer(Luis, Asha).
+?!owes-payer(Luis, Mei).
+
+// 4. Ordered succession (`First of Daniel, Priya Unless unavailable(person)`):
+?valid close-estate(Daniel).
+?!valid close-estate(Priya).
++unavailable(Daniel).
+?!valid close-estate(Daniel).
+?valid close-estate(Priya).
+
+// 5. Alternating turns via `%` on `Duration`:
+?daniel-week().
+@ 8.
+?!daniel-week().
+@ 15.
+?daniel-week().

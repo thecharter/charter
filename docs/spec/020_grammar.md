@@ -136,6 +136,8 @@ act_clause      ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Valid when' expr | 'Forbidden when' expr | 'Void when' expr | 'Except under' idents
                   | 'Repeals' idents | 'Installs' '{' (frame | '.')* '}'
                   | 'Resolves' '!'? expr | 'Decides' expr ('By' var | 'When' expr) | 'Standard' (ident | atom | str_lit)
+                  | 'Decided by' var ('Weighted by' ident)? 'At least' int_lit '/' int_lit 'In' ident
+                  | 'First of' atom (',' atom)* 'Unless' expr
                   | ('Supports' | 'Rebuts' | 'Retracts' '!'?) expr_list ('By' expr)?
                   | from_clause | deriv_clause
 event_clause    ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'

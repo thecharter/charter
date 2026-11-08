@@ -2,7 +2,7 @@
 
 **Status:** approved (Eric, 2026-11-06; Charter 1.0.0). Fixed by D2, D7, and D12. Implementation: compliant (`src/Charter/Eval/Eval.lean`, `src/Charter/Eval/Step.lean`).
 
-**6.1 Duty instances.** `Duty d Holder h Claimant c [Related to …]` declares a type whose instances have a holder, a claimant, and the related objects, created and terminated like any fact (by `+`/`-` or by effects). `test/spec/spec_006_1_duty_instance.eflint`
+**6.1 Duty instances (`D36`, `#39`, `#61`).** `Duty d Holder h [Claimant (c | Atom)] [Related to …] [Holds when …]` declares a type whose instances have a holder, an optional claimant (defaulting to `h` for single-party institutional duties, or accepting a fixed party atom `Atom` that binds automatically in `Created by`/`Terminated by`), and the related objects. Duties may be postulated (created and terminated by `+`/`-` or by act effects) or derived via `Holds when` / `Derived from` (`004.1`), in which case the duty holds whenever its derivation condition holds and is stamped with the step it first arose (`009.3`). `test/spec/spec_006_1_duty_instance.eflint`, `spec_003_15_roles_status_actors_and_succession.charter`, `spec_010_13_function_app_count_pred_amount_and_bool_bare.charter`
 
 **6.2 Violation.** A duty instance is *violated* when it holds and one of its `Violated when` conditions holds, the duty's components bound to the instance. Violation is a fact of the state (Law 3): `Violated(d(…))` answers it at any time. `test/spec/spec_006_2_violated_when.eflint`, `spec_006_5_violated_needs_holding.eflint`; proved: `Charter.isViolated_of_holds`, for an instance that holds the query is the violation condition itself, the same function the report of 6.5 evaluates (`src/Charter/Eval/Properties.lean`)
 
