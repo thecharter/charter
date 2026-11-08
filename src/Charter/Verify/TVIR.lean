@@ -100,13 +100,13 @@ def specThresholdWitnesses (spec : Spec) (stateInts : List Int) : List Int :=
     let kInts := match t.kind with
       | .act a =>
         (a.validWhen.flatMap termIntConsts) ++
-        (a.effects.flatMap fun | .cAll _ tm md => termIntConsts tm ++ (md.map termIntConsts).getD []
-                               | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
+        (a.effects.flatMap fun | .cAll _ tm md _ => termIntConsts tm ++ (md.map termIntConsts).getD []
+                               | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
                                | .amendOp _ => [])
       | .duty du => du.violatedWhen.flatMap termIntConsts
       | .immunity im => im.unlessConds.flatMap termIntConsts
-      | .event ev => ev.effects.flatMap fun | .cAll _ tm md => termIntConsts tm ++ (md.map termIntConsts).getD []
-                                            | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
+      | .event ev => ev.effects.flatMap fun | .cAll _ tm md _ => termIntConsts tm ++ (md.map termIntConsts).getD []
+                                            | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
                                             | .amendOp _ => []
       | .fact _ => []
     dInts ++ cInts ++ fInts ++ kInts
@@ -125,13 +125,13 @@ def isSingleThresholdFragment (spec : Spec) : Bool :=
     let kOk := match t.kind with
       | .act a =>
         a.validWhen.all (!hasComplexArith ·) &&
-        a.effects.all (fun | .cAll _ tm md => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
-                           | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm
+        a.effects.all (fun | .cAll _ tm md _ => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
+                           | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm
                            | .amendOp _ => true)
       | .duty du => du.violatedWhen.all (!hasComplexArith ·)
       | .immunity im => im.unlessConds.all (!hasComplexArith ·)
-      | .event ev => ev.effects.all (fun | .cAll _ tm md => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
-                                         | .tAll _ tm | .oAll _ tm | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm
+      | .event ev => ev.effects.all (fun | .cAll _ tm md _ => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
+                                         | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm
                                          | .amendOp _ => true)
       | .fact _ => true
     dOk && cOk && fOk && kOk

@@ -53,7 +53,7 @@ Act disclose Actor seller Recipient buyer Related to defect
   Creates disclosed()
 Immunity as-is Holder seller Related to defect Against demand-repair
   Holds when True
-  Unless known() && Not(disclosed())
+  Unless Established(known()) && Not(disclosed())
 Act demand-repair Actor buyer Recipient seller Related to car, defect
   Holds when delivered()
 Duty repair-due Holder seller Claimant buyer Related to car, defect

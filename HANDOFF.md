@@ -5,6 +5,22 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-07 (3): remaining six of the eleven accepted-and-wrong defects fixed (`D30`–`D33`)
+
+## Where
+
+- `main`, pushed (`tools/battery`: PASS across all 25 steps; `/Users/eric/psa/tools/verify-psa`: PASS across all 6 stages).
+- All eleven of the initial silent wrong-answer defects (`#2`–`#12`) are now fixed and closed.
+
+## What landed (`D30`–`D33`, `B13`–`B16`)
+
+- **`D30` (`B13`, #6)**: `charter test` now checks every declared `Invariant` at the end state of the program and of each `Scenario` (unless `?!inv().` claims the breach), aligning `test` with `explore` and `prove` (`011.10`, `spec_011_10b`). All 6 library tests with mid-genesis violations were verified individually to cure before genesis ends; 7 upstream eFLINT corpus files ending in breach are recorded in `tolerances.json` / `tolerances.md` (39 total tolerances).
+- **`D31` (`B14`, #9)**: two-valued derivation, violation, and immunity rules may no longer read an `Evidenced` fact bare (`CHR038`, `004.11`, `spec_004_11b`, `spec_004_11c`); `RentersInsurance`, `BillOfSale`, and `psa.charter` updated to `Established(…)`. Separate `004.12` normative conflict leakage through intermediate derived facts filed as `#80` with the bounded taint-overlay route.
+- **`D32` (`B15`, #11, plus #3 & #8)**: effects reading an unset `Var` (other than bare `Terminates v` / `Obfuscates v`) or an implicitly bound `Function` at an unassigned key argument halt with `CHR100` (`MissingInput.unassignedVar` / `unassignedFunction`, `005.4`, `spec_005_4b`, `spec_005_4c`, 0 eFLINT corpus divergences). Added `CHR039` warning on unfiltered `Count(Foreach x: f(x))` (`010.7`, `spec_010_7b`) and `CHR040` warning on binders over empty carrier types (`004.7`, `spec_004_7c`), which caught and fixed real vacuous binders in `Examples/Deed`, `Examples/TreasuryMandate`, `lib/monetary_estate.charter`, and `lib/agency_mandate.charter`.
+- **`D33` (`B16`, #12)**: evidence is keyed by `(fact, polarity, source)` defaulting to the performing actor with `By s` override (`005.11`, `spec_005_11b`), `Retracts !e` withdraws contrary evidence, and retractions matching nothing emit warning `CHR109` (`spec_005_11c`).
+
+---
+
 # Handoff — 2026-11-07 (2): five of the eleven accepted-and-wrong defects fixed (D29)
 
 ## Where

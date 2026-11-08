@@ -1,0 +1,18 @@
+// 011.10, 013.2: the end state of a program and of each scenario satisfies every invariant,
+// with or without `//! explore`. A violation on the way is a report; a scenario that means to
+// end in breach says so with `?!name().`.
+//! expect-failed-claims: 2
+Bool bad
+Invariant never-bad When Not(bad()).
+Scenario ends-in-breach {
+  +bad().
+}
+Scenario breach-and-cure {
+  +bad().
+  -bad().
+}
+Scenario breach-that-is-meant {
+  +bad().
+  ?!never-bad().
+}
++bad().

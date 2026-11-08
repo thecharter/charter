@@ -195,8 +195,27 @@ def ppElem : Elem → String
 /-- Explore from a configuration (plan §2.2.7): a violated invariant within the depth
 is a failed claim whose text is the shortest trace. D15: a judged act whose component
 had no menu is reported as unexplored, and the claim is then not a pass. -/
-def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats) : IO RunStats := do
-  if o.explore == 0 || cfg.spec.invariants.isEmpty then return stats
+def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats)
+    (acked : List DomId := []) : IO RunStats := do
+  if cfg.spec.invariants.isEmpty then return stats
+  -- 011.10, 013.2 (D30): an end state satisfies every invariant, whether or not the file asks
+  -- for exploration. `acked` are the invariants the program claims are breached (`?!name().`).
+  let endViolated := match Interp.checkInvariants cfg.spec cfg.spec.buildIndex cfg.state with
+    | .ok ds => ds
+    | .error _ => []
+  if o.explore == 0 then
+    if !o.testMode then return stats
+    let mut stats := stats
+    for d in endViolated do
+      if !acked.contains d then
+        let j := Json.mkObj [("kind", "claim"), ("tag", "checked"), ("assurance", "checked"), ("about", "invariants"),
+          ("scope", Json.mkObj [("kind", Json.str "end-state")]), ("completion", "complete"),
+          ("result", Json.bool false), ("invariant", Json.str d)]
+        emit o j s!"{where_}: invariant {d} does not hold in the end state (claim `?!{d}().` there if the breach is meant)"
+        stats := { stats with failedQueries := stats.failedQueries + 1 }
+    return stats
+  -- a breach the program claims: there is no lawful behaviour to explore from it
+  if !endViolated.isEmpty && endViolated.all acked.contains then return stats
   match Explore.bfs o.exploreMenu cfg o.explore 5000 with
   | .error e =>
     let d := Diagnostic.error e.code e.message
@@ -234,6 +253,13 @@ def exploreFrom (o : RunOpts) (where_ : String) (cfg : Config) (stats : RunStats
     emit o j s!"{where_}: explore: invariant {d} violated after {trace.length} step(s): {if trace.isEmpty then "(already in the end state)" else traceS}"
     return { stats with failedQueries := stats.failedQueries + 1 }
 
+/-- The invariants a list of phrases claims are breached: `?!name().` (D30). -/
+def ackedInvariants (ps : List Phrase) : List DomId :=
+  ps.filterMap fun
+    | .query (.not (.app d _)) => some d
+    | .query (.not (.ref v)) => some v.dom
+    | _ => none
+
 /-- Run a scenario's phrases from `cfg`, reporting under the scenario's name; the
 configuration is not changed. -/
 def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config) (ps : List Phrase)
@@ -251,7 +277,7 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
       | _ => s!"scenario {name}, phrase {k}"
     stats ← report o s!"{file} [scenario {name}, phrase {k}]" line label cfg.state cfg'.state outs stats
     cfg := cfg'
-  exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats
+  exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats (ackedInvariants ps)
 
 /-- Run one located item. -/
 def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO (Config × RunStats) := do
@@ -325,7 +351,11 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   if o.scenarioFilter.isEmpty then
-    stats ← exploreFrom o s!"{path}" cfg stats
+    let topPhrases := items.filterMap fun l => match l.item.val with
+      | .inr (.scenario ..) => none
+      | .inr ph => some ph
+      | .inl _ => none
+    stats ← exploreFrom o s!"{path}" cfg stats (ackedInvariants topPhrases)
   let (failedProv, loadedDocs, cov) ← reportProvenance o cfg.spec (path.parent.getD ".")
   if o.assurance.requireProvenance then
     for d in AssuranceGates.checkProvenanceGate path.toString cfg.spec loadedDocs cov do

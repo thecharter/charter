@@ -1,0 +1,25 @@
+// 005.11, 011.14: a piece of evidence is identified by the fact, its polarity, and who tendered
+// it. An act tenders in the name of its actor unless `By` names another. `Retracts e` withdraws
+// this source's supporting evidence and `Retracts !e` its contrary evidence.
+Fact physician Identified by DrAdler, DrBose
+Fact clerk Identified by Clerk
+Evidenced Bool lacks
+Act determine Actor physician Holds when True Supports lacks()
+Act doubt Actor physician Holds when True Rebuts lacks()
+Act withdraw Actor physician Holds when True Retracts lacks()
+Act withdraw-doubt Actor physician Holds when True Retracts !lacks()
+Act file-report Actor clerk Related to physician Holds when True Supports lacks() By physician
+.
+determine(DrAdler). determine(DrBose).
+?Established(lacks()).
+withdraw(DrAdler).
+?Established(lacks()).
+withdraw(DrBose).
+?Unresolved(lacks()).
+file-report(Clerk, DrAdler).
+doubt(DrBose).
+?Conflicted(lacks()).
+withdraw-doubt(DrBose).
+?Established(lacks()).
+withdraw(DrAdler).
+?Unresolved(lacks()).

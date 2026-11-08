@@ -20,6 +20,8 @@ Scenario a-stranger-conveys-nothing {
 
 Scenario the-grantor-pays-off-the-old-lien {
   sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
+  ?warranted(Robert, Sofia, Lot7, "county tax lien").
+  ?lawful demand-payoff(Sofia, Robert, Lot7, "county tax lien").
   demand-payoff(Sofia, Robert, Lot7, "county tax lien").
   ?payoff-due(Robert, Sofia, Lot7, "county tax lien").
   @ 29.

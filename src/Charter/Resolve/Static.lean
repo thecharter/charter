@@ -203,16 +203,49 @@ def arithTy (isSub : Bool) : Ty → Ty → Option Ty
 def convErr {α} (source target : Ty) : Stc α :=
   err "CHR012" s!"cannot use {source} where {target} is needed"
 
-/-- D15 (brief B11): a binder over an act whose domain is not enumerable and that has a
-`Holds when` sees only the act's assigned instances; the rule is judged per instance and
-never materialised, so the binder is almost never what the author meant. CHR025 says so. -/
+/-- D15 (brief B11) and 004.7 (#8): warn when a binder ranges over an un-materialised
+judged act (`CHR025`) or over an unrestricted, non-derived, closed `Money`, `Quantity`,
+`Duration`, or built-in `int`/`string` carrier type (`CHR040`), which has no held instances
+of its own unless explicitly asserted. -/
 def warnJudgedBinders (xs : List Var) : Stc Unit := do
   let spec ← getSpec
   xs.forM fun x => do
     let d := spec.removeDecoration x
     match spec.judgedAct d with
     | some _ => warn "CHR025" s!"a binder over {d} sees only its assigned instances: the domain of {d} is not enumerable and its Holds when is judged per instance, never materialised (D15)"
-    | none => pure ()
+    | none =>
+      match spec.findDecl d with
+      | some t =>
+        let isEmptyCarrier :=
+          t.restriction.isNone && t.derivation.isEmpty && t.isClosed && !t.isEvidencedFact &&
+          (match t.domain with
+            | .money _ _ | .quantity _ | .duration => true
+            | .anyInt => d == "int"
+            | .anyString => d == "string"
+            | _ => false)
+        if isEmptyCarrier then
+          warn "CHR040" s!"a binder over `{x}` ranges over held instances of `{d}` itself, of which none are asserted; bind the composite fact that carries the `{d}` instead (004.7)"
+        else pure ()
+      | none => pure ()
+
+/-- 010.7 (#3): `Count(Foreach x: f(x))` without `When` constructs an instance of `f` for
+every binding of `x` without testing whether `f(x)` holds, counting the whole domain. -/
+def warnUnfilteredCountConstructor (xs : List Var) (rawBody : Term) : Stc Unit := do
+  let spec ← getSpec
+  let hasEnum := xs.any fun x =>
+    match spec.findDecl (spec.removeDecoration x) with
+    | some t => spec.enumerable t.domain
+    | none => false
+  if !hasEnum then pure ()
+  else
+    match rawBody with
+    | .app d _ =>
+      let dBase := spec.chaseAlias d
+      let isBinder := xs.any fun x => spec.removeDecoration x == dBase
+      if !isBinder then
+        warn "CHR039" s!"`Count(Foreach …: {rawBody.pp})` constructs an instance of `{d}` for every binding without testing whether it holds; write `When {rawBody.pp}` to count holding instances (010.7)"
+      else pure ()
+    | _ => pure ()
 
 /-- An `Exists` or `Forall` whose body is a constant `True`/`False` over an enumerable
 type ignores whether any instance holds and tests only whether the domain is non-empty;
@@ -326,7 +359,11 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       orElse
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.neq a' b', .bool))
         (do let (b', tb) ← compileTerm fuel b; let a' ← convertTerm fuel a tb; return (.neq a' b', .bool))
-    | .count xs t => do warnJudgedBinders xs; let (t', _) ← compileTerm fuel t; return (.count xs t', .ints)
+    | .count xs t => do
+      warnJudgedBinders xs
+      warnUnfilteredCountConstructor xs t
+      let (t', _) ← compileTerm fuel t
+      return (.count xs t', .ints)
     | .max xs t => do
       warnJudgedBinders xs
       let (t1, ty1) ← compileTerm fuel t
@@ -561,20 +598,96 @@ end
 
 def termFuel : Nat := 100000
 
+/-! ### Evidenced facts are read by status in derivation rules (004.11, D31)
+
+An act's `Holds when` and `Valid when` are three-valued guards and may read an `Evidenced`
+fact bare. Every other rule is derived two-valued, where a bare read could only mean
+`Established(e)` and under `Not` reads "unresolved" as "no". Such a read is CHR038. -/
+
+/-- The type a term is an instance of, where that is syntactically clear. -/
+def headTypeOf (spec : Spec) : Term → Option DomId
+  | .app d _ => some d
+  | .ref x => some (spec.removeDecoration x)
+  | .project _ x => some (spec.removeDecoration x)
+  | .tag _ d => some d
+  | .when t _ => headTypeOf spec t
+  | _ => none
+
+def evidencedType (spec : Spec) (d : DomId) : List DomId :=
+  match spec.findDecl d with
+  | some ts => if ts.isEvidencedFact then [d] else []
+  | none => []
+
+mutual
+/-- The `Evidenced` types a term reads other than through `Established`, `Refuted`,
+`Unresolved`, or `Conflicted`. Structural, so the kernel can run it. -/
+def bareEvidenced (spec : Spec) : Nat → Term → List DomId
+  | 0, _ => []
+  | fuel + 1, t =>
+    match t with
+    | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => []
+    | .ref x => evidencedType spec (spec.removeDecoration x)
+    | .app _ args => bareEvidencedArgs spec fuel args
+    | .present u | .violated u | .enabled u =>
+      ((headTypeOf spec u).toList.flatMap (evidencedType spec)) ++ bareEvidenced spec fuel u
+    | .heldFor u d =>
+      ((headTypeOf spec u).toList.flatMap (evidencedType spec)) ++ bareEvidenced spec fuel u
+        ++ bareEvidenced spec fuel d
+    | .evStatus _ u | .hasConflict u =>
+      match u with
+      | .app _ args => bareEvidencedArgs spec fuel args
+      | _ => []
+    | .not u | .project u _ | .tag u _ | .untag u => bareEvidenced spec fuel u
+    | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
+    | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b =>
+      bareEvidenced spec fuel a ++ bareEvidenced spec fuel b
+    | .mulDivRound x n d _ =>
+      bareEvidenced spec fuel x ++ bareEvidenced spec fuel n ++ bareEvidenced spec fuel d
+    | .exists_ xs u | .forall_ xs u | .count xs u | .sum xs u | .max xs u | .min xs u =>
+      (xs.flatMap fun x => evidencedType spec (spec.removeDecoration x)) ++ bareEvidenced spec fuel u
+def bareEvidencedArgs (spec : Spec) : Nat → Args → List DomId
+  | 0, _ => []
+  | fuel + 1, args =>
+    match args with
+    | .pos ts => bareEvidencedList spec fuel ts
+    | .named ms => bareEvidencedList spec fuel (ms.map (·.2))
+def bareEvidencedList (spec : Spec) : Nat → List Term → List DomId
+  | 0, _ => []
+  | _, [] => []
+  | fuel + 1, t :: ts => bareEvidenced spec fuel t ++ bareEvidencedList spec fuel ts
+end
+
+/-- CHR038 unless `d` is an act or an event, whose conditions are three-valued guards. -/
+def refuseBareEvidenced (d : DomId) (t : Term) : Stc Unit := do
+  let spec ← getSpec
+  let guarded := match (spec.findDecl d).map (·.kind) with
+    | some (.act _) | some (.event _) => true
+    | _ => false
+  if guarded then pure ()
+  else
+    match bareEvidenced spec termFuel t with
+    | [] => pure ()
+    | e :: _ =>
+      err "CHR038" s!"{d}: a rule reads the `Evidenced` fact {e} without saying which status it means; write `Established({e}(…))`, `Refuted`, `Unresolved`, or `Conflicted` (004.11). Only an act's `Holds when` and `Valid when` may read it bare"
+
 /-- Compile a condition of type `d` (eFLINT `convert_precon`): checked as a
 boolean, with variables other than `d`'s components existentially bound. -/
 def convertPrecon (d : DomId) (tspec : TypeSpec) (t : Term) : Stc Term := do
   let xs := match tspec.domain with | .products xs => xs | _ => [⟨d, ""⟩]
   let cond ← convertTerm termFuel t .bool
+  refuseBareEvidenced d cond
   let fs ← freeVarsChecked cond
   let unbound := diff fs xs
+  warnJudgedBinders unbound
   return if unbound.isEmpty then cond else .exists_ unbound cond
 
 def compileViolationCondition (d : DomId) (t : Term) : Stc Term := do
   let xs := match ← getDom d with | .products xs => xs | _ => [⟨d, ""⟩]
   let t' ← convertTerm termFuel t .bool
+  refuseBareEvidenced d t'
   let fs ← freeVarsChecked t'
   let unbound := diff fs xs
+  warnJudgedBinders unbound
   return if unbound.isEmpty then t' else .exists_ unbound t'
 
 def compileSync (bound : List Var) (s : Sync) : Stc Sync := do
@@ -585,11 +698,12 @@ def compileSync (bound : List Var) (s : Sync) : Stc Sync := do
     return ⟨s.xs ++ diff fs (s.xs ++ bound), t'⟩
   | _ => err "CHR017" s!"`Syncs with {s.t}` is not an act or event instance"
 
-def compileEffect' (mk : List Var → Term → Effect) (bound xs : List Var) (t : Term) : Stc Effect := do
+def compileEffect' (mk : List Var → List Var → Term → Effect) (bound xs : List Var) (t : Term) : Stc Effect := do
   let (t', _) ← compileTerm termFuel t
   let fs ← freeVarsChecked t'
-  warnJudgedBinders (xs ++ diff fs (bound ++ xs))
-  return mk (xs ++ diff fs (bound ++ xs)) t'
+  let imp := diff fs (bound ++ xs)
+  warnJudgedBinders (xs ++ imp)
+  return mk (xs ++ imp) imp t'
 
 def checkEvidencedTarget (what : String) (t : Term) : Stc Term := do
   let (t', ty) ← compileTerm termFuel t
@@ -604,32 +718,35 @@ def checkEvidencedTarget (what : String) (t : Term) : Stc Term := do
   | _ => err "CHR015" s!"`{what}` needs an `Evidenced` fact instance, not {ty}"
 
 def compileEffect (bound : List Var) : Effect → Stc Effect
-  | .cAll xs t none => compileEffect' (fun xs t => .cAll xs t none) bound xs t
-  | .cAll xs t (some d) => do
+  | .cAll xs t none _ => compileEffect' (fun ys imp u => .cAll ys u none imp) bound xs t
+  | .cAll xs t (some d) _ => do
     -- the expiry's free variables (a `Param`, 014.1) are bound with the effect's
     let d' ← convertTerm termFuel d .duration
     let dfs ← freeVarsChecked d'
-    compileEffect' (fun ys t => .cAll (ys ++ diff dfs (bound ++ ys)) t (some d')) bound xs t
-  | .tAll xs t => compileEffect' .tAll bound xs t
-  | .oAll xs t => compileEffect' .oAll bound xs t
+    let dImp := diff dfs (bound ++ xs)
+    compileEffect' (fun ys imp u => .cAll (ys ++ diff dfs (bound ++ ys)) u (some d') (imp ++ dImp)) bound xs t
+  | .tAll xs t _ => compileEffect' (fun ys imp u => .tAll ys u imp) bound xs t
+  | .oAll xs t _ => compileEffect' (fun ys imp u => .oAll ys u imp) bound xs t
   | .evOp op xs t src => do
     let _ ← checkEvidencedTarget "Supports/Rebuts/Retracts" t
-    compileEffect' (fun ys u => .evOp op ys u src) bound xs t
+    compileEffect' (fun ys _ u => .evOp op ys u src) bound xs t
   | .findingOp pol xs t std => do
     let _ ← checkEvidencedTarget "Resolves" t
-    compileEffect' (fun ys u => .findingOp pol ys u std) bound xs t
+    compileEffect' (fun ys _ u => .findingOp pol ys u std) bound xs t
 
   | .amendOp actId => return .amendOp actId
 
 def compileDerivation (bound : List Var) (d : DomId) : Derivation → Stc Derivation
   | .holdsWhen t => do
     let t' ← convertTerm termFuel t .bool
+    refuseBareEvidenced d t'
     let fs ← freeVarsChecked t'
     let unbound := diff fs bound
     warnJudgedBinders unbound
     return .holdsWhen (if unbound.isEmpty then t' else .exists_ unbound t')
   | .dv xs t => do
     let t' ← convertTerm termFuel t (.tagged d)
+    refuseBareEvidenced d t'
     let fs ← freeVarsChecked t'
     warnJudgedBinders (xs ++ diff fs xs)
     return .dv (xs ++ diff fs xs) t'
@@ -643,6 +760,7 @@ def compileDefeasibleRule (ty : DomId) (tspec : TypeSpec) (r : DefeasibleRule) :
     | _, .products xs => xs
     | _, _ => [⟨ty, ""⟩]
   let c' ← convertTerm termFuel r.cond .bool
+  refuseBareEvidenced ty c'
   let cfs ← freeVarsChecked c'
   let unbound := diff cfs boundVars
   let condCompiled := if unbound.isEmpty then c' else .exists_ unbound c'
@@ -760,7 +878,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .terminatedBy as =>
         checkBinds "Terminated by" ty xs as
         let posts ← as.mapM fun a => do
-          let e ← compileEffect' .tAll xs [] (.app ty (.named []))
+          let e ← compileEffect' (fun ys imp u => .tAll ys u imp) xs [] (.app ty (.named []))
           return (a, [ModClause.postCond [e]])
         let holds ← as.mapM fun a => do
           let dv ← compileDerivation xs a (.holdsWhen (.present (.app ty (.named []))))
@@ -772,7 +890,7 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .createdBy as =>
         checkBinds "Created by" ty xs as
         let posts ← as.mapM fun a => do
-          let e ← compileEffect' (fun xs t => .cAll xs t none) xs [] (.app ty (.named []))
+          let e ← compileEffect' (fun ys imp u => .cAll ys u none imp) xs [] (.app ty (.named []))
           return (a, [ModClause.postCond [e]])
         return (ty, [.createdBy as]) :: posts
       | .strings ss =>
@@ -797,14 +915,25 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
       | .resolves pol target =>
         let t' ← checkEvidencedTarget "Resolves" target
         let std := (clauses.findSome? fun | .standard s => some s | _ => none).getD "default"
-        let eff ← compileEffect' (fun ys u => .findingOp pol ys u std) xs [] target
+        let eff ← compileEffect' (fun ys _ u => .findingOp pol ys u std) xs [] target
         return [(ty, [.resolves pol t', .postCond [eff]])]
       | .standard s => return [(ty, [.standard s])]
-      | .evEffect op ts =>
-        let opLabel := match op with | .support => "Supports" | .rebut => "Rebuts" | .retract => "Retracts"
+      | .evEffect op ts src? =>
+        let opLabel := match op with
+          | .support => "Supports" | .rebut => "Rebuts"
+          | .retract | .retractSupport | .retractRebut => "Retracts"
+        -- 005.11 (D33): evidence is tendered in the name of the act's actor unless `By` names
+        -- another: one of the act's components, or a name
+        let src : EvSource ← match src? with
+          | none => pure (match xs with | actor :: _ => EvSource.component actor | [] => EvSource.named ty)
+          | some (.ref v) =>
+            if xs.contains v then pure (EvSource.component v)
+            else err "CHR012" s!"`{opLabel} … By {v}` on {ty}: {v} is not a component of {ty}; `By` names one of its components or a name"
+          | some (.stringLit s) => pure (EvSource.named s)
+          | some other => err "CHR012" s!"`{opLabel} … By {other.pp}` on {ty}: `By` names one of the act's components or a name"
         let effs ← ts.mapM fun (fxs, tm) => do
           let _ ← checkEvidencedTarget opLabel tm
-          compileEffect' (fun ys u => .evOp op ys u ty) xs fxs tm
+          compileEffect' (fun ys _ u => .evOp op ys u src) xs fxs tm
         return [(ty, [.postCond effs])]
       | .defeasibleRule r =>
         let r' ← compileDefeasibleRule ty tspec r

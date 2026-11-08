@@ -18,9 +18,10 @@ Charter was originally created to formalize **[The Protocol of Sovereign Agency 
 Architecturally, **Charter is a strict syntactic and semantic superset of stratified [eFLINT 4.1](docs/reference/eflint.pdf)** (*eXtensible Formal Language for Institutional Normative Theories*, van Binsbergen et al.), implemented from the ground up in Lean 4:
 
 - **One unified grammar and semantics (`D2`, `D17`)**: Every well-stratified eFLINT 4.1 program parses and executes in Charter as-is under a single contextual parser — with no `--eflint` mode switch or forked `compat`/`strict` profiles.
-- **Continuous 196-file upstream regression gate**: Charter vendors the upstream Haskell `eflint-4.1.0.1` test and example corpus (`test/eflint-corpus/`), enforcing exact outcome parity except for **32 machine-audited tolerances** ([`tolerances.md`](test/eflint-corpus/tolerances.md), [`tolerances.json`](test/eflint-corpus/tolerances.json)):
-  - **8 files that fail in our run of `eflint-repl` 4.1.0.1 and pass in Charter**, traced to the order in which types are saturated (`D6(a)`), the type given to an instance created through a `Placeholder` (`D13`), and the precedence of `When` (`D14`); and
-  - **1 intentional well-foundedness boundary (`D6(b)`, `CHR020`)**: rejecting cyclic self-negation in `Holds when` / `Derived from` (`archetypes.eflint` and the 23 files that include it) so every derived fact has a unique stratified fixpoint and truthful `?why` explanations.
+- **Continuous 196-file upstream regression gate**: Charter vendors the upstream Haskell `eflint-4.1.0.1` test and example corpus (`test/eflint-corpus/`), enforcing exact outcome parity except for **39 machine-audited tolerances** ([`tolerances.md`](test/eflint-corpus/tolerances.md), [`tolerances.json`](test/eflint-corpus/tolerances.json)):
+  - **8 files that fail in our run of `eflint-repl` 4.1.0.1 and pass in Charter**, traced to the order in which types are saturated (`D6(a)`), the type given to an instance created through a `Placeholder` (`D13`), and the precedence of `When` (`D14`);
+  - **1 intentional well-foundedness boundary (`D6(b)`, `CHR020`)**: rejecting cyclic self-negation in `Holds when` / `Derived from` (`archetypes.eflint` and the 23 files that include it) so every derived fact has a unique stratified fixpoint and truthful `?why` explanations; and
+  - **7 end-state invariant checks (`D30`)**: `charter test` checks every declared `Invariant` at the end state of the program and of each scenario (aligning `test` with `explore` and `prove`), whereas eFLINT's `--test-mode` omits violation outputs.
 
 ### What Charter Adds Beyond eFLINT 4.1
 
@@ -78,7 +79,7 @@ Requires Lean `v4.24.0` (pinned in `lean-toolchain`; zero Mathlib or external Le
 lake build
 
 # Run the full PR verification battery: the build, 13 gates, the 196-file eFLINT corpus,
-# 162 spec conformance tests, 12 standard-library modules, kernel proof fixtures, the server
+# 171 spec conformance tests, 12 standard-library modules, kernel proof fixtures, the server
 # and projection suites, and every example
 ./tools/battery
 ```
@@ -135,7 +136,7 @@ Charter 1.0.1. The twenty worked agreements pass, and they were not easy to writ
 
 Known limits worth reading before relying on a result:
 
-- Six cases remain where a natural spelling is accepted and gives a wrong answer ([#3](https://github.com/thecharter/charter/issues/3), [#6](https://github.com/thecharter/charter/issues/6), [#8](https://github.com/thecharter/charter/issues/8), [#9](https://github.com/thecharter/charter/issues/9), [#11](https://github.com/thecharter/charter/issues/11), [#12](https://github.com/thecharter/charter/issues/12)). Their reproductions are in `docs/plans/2026-11-07-example-friction/reproductions/`.
+- All eleven of the initial silent wrong-answer defects found while writing the twenty examples ([#2](https://github.com/thecharter/charter/issues/2)–[#12](https://github.com/thecharter/charter/issues/12)) are fixed (`D29`–`D33`); seven secondary edge-case reproductions (such as normative conflict propagation through intermediate derived facts, [#80](https://github.com/thecharter/charter/issues/80), and clock-derived fact timestamps, [#16](https://github.com/thecharter/charter/issues/16)) remain in `docs/plans/2026-11-07-example-friction/reproductions/`.
 - `evalPhrase_sound` and `evalPhrase_complete` relate the evaluator to a step relation that is itself stated in terms of the evaluator's functions ([#65](https://github.com/thecharter/charter/issues/65)).
 - The Solidity, Quint and prompt targets are generated, not proved: `cir_guard_step_correspondence` concerns an intermediate guard step, not the emitted text ([#66](https://github.com/thecharter/charter/issues/66)).
 - There is no calendar: time is counted in whole steps (spec 9.6).
@@ -166,7 +167,7 @@ Examples/                          24 agreements with their English and cases (`
 benchmarks/                        Nine benchmark institutions (`docs/benchmarks.md`)
 sdk/, editors/                     TypeScript, Python and Rust clients; Tree-sitter and VS Code grammars
 test/
-  spec/                            162 normative conformance tests mapped to `docs/spec/` chapters
+  spec/                            171 normative conformance tests mapped to `docs/spec/` chapters
   lib/                             Test harnesses & bounded invariant exploration for `lib/*.charter`
   prove/                           End-to-end zero-axiom kernel-decision fixtures for `charter prove`
   eflint-corpus/                   Vendored upstream Haskell eFLINT 4.1.0.1 corpus (196 files) + `tolerances.json`
@@ -178,7 +179,7 @@ docs/
   assurance-levels.md              Normative `proved` / `decided` / `checked` / `assumed` + scope taxonomy
   claims.json                      Machine-checked assurance claim inventory
   plans/                           Implementation plans, and `2026-11-07-example-friction/` (what the examples cost to write)
-  meetings/                        Architectural decision records (`D1`–`D29`)
+  meetings/                        Architectural decision records (`D1`–`D33`)
   spec/                            Charter 1.0 language specification (`001`–`020`, approved) + `diagnostics.md`
 tools/
   battery                          Full verification suite required before landing changes on `main`

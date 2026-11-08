@@ -342,18 +342,18 @@ scenario exposed it.
 | # | What happens |
 |---|---|
 | 01 | `Fact yes Identified by person * person` is accepted; the second argument is dropped. **Fixed** (D29, CHR036) |
-| 02 | `Count(Foreach person: present(person))` counts everyone |
+| 02 | `Count(Foreach person: present(person))` counts everyone. **Fixed** (D32, CHR039) |
 | 03 | An atom outside the actor's type performs the act validly. **Fixed** (D29) |
 | 04 | `Held(e) For d` is false inside `Holds when` when `e` is derived. **Fixed** (D29) |
-| 05 | `charter test` exits 0 with a violated `Invariant` |
+| 05 | `charter test` exits 0 with a violated `Invariant`. **Fixed** (D30) |
 | 06 | `10000.00` is read as one hundred dollars. **Fixed** (D29, CHR012) |
-| 07 | A binder over a money, integer or string type is silently empty |
-| 08 | An unresolved evidenced premise becomes "yes" through one derived fact |
+| 07 | A binder over a money, integer or string type is silently empty. **Fixed** (D32, CHR040) |
+| 08 | An unresolved evidenced premise becomes "yes" through one derived fact. **Fixed** (D31, CHR038; 004.12 conflict case filed as #80) |
 | 09 | `Amend … Installs { Param … }` is valid and does nothing. **Fixed** (D29, CHR037) |
-| 11 | An effect that reads an unset `Var` does nothing |
-| 12 | `Retracts` in another act removes nothing; two physicians are one piece of evidence |
+| 11 | An effect that reads an unset `Var` does nothing. **Fixed** (D32, CHR100) |
+| 12 | `Retracts` in another act removes nothing; two physicians are one piece of evidence. **Fixed** (D33, CHR109) |
 | 13 | `Holds when` beside `Except under` is ignored |
-| 14 | A `Var` over an enumerated type, read by projection, ranges over the whole domain |
+| 14 | A `Var` over an enumerated type, read by projection, ranges over the whole domain (**fixed in effects**, D32; derivation half open) |
 | 15 | An `Immunity` with no `Holds when` never holds |
 | 16 | A derived fact is stamped when first seen, so a deadline depends on the days visited (matches 009.3) |
 | 17 | Re-creating a duty that already holds is silent: two unpaid months are one debt |

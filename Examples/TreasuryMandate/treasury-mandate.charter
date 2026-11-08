@@ -66,8 +66,8 @@ Fact recognized-holding Identified by trade-id * company * asset * usd-cents
 Fact recognized-via-apparent Identified by trade-id
 Fact settled-intent Identified by intent-id * trade-id * usd-cents
 Fact imputed-company-breach Identified by trade-id * company
-  Holds when (Exists accountant, account, asset, counterparty, usd-cents:
-    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents)
+  Holds when (Exists observed-trade:
+    observed-trade.trade-id == trade-id
     && company-directed-trade(trade-id, company))
 
 // ---- TM.1: Mandate appointment, revocation, and principal-binding recognition Power
@@ -101,22 +101,21 @@ Physical execute-bond-trade Actor accountant Related to trade-id, account, asset
 
 Act submit-confirmation Actor accountant Related to trade-id
   From TM.2 "The accountant must submit a trade confirmation within two days of any observed purchase; a missing report breaches the reporting duty without establishing concealment or theft by the company unless the company directed the misconduct."
-  Holds when (Exists account, asset, counterparty, usd-cents:
-    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Holds when (Exists observed-trade:
+    observed-trade.trade-id == trade-id && observed-trade.accountant == accountant)
   Creates trade-confirmed(trade-id)
   Terminates report-trade-duty(accountant, AcmeCorp, trade-id)
 
 // ---- TM.3: Evidenced custody attestations, Finding under `verifiedReceipt`, and idempotent settlement
 Act custodian-attest-receipt Actor custodian Related to trade-id
   From TM.3 "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard."
-  Holds when (Exists accountant, account, asset, counterparty, usd-cents:
-    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Holds when (Exists observed-trade: observed-trade.trade-id == trade-id)
   Supports custody-receipt-verified(trade-id)
 
 Act accountant-dispute-receipt Actor accountant Related to trade-id
   From TM.3 "Custody trade confirmation is evidenced by custodian and accountant filings; conflicting filings leave confirmation conflicted until an empowered audit panel issues a finding under the verified-receipt standard."
-  Holds when (Exists account, asset, counterparty, usd-cents:
-    observed-trade(trade-id, accountant, account, asset, counterparty, usd-cents))
+  Holds when (Exists observed-trade:
+    observed-trade.trade-id == trade-id && observed-trade.accountant == accountant)
   Rebuts custody-receipt-verified(trade-id)
 
 Finding adjudicate-receipt Actor panel Related to trade-id

@@ -1,0 +1,13 @@
+// 003.7, 005.4 (D32): reading an unset `Var` in an effect halts with missing input (CHR100)
+// rather than silently dropping the effect. Ordinary `Fact` reads over zero instances still
+// produce nothing, and `Terminates v` on an unset `Var` still clears cleanly.
+//! expect-error: CHR100
+Fact p Identified by A
+Fact usd Identified by Money(USD, 2)
+Fact bid Identified by p * usd
+Var paid Identified by usd
+Act clear-all Actor p Holds when True Terminates paid, bid When bid.p == p
+Act pay Actor p Related to usd Holds when True Creates paid(paid.usd + usd)
+.
+clear-all(A).
+pay(A, 500).

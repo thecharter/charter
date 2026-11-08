@@ -2,10 +2,11 @@
 
 Architecture and design decisions and *why*. Newest first. Each entry records the ruling, the laws it instances (`docs/mission.md`), the context, the alternatives weighed, what the reference projects do (`.reference/`), mission fit, the cost accepted, and the condition that would reopen it. A decision that supersedes or sharpens an earlier one says so in both. Delegated decisions (an agent's committed prediction of Eric's ruling, at 75% or better, on a reversible question that is not about semantics or trust) record the full brief; a veto is a revert plus a new entry. Examples, UAT fixtures, and spec wording are never delegated.
 
-Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations; B10, the certificate's signer; awaiting ruling), `2026-10-24-briefs-for-ruling.md` (B11, acts that name an amount; B12, `Duration * Int`; ruled as D15–D16).
+Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B8, ruled as D4–D11), `2026-10-23-briefs-for-ruling.md` (B9, duplicate declarations; B10, ruled in D27), `2026-10-24-briefs-for-ruling.md` (B11, acts that name an amount; B12, `Duration * Int`; ruled as D15–D16), `2026-11-07-briefs-for-ruling.md` (B13–B16, ruled as D30–D33).
 
 ## Decisions
 
+- [D30–D33 — End-state invariant checks in `test`, status-explicit `Evidenced` derivations (`CHR038`), missing-input `Var`/`Function` effects (`CHR100`), source-keyed evidence + `Retracts !e` + `CHR109`, and binder/count warnings (`CHR039`, `CHR040`; issues #3, #6, #8, #9, #11, #12)](2026-11-07-D30-D33-end-states-evidence-and-missing-input.md)
 - [D29 — A spelling that is accepted and gives a wrong answer is fixed where it is a bug and refused where it is not (`CHR036`, `CHR037`; issues #2, #4, #5, #7, #10)](2026-11-07-D29-silent-wrong-answers-are-refused-or-fixed.md)
 - [D28 — Live `CIR` projections (`solidity`, `abi`, `quint`, `prompt`), `CHR035` fragment rejection, and truthful target boundaries (`T32`, `T33`)](2026-11-06-D28-live-cir-projections-and-target-boundaries.md)
 - [D27 — Signed content-addressed `Artifact` bundles (`B10`), operator-blind `charter-server`, and `ExecutedUnknown` saga (`T09`, `T34`–`T36`)](2026-11-06-D27-signed-artifacts-and-operator-blind-server.md)

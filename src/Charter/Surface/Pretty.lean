@@ -119,13 +119,15 @@ def fmtDerivation : Derivation → String
   | .defeasibleDAG _ _ => ""
 
 def fmtEffect : Effect → String
-  | .cAll xs t none => "Creates " ++ fmtOptForeach xs t
-  | .cAll xs t (some d) => "Creates " ++ fmtOptForeach xs t ++ " For " ++ fmtTerm d
-  | .tAll xs t => "Terminates " ++ fmtOptForeach xs t
-  | .oAll xs t => "Obfuscates " ++ fmtOptForeach xs t
+  | .cAll xs t none _ => "Creates " ++ fmtOptForeach xs t
+  | .cAll xs t (some d) _ => "Creates " ++ fmtOptForeach xs t ++ " For " ++ fmtTerm d
+  | .tAll xs t _ => "Terminates " ++ fmtOptForeach xs t
+  | .oAll xs t _ => "Obfuscates " ++ fmtOptForeach xs t
   | .evOp .support xs t _ => "Supports " ++ fmtOptForeach xs t
   | .evOp .rebut xs t _ => "Rebuts " ++ fmtOptForeach xs t
   | .evOp .retract xs t _ => "Retracts " ++ fmtOptForeach xs t
+  | .evOp .retractSupport xs t _ => "Retracts " ++ fmtOptForeach xs t
+  | .evOp .retractRebut xs t _ => "Retracts !" ++ fmtOptForeach xs t
   | .findingOp pol _ t std =>
     s!"Resolves {if pol then "" else "!"}{fmtTerm t}" ++ (if std == "default" then "" else s!" Standard {fmtAtomOrStr std}")
   | .amendOp _ => ""
@@ -148,20 +150,20 @@ def fmtModClause : ModClause → String
   | .postCond [] => ""
   | .postCond effs@(.cAll .. :: _) =>
     "Creates " ++ ", ".intercalate (effs.map fun
-      | .cAll xs t none => fmtOptForeach xs t
-      | .cAll xs t (some d) => fmtOptForeach xs t ++ " For " ++ fmtTerm d
-      | .tAll xs t => fmtOptForeach xs t
-      | .oAll xs t => fmtOptForeach xs t
+      | .cAll xs t none _ => fmtOptForeach xs t
+      | .cAll xs t (some d) _ => fmtOptForeach xs t ++ " For " ++ fmtTerm d
+      | .tAll xs t _ => fmtOptForeach xs t
+      | .oAll xs t _ => fmtOptForeach xs t
       | .evOp _ xs t _ => fmtOptForeach xs t
       | .findingOp _ xs t _ => fmtOptForeach xs t
       | .amendOp _ => "")
   | .postCond effs@(.tAll .. :: _) =>
     "Terminates " ++ ", ".intercalate (effs.map fun
-      | .tAll xs t => fmtOptForeach xs t
+      | .tAll xs t _ => fmtOptForeach xs t
       | _ => "")
   | .postCond effs@(.oAll .. :: _) =>
     "Obfuscates " ++ ", ".intercalate (effs.map fun
-      | .oAll xs t => fmtOptForeach xs t
+      | .oAll xs t _ => fmtOptForeach xs t
       | _ => "")
   | .postCond (eff :: _) => fmtEffect eff
   | .sync ss => "Syncs with " ++ ", ".intercalate (ss.map fun s => fmtOptForeach s.xs s.t)
@@ -187,9 +189,14 @@ def fmtModClause : ModClause → String
   | .confidential auds => "Confidential To " ++ ", ".intercalate auds
   | .resolves pol t => "Resolves " ++ (if pol then "" else "!") ++ fmtTerm t
   | .standard s => "Standard " ++ fmtAtomOrStr s
-  | .evEffect .support ts => "Supports " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
-  | .evEffect .rebut ts => "Rebuts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
-  | .evEffect .retract ts => "Retracts " ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
+  | .evEffect op ts src? =>
+    let kw := match op with
+      | .support => "Supports "
+      | .rebut => "Rebuts "
+      | .retract | .retractSupport => "Retracts "
+      | .retractRebut => "Retracts !"
+    kw ++ ", ".intercalate (ts.map fun (xs, t) => fmtOptForeach xs t)
+      ++ (match src? with | some b => " By " ++ fmtTerm b | none => "")
   | .defeasibleRule r =>
     let head := if r.isDefault then s!"Default {r.id}"
       else s!"Exception {r.id} Overrides {", ".intercalate r.overrides}"

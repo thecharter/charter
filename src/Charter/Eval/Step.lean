@@ -200,6 +200,13 @@ def triggerViolations (info : TransInfo) (fuel : Nat) : List Output :=
     if info.isAction then (if info.forced then [.violation (.trigger info)] else [])
     else info.syncs.flatMap (triggerViolations · fuel)
 
+/-- Report any runtime warnings a trigger or its synced transitions raised (005.11, `CHR109`). -/
+def triggerWarnings (info : TransInfo) (fuel : Nat) : List Output :=
+  match fuel with
+  | 0 => []
+  | fuel + 1 =>
+    info.warnings.map Output.diag ++ info.syncs.flatMap (triggerWarnings · fuel)
+
 /-- Evaluate a compiled phrase to the store it applies (eFLINT `sem_phrase`). -/
 def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat → CPhrase → Option Store × List Output
   | 0, _ => (none, [.diag (Diagnostic.error "CHR104" "phrase too deeply nested")])
@@ -266,11 +273,11 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
       match run (foreach M.fuel xs (whenTagged (eval M.fuel t') pure)) with
       | .error e => (none, [diagOf e])
       | .ok vss => (some [], [.instQueryRes vss.flatten])
-    | .create xs t => effect ctx (.cAll xs t)
-    | .terminate xs t => effect ctx (.tAll xs t)
-    | .obfuscate xs t => effect ctx (.oAll xs t)
-    | .submitEvidence pol xs t src => effect ctx (.evOp (if pol then .support else .rebut) xs t src)
-    | .retractEvidence xs t src => effect ctx (.evOp .retract xs t src)
+    | .create xs t => effect ctx (.cAll xs t none xs)
+    | .terminate xs t => effect ctx (.tAll xs t xs)
+    | .obfuscate xs t => effect ctx (.oAll xs t xs)
+    | .submitEvidence pol xs t src => effect ctx (.evOp (if pol then .support else .rebut) xs t (.named src))
+    | .retractEvidence xs t src => effect ctx (.evOp .retract xs t (.named src))
     | .trigger xs t =>
       let m : M (Sum DomId (List TransInfo)) := do
         let tes ← foreach M.fuel xs (whenTagged (eval M.fuel t) pure)
@@ -283,7 +290,7 @@ def semPhrase (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Nat →
       | .error e => (none, [diagOf e])
       | .ok [.inl d] => (some [], [.diag (Diagnostic.error "CHR103" s!"{d} is not an act or event and cannot be triggered")])
       | .ok [.inr infos] =>
-        let outs := infos.flatMap fun i => Output.executed i :: triggerViolations i 1000
+        let outs := infos.flatMap fun i => Output.executed i :: triggerViolations i 1000 ++ triggerWarnings i 1000
         (some (Store.unions (infos.map (·.assignments))), outs)
       | .ok _ => (none, [.diag (Diagnostic.error "CHR104" "a trigger produced an unexpected number of results")])
     | .par ps =>
@@ -295,7 +302,10 @@ where
   effect (ctx : Ctx) (e : Effect) : Option Store × List Output :=
     match (evalEffect M.fuel e).run ctx [] with
     | .error err => (none, [diagOf err])
-    | .ok stores => (some (Store.unions stores), [])
+    | .ok pairs =>
+      let stores := pairs.map (·.1)
+      let warns := (pairs.flatMap (·.2)).map Output.diag
+      (some (Store.unions stores), warns)
 
 /-- Check all declared invariants on `state` (`013.1`). -/
 def checkInvariants (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Except RuntimeError (List DomId) :=

@@ -175,6 +175,7 @@ deriving instance ToJson, FromJson for DefeasibleConseq
 deriving instance ToJson, FromJson for DefeasibleRule
 deriving instance ToJson, FromJson for CompiledRuleNode
 deriving instance ToJson, FromJson for Derivation
+deriving instance ToJson, FromJson for EvSource
 deriving instance ToJson, FromJson for Effect
 deriving instance ToJson, FromJson for Sync
 deriving instance ToJson, FromJson for FactSpec

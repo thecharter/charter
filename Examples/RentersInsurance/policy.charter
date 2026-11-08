@@ -34,10 +34,10 @@ Fact cause Identified by Theft, Fire, Flood, OwnAct, Wear
 Evidenced Fact caused-by Identified by loss * cause
 Fact covered Identified by loss
   Default theft-or-fire
-    Holds when in-policy(loss) && (caused-by(loss, Theft) || caused-by(loss, Fire))
-  Exception flood Overrides theft-or-fire Rejects when caused-by(loss, Flood)
-  Exception on-purpose Overrides theft-or-fire Rejects when caused-by(loss, OwnAct)
-  Exception ordinary-wear Overrides theft-or-fire Rejects when caused-by(loss, Wear)
+    Holds when in-policy(loss) && (Established(caused-by(loss, Theft)) || Established(caused-by(loss, Fire)))
+  Exception flood Overrides theft-or-fire Rejects when Established(caused-by(loss, Flood))
+  Exception on-purpose Overrides theft-or-fire Rejects when Established(caused-by(loss, OwnAct))
+  Exception ordinary-wear Overrides theft-or-fire Rejects when Established(caused-by(loss, Wear))
   Exception late-notice Overrides theft-or-fire Rejects when Not(noticed(loss))
   Exception cause-in-dispute Overrides theft-or-fire
     Rejects when (Exists cause: Conflicted(caused-by(loss, cause)))

@@ -1,0 +1,15 @@
+// 003.7, 005.4 (D32): reading a `Function` at an unassigned argument in an effect halts with
+// missing input (CHR100), even when the function has values at other keys.
+//! expect-error: CHR100
+Fact shop Identified by Calloway
+Fact item Identified by Apple, Banana
+Fact usd Identified by Money(USD, 2)
+Function price Identified by item * usd
+Fact charged Identified by item * usd
+Act sell Actor shop Related to item Holds when True
+  Creates charged(item, price.usd) When price.item == item
+.
++price(Apple, 100).
+sell(Calloway, Apple).
+?charged(Apple, 100).
+sell(Calloway, Banana).

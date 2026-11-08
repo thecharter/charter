@@ -16,7 +16,7 @@ An expression denotes zero or more values: a term with free variables takes ever
 
 **10.6 Quantifiers.** `(Exists xs: e)` holds if some binding of `xs` makes `e` true; `(Forall xs: e)` if every binding does. When a binder ranges over an enumerable type and `e` is a constant boolean literal (`True` or `False`), resolution warns with CHR028 because the quantifier tests only whether the domain is non-empty rather than whether an instance holds (`Exists f: f`). `test/spec/spec_010_6_exists_forall.eflint`, `spec_010_6b_vacuous_enumerable_exists.eflint`
 
-**10.7 Aggregates.** `Count(Foreach xs: e)` is the number of values of `e`; `Sum`, `Max`, `Min` of integer values; `Max` and `Min` of no values are 0. `test/spec/spec_010_7_aggregates.eflint`
+**10.7 Aggregates.** `Count(Foreach xs: e)` is the number of values of `e`; `Sum`, `Max`, `Min` of integer values; `Max` and `Min` of no values are 0. When `xs` binds an enumerable type and `e` is an unfiltered constructor application `f(…)`, resolution warns with `CHR039` because `e` constructs an instance for every domain element without testing whether `f(…)` holds (`When f(…)`). `test/spec/spec_010_7_aggregates.eflint`, `spec_010_7b_count_of_constructor_warns.charter`
 
 **10.8 State questions.** `Holds(e)` (also `Present(e)`), `Enabled(e)`, `Violated(e)` ask the three state questions of an instance (004, 005.5, 006.2); on a value that is not an instance they are CHR015. `test/spec/spec_010_8_holds_enabled_violated.eflint`, `spec_010_8b_holds_on_literal.eflint`
 

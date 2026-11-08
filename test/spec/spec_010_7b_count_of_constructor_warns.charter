@@ -1,0 +1,7 @@
+// 010.7: `Count(Foreach x: f(x))` constructs an instance for every domain element of `x` without
+// testing whether `f(x)` holds, so it counts the whole domain (CHR039).
+//! expect-warning: CHR039
+Fact person Identified by Iris, Wren, Abel
+Fact present Identified by person.
+?Count(Foreach person: present(person)) == 3.
+?Count(Foreach person: person When present(person)) == 0.

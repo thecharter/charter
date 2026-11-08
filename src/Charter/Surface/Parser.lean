@@ -811,8 +811,13 @@ def clause (k : FrameKind) : P (Option ModClause) := do
       | .atom "Rebuts"   => .rebut
       | _                => .retract
     advance
+    -- `Retracts !e` withdraws contrary evidence, as `SubmitEvidence !e` tenders it (005.11)
+    let contrary ← if op == .retract then optKw "!" else pure false
+    let op : EvidenceOp := if op == .retract then (if contrary then .retractRebut else .retractSupport) else op
     let ts ← sepBy1 optForeach "," 1000
-    return some (.evEffect op ts)
+    -- `By s`: in whose name the evidence is tendered or withdrawn; the actor's when absent
+    let src? ← (do if ← isCtxAtom "By" then advance; return some (← expression) else return none)
+    return some (.evEffect op ts src?)
   | .atom "Against" | .kw "Against" =>
     if k != .immunity then return none
     advance

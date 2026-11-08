@@ -1,6 +1,0 @@
-// DEFECT (a tool that stayed silent). `charter test` exits 0 on a file whose `Invariant` is
-// violated; `charter run` prints the violation one phrase late. Expected: `test` fails.
-Bool bad
-Invariant never-bad When Not(bad()).
-+bad().
-?bad().

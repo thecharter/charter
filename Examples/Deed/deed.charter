@@ -25,7 +25,7 @@ Power deliver Actor grantor Recipient grantee Related to parcel
             && (Exists grantee': deed(grantee = grantee') && title(parcel, grantee')
                   && Not(recorded(grantee = grantee')))))
   Creates title(parcel, grantee), deed()
-        , (Foreach string: warranted() When lien())
+        , (Foreach lien: warranted(grantor, grantee, parcel, lien.string) When lien.parcel == parcel)
 Act record Actor grantee Related to parcel
   Holds when (Exists grantor: deed())
   Creates recorded()

@@ -52,12 +52,15 @@ more errors); `warning` does not.
 | CHR035 | error | `charter generate` target does not support a construct in the specification (no silent rule dropping, 017.2) | `Charter.Project` |
 | CHR036 | error | an application gives two different arguments to a component its type names twice (003.3; both positions hold one value, so one argument would be dropped silently) | `Charter.Resolve` |
 | CHR037 | error | an `Amend` whose `Installs` block declares a `Param` (014.1, 014.3; an amendment installs rules and leaves state intact, so the parameter would silently keep its value) | `Charter.Resolve` |
+| CHR038 | error | a rule that derives a fact, a duty's violation, or an immunity reads an `Evidenced` fact without naming a status (004.11; only an act's `Holds when` and `Valid when` are three-valued) | `Charter.Resolve` |
+| CHR039 | warning | `Count(Foreach x: f(x))` without `When` constructs an instance of `f` for every domain element of `x` without testing whether `f(x)` holds (010.7) | `Charter.Resolve` |
+| CHR040 | warning | a binder over an unrestricted, non-derived, closed `Money`, `Quantity`, `Duration`, or built-in `int`/`string` carrier type ranges over held instances of that type itself, of which none are asserted (004.7) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 
 | Code | Severity | Meaning | Raised by |
 |---|---|---|---|
-| CHR100 | error | missing input: an instance of an open type has no truth value and the state has none to infer | `Charter.Eval` |
+| CHR100 | error | missing input: an instance of an open type has no truth value, or an effect reads an unset `Var` or a `Function` at an unassigned argument (003.6, 005.4) | `Charter.Eval` |
 | CHR101 | error | cannot enumerate an infinite domain (`String`, `Int`) | `Charter.Eval` |
 | CHR102 | error | a variable is not bound (internal; a resolution gap) | `Charter.Eval` |
 | CHR103 | error | a phrase triggers a type that is not an act or event | `Charter.Eval` |
@@ -65,6 +68,7 @@ more errors); `warning` does not.
 | CHR105 | error | an undeclared type reached the evaluator (internal; a resolution gap) | `Charter.Eval` |
 | CHR106 | error | `@ t` would move the clock backwards (D7) | `Charter.Eval.Interpreter` |
 | CHR108 | error | `MulDivRound` division by zero or non-zero remainder under `ExactOrReject` (010.12) | `Charter.Eval` |
+| CHR109 | warning | `Retracts` / `RetractEvidence` found no active matching evidence from that source to withdraw (005.11) | `Charter.Eval` |
 
 ## Claims are not diagnostics
 

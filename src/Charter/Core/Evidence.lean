@@ -112,7 +112,12 @@ theorem triBool_deMorgan_or (a b : TriBool) :
 inductive EvidenceOp where
   | support
   | rebut
+  /-- Withdraw what a source tendered on the fact, of either polarity (`RetractEvidence`). -/
   | retract
+  /-- Withdraw a source's supporting evidence (`Retracts e`). -/
+  | retractSupport
+  /-- Withdraw a source's contrary evidence (`Retracts !e`). -/
+  | retractRebut
   deriving Repr, DecidableEq, BEq, Inhabited
 
 /-- Internal state domains storing tendered evidence and adjudicated findings inside `State.contents`. -/

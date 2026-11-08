@@ -1,4 +1,5 @@
 import Charter.Core.Spec
+import Charter.Core.Diagnostics
 
 /-!
 # Charter.Core.State — The knowledge base and what a transition reports
@@ -288,20 +289,22 @@ inductive TransInfo where
        (actor : Option Tagged) (syncs : List TransInfo)
        (lawfulTri : TriBool) (validTri : TriBool)
        (unmetEvidence : List (Tagged × EvidenceStatus))
+       (warnings : List Diagnostic := [])
   deriving Inhabited
 
 namespace TransInfo
-def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ _ _ _ _ => t
-def assignments : TransInfo → Store | .mk _ a _ _ _ _ _ _ _ _ => a
-def forced : TransInfo → Bool | .mk _ _ f _ _ _ _ _ _ _ => f
-def disabled : TransInfo → Bool | .mk _ _ _ d _ _ _ _ _ _ => d
+def tagged : TransInfo → Tagged | .mk t _ _ _ _ _ _ _ _ _ _ => t
+def assignments : TransInfo → Store | .mk _ a _ _ _ _ _ _ _ _ _ => a
+def forced : TransInfo → Bool | .mk _ _ f _ _ _ _ _ _ _ _ => f
+def disabled : TransInfo → Bool | .mk _ _ _ d _ _ _ _ _ _ _ => d
 /-- Charter (D5): whether the transition had institutional effect. -/
-def valid : TransInfo → Bool | .mk _ _ _ _ v _ _ _ _ _ => v
-def actor : TransInfo → Option Tagged | .mk _ _ _ _ _ a _ _ _ _ => a
-def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ _ s _ _ _ => s
-def lawfulTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ l _ _ => l
-def validTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ _ v _ => v
-def unmetEvidence : TransInfo → List (Tagged × EvidenceStatus) | .mk _ _ _ _ _ _ _ _ _ u => u
+def valid : TransInfo → Bool | .mk _ _ _ _ v _ _ _ _ _ _ => v
+def actor : TransInfo → Option Tagged | .mk _ _ _ _ _ a _ _ _ _ _ => a
+def syncs : TransInfo → List TransInfo | .mk _ _ _ _ _ _ s _ _ _ _ => s
+def lawfulTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ l _ _ _ => l
+def validTri : TransInfo → TriBool | .mk _ _ _ _ _ _ _ _ v _ _ => v
+def unmetEvidence : TransInfo → List (Tagged × EvidenceStatus) | .mk _ _ _ _ _ _ _ _ _ u _ => u
+def warnings : TransInfo → List Diagnostic | .mk _ _ _ _ _ _ _ _ _ _ ws => ws
 def isAction (t : TransInfo) : Bool := t.actor.isSome
 end TransInfo
 
@@ -311,10 +314,12 @@ inductive Violation where
   | invariant (d : DomId)
   deriving Inhabited
 
-/-- Missing input for an open type (eFLINT `MissingInput`). -/
+/-- Missing input for an open type, unset `Var`, or unassigned `Function` argument (003.6, 005.4, D32). -/
 inductive MissingInput where
   | assignments (unknowns : List Tagged)
   | instances (d : DomId)
+  | unassignedVar (d : DomId)
+  | unassignedFunction (d : DomId) (key : Option Tagged)
   deriving Inhabited
 
 inductive RuntimeError where
@@ -343,6 +348,9 @@ def RuntimeError.code : RuntimeError → String
 def RuntimeError.message : RuntimeError → String
   | .missingInput (.assignments tes) => s!"missing input: no truth value for {", ".intercalate (tes.map Tagged.pp)}"
   | .missingInput (.instances d) => s!"missing input: no instances of the open type {d} are known"
+  | .missingInput (.unassignedVar d) => s!"missing input: Var {d} has no value"
+  | .missingInput (.unassignedFunction d (some k)) => s!"missing input: Function {d} has no value at {k.pp}"
+  | .missingInput (.unassignedFunction d none) => s!"missing input: Function {d} has no value"
   | .enumerateInfiniteDomain d => s!"cannot enumerate every instance of {d}: its domain is infinite"
   | .missingSubstitution x => s!"variable {x} is not bound"
   | .primitiveApplication d => s!"{d} is a primitive type and cannot be applied to arguments"

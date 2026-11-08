@@ -336,7 +336,7 @@
       "scope": "concrete-trace",
       "artifact": "test/eflint-corpus/tolerances.json",
       "symbol": "tools/battery",
-      "summary": "Unified contextual parser and evaluator pass the 196-file upstream eFLINT 4.1.0.1 corpus without --eflint, modulo 32 documented tolerances."
+      "summary": "Unified contextual parser and evaluator pass the 196-file upstream eFLINT 4.1.0.1 corpus without --eflint, modulo 39 documented tolerances."
     },
     {
       "id": "spec.conformance_suite",

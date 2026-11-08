@@ -1,0 +1,15 @@
+// 004.11: a derivation rule says which status it means. An act's own `Holds when` and
+// `Valid when` may still read the fact bare, and are then three-valued.
+Fact person Identified by Walter
+Evidenced Bool lacks-capacity
+Bool questioned Holds when Not(Unresolved(lacks-capacity()))
+Bool found-lacking Holds when Established(lacks-capacity())
+Fact decided Identified by person
+Power decide Actor person Holds when Not(lacks-capacity()) Valid when Not(lacks-capacity()) Creates decided()
+Act determine Actor person Holds when True Supports lacks-capacity()
+.
+?!questioned(). ?!found-lacking().
+?undetermined decide(Walter).
+determine(Walter).
+?questioned(). ?found-lacking().
+?!valid decide(Walter).

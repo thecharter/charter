@@ -22,12 +22,12 @@ Module monetary-estate(account, party, item, entity) {
   // ---- Serializable reservation & settlement (`T09`)
   Power reserve-draw Actor party Related to account, int
     Holds when int > 0
-      && !(Exists int': reservation(account, party, int'))
+      && !(Exists reservation: reservation.account == account && reservation.party == party)
       && (Exists balance, reserved-total:
             balance.account == account && reserved-total.account == account
             && reserved-total.int + int <= balance.int)
     Valid when int > 0
-      && !(Exists int': reservation(account, party, int'))
+      && !(Exists reservation: reservation.account == account && reservation.party == party)
       && (Exists balance, reserved-total:
             balance.account == account && reserved-total.account == account
             && reserved-total.int + int <= balance.int)
@@ -62,12 +62,12 @@ Module monetary-estate(account, party, item, entity) {
 
   Power pledge-collateral Actor party Related to item, int
     Holds when int > 0
-      && !(Exists int': pledge(item, party, int'))
+      && !(Exists pledge: pledge.item == item && pledge.party == party)
       && (Exists collateral-value, pledged-total:
             collateral-value.item == item && pledged-total.item == item
             && pledged-total.int + int <= collateral-value.int)
     Valid when int > 0
-      && !(Exists int': pledge(item, party, int'))
+      && !(Exists pledge: pledge.item == item && pledge.party == party)
       && (Exists collateral-value, pledged-total:
             collateral-value.item == item && pledged-total.item == item
             && pledged-total.int + int <= collateral-value.int)

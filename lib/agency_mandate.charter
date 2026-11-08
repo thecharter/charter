@@ -27,8 +27,8 @@ Module agency-mandate(mandate, principal, delegate, counterparty, trade) {
   Fact principal-bound-trade Identified by trade * principal * counterparty * int
   Fact principal-directed Identified by trade * principal
   Fact principal-circumvention-imputed Identified by trade * principal
-    Holds when (Exists mandate, delegate, counterparty, int:
-      observed-delegate-trade(trade, mandate, delegate, counterparty, int) && principal-directed(trade, principal))
+    Holds when (Exists observed-delegate-trade:
+      observed-delegate-trade.trade == trade && principal-directed(trade, principal))
 
   // ---- Grant and revoke mandate (`T17`)
   Power grant-mandate Actor principal Recipient delegate Related to mandate, int
@@ -60,7 +60,10 @@ Module agency-mandate(mandate, principal, delegate, counterparty, trade) {
                When mandate-holder(mandate, principal, delegate))
 
   Act submit-trade-confirmation Actor delegate Related to trade, mandate
-    Holds when (Exists counterparty, int: observed-delegate-trade(trade, mandate, delegate, counterparty, int))
+    Holds when (Exists observed-delegate-trade:
+      observed-delegate-trade.trade == trade
+      && observed-delegate-trade.mandate == mandate
+      && observed-delegate-trade.delegate == delegate)
     Creates trade-confirmed(trade, mandate)
     Terminates (Foreach principal: report-trade(delegate, principal, trade, mandate)
                   When mandate-holder(mandate, principal, delegate))

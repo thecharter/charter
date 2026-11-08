@@ -1,0 +1,7 @@
+// 004.11: a rule that derives a fact, a duty's violation, or an immunity cannot read an `Evidenced`
+// fact bare. Bare has no meaning there that `Established(e)` does not already have, and under
+// `Not` it would read "unresolved" as "no" and invent a truth (Law 6). CHR038.
+//! expect-error: CHR038
+Evidenced Bool lacks-capacity
+Bool capable Holds when Not(lacks-capacity()).
+?capable().

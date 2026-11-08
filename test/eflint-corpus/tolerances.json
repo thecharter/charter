@@ -225,6 +225,55 @@
       "eflintOutcome": "fails",
       "charterOutcome": "passes",
       "reason": "Includes caretaker_contract/template.eflint."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/output/duties/duty-inv.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/output/invariants/contr-taut.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/output/invariants/taut-contr.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/output/invariants/two-invs.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/parallel-comp/violations.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v1/contract.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v2/contract.eflint",
+      "decision": "D30",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
     }
   ]
 }

@@ -13,7 +13,7 @@ namespace Charter.Verify
 /-- Types written directly by an effect list. -/
 def effectWriteTypes (spec : Spec) (effs : List Effect) : List DomId :=
   (effs.flatMap fun
-    | .cAll _ t _ | .tAll _ t | .oAll _ t => (Stratify.typeOf spec t).toList
+    | .cAll _ t _ _ | .tAll _ t _ | .oAll _ t _ => (Stratify.typeOf spec t).toList
     | .evOp _ _ t _ | .findingOp _ _ t _ =>
       (Stratify.typeOf spec t).toList ++ [evSupportDom, evRebutDom, evFindingPosDom, evFindingNegDom]
     | .amendOp actId => [amendCommitDom, actId] ++ spec.decls.map (·.1)).eraseDups
@@ -62,18 +62,18 @@ def actReadTypes (spec : Spec) (d : DomId) : List DomId :=
       | .act actSpec =>
         Stratify.depsList spec 500 xs .pos actSpec.validWhen ++
         (actSpec.effects.flatMap fun
-          | .cAll ys t md =>
+          | .cAll ys t md _ =>
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
             (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
-          | .tAll ys t | .oAll ys t | .evOp _ ys t _ | .findingOp _ ys t _ =>
+          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
           | .amendOp _ => [])
       | .event evSpec =>
         evSpec.effects.flatMap fun
-          | .cAll ys t md =>
+          | .cAll ys t md _ =>
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
             (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
-          | .tAll ys t | .oAll ys t | .evOp _ ys t _ | .findingOp _ ys t _ =>
+          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
             Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
           | .amendOp _ => []
       | _ => []

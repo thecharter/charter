@@ -1,0 +1,10 @@
+// 004.7: a binder over an unrestricted, non-derived, closed `Money`, `Quantity`, `Duration`, or
+// built-in `int`/`string` carrier type ranges over held instances of that type itself, of which
+// none are asserted (CHR040).
+//! expect-warning: CHR040
+Fact person Identified by Helen, Marcus
+Fact usd Identified by Money(USD, 2)
+Fact unrecorded Identified by person * usd.
++unrecorded(Marcus, 100).
+?(Exists unrecorded: unrecorded).
+?Not(Exists person, usd: unrecorded(person, usd)).

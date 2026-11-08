@@ -101,15 +101,27 @@ inductive Derivation where
   | defeasibleDAG (dag : List CompiledRuleNode) (rules : List DefeasibleRule)
   deriving Repr, Inhabited
 
+/-- Who tendered a piece of evidence (005.11, D33): a name, or the value of one of the act's
+components (its actor by default). Evidence is identified by the fact, its polarity, and this. -/
+inductive EvSource where
+  | named (s : String)
+  | component (x : Var)
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+def EvSource.mapDom (f : DomId → DomId) : EvSource → EvSource
+  | .named s => .named s
+  | .component x => .component (x.mapDom f)
+
 /-- An effect of an act or event: create, terminate, obfuscate, tender/retract evidence,
 or adjudicate a finding over every instance the term produces under `Foreach` binders. -/
 inductive Effect where
-  /-- Create; Charter (D7): `For d` stamps the instances with an expiry `now + d`. -/
-  | cAll (xs : List Var) (t : Term) (forDur : Option Term := none)
-  | tAll (xs : List Var) (t : Term)
-  | oAll (xs : List Var) (t : Term)
+  /-- Create; Charter (D7): `For d` stamps the instances with an expiry `now + d`. `imp` records
+  variables implicitly bound rather than written in `Foreach` (005.4, D32). -/
+  | cAll (xs : List Var) (t : Term) (forDur : Option Term := none) (imp : List Var := [])
+  | tAll (xs : List Var) (t : Term) (imp : List Var := [])
+  | oAll (xs : List Var) (t : Term) (imp : List Var := [])
   /-- Charter (D22, G3.2): `Supports` / `Rebuts` / `Retracts` on an `Evidenced` fact. -/
-  | evOp (op : EvidenceOp) (xs : List Var) (t : Term) (src : String := "")
+  | evOp (op : EvidenceOp) (xs : List Var) (t : Term) (src : EvSource := .named "")
   /-- Charter (D22, G3.2, Law 3): `Finding ... Resolves [!]e [Standard s]`. -/
   | findingOp (polarity : Bool) (xs : List Var) (t : Term) (standard : String := "default")
   /-- Charter (D11, D25, G3.5): rule-level `Amend` commit marker applied in `newContext`. -/
@@ -266,7 +278,7 @@ inductive ModClause where
   | resolves (polarity : Bool) (t : Term)
   | standard (s : String)
   /-- Charter (D22, G3.2): `Supports` / `Rebuts` / `Retracts` on an act (pre-compilation). -/
-  | evEffect (op : EvidenceOp) (ts : List (List Var × Term))
+  | evEffect (op : EvidenceOp) (ts : List (List Var × Term)) (src? : Option Term := none)
   /-- Charter (D23, G3.3): `Default` / `Exception ... Overrides ...` and `Priority ... Over ...`. -/
   | defeasibleRule (r : DefeasibleRule)
   | priorityEdge (higher : String) (lowers : List String)
@@ -723,7 +735,7 @@ where
               | eff => eff
             .act { a with finding := f', effects := effs' }
           | k => k }
-    | .evEffect _ _ => t
+    | .evEffect .. => t
     | .defeasibleRule r =>
       TypeSpec.syncDefeasibleDAG { t with defeasibleRules := t.defeasibleRules ++ [r] }
     | .priorityEdge hi los =>
@@ -750,10 +762,10 @@ def Derivation.mapDom (f : DomId → DomId) : Derivation → Derivation
   | .defeasibleDAG dag rs => .defeasibleDAG dag (rs.map (DefeasibleRule.mapDom f))
 
 def Effect.mapDom (f : DomId → DomId) : Effect → Effect
-  | .cAll xs t d => .cAll (xs.map (Var.mapDom f)) (t.mapDom f) (d.map (·.mapDom f))
-  | .tAll xs t => .tAll (xs.map (Var.mapDom f)) (t.mapDom f)
-  | .oAll xs t => .oAll (xs.map (Var.mapDom f)) (t.mapDom f)
-  | .evOp op xs t src => .evOp op (xs.map (Var.mapDom f)) (t.mapDom f) src
+  | .cAll xs t d imp => .cAll (xs.map (Var.mapDom f)) (t.mapDom f) (d.map (·.mapDom f)) (imp.map (Var.mapDom f))
+  | .tAll xs t imp => .tAll (xs.map (Var.mapDom f)) (t.mapDom f) (imp.map (Var.mapDom f))
+  | .oAll xs t imp => .oAll (xs.map (Var.mapDom f)) (t.mapDom f) (imp.map (Var.mapDom f))
+  | .evOp op xs t src => .evOp op (xs.map (Var.mapDom f)) (t.mapDom f) (src.mapDom f)
   | .findingOp pol xs t std => .findingOp pol (xs.map (Var.mapDom f)) (t.mapDom f) std
   | .amendOp actId => .amendOp (f actId)
 
@@ -808,7 +820,7 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .unlessCond ts => .unlessCond (ts.map (Term.mapDom f))
   | .dueWithin d => .dueWithin (d.mapDom f)
   | .resolves pol t => .resolves pol (t.mapDom f)
-  | .evEffect op ts => .evEffect op (ts.map fun (xs, t) => (xs.map (Var.mapDom f), t.mapDom f))
+  | .evEffect op ts src? => .evEffect op (ts.map fun (xs, t) => (xs.map (Var.mapDom f), t.mapDom f)) (src?.map (·.mapDom f))
   | .defeasibleRule r => .defeasibleRule (r.mapDom f)
   | .repeals rs => .repeals (rs.map f)
   | .protects ps => .protects (ps.map f)

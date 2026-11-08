@@ -218,6 +218,37 @@ def scopeWith {α} (bind : Var → M Tagged) : List Var → M α → M α
 def foreachWith {α} (bind : Var → M Tagged) (xs : List Var) (m : M α) : M (List α) :=
   results (scopeWith bind xs m)
 
+/-- Whether `t` is a bare mention of `d` (`Terminates v` / `Obfuscates v` clearing `v` itself). -/
+def isBareClearTerm (spec : Spec) (d : DomId) : Term → Bool
+  | .ref y => spec.removeDecoration y == d
+  | .app d' (.named []) => spec.chaseAlias d' == d
+  | .app d' (.pos []) => spec.chaseAlias d' == d
+  | _ => false
+
+/-- Extract `(v, k)` when `t` is `v.k` (possibly wrapped in `.untag`). -/
+def matchProjectRef : Term → Option (Var × Var)
+  | .project (.ref v) k => some (v, k)
+  | .untag (.project (.ref v) k) => some (v, k)
+  | _ => none
+
+/-- Find `fVar.kVar == keyTerm` or `keyTerm == fVar.kVar` in an effect's `When` guards (`D32`). -/
+def findFnKeyTerm (fVar kVar : Var) : Nat → Term → Option Term
+  | 0, _ => none
+  | fuel + 1, t =>
+    match t with
+    | .when body cond =>
+      (findFnKeyTerm fVar kVar fuel cond).orElse (fun _ => findFnKeyTerm fVar kVar fuel body)
+    | .and a b =>
+      (findFnKeyTerm fVar kVar fuel a).orElse (fun _ => findFnKeyTerm fVar kVar fuel b)
+    | .eq lhs rhs =>
+      match matchProjectRef lhs with
+      | some (v, k) => if v == fVar && k == kVar then some rhs else none
+      | none =>
+        match matchProjectRef rhs with
+        | some (v, k) => if v == fVar && k == kVar then some lhs else none
+        | none => none
+    | _ => none
+
 mutual
 
 /-- Every element of a domain (eFLINT `instantiate_domain`). -/
@@ -673,14 +704,16 @@ def instantiateTrans : Nat → List Tagged → Tagged → M TransInfo
           let syncInfos := syncInfos.flatten
           let (ssAss, anyF) := syncTransInfos syncInfos
           -- D5: the act's own effects apply iff it is valid; synced transitions are judged on their own
-          let stores ← if valid then effects.mapM (evalEffect fuel) else pure []
+          let pairs ← if valid then effects.mapM (evalEffect fuel) else pure []
+          let stores := pairs.map (·.1)
+          let warns := pairs.flatMap (·.2)
           -- Law 6: the act is the origin of what its effects assign
           let own : Store := (Store.unions stores).map fun (x, a) => (x, a.byAct te)
           let ass := Store.union own ssAss
           let disabled := anyF || !enabled
           let forced := anyF || (lTri == .no && !physical)
           let finalLTri := if anyF then .no else lTri
-          pure (.mk te ass forced disabled valid mActor syncInfos finalLTri vTri unmet)
+          pure (.mk te ass forced disabled valid mActor syncInfos finalLTri vTri unmet warns)
       match tspec.kind with
       | .fact _ => empty
       | .duty _ => empty
@@ -707,39 +740,107 @@ def evalSync : Nat → List Tagged → Sync → M (List TransInfo)
   | fuel + 1, done, s => foreachWith (everyValidSubs fuel) s.xs (whenTagged (eval fuel s.t) (instantiateTrans fuel done))
 termination_by structural n => n
 
-def evalEffect : Nat → Effect → M Store
+def evalEffect : Nat → Effect → M (Store × List Diagnostic)
   | 0, _ => err (.fuelExhausted "evaluating an effect")
   | fuel + 1, e => do
+    let elemSource : Elem → String := fun el =>
+      let rec go : Nat → Elem → String
+        | 0, _ => ""
+        | _ + 1, .str s => s
+        | _ + 1, .int i => toString i
+        | k + 1, .prod args => "(" ++ ", ".intercalate (args.map fun (e', _) => go k e') ++ ")"
+      go 16 el
+    let resolveSource : EvSource → M String
+      | .named s => pure s
+      | .component x => do
+        let (el, _) ← substituteVar x
+        pure (elemSource el)
+    let bindEffVar (allowClear : Bool) (imp : List Var) (t : Term) (x : Var) : M Tagged := do
+      let spec ← getSpec
+      let d := spec.removeDecoration x
+      let (tspec, _, _) ← getTypeEntry d
+      if tspec.restriction == some .var then
+        let trues ← trueInstancesOf d
+        if trues.isEmpty then
+          if allowClear && isBareClearTerm spec d t then empty
+          else err (.missingInput (.unassignedVar d))
+        else nd trues
+      else if tspec.restriction == some .function && imp.contains x then
+        let trues ← trueInstancesOf d
+        match tspec.domain with
+        | .products [kVar, _] =>
+          match findFnKeyTerm x kVar 32 t with
+          | some keyExpr =>
+            let kVals ← results (whenTagged (eval fuel keyExpr) pure)
+            match kVals with
+            | [kVal] =>
+              let matching := trues.filter fun (el, _) =>
+                match el with
+                | .prod [k, _] => k == kVal
+                | _ => false
+              if matching.isEmpty then err (.missingInput (.unassignedFunction d (some kVal)))
+              else nd matching
+            | _ =>
+              if trues.isEmpty then err (.missingInput (.unassignedFunction d none))
+              else nd trues
+          | none =>
+            if trues.isEmpty then err (.missingInput (.unassignedFunction d none))
+            else nd trues
+        | _ =>
+          if trues.isEmpty then err (.missingInput (.unassignedFunction d none))
+          else nd trues
+      else everyValidSubs fuel x
     match e with
-    | .cAll xs t none => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsTrue none none))
-    | .cAll xs t (some d) =>
+    | .cAll xs t none imp =>
+      let tes ← foreachWith (bindEffVar false imp t) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map (·, .holdsTrue none none), [])
+    | .cAll xs t (some d) imp =>
       -- D7: `Creates e For d` stamps the instances with the expiry now + d
       let now ← getTime
-      let pairs ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
-      pure (pairs.map fun (te, u) => (te, .holdsTrue (some u) none))
-    | .tAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .holdsFalse none))
-    | .oAll xs t => let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure); pure (tes.map (·, .unknown))
+      let pairs ← foreachWith (bindEffVar false imp t) xs (whenTagged (eval fuel t) (fun te => whenInt (eval fuel d) (fun dur => pure (te, now + dur))))
+      pure (pairs.map (fun (te, u) => (te, .holdsTrue (some u) none)), [])
+    | .tAll xs t imp =>
+      let tes ← foreachWith (bindEffVar true imp t) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map (·, .holdsFalse none), [])
+    | .oAll xs t imp =>
+      let tes ← foreachWith (bindEffVar true imp t) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map (·, .unknown), [])
     | .evOp .support xs t src => do
-      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
-      pure (tes.map fun te => ((.prod [te, (.str src, "string")], evSupportDom), .holdsTrue none none))
+      let srcStr ← resolveSource src
+      let tes ← foreachWith (bindEffVar false xs t) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map (fun te => ((.prod [te, (.str srcStr, "string")], evSupportDom), .holdsTrue none none)), [])
     | .evOp .rebut xs t src => do
-      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
-      pure (tes.map fun te => ((.prod [te, (.str src, "string")], evRebutDom), .holdsTrue none none))
-    | .evOp .retract xs t src => do
-      let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
+      let srcStr ← resolveSource src
+      let tes ← foreachWith (bindEffVar false xs t) xs (whenTagged (eval fuel t) pure)
+      pure (tes.map (fun te => ((.prod [te, (.str srcStr, "string")], evRebutDom), .holdsTrue none none)), [])
+    | .evOp op xs t src => do
+      let srcStr ← resolveSource src
+      let tes ← foreachWith (bindEffVar false xs t) xs (whenTagged (eval fuel t) pure)
       let state ← getState
-      let entries := tes.flatMap fun te =>
-        if !src.isEmpty then
-          [ ((.prod [te, (.str src, "string")], evSupportDom), Assignment.holdsFalse none),
-            ((.prod [te, (.str src, "string")], evRebutDom), Assignment.holdsFalse none) ]
-        else
-          state.contents.filterMap fun (entryTe, i) =>
-            if (entryTe.2 == evSupportDom || entryTe.2 == evRebutDom) && i.live state.time then
-              match entryTe.1 with
-              | .prod [targetTe, _] => if targetTe == te then some (entryTe, Assignment.holdsFalse none) else none
-              | _ => none
-            else none
-      pure entries
+      let doms : List DomId := match op with
+        | .retractSupport => [evSupportDom]
+        | .retractRebut   => [evRebutDom]
+        | _               => [evSupportDom, evRebutDom]
+      let polLabel : String := match op with
+        | .retractSupport => "supporting "
+        | .retractRebut   => "contrary "
+        | _               => ""
+      let perTarget := tes.map fun te =>
+        let found := state.contents.filterMap fun (entryTe, i) =>
+          if doms.contains entryTe.2 && i.live state.time then
+            match entryTe.1 with
+            | .prod [targetTe, (.str entrySrc, _)] =>
+              if targetTe == te && (srcStr.isEmpty || entrySrc == srcStr) then
+                some (entryTe, Assignment.holdsFalse none)
+              else none
+            | _ => none
+          else none
+        let ws := if found.isEmpty then
+          [Diagnostic.warning "CHR109"
+            s!"retraction on {Tagged.pp te}{if srcStr.isEmpty then "" else s!" by {srcStr}"} found no active {polLabel}evidence to withdraw (005.11)"]
+        else []
+        (found, ws)
+      pure (perTarget.flatMap (·.1), perTarget.flatMap (·.2))
     | .findingOp pol xs t std => do
       let tes ← foreachWith (everyValidSubs fuel) xs (whenTagged (eval fuel t) pure)
       let state ← getState
@@ -753,9 +854,9 @@ def evalEffect : Nat → Effect → M Store
             | _ => none
           else none
         ((.prod [te, (.str std, "string")], posDom), Assignment.holdsTrue none none) :: clearOpp
-      pure entries
+      pure (entries, [])
     | .amendOp actId =>
-      pure [((.str actId, amendCommitDom), Assignment.holdsTrue none none)]
+      pure ([((.str actId, amendCommitDom), Assignment.holdsTrue none none)], [])
 termination_by structural n => n
 
 /-- Evaluate a checked term to its values (eFLINT `eval`). -/

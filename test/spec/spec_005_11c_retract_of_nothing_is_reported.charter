@@ -1,0 +1,10 @@
+// 005.11: a retraction that finds nothing this source tendered is reported (CHR109), not silent.
+//! expect-warning: CHR109
+Fact physician Identified by DrAdler, DrBose
+Evidenced Bool lacks
+Act determine Actor physician Holds when True Supports lacks()
+Act withdraw Actor physician Holds when True Retracts lacks()
+.
+determine(DrAdler).
+withdraw(DrBose).
+?Established(lacks()).
