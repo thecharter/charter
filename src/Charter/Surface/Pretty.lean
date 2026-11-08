@@ -21,11 +21,8 @@ def fmtAtomOrStr (s : String) : String :=
 def fmtVars (xs : List Var) : String :=
   ", ".intercalate (xs.map toString)
 
-def wrapUnary (t : Term) (rendered : String) : String :=
-  match t with
-  | .ref _ | .app _ _ | .intLit _ | .stringLit _ | .boolLit _
-  | .present _ | .violated _ | .enabled _ | .project _ _ | .tag _ _ => rendered
-  | _ => "(" ++ rendered ++ ")"
+def wrapIf (need : Bool) (s : String) : String :=
+  if need then "(" ++ s ++ ")" else s
 
 def wrapPostfixBase (t : Term) (rendered : String) : String :=
   match t with
@@ -38,45 +35,45 @@ def fmtProjField (x : Var) : String :=
 
 mutual
 
-def fmtTerm : Term → String
-  | .not t => "!" ++ wrapUnary t (fmtTerm t)
-  | .and a b => "(" ++ fmtTerm a ++ " && " ++ fmtTerm b ++ ")"
-  | .or a b => "(" ++ fmtTerm a ++ " || " ++ fmtTerm b ++ ")"
+def fmtTermPrec (p : Nat) : Term → String
+  | .when t c => wrapIf (p > 1) (fmtTermPrec 1 t ++ " When " ++ fmtTermPrec 2 c)
+  | .or a b => wrapIf (p > 2) (fmtTermPrec 2 a ++ " || " ++ fmtTermPrec 3 b)
+  | .and a b => wrapIf (p > 3) (fmtTermPrec 3 a ++ " && " ++ fmtTermPrec 4 b)
+  | .eq a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " == " ++ fmtTermPrec 5 b)
+  | .neq a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " != " ++ fmtTermPrec 5 b)
+  | .leq a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " <= " ++ fmtTermPrec 5 b)
+  | .geq a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " >= " ++ fmtTermPrec 5 b)
+  | .ge a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " > " ++ fmtTermPrec 5 b)
+  | .le a b => wrapIf (p > 4) (fmtTermPrec 5 a ++ " < " ++ fmtTermPrec 5 b)
+  | .heldFor t d => wrapIf (p > 4) ("Held(" ++ fmtTermPrec 0 t ++ ") For " ++ fmtTermPrec 6 d)
+  | .add a b => wrapIf (p > 5) (fmtTermPrec 5 a ++ " + " ++ fmtTermPrec 6 b)
+  | .sub a b => wrapIf (p > 5) (fmtTermPrec 5 a ++ " - " ++ fmtTermPrec 6 b)
+  | .mult a b => wrapIf (p > 6) (fmtTermPrec 6 a ++ " * " ++ fmtTermPrec 7 b)
+  | .div a b => wrapIf (p > 6) (fmtTermPrec 6 a ++ " / " ++ fmtTermPrec 7 b)
+  | .mod a b => wrapIf (p > 6) (fmtTermPrec 6 a ++ " % " ++ fmtTermPrec 7 b)
+  | .not t => wrapIf (p > 7) ("!" ++ fmtTermPrec 7 t)
+  | .project t x => wrapIf (p > 8) (wrapPostfixBase t (fmtTermPrec 8 t) ++ "." ++ fmtProjField x)
+  | .tag t d => wrapIf (p > 8) (wrapPostfixBase t (fmtTermPrec 8 t) ++ ":" ++ d)
+  | .untag t => fmtTermPrec p t
   | .boolLit b => if b then "True" else "False"
-  | .leq a b => "(" ++ fmtTerm a ++ " <= " ++ fmtTerm b ++ ")"
-  | .geq a b => "(" ++ fmtTerm a ++ " >= " ++ fmtTerm b ++ ")"
-  | .ge a b => "(" ++ fmtTerm a ++ " > " ++ fmtTerm b ++ ")"
-  | .le a b => "(" ++ fmtTerm a ++ " < " ++ fmtTerm b ++ ")"
-  | .sub a b => "(" ++ fmtTerm a ++ " - " ++ fmtTerm b ++ ")"
-  | .add a b => "(" ++ fmtTerm a ++ " + " ++ fmtTerm b ++ ")"
-  | .mult a b => "(" ++ fmtTerm a ++ " * " ++ fmtTerm b ++ ")"
-  | .mod a b => "(" ++ fmtTerm a ++ " % " ++ fmtTerm b ++ ")"
-  | .div a b => "(" ++ fmtTerm a ++ " / " ++ fmtTerm b ++ ")"
   | .intLit i => if i < 0 then s!"(0 - {-i})" else toString i
   | .stringLit s => fmtAtomOrStr s
-  | .eq a b => "(" ++ fmtTerm a ++ " == " ++ fmtTerm b ++ ")"
-  | .neq a b => "(" ++ fmtTerm a ++ " != " ++ fmtTerm b ++ ")"
-  | .exists_ xs t => "(Exists " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .forall_ xs t => "(Forall " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .count xs t => "Count(Foreach " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .sum xs t => "Sum(Foreach " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .max xs t => "Max(Foreach " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .min xs t => "Min(Foreach " ++ fmtVars xs ++ ": " ++ fmtTerm t ++ ")"
-  | .when t c => "(" ++ fmtTerm t ++ " When " ++ fmtTerm c ++ ")"
-  | .present t => "Holds(" ++ fmtTerm t ++ ")"
-  | .violated t => "Violated(" ++ fmtTerm t ++ ")"
-  | .enabled t => "Enabled(" ++ fmtTerm t ++ ")"
-  | .project t x => wrapPostfixBase t (fmtTerm t) ++ "." ++ fmtProjField x
-  | .tag t d => wrapPostfixBase t (fmtTerm t) ++ ":" ++ d
-  | .untag t => fmtTerm t
+  | .exists_ xs t => "(Exists " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .forall_ xs t => "(Forall " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .count xs t => "Count(Foreach " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .sum xs t => "Sum(Foreach " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .max xs t => "Max(Foreach " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .min xs t => "Min(Foreach " ++ fmtVars xs ++ ": " ++ fmtTermPrec 0 t ++ ")"
+  | .present t => "Holds(" ++ fmtTermPrec 0 t ++ ")"
+  | .violated t => "Violated(" ++ fmtTermPrec 0 t ++ ")"
+  | .enabled t => "Enabled(" ++ fmtTermPrec 0 t ++ ")"
   | .ref x => toString x
   | .app d args => d ++ "(" ++ fmtArgs args ++ ")"
   | .currentTime => "Current Time"
-  | .heldFor t d => "(Held(" ++ fmtTerm t ++ ") For (" ++ fmtTerm d ++ "))"
-  | .evStatus want t => want.kwName ++ "(" ++ fmtTerm t ++ ")"
-  | .hasConflict t => "Conflict(" ++ fmtTerm t ++ ")"
-  | .mulDivRound x n d m => "MulDivRound(" ++ fmtTerm x ++ ", " ++ fmtTerm n ++ ", " ++ fmtTerm d ++ ", " ++ m.kwName ++ ")"
-  | .fnApp d k => d ++ "(" ++ fmtTerm k ++ ")"
+  | .evStatus want t => want.kwName ++ "(" ++ fmtTermPrec 0 t ++ ")"
+  | .hasConflict t => "Conflict(" ++ fmtTermPrec 0 t ++ ")"
+  | .mulDivRound x n d m => "MulDivRound(" ++ fmtTermPrec 0 x ++ ", " ++ fmtTermPrec 0 n ++ ", " ++ fmtTermPrec 0 d ++ ", " ++ m.kwName ++ ")"
+  | .fnApp d k => d ++ "(" ++ fmtTermPrec 0 k ++ ")"
   | .dimLit (.money "USD" 2) n =>
     let absN := n.natAbs
     let sign := if n < 0 then "-" else ""
@@ -86,12 +83,12 @@ def fmtTerm : Term → String
     s!"{sign}${dl}.{pad}"
   | .dimLit .rate n => s!"{n} bps"
   | .dimLit _ n => toString n
-  | .ite c t e => s!"If({fmtTerm c}, {fmtTerm t}, {fmtTerm e})"
-  | .doneAt t => s!"Done({fmtTerm t})"
-  | .stampOf t => s!"Since({fmtTerm t})"
-  | .calOp1 op t => s!"{op.kwName}({fmtTerm t})"
-  | .calOp2 op t a => s!"{op.kwName}({fmtTerm t}, {fmtTerm a})"
-  | .overdueOf t => s!"Overdue({fmtTerm t})"
+  | .ite c t e => s!"If({fmtTermPrec 0 c}, {fmtTermPrec 0 t}, {fmtTermPrec 0 e})"
+  | .doneAt t => s!"Done({fmtTermPrec 0 t})"
+  | .stampOf t => s!"Since({fmtTermPrec 0 t})"
+  | .calOp1 op t => s!"{op.kwName}({fmtTermPrec 0 t})"
+  | .calOp2 op t a => s!"{op.kwName}({fmtTermPrec 0 t}, {fmtTermPrec 0 a})"
+  | .overdueOf t => s!"Overdue({fmtTermPrec 0 t})"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -99,15 +96,17 @@ def fmtArgs : Args → String
 
 def fmtTermList : List Term → String
   | [] => ""
-  | [t] => fmtTerm t
-  | t :: ts => fmtTerm t ++ ", " ++ fmtTermList ts
+  | [t] => fmtTermPrec 0 t
+  | t :: ts => fmtTermPrec 0 t ++ ", " ++ fmtTermList ts
 
 def fmtNamedMods : List (Var × Term) → String
   | [] => ""
-  | [(x, t)] => toString x ++ " = " ++ fmtTerm t
-  | (x, t) :: ms => toString x ++ " = " ++ fmtTerm t ++ ", " ++ fmtNamedMods ms
+  | [(x, t)] => toString x ++ " = " ++ fmtTermPrec 0 t
+  | (x, t) :: ms => toString x ++ " = " ++ fmtTermPrec 0 t ++ ", " ++ fmtNamedMods ms
 
 end
+
+def fmtTerm (t : Term) : String := fmtTermPrec 0 t
 
 def fmtOptForeach (xs : List Var) (t : Term) : String :=
   if xs.isEmpty then fmtTerm t
@@ -224,7 +223,7 @@ def fmtModClause : ModClause → String
     let body := match r.conseq with
       | .holdsBool true => "Holds when " ++ fmtTerm r.cond
       | .holdsBool false => "Rejects when " ++ fmtTerm r.cond
-      | .yieldsVal v => "Yields (" ++ fmtTerm v ++ ") When " ++ fmtTerm r.cond
+      | .yieldsVal v => "Yields " ++ fmtTermPrec 2 v ++ " When " ++ fmtTerm r.cond
     head ++ " " ++ body
   | .priorityEdge hi los => s!"Priority {hi} Over {", ".intercalate los}"
   | .repeals rs => s!"Repeals {", ".intercalate rs}"
@@ -549,10 +548,155 @@ def itemDataRepr (items : List Item) : String :=
     | .inl d => Sum.inl d
     | .inr p => Sum.inr p.stripPos)
 
-/-- Format source text and verify round-trip AST preservation before returning. -/
+/-- Format source text via canonical AST rendering and verify round-trip AST preservation. -/
 def formatAndVerify (src : String) : Except Diagnostic String := do
   let items ← parseSource src
   let formatted := formatItems items
+  let reparsed ← parseSource formatted
+  if itemDataRepr items == itemDataRepr reparsed then
+    return formatted
+  else
+    throw (Diagnostic.error "CHR003"
+      "internal formatter round-trip mismatch: formatted source re-parsed to a different AST")
+
+/-- Format one code segment (outside strings, brackets, and comments), normalizing
+operator/comma spacing and collapsing multi-space runs (`#31`). -/
+def fmtCodeChars : Nat → List Char → Option Char → String → String
+  | 0, _, _, acc => acc.trim
+  | _, [], _, acc => acc.trim
+  | fuel + 1, '"' :: rest, _, acc =>
+    let rec takeQuoted : List Char → String → List Char × String
+      | [], q => ([], q)
+      | '\\' :: c :: more, q => takeQuoted more (q.push '\\' |>.push c)
+      | '"' :: more, q => (more, q.push '"')
+      | c :: more, q => takeQuoted more (q.push c)
+    let (rem, qStr) := takeQuoted rest (acc.push '"')
+    fmtCodeChars fuel rem (some '"') qStr
+  | fuel + 1, '[' :: rest, _, acc =>
+    let rec takeBrk : List Char → String → List Char × String
+      | [], q => ([], q)
+      | ']' :: more, q => (more, q.push ']')
+      | c :: more, q => takeBrk more (q.push c)
+    let (rem, bStr) := takeBrk rest (acc.push '[')
+    fmtCodeChars fuel rem (some ']') bStr
+  | fuel + 1, '?' :: '!' :: rest, _, acc =>
+    fmtCodeChars fuel rest (some '!') (acc ++ "?!")
+  | fuel + 1, c1 :: c2 :: rest, prev, acc =>
+    let two := String.mk [c1, c2]
+    if ["&&", "||", "==", "!=", "<=", ">=", "=>"].contains two then
+      let needBefore := match prev with
+        | none | some ' ' | some '(' => false
+        | _ => true
+      let acc1 := if needBefore then acc.push ' ' ++ two else acc ++ two
+      let rest' := rest.dropWhile (· == ' ')
+      let acc2 := if rest'.isEmpty then acc1 else acc1.push ' '
+      fmtCodeChars fuel rest' (some ' ') acc2
+    else if c1 == ',' then
+      let prevDigit := prev.any Char.isDigit
+      let nextDigit := c2.isDigit
+      if prevDigit && nextDigit then
+        fmtCodeChars fuel (c2 :: rest) (some ',') (acc.push ',')
+      else
+        let rest' := (c2 :: rest).dropWhile (· == ' ')
+        let acc1 := if rest'.isEmpty then acc.push ',' else acc ++ ", "
+        fmtCodeChars fuel rest' (some ' ') acc1
+    else if c1 == ' ' then
+      let rest' := (c2 :: rest).dropWhile (· == ' ')
+      let acc1 := if acc.isEmpty || prev == some ' ' then acc else acc.push ' '
+      fmtCodeChars fuel rest' (some ' ') acc1
+    else
+      fmtCodeChars fuel (c2 :: rest) (some c1) (acc.push c1)
+  | _ + 1, [c], prev, acc =>
+    if c == ' ' then acc.trim
+    else if c == ',' then acc.push ','
+    else
+      let _ := prev
+      acc.push c
+termination_by structural n => n
+
+def fmtCodeSeg (cs : List Char) : String :=
+  fmtCodeChars (cs.length + 2) cs none ""
+
+mutual
+/-- Split a line (starting outside or inside a block comment) into code/block-comment pieces and
+an optional trailing `//` comment, updating `inBlockComment` (`#31`). -/
+def formatSourceLine : Nat → Bool → String → Bool × String
+  | 0, inBlock, rawLine => (inBlock, rawLine.trimRight)
+  | fuel + 1, inBlock, rawLine =>
+    let expanded := String.intercalate "  " (rawLine.splitOn "\t")
+    let r := expanded.trimRight
+    if inBlock then
+      match r.splitOn "*/" with
+      | [_] => (true, r)
+      | before :: afterParts =>
+        let after := "*/".intercalate afterParts
+        let (stillBlock, fmtAfter) := formatSourceLine fuel false after
+        (stillBlock, before ++ "*/" ++ (if fmtAfter.isEmpty then "" else " " ++ fmtAfter.trimLeft))
+      | [] => (true, r)
+    else if r.isEmpty then
+      (false, "")
+    else
+      let chars := r.toList
+      let indentChars := chars.takeWhile (· == ' ')
+      let indent := String.mk indentChars
+      let bodyChars := chars.drop indentChars.length
+      scanSourceChars fuel indent bodyChars []
+termination_by structural n => n
+
+def scanSourceChars : Nat → String → List Char → List Char → Bool × String
+  | 0, indent, _, codeRev => (false, indent ++ fmtCodeSeg codeRev.reverse)
+  | _, indent, [], codeRev => (false, indent ++ fmtCodeSeg codeRev.reverse)
+  | fuel + 1, indent, '"' :: more, codeRev =>
+    let rec skipStr : List Char → List Char → List Char × List Char
+      | [], acc => ([], acc)
+      | '\\' :: c :: m, acc => skipStr m (c :: '\\' :: acc)
+      | '"' :: m, acc => (m, '"' :: acc)
+      | c :: m, acc => skipStr m (c :: acc)
+    let (rem, acc') := skipStr more ('"' :: codeRev)
+    scanSourceChars fuel indent rem acc'
+  | _ + 1, indent, '/' :: '/' :: more, codeRev =>
+    if codeRev.isEmpty then
+      (false, indent ++ "//" ++ String.mk more)
+    else
+      let trailingSpaces := (codeRev.takeWhile (· == ' ')).length
+      let gap := String.mk (List.replicate (Nat.max 1 trailingSpaces) ' ')
+      let codePart := fmtCodeSeg codeRev.reverse
+      (false, indent ++ codePart ++ gap ++ "//" ++ String.mk more)
+  | fuel + 1, indent, '/' :: '*' :: more, codeRev =>
+    let prefixCode := if codeRev.isEmpty then "" else fmtCodeSeg codeRev.reverse
+    let moreStr := String.mk more
+    match moreStr.splitOn "*/" with
+    | [_] =>
+      let sp := if prefixCode.isEmpty then "" else prefixCode ++ " "
+      (true, indent ++ sp ++ "/*" ++ moreStr)
+    | b1 :: restParts =>
+      let blk := "/*" ++ b1 ++ "*/"
+      let remStr := "*/".intercalate restParts
+      let (stillB, remFmt) := formatSourceLine fuel false remStr
+      let left := if prefixCode.isEmpty then blk else prefixCode ++ " " ++ blk
+      let full := if remFmt.trim.isEmpty then left else left ++ " " ++ remFmt.trimLeft
+      (stillB, indent ++ full)
+    | [] => (true, indent ++ prefixCode ++ "/*")
+  | fuel + 1, indent, c :: more, codeRev =>
+    scanSourceChars fuel indent more (c :: codeRev)
+termination_by structural n => n
+end
+
+/-- Format source text while preserving comments, single blank lines, and author line breaks,
+then verify exact AST round-trip equivalence (`#31`). -/
+def formatSourceAndVerify (src : String) : Except Diagnostic String := do
+  let items ← parseSource src
+  let normCr := String.intercalate "\n" (src.splitOn "\r\n")
+  let rawLines := normCr.splitOn "\n"
+  let (_, revLines, _) := rawLines.foldl (fun (inB, acc, blankRun) line =>
+    let (inB', fmtL) := formatSourceLine (line.length + 4) inB line
+    if !inB && !inB' && fmtL.isEmpty then
+      if acc.isEmpty || blankRun > 0 then (inB', acc, blankRun + 1)
+      else (inB', "" :: acc, 1)
+    else
+      (inB', fmtL :: acc, 0)) (false, ([] : List String), 0)
+  let trimmedRev := revLines.dropWhile (· == "")
+  let formatted := if trimmedRev.isEmpty then "\n" else "\n".intercalate trimmedRev.reverse ++ "\n"
   let reparsed ← parseSource formatted
   if itemDataRepr items == itemDataRepr reparsed then
     return formatted

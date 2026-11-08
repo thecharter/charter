@@ -391,15 +391,17 @@ def verdict (d : Directives) (denyWarnings : Bool) (stats : RunStats) : Bool × 
     else (false, s!"expected diagnostics missing: {", ".intercalate missing}; reported: {", ".intercalate stats.codes}")
   else match d.expectFailedClaims, d.knownIssue with
     | some n, _ =>
-      if stats.errors == 0 && stats.failedQueries == n && (!denyWarnings || stats.warnings == 0) then
+      let totalFailed := stats.failedQueries + stats.failedProvenance
+      if stats.errors == 0 && totalFailed == n && (!denyWarnings || stats.warnings == 0) then
         (true, s!"exactly {n} failed claim(s), as expected")
-      else (false, s!"expected exactly {n} failed claim(s) and no error; got {stats.failedQueries} and {stats.errors} error(s)")
+      else (false, s!"expected exactly {n} failed claim(s) and no error; got {totalFailed} and {stats.errors} error(s)")
     | none, some why =>
       if stats.ok denyWarnings then (false, s!"known issue unexpectedly passes ({why}); delete the directive")
       else (true, s!"known issue, still failing ({why})")
     | none, none =>
+      let provNote := if stats.failedProvenance > 0 then s!", {stats.failedProvenance} failed provenance check(s)" else ""
       let warnNote := if denyWarnings && stats.warnings > 0 then s!", {stats.warnings} denied warning(s)" else ""
-      (stats.ok denyWarnings, s!"{stats.errors} error(s), {stats.failedQueries} failed claim(s){warnNote}")
+      (stats.ok denyWarnings, s!"{stats.errors} error(s), {stats.failedQueries} failed claim(s){provNote}{warnNote}")
 
 /-- `charter test <paths…> [--expect file] [--tolerate file] [--out json]` -/
 def testCommand (args : List String) : IO UInt32 := do

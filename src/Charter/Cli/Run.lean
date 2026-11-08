@@ -29,6 +29,7 @@ structure RunOpts where
   testMode  : Bool := false
   json      : Bool := false
   eflint    : Bool := false
+  verbose   : Bool := false
   /-- Run `Scenario` blocks (test mode, or when `--scenario` selects one) instead of only noting them. -/
   scenarios : Bool := false
   /-- Optional `--scenario <name>` filter; empty runs every scenario when `scenarios` is set. -/
@@ -41,16 +42,17 @@ structure RunOpts where
   assurance : AssuranceOpts := {}
 
 structure RunStats where
-  phrases       : Nat := 0
-  errors        : Nat := 0
-  warnings      : Nat := 0
-  failedQueries : Nat := 0
+  phrases          : Nat := 0
+  errors           : Nat := 0
+  warnings         : Nat := 0
+  failedQueries    : Nat := 0
+  failedProvenance : Nat := 0
   /-- Every diagnostic code produced, in order (for fixture directives). -/
-  codes         : List String := []
+  codes            : List String := []
   deriving Repr
 
 def RunStats.ok (s : RunStats) (denyWarnings : Bool := false) : Bool :=
-  s.errors == 0 && s.failedQueries == 0 && (!denyWarnings || s.warnings == 0)
+  s.errors == 0 && s.failedQueries == 0 && s.failedProvenance == 0 && (!denyWarnings || s.warnings == 0)
 
 def yesNo (b : Bool) : String := if b then "yes" else "no"
 
@@ -107,9 +109,13 @@ def factChanges (before after : State) : List (String × Tagged) :=
   let nowTrue := after.holdsList.filter (fun te => visible te && !(before.holdsList.contains te)) |>.map fun te => ("+", te)
   gone ++ nowFalse ++ nowTrue
 
-def emit (o : RunOpts) (j : Json) (text : String) (toErr : Bool := false) : IO Unit :=
+def emit (o : RunOpts) (j : Json) (text : String) (toErr : Bool := false) : IO Unit := do
   if o.json then IO.println j.compress
-  else if toErr then IO.eprintln text else IO.println text
+  else if toErr then
+    (← IO.getStdout).flush
+    IO.eprintln text
+    (← IO.getStderr).flush
+  else IO.println text
 
 def isCascadedChr010 (discarded : List String) (d : Diagnostic) : Bool :=
   d.code == "CHR010" && !discarded.isEmpty && discarded.any fun nm =>
@@ -350,7 +356,8 @@ def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) 
   for c in claims do
     if !c.ok || (o.assurance.denyWarnings && c.warn) then failed := failed + 1
     if o.json then IO.println c.json.compress
-    else if !c.ok || c.warn || !o.testMode then IO.println c.render
+    else if !c.ok || c.warn || o.verbose then IO.println c.render
+  (← IO.getStdout).flush
   return (failed, loaded, cov)
 
 /-- Run a whole program. In test mode the provenance checks run at the end and a
@@ -399,12 +406,13 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     for d in AssuranceGates.checkProvenanceGate path.toString cfg.spec loadedDocs cov do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
-  return { stats with failedQueries := stats.failedQueries + failedProv }
+  return { stats with failedProvenance := stats.failedProvenance + failedProv }
 
-/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`, `--scenario <name>`, and assurance gates. -/
+/-- The flags shared by `run`, `test`, `check`: `--out json|text`, `--eflint`, `--verbose`, `--scenario <name>`, and assurance gates. -/
 structure RunFlags where
   json    : Bool := false
   eflint  : Bool := false
+  verbose : Bool := false
   explore : Nat := 0
   exploreMenu : Explore.Menu := []
   scenarios : List String := []
@@ -419,6 +427,7 @@ def takeFlags (args : List String) : Except String RunFlags :=
     | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
     | ["--out"], _ => .error "--out needs json or text"
     | "--eflint" :: rest, f => go rest { f with eflint := true }
+    | "--verbose" :: rest, f | "-v" :: rest, f => go rest { f with verbose := true }
     | "--require-provenance" :: rest, f => go rest { f with assurance := { f.assurance with requireProvenance := true } }
     | "--forbid-midstream-decls" :: rest, f => go rest { f with assurance := { f.assurance with forbidMidstreamDecls := true } }
     | "--require-complete-explore" :: rest, f => go rest { f with assurance := { f.assurance with requireCompleteExplore := true } }
@@ -460,9 +469,9 @@ def checkCommand (args : List String) : IO UInt32 := do
     | .error e => IO.eprintln s!"charter check: {e}"; return 2
     | .ok r => pure r
   if fl.rest.isEmpty then
-    IO.eprintln "usage: charter check <file.charter> ... [--out json] [--eflint] [--require-provenance] [--forbid-midstream-decls] [--deny-warnings]"
+    IO.eprintln "usage: charter check <file.charter> ... [--verbose] [--out json] [--eflint] [--require-provenance] [--forbid-midstream-decls] [--deny-warnings]"
     return 2
-  let o : RunOpts := { json := fl.json, eflint := fl.eflint, assurance := fl.assurance }
+  let o : RunOpts := { json := fl.json, eflint := fl.eflint, verbose := fl.verbose, assurance := fl.assurance }
   let mut status : UInt32 := 0
   for f in fl.rest do
     let (items, loadDiags) ← loadProgram f fl.eflint

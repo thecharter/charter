@@ -9,9 +9,9 @@
 | Command | Does |
 |---|---|
 | `charter init [<dir>]` | scaffold a reproducible Charter project (`agreement.md`, `main.charter`, `charter.toml`, `charter.lock`, `uat/smoke.sh`) (`G5.4`) |
-| `charter check <file.charter> …` | resolve every phrase in order without evaluating; report diagnostics and, for a program with `Document`/`Clause`s, the Law 8 provenance checks (012) |
+| `charter check [--verbose] <file.charter> …` | resolve every phrase in order without evaluating; report diagnostics, any failed/warned Law 8 provenance checks (or all checks under `--verbose`), and a one-line summary (`012`, `#33`) |
 | `charter build <file.charter> [-o <artifact>] [--sign-key <key>]` | elaborate into validated `CIR` epochs and emit a signed SHA-256 content-addressed `Artifact` bundle (`D18`, `D27`) |
-| `charter fmt [--check] [--stdout] <file.charter> …` | format files canonically while preserving `//!` directives and verifying round-trip AST equality (`020`, `test/spec/spec_018_4_fmt_roundtrip.charter`) |
+| `charter fmt [--check] [--stdout] [--canonical] <file.charter> …` | format files while preserving comments, blank lines, and author line breaks (or render minimal-parenthesis AST form under `--canonical`), verifying round-trip AST equality (`020`, `#31`, `test/spec/spec_018_4_fmt_roundtrip.charter`) |
 | `charter doc <file.charter> [-o <out.md>] [--out json]` | generate a consolidated institutional rulebook with clause tables and `Default`/`Exception` decision tables (`G5.4`) |
 | `charter lsp` | run the stdio JSON-RPC Language Server Protocol (`initialize`, live `CHR` diagnostics, `hover`, `definition` to Markdown clauses, `formatting`) (`G5.3`) |
 | `charter doctor [--claims <path>] [--fail-on-unbacked] [--lock [<dir>]]` | verify `claims.json` theorem/gate backing, `charter.lock` SHA-256 digests, and optional external solver availability (`G5.4`) |

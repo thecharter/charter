@@ -95,7 +95,7 @@ normative span names a rule, and that every act, duty and immunity is named by s
 
 `tools/examples-check` runs both over every example in this layout, and the battery runs it.
 
-Do not run `charter fmt` on these files. Today it removes comments and blank lines.
+`charter fmt` preserves comments, blank lines and line breaks while normalizing spacing.
 
 What these examples cost to write, and what would make them easier, is in
 `docs/plans/2026-11-07-example-friction/`.
