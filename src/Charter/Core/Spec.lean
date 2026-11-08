@@ -1,6 +1,7 @@
 import Charter.Core.Term
 import Charter.Core.Defeasible
 import Charter.Core.Provenance
+import Charter.Core.Diagnostics
 
 /-!
 # Charter.Core.Spec — Type declarations as records
@@ -324,7 +325,19 @@ inductive ModClause where
   | overridesDuties (targets : List (DomId × Option Args))
   /-- Charter (D36, `#50`): `Decided by <voter> [Weighted by <fn>] At least <num>/<den> In <voteFact>`. -/
   | decidedBy (voter : Var) (weightFn : Option DomId) (num den : Int) (voteFact : DomId)
+  /-- Source-span wrapper (`#27`): stripped when applied to `TypeSpec` so `CIR` stays position-free. -/
+  | atPos (pos : Pos) (c : ModClause)
   deriving Repr, Inhabited
+
+def ModClause.stripPos : ModClause → ModClause
+  | .atPos _ c => c.stripPos
+  | c => c
+
+def ModClause.unpos : ModClause → Pos × ModClause
+  | .atPos p c =>
+    let (p', c') := c.unpos
+    (if p' == {} then p else p', c')
+  | c => ({}, c)
 
 /-- Temporal property formulae (`docs/rfc.md` §7.4, `D20`), verified in `Charter.Verify`
 without widening `Charter.Eval`. -/
@@ -391,9 +404,35 @@ inductive Decl where
   | ensureCarrier (name : DomId) (dom : Domain)
   /-- Charter (D37, `#42`): initial value assignment `Var <name> : <dom> = <expr>` at Genesis. -/
   | varInit (name : DomId) (expr : Term)
+  /-- Source-span wrapper (`#27`): stripped when inserted into `Spec` so `CIR` stays position-free. -/
+  | atPos (pos : Pos) (d : Decl)
   deriving Repr, Inhabited
 
+def Decl.stripPos : Decl → Decl
+  | .atPos _ d => d.stripPos
+  | d => d
+
+def Decl.unpos : Decl → Pos × Decl
+  | .atPos p d =>
+    let (p', d') := d.unpos
+    (if p' == {} then p else p', d')
+  | d => ({}, d)
+
+mutual
+def Decl.stripAllPos : Decl → Decl
+  | .atPos _ d => d.stripAllPos
+  | .typeExt d cls k => .typeExt d (cls.map ModClause.stripPos) k
+  | .module n ps body => .module n ps (Decl.stripAllPosList body)
+  | .amendInstall a body => .amendInstall a (Decl.stripAllPosList body)
+  | d => d
+
+def Decl.stripAllPosList : List Decl → List Decl
+  | [] => []
+  | d :: ds => d.stripAllPos :: Decl.stripAllPosList ds
+end
+
 def Decl.isInitial : Decl → Bool
+  | .atPos _ d => d.isInitial
   | .typeDecl .. => true
   | .placeholder .. => true
   | .typeExt .. => false
@@ -412,6 +451,7 @@ def Decl.isInitial : Decl → Bool
   | .varInit .. => false
 
 def Decl.name : Decl → DomId
+  | .atPos _ d => d.name
   | .typeDecl d _ => d
   | .typeExt d _ _ => d
   | .placeholder f _ => f
@@ -515,7 +555,7 @@ def ruleIds (s : Spec) : List DomId :=
   let topRules := s.decls.filterMap fun (p : DomId × TypeSpec) =>
     if isRuleKind p.2.kind then some p.1 else none
   let installedRules := s.amendBodies.flatMap fun (_, ds) =>
-    ds.filterMap fun
+    ds.filterMap fun d => match d.stripPos with
       | .typeDecl bty bts => if isRuleKind bts.kind then some bty else none
       | _ => none
   (topRules ++ installedRules).eraseDups
@@ -526,7 +566,7 @@ invariants, including those in `Installs { ... }`), placeholders, and named `Def
 def citeableIds (s : Spec) : List String :=
   let declNames := s.decls.map (·.1)
   let installedDecls : List (DomId × TypeSpec) := s.amendBodies.flatMap fun (_, ds) =>
-    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
+    ds.filterMap fun d => match d.stripPos with | .typeDecl bty bts => some (bty, bts) | _ => none
   let instNames := installedDecls.map (·.1)
   let aliasNames := s.aliases.map (·.1)
   let defRules := (s.decls ++ installedDecls).flatMap fun (ty, ts) =>
@@ -741,7 +781,7 @@ def TypeSpec.syncDefeasibleDAG (t : TypeSpec) : TypeSpec :=
 
 /-- Apply compiled extension clauses to a type (eFLINT `apply_type_ext`). -/
 def TypeSpec.applyExt (clauses : List ModClause) (t : TypeSpec) : TypeSpec :=
-  clauses.foldr apply t
+  (clauses.map ModClause.stripPos).foldr apply t
 where
   apply (c : ModClause) (t : TypeSpec) : TypeSpec :=
     match c with
@@ -874,6 +914,7 @@ where
           | k => k }
     | .overridesDuties _ => t
     | .decidedBy _ _ _ _ _ => t
+    | .atPos _ _ => t
 
 /-! ## Renaming (module instantiation, D8) -/
 
@@ -955,11 +996,13 @@ def ModClause.mapDom (f : DomId → DomId) : ModClause → ModClause
   | .excusedWhen ts => .excusedWhen (ts.map (Term.mapDom f))
   | .overridesDuties targets => .overridesDuties (targets.map fun (d, args?) => (f d, args?.map (·.mapDom f)))
   | .decidedBy v wf num den vf => .decidedBy (v.mapDom f) (wf.map f) num den (f vf)
+  | .atPos p c => .atPos p (c.mapDom f)
   | c => c
 
 -- Rename the type names a declaration mentions and declares.
 mutual
 def Decl.mapDom (f : DomId → DomId) : Decl → Decl
+  | .atPos p d => .atPos p (d.mapDom f)
   | .typeDecl d t => .typeDecl (f d) (t.mapDom f)
   | .typeExt d cs k => .typeExt (f d) (cs.map (ModClause.mapDom f)) k
   | .placeholder a b => .placeholder (f a) (f b)
@@ -982,7 +1025,7 @@ end
 
 /-- The type names a block of declarations introduces (what a `Use` prefixes). -/
 def declaredNames (ds : List Decl) : List DomId :=
-  ds.filterMap fun
+  ds.filterMap fun raw => match raw.stripPos with
     | .typeDecl d _ => some d
     | .placeholder a _ => some a
     | .param n _ _ => some n

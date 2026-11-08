@@ -1,0 +1,15 @@
+// 011.7, 011.11, 012.1 (#34): `Document "..."` needs no `.` terminator before `#require`,
+// and `Scenario` names may end in digits (`t1`, `t2`).
+Document "include/tenancy.md"
+#require "include/base.eflint".
+
+Bool ready.
+
+Scenario t1 {
+  +ready().
+  ?ready().
+}
+
+Scenario t2 After t1 {
+  ?ready().
+}

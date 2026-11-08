@@ -1,0 +1,6 @@
+// 004.12 (#34): omitting the rule name after `Default` reports `CHR003` naming the missing
+// rule identifier rather than falling out of the declaration block with `CHR004`.
+//! expect-error: CHR003
+Bool in-term.
+Bool eligible
+  Default Holds when in-term().

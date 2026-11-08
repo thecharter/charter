@@ -1070,14 +1070,26 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     else return some (.confidential [])
   | .atom "Default" =>
     if k != .fact then return none
-    if !(match ← peekAt 1 with | .ident _ | .atom _ => true | _ => false) then return none
+    match ← peekAt 1 with
+    | .kw "Holds when" | .kw "Present when" | .kw "Holds" | .kw "Present" | .atom "Yields" =>
+      fail "CHR003" "`Default` needs a rule name before `Holds when` / `Rejects when` / `Yields` (e.g. `Default base-rule Holds when …`)"
+    | .atom "Rejects" =>
+      if (match ← peekAt 2 with | .kw "When" | .ident "when" => true | _ => false) then
+        fail "CHR003" "`Default` needs a rule name before `Rejects when` (e.g. `Default base-rule Rejects when …`)"
+      else pure ()
+    | .ident _ | .atom _ => pure ()
+    | _ => return none
     advance
     let rid ← ruleId
     let (cond, conseq) ← defeasibleBody
     return some (.defeasibleRule { id := rid, isDefault := true, overrides := [], cond, conseq })
   | .atom "Exception" =>
     if k != .fact then return none
-    if !(match ← peekAt 1 with | .ident _ | .atom _ => true | _ => false) then return none
+    match ← peekAt 1 with
+    | .atom "Overrides" | .kw "Holds when" | .kw "Present when" | .kw "Holds" | .kw "Present" | .atom "Yields" =>
+      fail "CHR003" "`Exception` needs a rule name before `Overrides` (e.g. `Exception ex-rule Overrides base-rule Holds when …`)"
+    | .ident _ | .atom _ => pure ()
+    | _ => return none
     advance
     let rid ← ruleId
     if !(← isCtxAtom "Overrides") then
@@ -1201,8 +1213,9 @@ def fromClauses : Nat → P (List (ClauseId × String))
 def clauses (k : FrameKind) : Nat → P (List ModClause)
   | 0 => return []
   | fuel + 1 => do
+    let cp ← pos
     match ← clause k with
-    | some c => return c :: (← clauses k fuel)
+    | some c => return .atPos cp c :: (← clauses k fuel)
     | none => return []
 
 def openness : P (Bool × Bool × Bool) := do
@@ -1334,10 +1347,11 @@ def parseActExtras (bodyFuel : Nat) : Nat → P (List ModClause × List Decl)
       let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
       return (moreCls, body ++ moreInsts)
     else
+      let cp ← pos
       match ← clause .act with
       | some c =>
         let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
-        return (c :: moreCls, moreInsts)
+        return (.atPos cp c :: moreCls, moreInsts)
       | none => return ([], [])
 
 /-- The declarations of a `Module` body, up to `}`, each block ended by `.` or by the
@@ -1347,8 +1361,9 @@ def moduleBody : Nat → P (List Decl)
   | fuel + 1 => do
     if ← isKw "}" then advance; return []
     if ← isKw "." then advance; return (← moduleBody fuel)
+    let fp ← pos
     let ds ← frame fuel
-    return ds ++ (← moduleBody fuel)
+    return ds.map (.atPos fp) ++ (← moduleBody fuel)
 
 /-- One frame: a type declaration, an `Extend`, a `Placeholder`, a `Clause`, … -/
 def frame : Nat → P (List Decl)
@@ -1528,8 +1543,8 @@ def frame : Nat → P (List Decl)
       | .kw "When" | .ident "when" => advance; return some (← expression)
       | _ => return none)
     let (cls, _) ← parseActExtras fuel 1000
-    let unlessTerms := cls.flatMap fun | .unlessCond ts => ts | _ => []
-    let cleanCls := cls.filter fun | .unlessCond _ => false | _ => true
+    let unlessTerms := cls.flatMap fun mc => match mc.stripPos with | .unlessCond ts => ts | _ => []
+    let cleanCls := cls.filter fun mc => match mc.stripPos with | .unlessCond _ => false | _ => true
     let excOr := unlessTerms.foldr Term.or (.boolLit false)
     let lawfulTerm : Term := match whenCond?, unlessTerms.isEmpty with
       | none, true => .boolLit false
@@ -1890,7 +1905,9 @@ def startsFrame : P Bool := do
 def declarations : Nat → P (List Decl)
   | 0 => return []
   | fuel + 1 => do
+    let fp ← pos
     let ds ← frame fuel
+    let ds := ds.map (.atPos fp)
     if ← startsFrame then return ds ++ (← declarations fuel) else return ds
 
 /-! ## Phrases -/
@@ -1964,15 +1981,16 @@ def phrase : P Phrase := do
   | .kw "!" => advance; let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
   | _ => let (xs, t) ← optForeach; let n ← optTriggerNote; return .trigger xs t n
 
-/-- The body of `Scenario name { … }`: phrases, `Let alias = expr.`, and parallel blocks. -/
-def scenarioBody : Nat → P (List Phrase)
+/-- The body of `Scenario name { … }`: located phrases, `Let alias = expr.`, and parallel blocks. -/
+def scenarioBody : Nat → P (List (Pos × Phrase))
   | 0 => return []
   | fuel + 1 => do
     if ← isKw "}" then advance; return []
+    let qp ← pos
     if ← isKw "{" then
       advance
       let ps ← parBlockFuel fuel
-      return .par ps :: (← scenarioBody fuel)
+      return (qp, .par ps) :: (← scenarioBody fuel)
     if (← isCtxAtom "Let") && (match ← peekAt 2 with | .kw "=" => true | _ => false) then
       advance
       let aliasName ← (do match ← peek with
@@ -1983,11 +2001,11 @@ def scenarioBody : Nat → P (List Phrase)
       let val ← expression
       expectKw "."
       let rest ← scenarioBody fuel
-      return Phrase.substAliasList aliasName val rest
+      return rest.map fun (rp, rph) => (rp, rph.substAlias aliasName val)
     let p ← phrase
     match ← peek with
-    | .kw "." => advance; return p :: (← scenarioBody fuel)
-    | .kw "}" => advance; return [p]
+    | .kw "." => advance; return (qp, p) :: (← scenarioBody fuel)
+    | .kw "}" => advance; return [(qp, p)]
     | k => fail "CHR004" s!"expected `.` to end the phrase but found {k.describe}"
 where
   parBlockFuel : Nat → P (List Phrase)
@@ -2024,9 +2042,16 @@ where
     | .str s => advance; return s
     | _ => unexpected "a file name in double quotes"
 
+def scenarioName : P String := do
+  match ← peek with
+  | .str s => advance; return s
+  | .atom s => advance; return s
+  | .ident _ => toString <$> var
+  | k => fail "CHR003" s!"expected a scenario name but found {k.describe}"
+
 /-- The whole file: directives and phrases, each terminated by `.` except a
-parallel block and an optional last phrase. -/
-def items (lineOf : Pos → String) (seenScenarios : List (String × List Phrase) := []) : Nat → P (List Item)
+parallel block, a standalone `Document` before a directive (`#34`), and an optional last phrase. -/
+def items (lineOf : Pos → String) (seenScenarios : List (String × List (Pos × Phrase)) := []) : Nat → P (List Item)
   | 0 => fail "CHR003" "file too long to parse"
   | fuel + 1 => do
     if (← peek) == .eof then return []
@@ -2034,44 +2059,42 @@ def items (lineOf : Pos → String) (seenScenarios : List (String × List Phrase
     match ← directive with
     | some d =>
       expectKw "."
-      return ⟨p, lineOf p, .inl d⟩ :: (← items lineOf seenScenarios fuel)
+      return ⟨p, lineOf p, [], .inl d⟩ :: (← items lineOf seenScenarios fuel)
     | none =>
     if ← isKw "{" then
       advance
       let ps ← parBlock 10000
-      return ⟨p, lineOf p, .inr (.par ps)⟩ :: (← items lineOf seenScenarios fuel)
+      return ⟨p, lineOf p, [], .inr (.par ps)⟩ :: (← items lineOf seenScenarios fuel)
     else if (← isCtxAtom "Scenario") && (match ← peekAt 1 with | .ident _ | .atom _ | .str _ => true | _ => false) then
       advance
-      let name ← (do match ← peek with
-        | .ident s => advance; return s
-        | .atom s => advance; return s
-        | .str s => advance; return s
-        | k => fail "CHR003" s!"expected a scenario name but found {k.describe}")
+      let name ← scenarioName
       let after? ← (do
         if ← isCtxAtom "After" then
           advance
-          match ← peek with
-          | .ident s => advance; return some s
-          | .atom s => advance; return some s
-          | .str s => advance; return some s
-          | k => fail "CHR003" s!"expected base scenario name after `After` but found {k.describe}"
+          some <$> scenarioName
         else return none)
       let fs ← fromClauses 100
       expectKw "{"
-      let ownPs ← scenarioBody 10000
-      let fullPs ← match after? with
-        | none => pure ownPs
+      let ownPairs ← scenarioBody 10000
+      let fullPairs ← match after? with
+        | none => pure ownPairs
         | some baseName =>
           match seenScenarios.find? (·.1 == baseName) with
-          | some (_, basePs) => pure (basePs ++ ownPs)
+          | some (_, basePairs) => pure (basePairs ++ ownPairs)
           | none => fail "CHR010" s!"Scenario `{name}` After `{baseName}`: unknown prior scenario `{baseName}`"
-      let seen' := (name, fullPs) :: seenScenarios.filter (·.1 != name)
-      return ⟨p, lineOf p, .inr (.scenario name fullPs fs)⟩ :: (← items lineOf seen' fuel)
+      let seen' := (name, fullPairs) :: seenScenarios.filter (·.1 != name)
+      return ⟨p, lineOf p, fullPairs.map (·.1), .inr (.scenario name (fullPairs.map (·.2)) fs)⟩ :: (← items lineOf seen' fuel)
     else
       let ph ← phrase
+      let isDocBlock := match ph with
+        | .decls ds => !ds.isEmpty && ds.all (fun d => match d.stripPos with | .document .. => true | _ => false)
+        | _ => false
       match ← peek with
-      | .kw "." => advance; return ⟨p, lineOf p, .inr ph⟩ :: (← items lineOf seenScenarios fuel)
-      | .eof => return [⟨p, lineOf p, .inr ph⟩]
+      | .kw "." => advance; return ⟨p, lineOf p, [], .inr ph⟩ :: (← items lineOf seenScenarios fuel)
+      | .eof => return [⟨p, lineOf p, [], .inr ph⟩]
+      | .kw "#require" | .kw "#include" =>
+        if isDocBlock then return ⟨p, lineOf p, [], .inr ph⟩ :: (← items lineOf seenScenarios fuel)
+        else fail "CHR004" s!"expected `.` to end the phrase but found {(← peek).describe}"
       | k => fail "CHR004" s!"expected `.` to end the phrase but found {k.describe}"
 
 end Parser

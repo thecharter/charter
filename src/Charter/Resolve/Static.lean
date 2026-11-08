@@ -50,6 +50,19 @@ def err {α} (code msg : String) : Stc α := ⟨fun _ _ => .error [Diagnostic.er
 
 def warn (code msg : String) : Stc Unit := ⟨fun s w => .ok ⟨s, w ++ [Diagnostic.warning code msg], ()⟩⟩
 
+/-- Attach `p` to any diagnostic without a position emitted inside `m` (`#27`). -/
+def withPos {α} (p : Pos) (m : Stc α) : Stc α := ⟨fun s w =>
+  if p == {} then m.run s w
+  else
+    let prevLen := w.length
+    match m.run s w with
+    | .ok o =>
+      let oldW := o.warnings.take prevLen
+      let newW := (o.warnings.drop prevLen).map (·.withPos p)
+      .ok { o with warnings := oldW ++ newW }
+    | .error es =>
+      .error (es.map (·.withPos p))⟩
+
 /-- Try `p`; on failure try `q`, reporting both errors if both fail. -/
 def orElse {α} (p q : Stc α) : Stc α := ⟨fun s w => match p.run s w with
   | .ok o => .ok o
@@ -1149,8 +1162,11 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
   | none => err "CHR013" s!"cannot extend {ty}: no such type"
   | some tspec =>
     let xs := match tspec.domain with | .products xs => xs | _ => [⟨ty, ""⟩]
-    let one (c : ModClause) : Stc (List (DomId × List ModClause)) := do
+    let one (cRaw : ModClause) : Stc (List (DomId × List ModClause)) :=
+      let (cp, c) := cRaw.unpos
+      withPos cp do
       match c with
+      | .atPos _ inner => return [(ty, [inner.stripPos])]
       | .conditionedBy conds => return [(ty, [.conditionedBy (← conds.mapM (convertPrecon ty tspec))])]
       | .derivation dvs => return [(ty, [.derivation (← dvs.mapM (compileDerivation xs ty))])]
       | .postCond effs => return [(ty, [.postCond (← effs.mapM (compileEffect xs))])]
@@ -1353,11 +1369,14 @@ def expandUses : Nat → List Decl → Stc (List Decl)
   | 0, _ => err "CHR003" "modules nest too deeply"
   | fuel + 1, ds => do
     -- register the block's modules first so a Use may precede its Module in the block
-    ds.forM fun d => match d with
+    ds.forM fun d => match d.stripPos with
       | .module n ps body => modifySpec fun s => { s with modules := (n, ps, body) :: s.modules.filter (·.1 != n) }
       | _ => pure ()
     let spec ← getSpec
-    let expanded ← ds.mapM fun d => match d with
+    let expanded ← ds.mapM fun rawD =>
+      let (dp, d) := rawD.unpos
+      withPos dp do
+      match d with
       | .use n args pre sps =>
         match spec.modules.find? (·.1 == n) with
         | none => err "CHR023" s!"Use {n}: no such module"
@@ -1371,9 +1390,20 @@ def expandUses : Nat → List Decl → Stc (List Decl)
               | some (_, a) => a
               | none => if declared.contains x then (match pre with | some p => p ++ "-" ++ x | none => x) else x
             let mapped ← expandUses fuel (body.map (Decl.mapDom f))
+            let mapped := if dp == {} then mapped else mapped.map (fun md => match md with | .atPos _ inner => .atPos dp inner | inner => .atPos dp inner)
             if sps.isEmpty then pure mapped
             else
               let attachSpans : Decl → Decl
+                | .atPos mp inner =>
+                  match inner.stripPos with
+                  | .typeDecl rd rts =>
+                    let isRule := match rts.kind with
+                      | .act _ | .duty _ | .immunity _ => true
+                      | .fact fs => fs.invariant
+                      | _ => false
+                    if isRule then .atPos mp (.typeDecl rd { rts with spans := rts.spans ++ sps })
+                    else .atPos mp inner
+                  | _ => .atPos mp inner
                 | .typeDecl rd rts =>
                   let isRule := match rts.kind with
                     | .act _ | .duty _ | .immunity _ => true
@@ -1384,7 +1414,7 @@ def expandUses : Nat → List Decl → Stc (List Decl)
                 | other => other
               pure (mapped.map attachSpans)
       | .module .. => pure []
-      | d => pure [d]
+      | d0 => pure [if dp == {} then d0 else .atPos dp d0]
     return expanded.flatten
 
 mutual
@@ -1447,12 +1477,14 @@ instances of the block's `Param`s (D11). -/
 def executeDecls (ds : List Decl) : Stc Store := do
   let ds ← expandUses 32 ds
   let (inits, exts) := ds.partition Decl.isInitial
-  let init : Store := inits.filterMap fun d => match d with
+  let init : Store := inits.filterMap fun d => match d.stripPos with
     | .param n _ v => some ((.int v, n), .holdsTrue none none)
     | _ => none
   -- 1. insert the raw declarations so that mutually referring types resolve
   -- (`forM`, not `for`: see AGENTS.md, common mistakes)
-  inits.forM fun d => do
+  inits.forM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
     match d with
     | .typeDecl ty tspec =>
       let spec ← getSpec
@@ -1489,14 +1521,19 @@ def executeDecls (ds : List Decl) : Stc Store := do
       if (spec.lookupDecl n).isNone then
         setSpec (spec.insertDecl n { kind := .fact {}, domain := dom })
     | .varInit .. => pure ()
+    | .atPos .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
-  inits.forM fun d => do
+  inits.forM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
     match d with
     | .placeholder _ t => checkKnownType [⟨t, ""⟩]
     | _ => pure ()
   -- 2. compile each new type's own terms (and `Amount` definitions, `#46`)
-  inits.forM fun d => do
+  inits.forM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
     match d with
     | .typeDecl ty tspec =>
       let compiled ← compileTypeSpec ty tspec
@@ -1517,7 +1554,9 @@ def executeDecls (ds : List Decl) : Stc Store := do
       modifySpec fun s => s.adjustDecl n fun ts => { ts with derivation := [dv] }
     | _ => pure ()
   -- 3. extensions and temporal properties, in order
-  exts.forM fun d => do
+  exts.forM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
     match d with
     | .typeExt ty clauses _ =>
       let parts ← compileExt ty clauses
@@ -1542,7 +1581,10 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .amendInstall actId body =>
       -- 014.1, 014.3: an amendment installs rule records and leaves state intact, so a `Param`
       -- inside `Installs` would be accepted and change nothing
-      body.forM fun bd => match bd with
+      body.forM fun rawBd =>
+        let (bp, bd) := rawBd.unpos
+        withPos bp do
+        match bd with
         | .param n _ _ =>
           err "CHR037" s!"Amend {actId}: `Installs` cannot set the parameter {n}; a parameter is state, so the amendment changes it with `Creates {n}(…)` (014.1)"
         | _ => pure ()
@@ -1550,16 +1592,22 @@ def executeDecls (ds : List Decl) : Stc Store := do
       let compiledBody ← withSpec curSpec do
         let bExp ← expandUses 16 body
         let (bInits, bExts) := bExp.partition Decl.isInitial
-        bInits.forM fun bd => match bd with
+        bInits.forM fun rawBd => match rawBd.stripPos with
           | .typeDecl bty bts => modifySpec (·.insertDecl bty bts)
           | _ => pure ()
-        let cInits ← bInits.mapM fun bd => match bd with
+        let cInits ← bInits.mapM fun rawBd =>
+          let (bp, bd) := rawBd.unpos
+          withPos bp do
+          match bd with
           | .typeDecl bty bts => do
             let cb ← compileTypeSpec bty bts
             modifySpec (·.insertDecl bty cb)
             return Decl.typeDecl bty cb
           | other => return other
-        let cExts ← bExts.flatMapM fun bd => match bd with
+        let cExts ← bExts.flatMapM fun rawBd =>
+          let (bp, bd) := rawBd.unpos
+          withPos bp do
+          match bd with
           | .typeExt bty bcls bk => do
             let parts ← compileExt bty bcls
             parts.forM fun part => executeExt part.1 part.2
@@ -1588,7 +1636,9 @@ def executeDecls (ds : List Decl) : Stc Store := do
   --    inheritance (`#54`), `Power` `Holds when` default (`#37`), `Protection` `Holds when True`
   --    default (`#52`), `Clause`-based `Protects` expansion (`#54`), and `Except under` warning (`CHR042`, `#13`)
   let preCheckSpec ← getSpec
-  inits.forM fun d => do
+  inits.forM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
     match d with
     | .typeDecl ty _ =>
       match (← getSpec).lookupDecl ty with
@@ -1658,7 +1708,12 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | _ => pure ()
   let finalSpec ← getSpec
   -- 5. validate defeasible rule IDs, override targets, and priority acyclicity (`CHR034`, 004.12, 007.6)
-  finalSpec.decls.forM fun (ty, ts) => do
+  let posOfDecl (ty : DomId) : Pos :=
+    match ds.findSome? (fun rd => let (p, d) := rd.unpos; if d.name == ty && p != {} then some p else none) with
+    | some p => p
+    | none => {}
+  finalSpec.decls.forM fun (ty, ts) =>
+    withPos (posOfDecl ty) do
     if !ts.defeasibleRules.isEmpty then
       let rids := ts.defeasibleRules.map (·.id)
       if rids.eraseDups.length != rids.length then
@@ -1675,7 +1730,10 @@ def executeDecls (ds : List Decl) : Stc Store := do
       | none => pure ()
   -- 6. compile any ground-fact initializers (`Clause` spans `#36`, `Var x = init` `#42`)
   let curSpec ← getSpec
-  let spanStoreLists ← exts.mapM fun d => match d with
+  let spanStoreLists ← exts.mapM fun rawD =>
+    let (dp, d) := rawD.unpos
+    withPos dp do
+    match d with
     | .spanInit rawTm => do
       let (t', ty) ← compileTerm termFuel rawTm
       match ty with
@@ -1785,6 +1843,45 @@ def compilePhrase : Nat → Phrase → Stc CPhrase
       return .par (.onlyDecls init :: cs)
 
 end Resolve
+
+/-- Recover declaration shells from a failed `.decls` block (`#28`) so one error inside a
+declaration block does not cascade into `CHR010` undeclared-type errors across every sibling
+declaration, subsequent phrase, or `#require`ing file. -/
+def recoverDeclsInto : Nat → Spec → List Decl → Spec
+  | 0, s, _ => s
+  | fuel + 1, s0, ds =>
+    ds.foldl (fun s rawD => match rawD.stripPos with
+      | .typeDecl ty tspec => s.insertDecl ty tspec
+      | .placeholder f t => s.insertAlias f t
+      | .clause c => s.insertClause c
+      | .document p docId? sha? rank? => s.insertDocument { id := docId?, path := p, expectedSha256 := sha?, rank := rank? }
+      | .param n dom v => s.insertDecl n { kind := .fact { defaultVal := some v }, domain := dom, restriction := some .var }
+      | .module n ps body => { s with modules := (n, ps, body) :: s.modules.filter (·.1 != n) }
+      | .use n args pre _ =>
+        match s.modules.find? (·.1 == n) with
+        | some (_, ps, body) =>
+          if ps.length == args.length then
+            let declared := declaredNames body
+            let f (x : DomId) : DomId :=
+              match (ps.zip args).find? (·.1 == x) with
+              | some (_, a) => a
+              | none => if declared.contains x then (match pre with | some p => p ++ "-" ++ x | none => x) else x
+            recoverDeclsInto fuel s (body.map (Decl.mapDom f))
+          else s
+        | none => s
+      | .amountDef n dom? _ => s.insertDecl n { kind := .fact {}, domain := dom?.getD .anyInt, restriction := some .var }
+      | .ensureCarrier n dom => if (s.lookupDecl n).isNone then s.insertDecl n { kind := .fact {}, domain := dom } else s
+      | .typeExt ty cls _ => s.adjustDecl ty (TypeSpec.applyExt cls)
+      | .amendInstall actId body => s.insertAmendBody actId body
+      | _ => s) s0
+
+def recoverPhraseDecls (spec : Spec) : Phrase → Spec
+  | .decls ds => recoverDeclsInto 16 spec ds
+  | .par ps =>
+    let ds := ps.flatMap fun | .decls ds => ds | _ => []
+    recoverDeclsInto 16 spec ds
+  | .scenario name _ spans => spec.insertScenario name spans
+  | _ => spec
 
 /-- Resolve one phrase against a spec: the compiled phrase and the updated spec, or
 diagnostics. Warnings are returned alongside. -/

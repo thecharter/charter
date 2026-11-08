@@ -54,10 +54,12 @@ def applyRepeals : Spec → List DomId → Spec
   | s, [] => s
   | s, r :: rs => applyRepeals (s.adjustDecl r neutralizeTypeSpec) rs
 
-def applyInstallDecl : Spec → Decl → Spec
-  | s, .typeDecl d t => s.insertDecl d t
-  | s, .typeExt d cs _ => s.adjustDecl d (TypeSpec.applyExt cs)
-  | s, _ => s
+def applyInstallDecl (s : Spec) : Decl → Spec
+  | .atPos _ d => applyInstallDecl s d
+  | .typeDecl d t => s.insertDecl d t
+  | .typeExt d cs _ => s.adjustDecl d (TypeSpec.applyExt cs)
+  | _ => s
+termination_by structural x => x
 
 def applyInstallDecls : Spec → List Decl → Spec
   | s, [] => s
@@ -67,11 +69,19 @@ def applyInstallDecls : Spec → List Decl → Spec
 def applyAmendChange (s : Spec) (repeals : List DomId) (installs : List Decl) : Spec :=
   applyInstallDecls (applyRepeals s repeals) installs
 
+def touchedByOne : Decl → Option DomId
+  | .atPos _ d => touchedByOne d
+  | .typeDecl d _ => some d
+  | .typeExt d _ _ => some d
+  | _ => none
+termination_by structural x => x
+
 def touchedByDecls : List Decl → List DomId
   | [] => []
-  | .typeDecl d _ :: ds => d :: touchedByDecls ds
-  | .typeExt d _ _ :: ds => d :: touchedByDecls ds
-  | _ :: ds => touchedByDecls ds
+  | d :: ds =>
+    match touchedByOne d with
+    | some k => k :: touchedByDecls ds
+    | none => touchedByDecls ds
 
 /-- All rule IDs modified by `(repeals, installs)`. -/
 def touchedIds (repeals : List DomId) (installs : List Decl) : List DomId :=
@@ -172,27 +182,41 @@ theorem applyRepeals_lookupDecl_not_mem (r : DomId) :
     simp only [applyRepeals]
     rw [applyRepeals_lookupDecl_not_mem r xs _ hxs, adjustDecl_lookupDecl_ne s x r _ hxr]
 
+theorem applyInstallDecl_lookupDecl_ne (r : DomId) :
+    ∀ (d : Decl) (s : Spec), touchedByOne d ≠ some r → (applyInstallDecl s d).lookupDecl r = s.lookupDecl r
+  | .atPos _ d, s, hne => by
+    simp only [touchedByOne] at hne
+    simp only [applyInstallDecl]
+    exact applyInstallDecl_lookupDecl_ne r d s hne
+  | .typeDecl k t, s, hne => by
+    have hkr : k ≠ r := fun h => hne (by simp [touchedByOne, h])
+    simp only [applyInstallDecl]
+    exact insertDecl_lookupDecl_ne s k r t hkr
+  | .typeExt k cs extK, s, hne => by
+    have hkr : k ≠ r := fun h => hne (by simp [touchedByOne, h])
+    simp only [applyInstallDecl]
+    exact adjustDecl_lookupDecl_ne s k r _ hkr
+  | .placeholder _ _, _, _ | .clause _, _, _ | .document _ _ _ _, _, _ | .param _ _ _, _, _
+  | .module _ _ _, _, _ | .use _ _ _ _, _, _ | .spanInit _, _, _ | .property _, _, _
+  | .amendInstall _ _, _, _ | .regime _, _, _ | .amendProcedure _, _, _
+  | .amountDef _ _ _, _, _ | .ensureCarrier _ _, _, _ | .varInit _ _, _, _ => rfl
+
 theorem applyInstallDecls_lookupDecl_not_mem (r : DomId) :
     ∀ (ds : List Decl) (s : Spec), r ∉ touchedByDecls ds → (applyInstallDecls s ds).lookupDecl r = s.lookupDecl r
   | [], s, _ => rfl
   | d :: ds, s, hnm => by
-    cases d with
-    | typeDecl k t =>
-      simp only [touchedByDecls, List.mem_cons, not_or] at hnm
-      have hkr : k ≠ r := fun h => hnm.1 h.symm
-      simp only [applyInstallDecls, applyInstallDecl]
-      rw [applyInstallDecls_lookupDecl_not_mem r ds _ hnm.2, insertDecl_lookupDecl_ne s k r t hkr]
-    | typeExt k cs extK =>
-      simp only [touchedByDecls, List.mem_cons, not_or] at hnm
-      have hkr : k ≠ r := fun h => hnm.1 h.symm
-      simp only [applyInstallDecls, applyInstallDecl]
-      rw [applyInstallDecls_lookupDecl_not_mem r ds _ hnm.2, adjustDecl_lookupDecl_ne s k r _ hkr]
-    | placeholder _ _ | clause _ | document _ _ _ _ | param _ _ _
-    | module _ _ _ | use _ _ _ _ | spanInit _ | property _ | amendInstall _ _ | regime _
-    | amendProcedure _ | amountDef _ _ _ | ensureCarrier _ _ | varInit _ _ =>
-      simp only [touchedByDecls] at hnm
-      simp only [applyInstallDecls, applyInstallDecl]
-      exact applyInstallDecls_lookupDecl_not_mem r ds s hnm
+    simp only [touchedByDecls] at hnm
+    cases ht : touchedByOne d with
+    | none =>
+      rw [ht] at hnm
+      have hne : touchedByOne d ≠ some r := by rw [ht]; intro h; cases h
+      simp only [applyInstallDecls]
+      rw [applyInstallDecls_lookupDecl_not_mem r ds _ hnm, applyInstallDecl_lookupDecl_ne r d s hne]
+    | some k =>
+      rw [ht, List.mem_cons, not_or] at hnm
+      have hne : touchedByOne d ≠ some r := by rw [ht]; intro h; exact hnm.1 (Option.some.inj h).symm
+      simp only [applyInstallDecls]
+      rw [applyInstallDecls_lookupDecl_not_mem r ds _ hnm.2, applyInstallDecl_lookupDecl_ne r d s hne]
 
 /-- Any rule `r ∉ touchedIds repeals installs` is preserved identically across `applyAmendChange`. -/
 theorem applyAmendChange_lookupDecl_untouched (s : Spec) (repeals : List DomId) (installs : List Decl)

@@ -202,6 +202,7 @@ deriving instance ToJson, FromJson for ImmunitySpec
 deriving instance ToJson, FromJson for DutySpec
 deriving instance ToJson, FromJson for EventSpec
 deriving instance ToJson, FromJson for Kind
+deriving instance ToJson, FromJson for Pos
 deriving instance ToJson, FromJson for TypeSpec
 deriving instance ToJson, FromJson for ModClause
 deriving instance ToJson, FromJson for TemporalFormula
@@ -209,8 +210,9 @@ deriving instance ToJson, FromJson for TemporalSpec
 deriving instance ToJson, FromJson for RegimeSpec
 
 partial def declToJson : Decl → Json
+  | .atPos _ d => declToJson d
   | .typeDecl d t => Json.mkObj [("k", "td"), ("d", Json.str d), ("t", toJson t)]
-  | .typeExt d cs ek => Json.mkObj [("k", "te"), ("d", Json.str d), ("cs", toJson cs), ("ek", Json.str ek)]
+  | .typeExt d cs ek => Json.mkObj [("k", "te"), ("d", Json.str d), ("cs", toJson (cs.map ModClause.stripPos)), ("ek", Json.str ek)]
   | .placeholder f t => Json.mkObj [("k", "ph"), ("f", Json.str f), ("t", Json.str t)]
   | .clause c => Json.mkObj [("k", "cl"), ("c", toJson c)]
   | .document p id? sha? rk? => Json.mkObj [("k", "doc"), ("p", Json.str p), ("id", toJson id?), ("sha", toJson sha?), ("rk", toJson rk?)]

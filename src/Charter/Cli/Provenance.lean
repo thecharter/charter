@@ -250,7 +250,7 @@ def clauseRulesDigest (spec : Spec) (c : Clause) : String :=
   let spanPart := c.spans.map fun s => s!"{reprStr s.register}:{",".intercalate s.meaning}"
   let targets := (c.spans.flatMap (·.meaning)).eraseDups
   let installedDecls : List (DomId × TypeSpec) := spec.amendBodies.flatMap fun (_, ds) =>
-    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
+    ds.filterMap fun d => match d.stripPos with | .typeDecl bty bts => some (bty, bts) | _ => none
   let targetDefs := targets.map fun m =>
     let instParts := (installedDecls.filter (·.1 == m)).map fun (_, bts) =>
       s!"inst:{m}={reprStr { bts with spans := [] }}"
@@ -275,7 +275,7 @@ def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List Clau
   let knownIds := (citeable ++ scenarioNames).eraseDups
   let invariants := spec.invariants
   let installedDecls : List (DomId × TypeSpec) := spec.amendBodies.flatMap fun (_, ds) =>
-    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
+    ds.filterMap fun d => match d.stripPos with | .typeDecl bty bts => some (bty, bts) | _ => none
   let allDecls := spec.decls ++ installedDecls
   let fromSpans : List Span := allDecls.flatMap fun (p : DomId × TypeSpec) =>
     p.2.spans.map fun sp => ⟨sp.1, sp.2, .norm, [p.1]⟩

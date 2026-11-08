@@ -260,16 +260,27 @@ def permuteTermMods (perm : List (String × String)) : List (Var × Term) → Li
   | (x, t) :: ms => (x, permuteTerm perm t) :: permuteTermMods perm ms
 end
 
+mutual
+def stripAdvisoryDecl : Decl → Option Decl
+  | .atPos p d => (stripAdvisoryDecl d).map (.atPos p)
+  | .clause _ => none
+  | .document .. => none
+  | .typeExt d cls k =>
+    let cls' := cls.filter fun mc => match mc.stripPos with | .fromSpan _ _ => false | _ => true
+    some (.typeExt d cls' k)
+  | .module n ps body =>
+    some (.module n ps (stripAdvisoryDecls body))
+  | d => some d
+termination_by structural x => x
+
 def stripAdvisoryDecls : List Decl → List Decl
   | [] => []
-  | .clause _ :: rest => stripAdvisoryDecls rest
-  | .document .. :: rest => stripAdvisoryDecls rest
-  | .typeExt d cls k :: rest =>
-    let cls' := cls.filter fun | .fromSpan _ _ => false | _ => true
-    .typeExt d cls' k :: stripAdvisoryDecls rest
-  | .module n ps body :: rest =>
-    .module n ps (stripAdvisoryDecls body) :: stripAdvisoryDecls rest
-  | d :: rest => d :: stripAdvisoryDecls rest
+  | d :: rest =>
+    match stripAdvisoryDecl d with
+    | some d' => d' :: stripAdvisoryDecls rest
+    | none => stripAdvisoryDecls rest
+termination_by structural x => x
+end
 
 mutual
 def stripAdvisoryPhrase : Phrase → Phrase

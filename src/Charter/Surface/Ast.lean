@@ -57,12 +57,25 @@ inductive Directive where
 
 /-- A top-level item with the position of its first token. -/
 structure Item where
-  pos  : Pos
+  pos    : Pos
   /-- The source text of the item's first line, for `run` output and claims. -/
-  text : String := ""
-  val  : Sum Directive Phrase
+  text   : String := ""
+  /-- Per-phrase source positions for `Scenario` bodies (`#29`). -/
+  subPos : List Pos := []
+  val    : Sum Directive Phrase
 
-instance : Inhabited Item := ⟨⟨{}, "", .inr (.query (.boolLit true))⟩⟩
+instance : Inhabited Item := ⟨⟨{}, "", [], .inr (.query (.boolLit true))⟩⟩
+
+mutual
+def Phrase.stripPos : Phrase → Phrase
+  | .decls ds => .decls (Decl.stripAllPosList ds)
+  | .par ps => .par (Phrase.stripPosList ps)
+  | .scenario s ps sps => .scenario s (Phrase.stripPosList ps) sps
+  | p => p
+def Phrase.stripPosList : List Phrase → List Phrase
+  | [] => []
+  | p :: ps => p.stripPos :: Phrase.stripPosList ps
+end
 
 mutual
 def Phrase.substAlias (name : String) (val : Term) : Phrase → Phrase

@@ -157,38 +157,45 @@ theorem foldl_step {s s' : Summary} {p : Phrase} {ps : List Phrase} (h : stepSum
     (p :: ps).foldl stepSummary s = ps.foldl stepSummary s' := by
   rw [List.foldl_cons, h]
 
-theorem stepItem_phrase (s : Summary) (pos : Pos) (text : String) (p : Phrase) :
-    stepItem s ⟨pos, text, Sum.inr p⟩ = stepPhrase s p := rfl
+theorem stepItem_phrase (s : Summary) (pos : Pos) (text : String) (subPos : List Pos) (p : Phrase) :
+    stepItem s ⟨pos, text, subPos, Sum.inr p⟩ = stepPhrase s p := rfl
 
 theorem stepPhrase_of_none {s : Summary} {p : Phrase} (hs : p.scenarioParts = none) :
     stepPhrase s p = stepSummary s p := by
   unfold stepPhrase; rw [hs]
 
 /-- A phrase that is not a scenario advances the chain by its checkpoint theorem. -/
-theorem foldl_phrase {s s' : Summary} {pos : Pos} {text : String} {p : Phrase} {rest : List Item}
+theorem foldl_phrase {s s' : Summary} {pos : Pos} {text : String} {subPos : List Pos} {p : Phrase} {rest : List Item}
     (h : stepSummary s p = s') (hs : p.scenarioParts = none) :
-    (⟨pos, text, Sum.inr p⟩ :: rest).foldl stepItem s = rest.foldl stepItem s' := by
+    (⟨pos, text, subPos, Sum.inr p⟩ :: rest).foldl stepItem s = rest.foldl stepItem s' := by
   rw [List.foldl_cons, stepItem_phrase, stepPhrase_of_none hs, h]
 
 /-- A scenario advances the chain by its own sub-chain (`h`), the check of its end state
 (`hv`), and the restored configuration (`hc`, by `rfl` in the generated project). -/
-theorem foldl_scenario {s s' s'' s₃ : Summary} {pos : Pos} {text name : String} {ps : List Phrase}
+theorem foldl_scenario {s s' s'' s₃ : Summary} {pos : Pos} {text name : String} {subPos : List Pos} {ps : List Phrase}
     {spans : List (ClauseId × String)} {rest : List Item}
     (h : ps.foldl stepSummary s = s') (hv : addViolated s' = s'')
     (hc : afterScenario s s'' = s₃) :
-    (⟨pos, text, Sum.inr (.scenario name ps spans)⟩ :: rest).foldl stepItem s = rest.foldl stepItem s₃ := by
+    (⟨pos, text, subPos, Sum.inr (.scenario name ps spans)⟩ :: rest).foldl stepItem s = rest.foldl stepItem s₃ := by
   rw [List.foldl_cons, stepItem_phrase]
   show rest.foldl stepItem (afterScenario s (addViolated (ps.foldl stepSummary s))) = _
   rw [h, hv, hc]
 
 /-- The labels of a program's claims, in the order of `summary`: `(file line, text)`;
-a scenario's claims carry the scenario's line and name. -/
+a scenario's claims carry each claim's own line and the scenario's name (`#29`). -/
 def claimLabels (items : List Item) : List (Nat × String) :=
   items.flatMap fun it => match it.val with
     | .inl _ => []
     | .inr (.scenario name ps _) =>
-      (ps.flatMap Phrase.claimTexts).map fun t => (it.pos.line, s!"scenario {name}: {t}")
-    | .inr p => p.claimTexts.map fun t => (it.pos.line, if it.text.isEmpty then t else it.text)
+      let rec go : List Phrase → List Pos → List (Nat × String)
+        | [], _ => []
+        | p :: rest, pPos :: restPos =>
+          let ln := if pPos.line == 0 then it.pos.line else pPos.line
+          p.claimTexts.map (fun t => (ln, s!"scenario {name}: {t}")) ++ go rest restPos
+        | p :: rest, [] =>
+          p.claimTexts.map (fun t => (it.pos.line, s!"scenario {name}: {t}")) ++ go rest []
+      go ps it.subPos
+    | .inr p => p.claimTexts.map fun t => (it.pos.line, t)
 
 /-- Whether a named invariant holds in the final configuration. -/
 def Outcome.invariantHolds (o : Outcome) (d : DomId) : Bool :=

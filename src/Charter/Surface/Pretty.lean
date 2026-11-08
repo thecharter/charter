@@ -239,9 +239,11 @@ def fmtModClause : ModClause → String
   | .decidedBy v wf num den vf =>
     let wPart := match wf with | some w => s!" Weighted by {w}" | none => ""
     s!"Decided by {v}{wPart} At least {num}/{den} In {vf}"
+  | .atPos _ c => fmtModClause c
+termination_by structural x => x
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
-  let rendered := (cls.map fmtModClause).filter (!·.isEmpty)
+  let rendered := (cls.map (fun c => fmtModClause c.stripPos)).filter (!·.isEmpty)
   if rendered.isEmpty then ""
   else "\n" ++ "\n".intercalate (rendered.map (indent ++ ·))
 
@@ -298,17 +300,22 @@ def fmtClauseBlock (indent : String) (c : Clause) : String :=
   fmtClauseBlockWithInits indent c []
 
 def stripPhysicalDefault : List ModClause → List ModClause
-  | .derivation [.holdsWhen (.boolLit true)] :: rest => rest
-  | cls => cls
+  | c :: rest => match c.stripPos with
+    | .derivation [.holdsWhen (.boolLit true)] => rest
+    | _ => c :: rest
+  | [] => []
 
 def extractInvariantForm : List ModClause → Option (Term × List (ClauseId × String))
-  | .derivation [.holdsWhen t] :: rest =>
-    let rec takeFroms : List ModClause → Option (List (ClauseId × String))
-      | [] => some []
-      | .fromSpan c s :: more => (takeFroms more).map ((c, s) :: ·)
-      | _ => none
-    (takeFroms rest).map (fun fs => (t, fs))
-  | _ => none
+  | c :: rest => match c.stripPos with
+    | .derivation [.holdsWhen t] =>
+      let rec takeFroms : List ModClause → Option (List (ClauseId × String))
+        | [] => some []
+        | m :: more => match m.stripPos with
+          | .fromSpan cl s => (takeFroms more).map ((cl, s) :: ·)
+          | _ => none
+      (takeFroms rest).map (fun fs => (t, fs))
+    | _ => none
+  | [] => none
 
 def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List ModClause) : String :=
   let openPrefix := if t.closed == some false then "Open " else ""
@@ -395,36 +402,37 @@ def fmtTemporalFormula : TemporalFormula → String
   | .until_ a b => "Until(" ++ fmtTerm a ++ ", " ++ fmtTerm b ++ ")"
   | .weakUntil a b => "WeakUntil(" ++ fmtTerm a ++ ", " ++ fmtTerm b ++ ")"
 
-def fmtDecls (indent : String) : Nat → List Decl → List String
+def fmtDeclsRaw (indent : String) : Nat → List Decl → List String
   | 0, _ => []
   | _, [] => []
+  | fuel + 1, .atPos _ _ :: rest => fmtDeclsRaw indent fuel rest
   | fuel + 1, .typeDecl d t :: .typeExt d' cls _ :: .amendInstall d'' body :: rest =>
     if d == d' && d == d'' then
       let base := fmtTypeDeclAndExt indent d t cls
-      let inner := fmtDecls (indent ++ "    ") fuel body
+      let inner := fmtDeclsRaw (indent ++ "    ") fuel (Decl.stripAllPosList body)
       let instPart := if inner.isEmpty then "" else s!"\n{indent}  Installs \{\n" ++ (".\n").intercalate inner ++ s!".\n{indent}  }"
-      (base ++ instPart) :: fmtDecls indent fuel rest
+      (base ++ instPart) :: fmtDeclsRaw indent fuel rest
     else
-      fmtTypeDeclAndExt indent d t [] :: fmtDecls indent fuel (.typeExt d' cls "Act" :: .amendInstall d'' body :: rest)
+      fmtTypeDeclAndExt indent d t [] :: fmtDeclsRaw indent fuel (.typeExt d' cls "Act" :: .amendInstall d'' body :: rest)
   | fuel + 1, .typeDecl d t :: .typeExt d' cls _ :: rest =>
     if d == d' then
-      fmtTypeDeclAndExt indent d t cls :: fmtDecls indent fuel rest
+      fmtTypeDeclAndExt indent d t cls :: fmtDeclsRaw indent fuel rest
     else
-      fmtTypeDeclAndExt indent d t [] :: fmtDecls indent fuel (.typeExt d' cls :: rest)
+      fmtTypeDeclAndExt indent d t [] :: fmtDeclsRaw indent fuel (.typeExt d' cls :: rest)
   | fuel + 1, .typeDecl d t :: rest =>
-    fmtTypeDeclAndExt indent d t [] :: fmtDecls indent fuel rest
+    fmtTypeDeclAndExt indent d t [] :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .typeExt d cls extKind :: rest =>
-    (s!"{indent}Extend {extKind} {d}{fmtModClauses (indent ++ "  ") cls}") :: fmtDecls indent fuel rest
+    (s!"{indent}Extend {extKind} {d}{fmtModClauses (indent ++ "  ") cls}") :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .placeholder f t :: rest =>
-    s!"{indent}Placeholder {f} For {t}" :: fmtDecls indent fuel rest
+    s!"{indent}Placeholder {f} For {t}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .clause c :: rest =>
     let (inits, rest') := takeSpanInits rest
-    fmtClauseBlockWithInits indent c inits :: fmtDecls indent fuel rest'
+    fmtClauseBlockWithInits indent c inits :: fmtDeclsRaw indent fuel rest'
   | fuel + 1, .document p docId? sha? rank? :: rest =>
     let idPart := match docId? with | some id => s!" {id}" | none => ""
     let shaPart := match sha? with | some h => s!" SHA256 {showString h}" | none => ""
     let rankPart := match rank? with | some r => s!" Rank {r}" | none => ""
-    s!"{indent}Document{idPart} {showString p}{shaPart}{rankPart}" :: fmtDecls indent fuel rest
+    s!"{indent}Document{idPart} {showString p}{shaPart}{rankPart}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .param name dom value :: rest =>
     let tyPart := match dom with
       | .time => " : Time"
@@ -433,33 +441,33 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
       | .quantity unit => s!" : Quantity({unit})"
       | .rate => " : Rate"
       | _ => ""
-    s!"{indent}Param {name}{tyPart} = {value}" :: fmtDecls indent fuel rest
+    s!"{indent}Param {name}{tyPart} = {value}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .module name params body :: rest =>
-    let inner := fmtDecls (indent ++ "  ") fuel body
+    let inner := fmtDeclsRaw (indent ++ "  ") fuel (Decl.stripAllPosList body)
     let bodyStr := if inner.isEmpty then "" else "\n" ++ (".\n").intercalate inner ++ "."
-    s!"{indent}Module {name}({", ".intercalate params}) \{{bodyStr}\n{indent}}" :: fmtDecls indent fuel rest
+    s!"{indent}Module {name}({", ".intercalate params}) \{{bodyStr}\n{indent}}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .use name args pre sps :: rest =>
     let asPart := match pre with | some p => s!" As {p}" | none => ""
     let fromPart := String.join (sps.map fun (c, s) => if s.isEmpty then s!" From {c}" else s!" From {c} {showString s}")
-    s!"{indent}Use {name}({", ".intercalate args}){asPart}{fromPart}" :: fmtDecls indent fuel rest
+    s!"{indent}Use {name}({", ".intercalate args}){asPart}{fromPart}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .spanInit t :: rest =>
     -- emitted alongside its `Clause` during initial parsing; rendered as no-op standalone decl if orphaned
     let _ := t
-    fmtDecls indent fuel rest
+    fmtDeclsRaw indent fuel rest
   | fuel + 1, .property tp :: rest =>
     let assPart := if tp.assumptions.isEmpty then "" else " Assumes " ++ ", ".intercalate tp.assumptions
     let fromPart := String.join (tp.spans.map fun (c, s) => if s.isEmpty then s!"\n{indent}  From {c}" else s!"\n{indent}  From {c} {showString s}")
-    s!"{indent}Property {tp.name}{assPart} When {fmtTemporalFormula tp.formula}{fromPart}" :: fmtDecls indent fuel rest
+    s!"{indent}Property {tp.name}{assPart} When {fmtTemporalFormula tp.formula}{fromPart}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .amendInstall actId body :: rest =>
-    let inner := fmtDecls (indent ++ "    ") fuel body
+    let inner := fmtDeclsRaw (indent ++ "    ") fuel (Decl.stripAllPosList body)
     let bodyStr := if inner.isEmpty then "" else "\n" ++ (".\n").intercalate inner ++ "."
-    s!"{indent}Extend Amend {actId}\n{indent}  Installs \{{bodyStr}\n{indent}  }" :: fmtDecls indent fuel rest
+    s!"{indent}Extend Amend {actId}\n{indent}  Installs \{{bodyStr}\n{indent}  }" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .regime r :: rest =>
     let rows := r.params.map fun (k, v) => s!"{indent}  {k} = {v}"
     let bodyStr := if rows.isEmpty then "" else "\n" ++ (",\n").intercalate rows ++ "\n" ++ indent
-    s!"{indent}Regime {fmtAtomOrStr r.name} \{{bodyStr}}" :: fmtDecls indent fuel rest
+    s!"{indent}Regime {fmtAtomOrStr r.name} \{{bodyStr}}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .amendProcedure conds :: rest =>
-    s!"{indent}Amend Procedure Valid when {fmtTermList conds}" :: fmtDecls indent fuel rest
+    s!"{indent}Amend Procedure Valid when {fmtTermList conds}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .amountDef name dom? e :: rest =>
     let tyPart := match dom? with
       | some .time => " : Time"
@@ -469,9 +477,12 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
       | some .rate => " : Rate"
       | some .anyInt => " : Int"
       | _ => ""
-    s!"{indent}Amount {name}{tyPart} Is {fmtTerm e}" :: fmtDecls indent fuel rest
-  | fuel + 1, .ensureCarrier _ _ :: rest => fmtDecls indent fuel rest
-  | fuel + 1, .varInit _ _ :: rest => fmtDecls indent fuel rest
+    s!"{indent}Amount {name}{tyPart} Is {fmtTerm e}" :: fmtDeclsRaw indent fuel rest
+  | fuel + 1, .ensureCarrier _ _ :: rest => fmtDeclsRaw indent fuel rest
+  | fuel + 1, .varInit _ _ :: rest => fmtDeclsRaw indent fuel rest
+
+def fmtDecls (indent : String) (fuel : Nat) (ds : List Decl) : List String :=
+  fmtDeclsRaw indent fuel (Decl.stripAllPosList ds)
 
 mutual
 
@@ -534,7 +545,9 @@ def formatItems (items : List Item) : String :=
 
 /-- Normalized structural projection of an `Item` (ignoring `Pos` and first-line `text`). -/
 def itemDataRepr (items : List Item) : String :=
-  reprStr (items.map (·.val))
+  reprStr (items.map fun it => match it.val with
+    | .inl d => Sum.inl d
+    | .inr p => Sum.inr p.stripPos)
 
 /-- Format source text and verify round-trip AST preservation before returning. -/
 def formatAndVerify (src : String) : Except Diagnostic String := do

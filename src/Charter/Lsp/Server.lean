@@ -85,12 +85,15 @@ def analyzeDocument (uri content : String) : IO (Spec × Array Json) := do
       | .inr p =>
         match resolvePhrase spec p with
         | .error ds =>
+          spec := recoverPhraseDecls spec p
           for d in ds do
-            lspDiags := lspDiags.push (mkLspDiag it.pos.line it.pos.col 1 d.code d.message)
+            let dp := (d.withPos it.pos).pos
+            lspDiags := lspDiags.push (mkLspDiag dp.line dp.col 1 d.code d.message)
         | .ok (spec', _, ws) =>
           spec := spec'
           for w in ws do
-            lspDiags := lspDiags.push (mkLspDiag it.pos.line it.pos.col 2 w.code w.message)
+            let wp := (w.withPos it.pos).pos
+            lspDiags := lspDiags.push (mkLspDiag wp.line wp.col 2 w.code w.message)
     if !spec.clauses.isEmpty || spec.document.isSome || !spec.documents.isEmpty then
       let dir := (System.FilePath.mk path).parent.getD "."
       let loaded ← Cli.readDocuments spec dir

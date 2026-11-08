@@ -173,7 +173,7 @@ def Gen.item (g : Gen) (k : Nat) (it : Item) : Gen :=
   | .inl _ => g
   | .inr p =>
     let g := g.chunked
-    let pos := s!"⟨⟨{it.pos.line}, {it.pos.col}⟩, \"\", Sum.inr"
+    let pos := s!"⟨⟨{it.pos.line}, {it.pos.col}⟩, \"\", [], Sum.inr"
     match p.scenarioParts with
     | none =>
       let (g, pName, _) := g.checkpoint (toString k) p it.pos.line "phrase"
@@ -189,9 +189,12 @@ def Gen.item (g : Gen) (k : Nat) (it : Item) : Gen :=
       let mut stepNames : Array String := #[]
       let mut j := 0
       for q in ps do
+        let qLine := match it.subPos[j]? with
+          | some qp => if qp.line == 0 then it.pos.line else qp.line
+          | none => it.pos.line
         j := j + 1
         g := g.chunked -- a sub-chain may span modules; `scen_k` below imports them all
-        let (g', pName, _) := g.checkpoint s!"{k}_{j}" q it.pos.line "phrase"
+        let (g', pName, _) := g.checkpoint s!"{k}_{j}" q qLine "phrase"
         g := g'
         pNames := pNames.push pName
         stepNames := stepNames.push s!"step_{k}_{j}"

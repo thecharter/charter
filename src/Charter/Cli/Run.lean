@@ -111,31 +111,42 @@ def emit (o : RunOpts) (j : Json) (text : String) (toErr : Bool := false) : IO U
   if o.json then IO.println j.compress
   else if toErr then IO.eprintln text else IO.println text
 
+def isCascadedChr010 (discarded : List String) (d : Diagnostic) : Bool :=
+  d.code == "CHR010" && !discarded.isEmpty && discarded.any fun nm =>
+    occursIn d.message s!" {nm}" || occursIn d.message s!"`{nm}`"
+
 /-- Print what one phrase reported and update the statistics. -/
-def report (o : RunOpts) (file : String) (line : Nat) (text : String) (before after : State)
-    (outs : List Output) (stats : RunStats) : IO RunStats := do
-  let where_ := s!"{file}:{line}"
+def report (o : RunOpts) (file : String) (pos : Pos) (text : String) (before after : State)
+    (outs : List Output) (stats : RunStats) (scenCtx : Option String := none)
+    (discarded : List String := []) : IO RunStats := do
+  let loc := if pos == {} then file
+    else if pos.col == 0 then s!"{file}:{pos.line}"
+    else s!"{file}:{pos.line}:{pos.col}"
+  let ctx := match scenCtx with | some sc => s!" [{sc}]" | none => ""
+  let where_ := s!"{loc}{ctx}"
   let mut stats := stats
   for out in outs do
     match out with
     | .diag d =>
-      let d := (d.withFile file).withPos ⟨line, 0⟩
-      stats := { stats with codes := stats.codes ++ [d.code] }
-      if d.isError then stats := { stats with errors := stats.errors + 1 }
-      else stats := { stats with warnings := stats.warnings + 1 }
-      if d.isError || o.assurance.denyWarnings || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
+      if isCascadedChr010 discarded d then pure ()
+      else
+        let d := (d.withFile file).withPos pos
+        stats := { stats with codes := stats.codes ++ [d.code] }
+        if d.isError then stats := { stats with errors := stats.errors + 1 }
+        else stats := { stats with warnings := stats.warnings + 1 }
+        if d.isError || o.assurance.denyWarnings || !o.testMode || o.json then emit o (diagJson d) d.render (toErr := true)
     | .queryRes ok =>
       if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
       let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("assurance", "checked"),
         ("about", "holds"), ("scope", Json.mkObj [("kind", "concrete-trace")]), ("completion", "complete"),
-        ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
+        ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num pos.line), ("col", Json.num pos.col)]
       if !ok then emit o j s!"{where_}: query failed: {text}"
       else if !o.testMode then emit o j "  query holds"
     | .expectRes w neg ok =>
       if !ok then stats := { stats with failedQueries := stats.failedQueries + 1 }
       let j := Json.mkObj [("kind", "claim"), ("claim", Json.str text), ("tag", "checked"), ("assurance", "checked"),
         ("about", Json.str w.name), ("scope", Json.mkObj [("kind", "concrete-trace")]), ("completion", "complete"),
-        ("negated", Json.bool neg), ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num line)]
+        ("negated", Json.bool neg), ("result", Json.bool ok), ("file", Json.str file), ("line", Json.num pos.line), ("col", Json.num pos.col)]
       if !ok then emit o j s!"{where_}: claim failed: {text}"
       else if !o.testMode then emit o j s!"  {if neg then "not " else ""}{w.name}: as claimed"
     | .timeSet t =>
@@ -261,14 +272,19 @@ def ackedInvariants (ps : List Phrase) : List DomId :=
     | .query (.not (.ref v)) => some v.dom
     | _ => none
 
-/-- Run a scenario's phrases from `cfg`, reporting under the scenario's name; the
-configuration is not changed. -/
-def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config) (ps : List Phrase)
+/-- Run a scenario's phrases from `cfg`, reporting under each phrase's own position
+and the scenario's name (`#29`); the configuration is not changed. -/
+def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config)
+    (ps : List Phrase) (subPos : List Pos) (discarded : List String)
     (stats : RunStats) : IO RunStats := do
   let mut cfg := cfg
   let mut stats := stats
+  let mut locDiscard := discarded
   let mut k := 0
   for p in ps do
+    let pPos := match subPos[k]? with
+      | some qp => if qp == {} then ⟨line, 0⟩ else qp
+      | none => ⟨line, 0⟩
     k := k + 1
     let (cfg', outs) := runPhrase cfg p
     stats := { stats with phrases := stats.phrases + 1 }
@@ -276,15 +292,20 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
       | .query t => s!"?{t}"
       | .expect w neg t => s!"?{if neg then "!" else ""}{w.name} {t}"
       | _ => s!"scenario {name}, phrase {k}"
-    stats ← report o s!"{file} [scenario {name}, phrase {k}]" line label cfg.state cfg'.state outs stats
+    stats ← report o file pPos label cfg.state cfg'.state outs stats (some s!"scenario {name}") locDiscard
+    if p.hasDecls && outs.any (fun | .diag d => d.isError | _ => false) then
+      let recSpec := recoverPhraseDecls cfg.spec p
+      let newly := recSpec.citeableIds.filter (!cfg.spec.citeableIds.contains ·)
+      locDiscard := (locDiscard ++ newly).eraseDups
     cfg := cfg'
   exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats (ackedInvariants ps)
 
 /-- Run one located item. -/
-def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO (Config × RunStats) := do
+def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located)
+    (discarded : List String := []) : IO (Config × RunStats × List String) := do
   let it := l.item
   match it.val with
-  | .inl _ => return (cfg, stats)
+  | .inl _ => return (cfg, stats, discarded)
   | .inr (.scenario name ps spans) =>
     let cfg := { cfg with spec := cfg.spec.insertScenario name spans }
     let shouldRun := o.scenarios && (o.scenarioFilter.isEmpty || o.scenarioFilter.contains name)
@@ -294,18 +315,27 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
     else if !o.testMode then
       IO.println s!"{l.file}:{it.pos.line}: Scenario {name} ({ps.length} phrases{if shouldRun then "" else "; skipped"})"
     if shouldRun then
-      let stats ← runScenario o l.file it.pos.line name cfg ps stats
-      return (cfg, stats)
-    else return (cfg, stats)
+      let stats ← runScenario o l.file it.pos.line name cfg ps it.subPos discarded stats
+      return (cfg, stats, discarded)
+    else return (cfg, stats, discarded)
   | .inr p =>
+    let label := match p with
+      | .query t => s!"?{t}"
+      | .expect w neg t => s!"?{if neg then "!" else ""}{w.name} {t}"
+      | _ => it.text
     if !o.testMode && !o.json then
       IO.println s!"{l.file}:{it.pos.line}: {it.text}"
     if o.json then
-      IO.println (Json.mkObj [("kind", "phrase"), ("file", Json.str l.file), ("line", Json.num it.pos.line), ("text", Json.str it.text)]).compress
+      IO.println (Json.mkObj [("kind", "phrase"), ("file", Json.str l.file), ("line", Json.num it.pos.line), ("text", Json.str label)]).compress
     let (cfg', outs) := runPhrase cfg p
     let stats := { stats with phrases := stats.phrases + 1 }
-    let stats ← report o l.file it.pos.line it.text cfg.state cfg'.state outs stats
-    return (cfg', stats)
+    let stats ← report o l.file it.pos label cfg.state cfg'.state outs stats none discarded
+    let discarded' := if p.hasDecls && outs.any (fun | .diag d => d.isError | _ => false) then
+      let recSpec := recoverPhraseDecls cfg.spec p
+      let newly := recSpec.citeableIds.filter (!cfg.spec.citeableIds.contains ·)
+      (discarded ++ newly).eraseDups
+    else discarded
+    return (cfg', stats, discarded')
 
 /-- Print the provenance report of a resolved spec (Law 8); returns `(failedChecks, loadedDocs, coverage)`. -/
 def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × LoadedDocs × ProvenanceCoverage) := do
@@ -338,10 +368,12 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   let mut cfg : Config := {}
+  let mut discarded : List String := []
   for l in items do
-    let (cfg', stats') ← stepItem o cfg stats l
+    let (cfg', stats', disc') ← stepItem o cfg stats l discarded
     cfg := cfg'
     stats := stats'
+    discarded := disc'
   let declaredScens := cfg.spec.scenarios.map (·.1)
   for wanted in o.scenarioFilter do
     if !declaredScens.contains wanted then
@@ -447,9 +479,32 @@ def checkCommand (args : List String) : IO UInt32 := do
     for l in items do
       match l.item.val with
       | .inl _ => pure ()
+      | .inr (.scenario name ps spans) =>
+        spec := spec.insertScenario name spans
+        let mut sSpec := spec
+        let mut idx := 0
+        for q in ps do
+          let qPos := match l.item.subPos[idx]? with
+            | some qp => if qp == {} then l.item.pos else qp
+            | none => l.item.pos
+          idx := idx + 1
+          match resolvePhrase sSpec q with
+          | .error ds =>
+            sSpec := recoverPhraseDecls sSpec q
+            for d in ds do
+              let d := (d.withFile l.file).withPos qPos
+              emit o (diagJson d) d.render (toErr := true)
+              errors := errors + 1
+          | .ok (sSpec', _, ws) =>
+            sSpec := sSpec'
+            for w in ws do
+              let w := (w.withFile l.file).withPos qPos
+              emit o (diagJson w) w.render (toErr := true)
+              warnings := warnings + 1
       | .inr p =>
         match resolvePhrase spec p with
         | .error ds =>
+          spec := recoverPhraseDecls spec p
           for d in ds do
             let d := (d.withFile l.file).withPos l.item.pos
             emit o (diagJson d) d.render (toErr := true)

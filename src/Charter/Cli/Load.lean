@@ -75,11 +75,14 @@ def relativeDir (base target : System.FilePath) : IO (Option System.FilePath) :=
 documents relative to the program's own directory, so a document declared in a file loaded
 from another directory has that directory (relative to the program's) put in front of it. -/
 def rebaseDocuments (rel : System.FilePath) : Phrase → Phrase
-  | .decls ds => .decls (ds.map fun
+  | .decls ds =>
+    let rec rebOne : Decl → Decl
+      | .atPos pos d => .atPos pos (rebOne d)
       | .document p docId? sha? rank? =>
         if (System.FilePath.mk p).isAbsolute then .document p docId? sha? rank?
         else .document (rel / p).toString docId? sha? rank?
-      | d => d)
+      | d => d
+    .decls (ds.map rebOne)
   | ph => ph
 
 /-- Load a file and expand its directives. `seen` holds every file loaded so far

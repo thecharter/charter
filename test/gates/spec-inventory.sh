@@ -78,8 +78,51 @@ try:
     if rd.returncode == 0 or "STALE 1.2/1" not in (rd.stdout + rd.stderr):
         print(f"FAIL spec-inventory: rule-drift STALE detection failed:\n{rd.stdout}\n{rd.stderr}")
         sys.exit(1)
+
+    # Verify exact clause line:col (#27) & non-cascading block errors (#28)
+    ef = tmp_dir / "loc_err.charter"
+    ef.write_text(
+        "Fact person Identified by Anna, Bob\n"
+        "Fact amount Identified by Int\n"
+        "Act pay Actor person Related to amount\n"
+        "  Holds when True\n"
+        "Power bad Actor person\n"
+        "  Valid when pay(Anna)\n"
+        ".\n"
+        "+person(Anna).\n"
+        "pay(Anna, 10).\n",
+        encoding="utf-8",
+    )
+    re_chk = subprocess.run([bin_path, "check", str(ef)], capture_output=True, text=True)
+    re_tst = subprocess.run([bin_path, "test", str(ef)], capture_output=True, text=True)
+    comb_chk = re_chk.stdout + re_chk.stderr
+    comb_tst = re_tst.stdout + re_tst.stderr
+    if ":6:" not in comb_chk or "CHR010" in comb_chk:
+        print(f"FAIL spec-inventory: #27/#28 check location or cascade failed:\n{comb_chk}")
+        sys.exit(1)
+    if ":6:" not in comb_tst or "CHR010" in comb_tst:
+        print(f"FAIL spec-inventory: #27/#28 test location or cascade failed:\n{comb_tst}")
+        sys.exit(1)
+
+    # Verify exact claim line:col inside and outside Scenario (#29)
+    cf = tmp_dir / "claim_loc.charter"
+    cf.write_text(
+        "Fact person Identified by Anna, Bob.\n"
+        "+person(Anna).\n"
+        "?person(Anna). ?person(Bob).\n"
+        "Scenario s1 {\n"
+        "  ?person(Anna).\n"
+        "  ?person(Bob).\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    rc_tst = subprocess.run([bin_path, "test", str(cf)], capture_output=True, text=True)
+    comb_cl = rc_tst.stdout + rc_tst.stderr
+    if ":3:16: query failed: ?person(\"Bob\")" not in comb_cl or ":6:3 [scenario s1]: query failed: ?person(\"Bob\")" not in comb_cl:
+        print(f"FAIL spec-inventory: #29 exact claim line:col failed:\n{comb_cl}")
+        sys.exit(1)
 finally:
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-print(f"ok   spec-inventory ({len(src_codes)} CHR codes, all lexer keywords, {checked} AST round-trips + idempotence, lockfile rule-drift check)")
+print(f"ok   spec-inventory ({len(src_codes)} CHR codes, all lexer keywords, {checked} AST round-trips + idempotence, lockfile & span checks)")
 PY
