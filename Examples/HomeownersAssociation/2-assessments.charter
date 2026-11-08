@@ -1,25 +1,22 @@
 // Article 2. Assessments, the late fee, and the lien.
 #require "1-association.charter".
-Param assessment : Money(USD, 2) = 15000
-Param late-fee : Money(USD, 2) = 2500
+Param assessment = $150.00
+Param late-fee = $25.00
 Fact month Identified by 1..12
 
 Event month-begins Related to month
-  Creates assessment-due()
+  Creates assessment-due(owner, association, month)
 Duty assessment-due Holder owner Claimant association Related to month
-  Due within 1
+  Due within 1 day
   Terminated by pay-assessment
 Fact late Identified by owner * month
-  Holds when Held(assessment-due()) For 15
-Act pay-assessment Actor owner Recipient association Related to month, usd
-  Valid when (usd == assessment && Not(late())) || (usd == assessment + late-fee && late())
+  Holds when Held(assessment-due(owner, association, month)) For 15 days
+Act pay-assessment Actor owner Recipient association Related to month, amount : USD
+  Valid when (amount == assessment && !late(owner, month))
+          || (amount == assessment + late-fee && late(owner, month))
 Fact lien Identified by owner
-  Holds when (Exists month: Held(assessment-due(owner, association, month)) For 30)
+  Holds when (Exists month: Held(assessment-due(owner, association, month)) For 30 days)
 
-Clause 2.1 Approved "34067a7ead6ab7e8f08d8759fd6709c89af2c7e1e8c2f5ae1e239c2919c8925a"
-  Norm "Each owner pays the association an assessment of one hundred fifty dollars for each month, due on the first day of that month." => assessment-due, pay-assessment
-Clause 2.2 Approved "79779c0171817d29d0617469ffed77acc8eb1c6d0e162eaeaaf1a4f11bf9af76"
-  Norm "An assessment not paid within fifteen days after it is due bears a late fee of twenty-five dollars." => pay-assessment
-Clause 2.3 Approved "112f0658d0eed6eb7ce5e379d2f2da28e5d99e201b430f0c7a9859b21b9f869f"
-  Norm "An assessment still unpaid thirty days after it is due becomes a lien on the owner's house, and the lien remains until the assessment and its late fee are paid." => assessment-due, pay-assessment
-.
+Clause 2.1 => assessment, month-begins, assessment-due, pay-assessment
+Clause 2.2 => late-fee, late, pay-assessment
+Clause 2.3 => lien, assessment-due, pay-assessment.

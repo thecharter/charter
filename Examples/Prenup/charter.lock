@@ -1,0 +1,57 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "6dc05a33b05edded4bfecf46d7ae00d9446549fba61125fd72b714e8087303fe",
+   "path": "prenup.charter"},
+  {"sha256": "3f7a6ce939a658c31d4b47f6cda02304c4c3ab64755ed580d9c723070aa2e8a8",
+   "path": "prenup.md"}],
+ "clauses":
+ [{"textSha256":
+   "ed0a9188631b8c3dff1085e6457dfab0173ec7a1dd081f107b8a40ab22e0c33b",
+   "rulesSha256":
+   "161a95dc01743955e01fdba9d7aaed86439885835d2efc3a608a58283e012f22",
+   "id": "N.1/1"},
+  {"textSha256":
+   "836f588f87a6a2199285f2f368a407608d661f659ae72352382205b67c4fa6fc",
+   "rulesSha256":
+   "00d11d25f56a6b4d21d2fc8c459d206600feee4268a986500313c43206987ffd",
+   "id": "N.1/2"},
+  {"textSha256":
+   "83af9d9d49b232c7eaa5cee39c895f1d42b1dbf029aceb757cdf99f93e0e035c",
+   "rulesSha256":
+   "48485ad4b83005231bc6fd252f00b01dcac9c703c1e5227fff3008ba32904155",
+   "id": "N.1/3"},
+  {"textSha256":
+   "ee11b5eec6d02bf3303e985a77679c072fab356aca3c28f400a2470836785785",
+   "rulesSha256":
+   "deb5b14f452cb384c7d115ab5fcdd7239940e2dce6a715977f508f09c19f3df0",
+   "id": "N.2/1"},
+  {"textSha256":
+   "fc722066313fd7c81cf27292d96a570e6da386900915c23d8c1b98b4c1d8bdc9",
+   "rulesSha256":
+   "26115f088c9f15100df0ec5a326c0d9495429bb5b9c50c903aeaa59ab6d8320e",
+   "id": "N.2/2"},
+  {"textSha256":
+   "41841837d858a605cfa4faed4dfbf8100aeaa5d7bcc087eba0170bdddfdf6a06",
+   "rulesSha256":
+   "fc1969a5a1ee2fa1e0dac83aa093de0d23d86dfefe216a8a40c5731a680bc25d",
+   "id": "N.3"},
+  {"textSha256":
+   "af1ae40a8bdf0ec148f5537eeb1f447728dfa3c262f3d6d5a050bd9bbef22f6a",
+   "rulesSha256":
+   "b869ff5da28ec1e9cecb28016fb774e4f7edb9fddacc1f9dbafcf874ed2a1012",
+   "id": "N.4"},
+  {"textSha256":
+   "8ea2db0fabe7bf942e0a3ffdab37f93e9c619275e4e698965d314d37fb68101f",
+   "rulesSha256":
+   "e20995db0f0605d178a091849a267303b3424171d5a1e95cab8a16658351f0a8",
+   "id": "N.5/1"},
+  {"textSha256":
+   "9c3d19e557797cd4e9e8cf39d019fb96b562da091e4d96b9e2c13fe3aeafa11c",
+   "rulesSha256":
+   "b532a474c1fc0c63aa968041582b9fcd8b07b640ebcea8fa43e3cc0ab70fc7e8",
+   "id": "N.5/2"},
+  {"textSha256":
+   "dc943cf687a54f70d328938f75aff2b3be4a6a2d64ca5a3d637aa5bd8ffaa93a",
+   "rulesSha256":
+   "4182304bd74a89855662d08edb70f243b5509083347ade728ff39e75aab3e266",
+   "id": "N.6"}]}

@@ -1,16 +1,12 @@
 // Article 3. Distributions.
 #require "2-decisions.charter".
-Use poll(usd) As payout
+Use poll(usd) As payout From 3.1
 Fact paid Identified by person * usd
 Power distribute Actor company Related to usd
-  Holds when True
-  Valid when payout-majority(usd) && usd <= cash.usd
-  Creates (Foreach capital: paid(capital.person, MulDivRound(usd, capital.int, total-capital.int, Floor)))
-        , cash(cash.usd - Sum(Foreach capital: MulDivRound(usd, capital.int, total-capital.int, Floor)))
+  Valid when payout-majority(usd) && usd <= cash
+  Creates (Foreach capital: paid(capital.person, MulDivRound(usd, capital.int, total-capital, Floor)))
+        , cash(cash - Sum(Foreach capital: MulDivRound(usd, capital.int, total-capital, Floor)))
   Terminates (Foreach person: payout-yes(person, usd))
 
-Clause 3.1 Approved "c78d0281f24d8518057718d4fdb0a85c79ed409ca8e63b66db89238c2f9cb00f"
-  Norm "The members may by ordinary decision distribute cash the company holds." => payout-vote, distribute
-Clause 3.2 Approved "ac2a94b7251397c5dbf9262f73c4ed6c8c903a5e1b6b95b1fe71251c0120abbf"
-  Norm "A distribution is divided among the members in proportion to their percentage interests. Each share is rounded down to the cent, and what is left over stays with the company." => distribute
-.
+Clause 3.1 => payout-vote, distribute
+Clause 3.2 => paid, cash, distribute.

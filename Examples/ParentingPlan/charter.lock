@@ -1,0 +1,57 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "6aa83fd70a7a6c8ce001a4a639a13b76db892850d943f6c8db5e47e4de143303",
+   "path": "plan.charter"},
+  {"sha256": "2ebf5e0fcc8b02ef8c7e79ab0ba34ee7ffe98303586bdca44ec570ad04a0aaf6",
+   "path": "plan.md"}],
+ "clauses":
+ [{"textSha256":
+   "4473c5ddafcbf661079ff8a35c14ff25403a6b6af2617f33ae26276355c0c2b4",
+   "rulesSha256":
+   "7c28e5aca591c69847121026c15172c76eb8ad5f891c7724cf6781c4676a4671",
+   "id": "1.1"},
+  {"textSha256":
+   "baa64b56b7ad4fef3b1ff0ddcd815cbf8432432912888ae81fa44432aabd5ac1",
+   "rulesSha256":
+   "213fdb79d0613c7e6b96e0654fc4fa3e34d70493029cbbed6c9d06a825fa0fbf",
+   "id": "2.1"},
+  {"textSha256":
+   "df333a71eda7667ad15c19324d4d36fd6ed056f5dd288b1da4fd148d904c1dc3",
+   "rulesSha256":
+   "852f7ba9c68b5be192e655f877b8af6e6f6e511668599d4b73cfa313f3157384",
+   "id": "3.1/1"},
+  {"textSha256":
+   "fbbd315a81ecc281ddab5c4439a4781a069a3cbe7b46be4bfac4420c47b08612",
+   "rulesSha256":
+   "24349e1aab4040776fc097abc4251eda4b00b6881a37b8434e47e38b786664d2",
+   "id": "3.1/2"},
+  {"textSha256":
+   "964fcea93c293bcc533e5b41329d193ed324160da2c15f778855f6215ebe551d",
+   "rulesSha256":
+   "8546a882c038b21c8f2a71ecebb201510386cbd0d998981a8ddbd9cda46dcc51",
+   "id": "4.1"},
+  {"textSha256":
+   "b06a726506d633cd573e067527e8cb5907d1a9fc3bfcfe979f0a29dbd565e964",
+   "rulesSha256":
+   "f4dfac5cb6f15cd61f99f587318506b26e28e9cb55d09ff72e0dee087753b24b",
+   "id": "4.2"},
+  {"textSha256":
+   "3af61f853af8f2a9148a4cd57df804a6237cc360bdc9718ab109ab505d1fc4fa",
+   "rulesSha256":
+   "a7fdcf6e41669a38fdca8360e395b7014898d3de2141fdb921869dec2e80577a",
+   "id": "5.1"},
+  {"textSha256":
+   "beae0b05c5be858cc85cf2fd2a0d411eef4fffbf854122af5a6fc47eea8288ff",
+   "rulesSha256":
+   "a9895b521d76567368e7ef28b50c8ec25beb57d997d9f8fe58f0ce6731038c60",
+   "id": "6.1"},
+  {"textSha256":
+   "0dc27972c97137cb9e66f0c0b0b9641111bfd49216aaa1cd34bdd1c118daed76",
+   "rulesSha256":
+   "f163820fa23c26eade9c1bb174559061722df8b2077223aa2bf687ae436ba2bc",
+   "id": "1.2"},
+  {"textSha256":
+   "94f4e07f4d87053924fe31c959e39bf29a0cb4dc405765d4c974fe7e178fd8ec",
+   "rulesSha256":
+   "2d83a5b64926295be15f278d3204f506aec4f7c148ecb27a7afa14f542a998cc",
+   "id": "2.2"}]}

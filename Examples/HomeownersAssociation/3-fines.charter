@@ -1,6 +1,6 @@
 // Article 3. Violations and fines: notice, a hearing, a finding, and only then a fine.
 #require "1-association.charter".
-Param maximum-fine : Money(USD, 2) = 10000
+Param maximum-fine = $100.00
 Fact violation
 Evidenced Fact committed Identified by owner * violation
 Fact notified Identified by owner * violation
@@ -8,31 +8,21 @@ Fact answer Identified by Yes, No
 
 Act give-notice Actor board Recipient owner Related to violation
   Holds when True
-  Creates notified()
+  Creates notified(owner, violation)
 Finding hear Actor board Recipient owner Related to violation, answer
-  Resolves committed() When answer == Yes
-  Resolves !committed() When answer == No
-  Holds when Held(notified()) For 10
-  Valid when Held(notified()) For 10
-Power fine Actor board Recipient owner Related to violation, usd
-  Holds when committed() && usd <= maximum-fine
-  Valid when committed() && usd <= maximum-fine
-  Creates fine-due()
-Duty fine-due Holder owner Claimant association Related to violation, usd
-  Due within 30
+  Decides committed(owner, violation) When answer == Yes
+  Valid when Held(notified(owner, violation)) For 10 days
+Power fine Actor board Recipient owner Related to violation, amount : USD
+  Valid when committed(owner, violation) && amount <= maximum-fine
+  Creates fine-due(owner, association, violation, amount)
+Duty fine-due Holder owner Claimant association Related to violation, amount : USD
+  Due within 30 days
   Terminated by pay-fine
-Act pay-fine Actor owner Recipient association Related to violation, usd
+Act pay-fine Actor owner Recipient association Related to violation, amount : USD
 
-Clause 3.1 Approved "0f735775534f716c4020a90e6feb4197b89253721812ff3c44d8b4424d703503"
-  Norm "The board may fine an owner for a violation of these rules only after written notice and a hearing." => give-notice, hear, fine
-Clause 3.2 Approved "afb30b5183c15f6166b52a476aa1cf6379c6c8ccc079e2c9ef019c8657851c3d"
-  Norm "The notice states the violation alleged." => give-notice
-  Norm " The hearing is held no sooner than ten days after the notice, so that the owner can prepare an answer." => hear
-Clause 3.3 Approved "a5a4bbbb4dae321c3b9770b883c094d8dc80ceab221c6649dfcd2a2fd87050b7"
-  Norm "At the hearing the board finds whether the owner committed the violation." => hear
-Clause 3.4 Approved "6cf826483068f32575a820922198ba4e04445bd80d610818a8495fad0ac3b644"
-  Norm "The board may fine the owner up to one hundred dollars for a violation it has found." => fine
-  Norm " A fine for a violation the board has not found has no effect." => fine
-Clause 3.5 Approved "eb16a7194307b4148eb4074e52142af7da8163591fe317f82f1768291fa30660"
-  Norm "The owner pays a fine within thirty days after it is imposed." => fine-due, pay-fine
-.
+Clause 3.1 => give-notice, hear, fine
+Clause 3.2/1 => give-notice, notified
+Clause 3.2/2 => hear
+Clause 3.3 => committed, hear
+Clause 3.4 => maximum-fine, fine
+Clause 3.5 => fine-due, pay-fine.

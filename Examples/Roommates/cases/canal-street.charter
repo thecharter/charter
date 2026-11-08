@@ -3,12 +3,12 @@
 Extend Fact person Identified by Tom.
 
 Scenario rent-is-shared-by-floor-area-and-rounded-down {
-  ?share(Asha, 77777). ?share(Luis, 66666). ?share(Mei, 55555).   // two cents short of $2,000.00
+  ?share(Asha, $777.77). ?share(Luis, $666.66). ?share(Mei, $555.55). // two cents short of $2,000.00
   month-begins().
   ?share-due(Luis, Asha). ?share-due(Mei, Asha).
-  ?!share-due(Asha, Asha). ?!share-due(Mei, Luis).                // only to the one who pays the landlord
-  ?!valid pay-share(Luis, Asha, 66667).                           // not his share
-  pay-share(Luis, Asha, 66666).
+  ?!share-due(Asha, Asha). ?!share-due(Mei, Luis).                    // only to the one who pays the landlord
+  ?!valid pay-share(Luis, Asha, $666.67).                             // not his share
+  pay-share(Luis, Asha, $666.66).
   ?!share-due(Luis, Asha).
   @ 1.
   ?violated share-due(Mei, Asha).
@@ -16,26 +16,26 @@ Scenario rent-is-shared-by-floor-area-and-rounded-down {
 
 Scenario each-roommate-owes-the-landlord-the-whole-rent {
   month-begins().
-  pay-share(Luis, Asha, 66666).
+  pay-share(Luis, Asha, $666.66).
   @ 1.
   ?violated rent-due(Asha, Grove).
-  ?violated rent-due(Luis, Grove).                                // though Luis paid his share
-  ?!valid pay-rent(Luis, Grove, 66666).                           // a share is not the rent
-  pay-rent(Luis, Grove, 66666).
+  ?violated rent-due(Luis, Grove).                                    // though Luis paid his share
+  ?!valid pay-rent(Luis, Grove, $666.66).                             // a share is not the rent
+  pay-rent(Luis, Grove, $666.66).
   ?rent-due(Luis, Grove).
-  pay-rent(Luis, Grove, 200000).
+  pay-rent(Luis, Grove, $2,000.00).
   ?!rent-due(Asha, Grove). ?!rent-due(Luis, Grove). ?!rent-due(Mei, Grove).
 }
 
 Scenario a-utility-bill-is-split-in-thirds {
-  show-bill(Asha, "gas", 10000).
-  ?utility-due(Luis, Asha, "gas", 3333). ?utility-due(Mei, Asha, "gas", 3333).
-  ?!utility-due(Asha, Asha, "gas", 3333).
+  show-bill(Asha, "gas", $100.00).
+  ?utility-due(Luis, Asha, "gas", $33.33). ?utility-due(Mei, Asha, "gas", $33.33).
+  ?!utility-due(Asha, Asha, "gas", $33.33).
   @ 13.
-  pay-utility(Luis, Asha, "gas", 3333).
+  pay-utility(Luis, Asha, "gas", $33.33).
   @ 14.
-  ?!utility-due(Luis, Asha, "gas", 3333).
-  ?violated utility-due(Mei, Asha, "gas", 3333).
+  ?!utility-due(Luis, Asha, "gas", $33.33).
+  ?violated utility-due(Mei, Asha, "gas", $33.33).
 }
 
 Scenario a-leaver-stays-liable-until-everyone-approves-a-replacement {
@@ -46,28 +46,28 @@ Scenario a-leaver-stays-liable-until-everyone-approves-a-replacement {
   ?lawful move-out(Mei).
   move-out(Mei).
   month-begins().
-  ?share-due(Mei, Asha). ?rent-due(Mei, Grove).                   // gone, but still a roommate
+  ?share-due(Mei, Asha). ?rent-due(Mei, Grove).                       // gone, but still a roommate
   approve(Asha, Tom).
-  ?!valid take-place(Tom, Mei).                                   // Luis has not approved
+  ?!valid take-place(Tom, Mei).                                       // Luis has not approved
   take-place(Tom, Mei).
   ?roommate(Mei). ?!roommate(Tom).
   approve(Luis, Tom).
   take-place(Tom, Mei).
   ?roommate(Tom). ?!roommate(Mei).
-  ?share(Tom, 55555). ?!share(Mei, 55555).
+  ?share(Tom, $555.55). ?!share(Mei, $555.55).
   @ 60.
   month-begins().
   ?share-due(Tom, Asha).
-  ?violated share-due(Mei, Asha).                                 // what Mei already owed, she still owes
+  ?violated share-due(Mei, Asha).                                     // what Mei already owed, she still owes
 }
 
 Scenario a-replacement-takes-the-place-of-the-leaver {
   give-notice(Asha).
   approve(Luis, Tom). approve(Mei, Tom).
   take-place(Tom, Asha).
-  ?share(Tom, 77777).
+  ?share(Tom, $777.77).
   month-begins().
-  ?share-due(Luis, Tom). ?!share-due(Luis, Asha).                 // Tom now pays the landlord
+  ?share-due(Luis, Tom). ?!share-due(Luis, Asha).                     // Tom now pays the landlord
   ?rent-due(Tom, Grove). ?!rent-due(Asha, Grove).
 }
 
@@ -99,7 +99,7 @@ Scenario a-guest-stays-three-nights-unless-everyone-consents {
   consent-to-stay(Asha, "Kenji").
   @ 4.
   ?!guest-leaves(Mei, Asha, "Kenji").
-  ?violated guest-leaves(Mei, Luis, "Kenji").                     // a fourth night without Luis's consent
+  ?violated guest-leaves(Mei, Luis, "Kenji").                         // a fourth night without Luis's consent
   see-off(Mei, "Kenji").
   ?!guest-leaves(Mei, Luis, "Kenji").
 }

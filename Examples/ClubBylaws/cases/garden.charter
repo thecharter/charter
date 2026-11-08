@@ -2,14 +2,14 @@
 // and Gus, who has not paid.
 #require "../bylaws.charter".
 Extend Fact person Identified by Dev, Esme, Farid, Gus.
-pay-dues(Dev, 3000). pay-dues(Esme, 3000). pay-dues(Farid, 3000).
+pay-dues(Dev, $30.00). pay-dues(Esme, $30.00). pay-dues(Farid, $30.00).
 
 Scenario dues-make-a-member-for-a-year {
-  ?!valid pay-dues(Gus, 2999).                   // less than the annual dues
-  pay-dues(Gus, 2999).
+  ?!valid pay-dues(Gus, $29.99).                 // less than the annual dues
+  pay-dues(Gus, $29.99).
   ?!member(Gus).
   @ 300.
-  pay-dues(Ada, 3000).                           // Ada pays again before her year is out
+  pay-dues(Ada, $30.00).                         // Ada pays again before her year is out
   @ 364.
   ?member(Dev).
   @ 365.
@@ -24,44 +24,44 @@ Scenario a-meeting-needs-notice-and-a-quorum {
   @ 7.
   open-meeting(Ada).
   attend(Ada).
-  ?!quorum().                                    // one of six
+  ?!quorum.                                      // one of six
   motion-vote-aye(Ada, "repaint the shed").
-  ?!valid resolve(GardenClub, "repaint the shed").
-  resolve(GardenClub, "repaint the shed").
+  ?!valid resolve("repaint the shed").
+  resolve("repaint the shed").
   ?!resolved("repaint the shed").                // it was moved and decided nothing
   attend(Bram).
-  ?quorum().                                     // two of six
-  resolve(GardenClub, "repaint the shed").
+  ?quorum.                                       // two of six
+  resolve("repaint the shed").
   ?resolved("repaint the shed").
 }
 
 Scenario only-members-present-vote-and-a-tie-does-not-carry {
   call-meeting(Ada). @ 7. open-meeting(Ada).
   attend(Ada). attend(Bram). attend(Carmen).
-  ?!lawful dues-motion-vote-aye(Dev, 4000).      // a member, but not at the meeting
-  dues-motion-vote-aye(Dev, 4000).
+  ?!lawful dues-motion-vote-aye(Dev, $40.00).    // a member, but not at the meeting
+  dues-motion-vote-aye(Dev, $40.00).
   ?!lawful attend(Gus).
-  attend(Gus). dues-motion-vote-aye(Gus, 4000).  // at the meeting, but not a member
-  dues-motion-vote-aye(Ada, 4000). dues-motion-vote-nay(Bram, 4000).
-  ?!valid set-dues(GardenClub, 4000).            // one for, one against
-  dues-motion-vote-aye(Carmen, 4000).
-  set-dues(GardenClub, 4000).
-  ?dues(4000).
-  ?!valid pay-dues(Gus, 3000).                   // thirty dollars no longer buys a membership
+  attend(Gus). dues-motion-vote-aye(Gus, $40.00). // at the meeting, but not a member
+  dues-motion-vote-aye(Ada, $40.00). dues-motion-vote-nay(Bram, $40.00).
+  ?!valid set-dues($40.00).                      // one for, one against
+  dues-motion-vote-aye(Carmen, $40.00).
+  set-dues($40.00).
+  ?dues($40.00).
+  ?!valid pay-dues(Gus, $30.00).                 // thirty dollars no longer buys a membership
 }
 
 Scenario the-most-votes-wins-an-office-for-a-year {
   call-meeting(Ada). @ 7. open-meeting(Ada).
   attend(Ada). attend(Bram). attend(Dev). attend(Esme).
   vote-for(Ada, Dev, President). vote-for(Bram, Ada, President).
-  ?!valid elect(GardenClub, Dev, President).     // one vote each
+  ?!valid elect(Dev, President).                 // one vote each
   vote-for(Esme, Esme, President).
   vote-for(Esme, Dev, President).                // Esme changes her vote; she has one
-  ?valid elect(GardenClub, Dev, President). ?!valid elect(GardenClub, Ada, President).
-  elect(GardenClub, Dev, President).
+  ?valid elect(Dev, President). ?!valid elect(Ada, President).
+  elect(Dev, President).
   ?officer(President, Dev). ?!officer(President, Ada).
   vote-for(Ada, Dev, Treasurer).
-  ?!valid elect(GardenClub, Dev, Treasurer).     // Dev is already president
+  ?!valid elect(Dev, Treasurer).                 // Dev is already president
   meeting-ends().
   @ 371.
   ?officer(President, Dev).
@@ -75,11 +75,11 @@ Scenario two-thirds-of-those-voting-remove-an-officer {
   attend(Ada). attend(Bram). attend(Dev). attend(Esme). attend(Farid).
   removal-vote-aye(Dev, Carmen). removal-vote-aye(Esme, Carmen).
   removal-vote-nay(Ada, Carmen). removal-vote-nay(Bram, Carmen).
-  ?!valid remove(GardenClub, Carmen).            // two of four voting
+  ?!valid remove(Carmen).                        // two of four voting
   removal-vote-aye(Farid, Carmen).
-  ?!valid remove(GardenClub, Carmen).            // three of five is not two thirds
+  ?!valid remove(Carmen).                        // three of five is not two thirds
   removal-vote-aye(Bram, Carmen).
-  remove(GardenClub, Carmen).                    // four of five
+  remove(Carmen).                                // four of five
   ?!officer(Treasurer, Carmen).
 }
 
@@ -88,11 +88,11 @@ Scenario an-amendment-needs-fourteen-days-notice {
   attend(Ada). attend(Bram). attend(Dev). attend(Esme). attend(Farid).
   (Foreach person: amendment-vote-aye(person, RemovalByMotion) When present(person)).
   ?amendment-two-thirds(RemovalByMotion).
-  ?!valid removal-by-motion(GardenClub).         // unanimous, on seven days' notice
-  removal-by-motion(GardenClub).
+  ?!valid removal-by-motion().                   // unanimous, on seven days' notice
+  removal-by-motion().
   removal-vote-aye(Dev, Carmen). removal-vote-aye(Esme, Carmen). removal-vote-aye(Farid, Carmen).
   removal-vote-nay(Ada, Carmen). removal-vote-nay(Bram, Carmen).
-  ?!valid remove(GardenClub, Carmen).            // 4.4 still reads as adopted
+  ?!valid remove(Carmen).                        // 4.4 still reads as adopted
 }
 
 Scenario an-amendment-needs-two-thirds-of-those-voting {
@@ -100,13 +100,13 @@ Scenario an-amendment-needs-two-thirds-of-those-voting {
   attend(Ada). attend(Bram). attend(Dev). attend(Esme). attend(Farid).
   amendment-vote-aye(Dev, RemovalByMotion). amendment-vote-aye(Esme, RemovalByMotion). amendment-vote-aye(Farid, RemovalByMotion).
   amendment-vote-nay(Ada, RemovalByMotion). amendment-vote-nay(Bram, RemovalByMotion).
-  ?!valid removal-by-motion(GardenClub).         // three of five
+  ?!valid removal-by-motion().                   // three of five
   amendment-vote-aye(Bram, RemovalByMotion).
-  removal-by-motion(GardenClub).                 // four of five
+  removal-by-motion().                           // four of five
   removal-vote-aye(Dev, Carmen). removal-vote-aye(Esme, Carmen). removal-vote-aye(Farid, Carmen).
   removal-vote-nay(Ada, Carmen). removal-vote-nay(Bram, Carmen).
-  ?valid remove(GardenClub, Carmen).             // three against two now carries
-  remove(GardenClub, Carmen).
+  ?valid remove(Carmen).                         // three against two now carries
+  remove(Carmen).
   ?!officer(Treasurer, Carmen).
 }
 
@@ -116,13 +116,13 @@ Scenario article-one-cannot-be-amended {
   (Foreach person: amendment-vote-aye(person, RepealNoProfit) When member(person)).
   (Foreach person: amendment-vote-aye(person, RepealEntrenchment) When member(person)).
   ?amendment-two-thirds(RepealNoProfit). ?amendment-two-thirds(RepealEntrenchment).
-  ?!valid repeal-entrenchment(GardenClub).       // 5.2 protects itself
-  repeal-entrenchment(GardenClub).
+  ?!valid repeal-entrenchment().                 // 5.2 protects itself
+  repeal-entrenchment().
   ?entrenched(GardenClub).
-  ?!valid repeal-no-profit(GardenClub).
-  repeal-no-profit(GardenClub).
-  ?!lawful pay-profit(GardenClub, Ada, 50000).   // still a breach
-  ?lawful pay-profit(GardenClub, Gus, 50000).    // Gus is not a member
+  ?!valid repeal-no-profit().
+  repeal-no-profit().
+  ?!lawful pay-profit(Ada, $500.00).             // still a breach
+  ?lawful pay-profit(Gus, $500.00).              // Gus is not a member
 }
 
 Scenario the-board-owes-a-meeting-every-year {

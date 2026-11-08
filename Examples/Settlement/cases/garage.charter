@@ -3,22 +3,22 @@
 
 Scenario nothing-is-owed-until-both-have-signed {
   sign(Elena).
-  ?!in-effect().
+  ?!in-effect.
   ?!payment-due().
-  ?!lawful pay(usd = 1800000).
+  ?!lawful pay($18,000.00).
   sign(Northgate).
-  ?in-effect().
+  ?in-effect.
   ?payment-due().
 }
 
 sign(Elena). sign(Northgate).
 
 Scenario full-payment-releases-both-sides {
-  ?!released().
+  ?!released.
   ?lawful sue(Northgate, Elena, Incident).       // until then no claim is released
   @ 10.
-  pay(usd = 1800000).
-  ?released(). ?!payment-due().
+  pay($18,000.00).
+  ?released. ?!payment-due().
   ?!lawful sue(Elena, Northgate, Incident).
   ?!lawful sue(Northgate, Elena, Incident).
   ?lawful sue(Elena, Northgate, AnotherMatter).  // only claims arising from the incident
@@ -28,19 +28,19 @@ Scenario full-payment-releases-both-sides {
 }
 
 Scenario part-payment-releases-nothing {
-  pay(usd = 1000000).
-  ?paid(1000000).
-  ?!released(). ?payment-due().
+  pay($10,000.00).
+  ?paid($10,000.00).
+  ?!released. ?payment-due().
   ?lawful sue(Northgate, Elena, Incident).
   ?!dismissal-due().
-  pay(usd = 800000).
-  ?released(). ?!payment-due().
+  pay($8,000.00).
+  ?released. ?!payment-due().
 }
 
 Scenario the-lawsuit-is-dismissed-within-seven-days-of-payment {
   ?!dismissal-due().
   @ 10.
-  pay(usd = 1800000).
+  pay($18,000.00).
   ?dismissal-due().
   @ 16.
   ?!violated dismissal-due().
@@ -53,12 +53,12 @@ Scenario the-lawsuit-is-dismissed-within-seven-days-of-payment {
 
 Scenario payment-in-time-leaves-nothing-to-rescind {
   @ 13.
-  pay(usd = 1800000).
+  pay($18,000.00).
   @ 30.
   ?!violated payment-due().
   ?!valid rescind().
   rescind().
-  ?released().                                   // the attempt changed nothing
+  ?released.                                     // the attempt changed nothing
 }
 
 Scenario late-payment-lets-the-claimant-undo-the-release {
@@ -69,17 +69,17 @@ Scenario late-payment-lets-the-claimant-undo-the-release {
   ?violated payment-due().
   ?valid rescind().
   @ 20.
-  pay(usd = 1800000).
-  ?released().                                   // paid in full, but late
+  pay($18,000.00).
+  ?released.                                     // paid in full, but late
   ?valid rescind().
   rescind().
-  ?!in-effect(). ?!released().
+  ?!in-effect. ?!released.
   ?lawful sue(Elena, Northgate, Incident).       // as if never released
   ?!dismissal-due().
   ?return-due().
-  ?!valid return-payment(usd = 1000000).         // she returns whatever was paid, not part
-  return-payment(usd = 1800000).
-  ?paid(0). ?!return-due().
+  ?!valid return-payment($10,000.00).            // she returns whatever was paid, not part
+  return-payment($18,000.00).
+  ?paid($0). ?!return-due().
 }
 
 Scenario the-terms-stay-confidential-unless-the-law-requires {
@@ -90,8 +90,8 @@ Scenario the-terms-stay-confidential-unless-the-law-requires {
 }
 
 Scenario paying-admits-nothing {
-  pay(usd = 1800000).
+  pay($18,000.00).
   dismiss-lawsuit().
   ?!admission(Northgate). ?!admission(Elena).
-  ?no-admission().
+  ?no-admission.
 }

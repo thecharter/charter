@@ -2,10 +2,7 @@
 #require "5-amendment.charter".
 Extend Fact amendment Identified by A1
 Amend late-fee-fifty Actor board
-  Holds when carried(A1)
   Valid when carried(A1)
-  Creates late-fee(5000)
+  Creates late-fee($50.00)
 
-Clause A.1 Approved "c4238dda4e6e3193d85b839778daafb2694915da6f81d2ca2edba0b5bbdede52"
-  Norm "Clause 2.2 is amended to read: An assessment not paid within fifteen days after it is due bears a late fee of fifty dollars." => late-fee-fifty
-.
+Clause A.1 => late-fee-fifty.

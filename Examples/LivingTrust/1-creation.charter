@@ -1,16 +1,15 @@
 // Article 1. Creation: the parties and the trust fund.
 Fact person Identified by Margaret, Daniel, Anna, Ben
-Fact usd Identified by Money(USD, 2)
-Var fund Identified by usd
+Role settlor For person Is Margaret
+Role beneficiary For person Where person == Anna || person == Ben
+Var fund : USD
 Bool in-force
 Fact deceased Identified by person
 Event death Related to person Creates deceased(person)
 
-Act settle Actor person Related to usd
-  Holds when person == Margaret && Not(in-force())
-  Creates in-force(), fund(usd)
+Act settle Actor settlor Related to amount : USD
+  Holds when !in-force
+  Creates in-force, fund(amount)
 
-Clause 1.1 Approved "be7e6c0e60e0828b820bc3bef28313a3e53da746f72d56149ceb33a040822b1a"
-  Norm "Margaret Ellis, the settlor, transfers the trust fund to the trustee to hold in trust." => settle
-  Definition " The settlor is the first trustee."
-.
+Clause 1.1/1 => settlor, fund, in-force, settle
+Clause 1.1/2 Definition => settlor.

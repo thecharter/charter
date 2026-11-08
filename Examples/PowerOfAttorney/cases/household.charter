@@ -6,29 +6,29 @@ Extend Fact account Identified by Savings.
 +beneficiary(Savings, Estate).
 
 Scenario the-agent-pays-a-bill-and-it-binds-the-principal {
-  ?!valid pay(Marcus, Citylight, 12000).           // not yet signed
-  sign(Helen).
-  ?lawful pay(Marcus, Citylight, 12000).
-  pay(Marcus, Citylight, 12000).
-  ?dealt(Citylight, 12000).
-  ?!valid pay(Nora, Citylight, 9900).              // Nora is not the agent
-  pay(Nora, Citylight, 9900).
-  ?!dealt(Citylight, 9900).
-  transfer(Marcus, Lakeside, 300000).
-  ?dealt(Lakeside, 300000).
+  ?!valid pay(Marcus, Citylight, $120.00).         // not yet signed
+  sign().
+  ?lawful pay(Marcus, Citylight, $120.00).
+  pay(Marcus, Citylight, $120.00).
+  ?dealt(Citylight, $120.00).
+  ?!valid pay(Nora, Citylight, $99.00).            // Nora is not the agent
+  pay(Nora, Citylight, $99.00).
+  ?!dealt(Citylight, $99.00).
+  transfer(Marcus, Lakeside, $3,000.00).
+  ?dealt(Lakeside, $3,000.00).
 }
 
 Scenario a-gift-above-five-hundred-dollars-does-not-bind {
-  sign(Helen).
-  ?valid give(Marcus, Nora, 50000).
-  ?!lawful give(Marcus, Nora, 50001).
-  ?!valid give(Marcus, Nora, 50001).
-  give(Marcus, Nora, 50001).
-  ?!dealt(Nora, 50001).                            // it occurred and changed nothing
+  sign().
+  ?valid give(Marcus, Nora, $500.00).
+  ?!lawful give(Marcus, Nora, $500.01).
+  ?!valid give(Marcus, Nora, $500.01).
+  give(Marcus, Nora, $500.01).
+  ?!dealt(Nora, $500.01).                          // it occurred and changed nothing
 }
 
 Scenario the-agent-cannot-change-a-beneficiary {
-  sign(Helen).
+  sign().
   ?!lawful change-beneficiary(Marcus, Savings, Marcus).
   ?!valid change-beneficiary(Marcus, Savings, Marcus).
   change-beneficiary(Marcus, Savings, Marcus).
@@ -38,49 +38,49 @@ Scenario the-agent-cannot-change-a-beneficiary {
 }
 
 Scenario the-power-survives-incapacity {
-  sign(Helen).
+  sign().
   loses-capacity().
-  ?lawful pay(Marcus, Citylight, 12000).           // durable
-  ?valid pay(Marcus, Citylight, 12000).
+  ?lawful pay(Marcus, Citylight, $120.00).         // durable
+  ?valid pay(Marcus, Citylight, $120.00).
   ?!valid revoke(Helen).                           // she cannot revoke without capacity
   revoke(Helen).
-  ?authority().
+  ?authority.
   regains-capacity().
   ?valid revoke(Helen).
 }
 
 Scenario after-revocation-only-a-person-without-notice-is-protected {
-  sign(Helen).
+  sign().
   revoke(Helen).
-  ?!authority().
-  ?!lawful pay(Marcus, Lakeside, 12000).           // the agent has no authority now
-  ?valid pay(Marcus, Lakeside, 12000).             // but the bank has no notice
-  pay(Marcus, Lakeside, 12000).
-  ?dealt(Lakeside, 12000).
+  ?!authority.
+  ?!lawful pay(Marcus, Lakeside, $120.00).         // the agent has no authority now
+  ?valid pay(Marcus, Lakeside, $120.00).           // but the bank has no notice
+  pay(Marcus, Lakeside, $120.00).
+  ?dealt(Lakeside, $120.00).
   give-notice(Helen, Citylight).
-  ?!valid pay(Marcus, Citylight, 12000).
-  pay(Marcus, Citylight, 12000).
-  ?!dealt(Citylight, 12000).
+  ?!valid pay(Marcus, Citylight, $120.00).
+  pay(Marcus, Citylight, $120.00).
+  ?!dealt(Citylight, $120.00).
 }
 
 Scenario authority-ends-at-death {
-  sign(Helen).
+  sign().
   ?!lawful give-notice(Nora, Lakeside).            // nothing has ended yet
   death().
-  ?!lawful transfer(Marcus, Lakeside, 300000).
-  ?valid transfer(Marcus, Lakeside, 300000).       // binds the estate until the bank knows
+  ?!lawful transfer(Marcus, Lakeside, $3,000.00).
+  ?valid transfer(Marcus, Lakeside, $3,000.00).    // binds the estate until the bank knows
   give-notice(Nora, Lakeside).
-  ?!valid transfer(Marcus, Lakeside, 300000).
+  ?!valid transfer(Marcus, Lakeside, $3,000.00).
   ?!valid revoke(Helen).
 }
 
 Scenario the-account-is-due-thirty-days-after-the-request {
-  sign(Helen).
-  pay(Marcus, Citylight, 12000).
-  request-account(Helen, Marcus).
+  sign().
+  pay(Marcus, Citylight, $120.00).
+  request-account().
   ?account-due(Marcus, Helen).
   ?!lawful give-account(Marcus, Helen).            // the payment is not yet recorded
-  record(Marcus, Citylight, 12000).
+  record(Marcus, Citylight, $120.00).
   ?lawful give-account(Marcus, Helen).
   @ 29.
   ?!violated account-due(Marcus, Helen).

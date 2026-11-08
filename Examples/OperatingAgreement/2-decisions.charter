@@ -2,41 +2,34 @@
 #require "1-members.charter".
 Module poll(subject) {
   Fact yes Identified by person * subject
-  Act vote Actor person Related to subject
-    Holds when member(person)
-    Creates yes()
+  Act vote Actor member Related to subject
+    Holds when True
+    Creates yes(member, subject)
   Fact majority Identified by subject
     Derived from majority(yes.subject)
-      When Sum(Foreach capital: capital.int When yes(capital.person, yes.subject)) * 2 > total-capital.int
+      When Sum(Foreach capital: capital.int When yes(capital.person, yes.subject)) * 2 > total-capital
   Fact three-quarters Identified by subject
     Derived from three-quarters(yes.subject)
-      When Sum(Foreach capital: capital.int When yes(capital.person, yes.subject)) * 4 >= total-capital.int * 3
+      When Sum(Foreach capital: capital.int When yes(capital.person, yes.subject)) * 4 >= total-capital * 3
   Fact unanimous Identified by subject
     Derived from unanimous(yes.subject)
-      When Not(Exists person: member(person) && Not(yes(person, yes.subject)))
+      When !(Exists person: member(person) && !yes(person, yes.subject))
 }
 
 Placeholder candidate For person
 Fact matter Identified by SellTheBusiness
-Use poll(candidate) As admission
-Use poll(matter) As matter
+Use poll(candidate) As admission From 2.1
+Use poll(matter) As matter From 2.1
 
 Bool business-sold
 Power admit Actor company Recipient candidate
-  Holds when True
   Valid when admission-unanimous(candidate)
   Creates member(candidate)
 Power sell-business Actor company
-  Holds when True
   Valid when matter-unanimous(SellTheBusiness)
-  Creates business-sold()
+  Creates business-sold
 
-Clause 2.1 Approved "f73072469ad913965faa8ea15f03e180d8e3f42b2a73b59245c86e2e5217f649"
-  Norm "The members vote in proportion to their percentage interests." => admission-vote, matter-vote
-Clause 2.2 Approved "f82355c2dbe927a66ce4c06f36d1be8f511908768ab518c9775f6285e97b1b77"
-  Definition "An ordinary decision is made by members holding more than half of the percentage interests."
-Clause 2.3 Approved "b6c95409ae67b33c8a534dfa0aa4c45155cc1fb0164f20e013bb8b6f5e4e4d64"
-  Norm "A decision to admit a new member or to sell the business is made only by all the members." => admit, sell-business
-Clause 2.4 Approved "61bd213ddcfd307441229f3981306bc1b3dcbb13d3c5af2fd5a29497793217f7"
-  Norm "A decision made without the vote this agreement requires has no effect." => admit, sell-business
-.
+Clause 2.1 => admission-vote, matter-vote
+Clause 2.2 Definition
+Clause 2.3 => admit, sell-business
+Clause 2.4 => admit, sell-business.

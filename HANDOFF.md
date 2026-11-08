@@ -5,6 +5,37 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-08 (2): remaining 10 bugs & diagnostics closed (`#80`, `#19`, `#20`, `#24`, `#27`–`#29`, `#31`, `#33`, `#34`) and all 20 worked `Examples/` rewritten in `D34`–`D38` Charter
+
+## Where
+
+- `main`, pushed in atomic, battery-green commits (`5a6b8a4`, `3939564`, `601338b`, plus the 20-example `D34`–`D38` rewrite).
+- `tools/battery`: **PASS** across all 25 steps (zero build warnings across 187 jobs, 202/202 spec conformance fixtures, 13/13 stdlib suites, 4/4 zero-axiom `prove`, 14/14 `verify`, 196/196 eFLINT corpus, 20/20 worked examples, and `spec-inventory` checking all AST + comment-preserving `fmt` round-trips); `/Users/eric/psa/tools/verify-psa`: **PASS** across all 6 stages.
+- Tracking issue `#79`: **62 closed / 16 open** (every bug, wrong-answer defect, diagnostic issue, language ergonomics proposal, and stdlib-provenance item is now closed; only layout/LSP views `#63`, `#64`, `#72`, proof/projection/service items `#65`–`#71`, `#73`, and PSA-scale items `#74`–`#78` remain).
+
+## What landed
+
+1. **Remaining wrong-answer, checker & loader fixes (`5a6b8a4` + `Derivation.lean` `Done`/`Since` stratification fix)**:
+   - **`#80` (`spec_004_12b`)**: bounded Kleene conflict-taint overlay in `Eval.evalTermTri` and `Eval.evalActTri` (preserving two-valued `Saturate` and all fixpoint theorems untouched while propagating `undetermined` through intermediate derived facts reading conflicted `Default`/`Exception` premises positively or negatively; explicit assignments override per `004.3`).
+   - **`#19` (`spec_004_12c`)**: `DefeasibleRule.freeVars` binds free `Param` and fact variables jointly across `Yields <val> When <cond>` on `Function` and `Var` (including 1-product `Var` domains and `Extend Var`/`Function`/`Bool`/`Role`), fixes non-product self-dependency in `Stratify.typeDeps`, and checks `Stratify.strata` (`CHR020`) in `charter check`.
+   - **`#20` (`spec_011_7b`)**: canonicalizes `#require` paths via `IO.FS.realPath` so cyclic/back-referenced article files load at most once regardless of relative path spelling.
+   - **`#24` (`spec_012_6b`)**: includes rules declared inside `Amend ... Installs { ... }` in `Spec.ruleIds`, `citeableIds`, `fromSpans`, and `clauseRulesDigest`.
+   - **Compiler fixes uncovered by the 20-example rewrite**: `Decides <fact> When <cond>` parses `<fact>` at `orExpr` so `When` is not swallowed (`Parser.lean`), and `Stratify.deps` treats `Done(act)` / `Since(act)` on triggerable `Act`/`Event`s as state `$occ` lookups rather than derived-fact dependencies (`Derivation.lean`).
+2. **Source spans, block recovery, claim locations & parser diagnostics (`3939564`)**:
+   - **`#27`**: `Decl.atPos`, `ModClause.atPos`, and `Resolve.withPos` anchor resolve diagnostics to the exact offending declaration or clause `line:col` while stripping positions before `CIR` (`TypeSpec`).
+   - **`#28`**: `recoverPhraseDecls` preserves sibling declarations across failed blocks in `check` and `lsp` and suppresses cascaded `CHR010`s in `test` and `run`.
+   - **`#29`**: `Item.subPos` tracks per-phrase positions inside `Scenario` (including `Scenario ... After`), reporting each failing claim's own `line:col` and isolated claim text.
+   - **`#34` (`spec_004_12d`, `spec_011_11c`)**: clear `CHR003` when `Default`/`Exception` omits its rule name, digit-suffixed `Scenario` names (`t1`, `t2`), and optional `.` after standalone `Document "..."` before `#require`/`#include`.
+3. **`charter fmt` & `charter check` UX (`601338b`)**:
+   - **`#31`**: `Pretty.formatSourceAndVerify` preserves `//` and `/* ... */` comments, single blank lines, end-of-line comment alignment, and author line breaks while normalizing spacing and verifying AST round-trips; `Pretty.fmtTermPrec` (`--canonical`) emits minimal precedence-aware parentheses with zero duplicate `Text` lines. `charter fmt --check` passes across all `Examples/`.
+   - **`#33`**: `charter check` prints only failures/warnings and the summary line by default (`--verbose` prints all passing checks), flushes stdout/stderr to prevent mid-line interleaving, and `charter test` reports `failed provenance check(s)` separately from `failed claim(s)`.
+4. **All 20 worked `Examples/` rewritten in idiomatic `D34`–`D38` Charter (`git diff Examples/*/*.md` empty)**:
+   - Retyped clause English: `24,814` chars → **`0` chars** (`-100%`, heading/paragraph/sentence `Clause <ID>` extraction).
+   - Inline `Approved` digests: `14,325` chars → **`0` chars** (`-100%`, rule-aware `charter.lock` via `charter approve --lock`).
+   - Total spec lines (rules + clauses): `1,776` → **`1,470`** (`-306` lines, `-17.2%`); unlinked spans `33` → **`0`**; repeated `Power` conditions `20` → **`4`** (`-80%`); `x == Name` comparisons `54` → **`17`** (`-69%`, zero party checks); empty `f()` applications `414` → **`14`** (`-97%`).
+
+---
+
 # Handoff — 2026-11-08: all 27 ergonomics proposals (`#35`–`#61`) + stdlib provenance (`#62`) implemented (`D34`–`D38`)
 
 ## Where

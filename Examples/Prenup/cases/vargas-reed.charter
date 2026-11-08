@@ -1,16 +1,16 @@
 // Elena and Tomas: a flat and a boat owned before the wedding; salary, a bequest and a car after.
 #require "../prenup.charter".
 Extend Fact asset Identified by Flat, Boat, Savings, Bequest, Car.
-acquires(Elena, Flat, 30000000).
-acquires(Tomas, Boat, 4000000).
+acquires(Elena, Flat, $300,000.00).
+acquires(Tomas, Boat, $40,000.00).
 
 Scenario divided-as-written {
   list(Elena, Flat). list(Tomas, Boat).
   sign(Elena). sign(Tomas).
-  ?in-force().
+  ?in-force.
   wedding().
-  acquires(Tomas, Savings, 9000001).
-  receives-gift(Elena, Bequest, 5000000).
+  acquires(Tomas, Savings, $90,000.01).
+  receives-gift(Elena, Bequest, $50,000.00).
   ?!marital(Flat). ?!marital(Boat). ?marital(Savings). ?!marital(Bequest).
   ?!marital(Car).                                  // nobody owns a car
   @ 2000.
@@ -19,16 +19,16 @@ Scenario divided-as-written {
   ?valid keep(Elena, Flat). ?valid keep(Tomas, Boat). ?valid keep(Elena, Bequest).
   ?!valid keep(Tomas, Savings).                    // marital
   ?!valid keep(Tomas, Flat).                       // not his
-  ?pool(9000001).                                  // the savings are the only marital property
+  ?pool($90,000.01).                               // the savings are the only marital property
   take-half(Elena). take-half(Tomas).
-  ?awarded(Elena, 4500000). ?awarded(Tomas, 4500000).
+  ?awarded(Elena, $45,000.00). ?awarded(Tomas, $45,000.00).
 }
 
 Scenario a-void-claim-occurs-and-changes-nothing {
   list(Elena, Flat). list(Tomas, Boat).
   sign(Elena). sign(Tomas).
   wedding().
-  acquires(Tomas, Savings, 9000001).
+  acquires(Tomas, Savings, $90,000.01).
   divorce().
   keep(Tomas, Savings).
   ?!kept(Tomas, Savings).
@@ -40,10 +40,10 @@ Scenario property-left-off-the-list-voids-the-agreement {
   list(Elena, Flat).
   sign(Elena). sign(Tomas).                        // Tomas did not list the boat
   ?concealed(Tomas). ?!concealed(Elena).
-  ?!in-force().
+  ?!in-force.
   ?!lawful list(Tomas, Boat).                      // too late
   list(Tomas, Boat).
-  ?!in-force().
+  ?!in-force.
   wedding().
   divorce().
   ?!valid keep(Elena, Flat).
@@ -53,19 +53,19 @@ Scenario property-left-off-the-list-voids-the-agreement {
 Scenario one-signature-binds-nobody {
   list(Elena, Flat). list(Tomas, Boat).
   sign(Elena).
-  ?!in-force().
+  ?!in-force.
   wedding().
   divorce().
   ?!valid take-half(Tomas).
   take-half(Tomas).
-  ?!awarded(Tomas, 0).                             // the claim occurred and awarded nothing
+  ?!awarded(Tomas, $0).                            // the claim occurred and awarded nothing
 }
 
 Scenario a-bequest-put-in-the-joint-account-becomes-marital {
   list(Elena, Flat). list(Tomas, Boat).
   sign(Elena). sign(Tomas).
   wedding().
-  receives-gift(Elena, Bequest, 5000000).
+  receives-gift(Elena, Bequest, $50,000.00).
   ?!marital(Bequest).
   ?!lawful put-in-joint-account(Tomas, Bequest).   // it is Elena's to move
   put-in-joint-account(Elena, Bequest).
@@ -76,7 +76,7 @@ Scenario a-bequest-put-in-the-joint-account-becomes-marital {
   ?!valid keep(Elena, Bequest).
   ?!valid keep(Tomas, Boat).
   take-half(Tomas).
-  ?awarded(Tomas, 4500000).                        // half of the bequest and the boat
+  ?awarded(Tomas, $45,000.00).                     // half of the bequest and the boat
 }
 
 Scenario the-agreement-lapses-after-ten-years {
@@ -84,9 +84,9 @@ Scenario the-agreement-lapses-after-ten-years {
   sign(Elena). sign(Tomas).
   wedding().
   @ 3649.
-  ?in-force().
+  ?in-force.
   @ 3650.
-  ?!in-force().
+  ?!in-force.
   divorce().
   ?!valid keep(Elena, Flat).
   ?!valid take-half(Elena).
@@ -99,7 +99,7 @@ Scenario a-divorce-inside-the-term-stays-governed {
   @ 3649.
   divorce().
   @ 5000.
-  ?!in-force().
+  ?!in-force.
   ?valid keep(Elena, Flat).
   ?valid take-half(Elena).
 }
@@ -108,8 +108,8 @@ Scenario an-odd-cent-goes-to-neither {
   list(Elena, Flat). list(Tomas, Boat).
   sign(Elena). sign(Tomas).
   wedding().
-  acquires(Elena, Car, 1500001).
+  acquires(Elena, Car, $15,000.01).
   divorce().
   take-half(Elena). take-half(Tomas).
-  ?awarded(Elena, 750000). ?awarded(Tomas, 750000).
+  ?awarded(Elena, $7,500.00). ?awarded(Tomas, $7,500.00).
 }

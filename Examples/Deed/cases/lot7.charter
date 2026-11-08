@@ -19,18 +19,19 @@ Scenario a-stranger-conveys-nothing {
 }
 
 Scenario the-grantor-pays-off-the-old-lien {
+  Let TaxLien = "county tax lien".
   sign(Robert, Sofia, Lot7). deliver(Robert, Sofia, Lot7).
-  ?warranted(Robert, Sofia, Lot7, "county tax lien").
-  ?lawful demand-payoff(Sofia, Robert, Lot7, "county tax lien").
-  demand-payoff(Sofia, Robert, Lot7, "county tax lien").
-  ?payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  ?warranted(Robert, Sofia, Lot7, TaxLien).
+  ?lawful demand-payoff(Sofia, Robert, Lot7, TaxLien).
+  demand-payoff(Sofia, Robert, Lot7, TaxLien).
+  ?payoff-due(Robert, Sofia, Lot7, TaxLien).
   @ 29.
-  ?!violated payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  ?!violated payoff-due(Robert, Sofia, Lot7, TaxLien).
   @ 30.
-  ?violated payoff-due(Robert, Sofia, Lot7, "county tax lien").
-  pay-off(Robert, Sofia, Lot7, "county tax lien").
-  ?!lien(Lot7, "county tax lien").
-  ?!payoff-due(Robert, Sofia, Lot7, "county tax lien").
+  ?violated payoff-due(Robert, Sofia, Lot7, TaxLien).
+  pay-off(Robert, Sofia, Lot7, TaxLien).
+  ?!lien(Lot7, TaxLien).
+  ?!payoff-due(Robert, Sofia, Lot7, TaxLien).
 }
 
 Scenario an-unrecorded-deed-loses-to-a-later-buyer-without-notice {

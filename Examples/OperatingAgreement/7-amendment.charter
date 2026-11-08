@@ -1,9 +1,7 @@
 // Article 7. Amendment.
 #require "2-decisions.charter".
 Fact amendment
-Use poll(amendment) As amendment
+Use poll(amendment) As amendment From 7.1/1
 
-Clause 7.1 Approved "19139fb73f932f50fba03418c53e3dff6d76b5cc4a220db4efa74a86a7110599"
-  Norm "This agreement may be amended only by members holding at least three quarters of the percentage interests." => amendment-vote
-  Norm " An amendment made without that vote has no effect." => first-amendment
-.
+Clause 7.1/1 => amendment-vote
+Clause 7.1/2 => first-amendment.

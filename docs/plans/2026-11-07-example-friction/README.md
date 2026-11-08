@@ -1,6 +1,6 @@
 # What twenty ordinary agreements cost to write in Charter
 
-**Date:** 2026-11-07. **Status:** ruled and implemented (`D29`–`D38`, 2026-11-08; tracked in [#79](https://github.com/thecharter/charter/issues/79)). All 18 runnable reproductions formerly in `reproductions/` have been fixed and replaced by `test/spec/` conformance fixtures, and all 27 language ergonomics proposals ([#35](https://github.com/thecharter/charter/issues/35)–[#61](https://github.com/thecharter/charter/issues/61)) plus standard-library provenance ([#62](https://github.com/thecharter/charter/issues/62)) are implemented. Remaining compiler/tooling/verification items remain tracked in [#79](https://github.com/thecharter/charter/issues/79).
+**Date:** 2026-11-07. **Status:** ruled, implemented, and verified across all 20 worked examples (`D29`–`D38` + bug/diagnostic sweep `#19`, `#20`, `#24`, `#27`–`#29`, `#31`, `#33`, `#34`, `#80`, 2026-11-08; tracked in [#79](https://github.com/thecharter/charter/issues/79)). All 18 runnable reproductions formerly in `reproductions/` have been fixed and replaced by `test/spec/` conformance fixtures, all 27 language ergonomics proposals ([#35](https://github.com/thecharter/charter/issues/35)–[#61](https://github.com/thecharter/charter/issues/61)) plus standard-library provenance ([#62](https://github.com/thecharter/charter/issues/62)) are implemented, and all 20 agreements under `Examples/` have been rewritten into idiomatic `D34`–`D38` Charter with zero edits to any English `.md` document. Remaining multi-file layout, proof, projection, and PSA-scale enhancements remain tracked in [#79](https://github.com/thecharter/charter/issues/79).
 
 Twenty agreements a person might actually sign were written in Charter 1.0.1, each with its
 English, its specification and cases: `Examples/` (index in `Examples/README.md`). The purpose
@@ -29,21 +29,19 @@ decision; those are marked.
 
 Across the twenty examples (5,542 words of English, 191 clauses):
 
-| Measure | Count |
-|---|---:|
-| Lines of rules and declarations | 1,323 |
-| Lines of `Clause` blocks | 453 (26% of every specification) |
-| English retyped inside `Clause` blocks | 24,814 characters |
-| `Approved` digests | 191, 14,325 characters |
-| Declarations a clause can name (acts, duties, immunities, invariants) | 219 |
-| Declarations a clause cannot name (facts, derived facts, events, parameters) | 372 |
-| Spans that name nothing | 33 |
-| `Power`s | 51, of which 20 repeat a condition in `Holds when` and `Valid when` |
-| `Holds when True` | 53 |
-| `x == Name` comparisons to say who a party is | 54 |
-| `Count(Foreach …)` | 18 |
-| Empty applications `f()` | 414 |
-| Lines of cases | 1,885 |
+| Measure | Baseline (1.0.1) | After `D34`–`D38` | Delta |
+|---|---:|---:|---:|
+| Lines of rules and declarations | 1,323 | 1,211 | -112 (-8.5%) |
+| Lines of `Clause` blocks | 453 (26% of spec) | 259 | -194 (-42.8%) |
+| Total specification lines (rules + clauses) | 1,776 | 1,470 | -306 (-17.2%) |
+| English retyped inside `Clause` blocks | 24,814 chars | **0 chars** | **-24,814 (-100%)** |
+| Inline `Approved` digests in source | 14,325 chars | **0 chars** | **-14,325 (-100%, in `charter.lock`)** |
+| Spans that name nothing | 33 | **0** | **-33 (-100%)** |
+| `Power`s repeating a condition in `Holds when` & `Valid when` | 20 / 51 | **4 / 50** | **-80%** |
+| `x == Name` comparisons | 54 | **17** (enum tags only, 0 party checks) | **-68.5%** |
+| `Count(Foreach …)` | 18 | **10** | **-44.4%** |
+| Empty applications `f()` | 414 | **14** | **-96.6%** |
+| Lines of cases | 1,885 | 1,885 | 0 (167 scenarios) |
 
 The per-example table is at the end.
 
@@ -453,3 +451,31 @@ name; "rules" are those it can.
 | Roommates | 296 | 80 | 20 | 1365 | 525 | 95 | 9 | 19 | 16 | 2 | 1 | 0 | 1 | 0 | 0 | 9 | 2 | 0 |
 | Settlement | 226 | 56 | 21 | 1019 | 675 | 87 | 8 | 19 | 11 | 1 | 2 | 2 | 1 | 2 | 0 | 24 | 0 | 0 |
 | **Total (20)** | **5542** | **1323** | **453** | **24814** | **14325** | **1885** | **166** | **372** | **219** | **33** | **51** | **20** | **53** | **54** | **18** | **414** | **20** | **6** |
+
+## Per-example counts after `D34`–`D38` rewrite
+
+Recomputed by `tools/examples-metrics` on 2026-11-08 after rewriting all twenty agreements in `D34`–`D38` Charter (`git diff Examples/*/*.md` empty; approvals in `charter.lock`).
+
+| Example | English words | rule lines | clause lines | English retyped (chars) | digests (chars) | case lines | scenarios | facts | rules | spans naming nothing | powers | powers repeating a condition | `Holds when True` | `x == Name` | `Count(Foreach` | `f()` | placeholders | `+fact` in scenarios |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| BillOfSale | 269 | 46 | 8 | 0 | 0 | 89 | 9 | 12 | 12 | 0 | 1 | 0 | 4 | 0 | 0 | 0 | 0 | 1 |
+| ClubBylaws | 393 | 119 | 23 | 0 | 0 | 130 | 9 | 17 | 15 | 0 | 5 | 0 | 4 | 0 | 9 | 0 | 2 | 0 |
+| Deed | 126 | 34 | 6 | 0 | 0 | 55 | 6 | 9 | 6 | 0 | 1 | 1 | 1 | 0 | 0 | 0 | 2 | 4 |
+| Employment | 285 | 71 | 16 | 0 | 0 | 113 | 10 | 25 | 16 | 0 | 2 | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| Guaranty | 274 | 49 | 10 | 0 | 0 | 90 | 8 | 14 | 12 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
+| HealthcareDirective | 240 | 51 | 12 | 0 | 0 | 96 | 10 | 16 | 10 | 0 | 3 | 0 | 3 | 3 | 0 | 5 | 1 | 0 |
+| HomePurchase | 411 | 65 | 18 | 0 | 0 | 119 | 11 | 15 | 16 | 0 | 6 | 0 | 8 | 0 | 0 | 2 | 0 | 0 |
+| HomeownersAssociation | 390 | 70 | 18 | 0 | 0 | 112 | 8 | 23 | 13 | 0 | 2 | 0 | 4 | 1 | 1 | 0 | 0 | 0 |
+| LastWill | 178 | 45 | 9 | 0 | 0 | 62 | 7 | 19 | 5 | 0 | 0 | 0 | 2 | 2 | 0 | 0 | 2 | 0 |
+| LivingTrust | 245 | 64 | 12 | 0 | 0 | 54 | 6 | 19 | 11 | 0 | 5 | 0 | 3 | 2 | 0 | 0 | 0 | 1 |
+| NonDisclosure | 223 | 38 | 10 | 0 | 0 | 77 | 8 | 14 | 7 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 2 | 0 |
+| OperatingAgreement | 496 | 117 | 25 | 0 | 0 | 119 | 11 | 17 | 16 | 0 | 10 | 1 | 3 | 0 | 0 | 0 | 3 | 0 |
+| ParentingPlan | 253 | 60 | 10 | 0 | 0 | 110 | 9 | 17 | 11 | 0 | 1 | 0 | 3 | 4 | 0 | 0 | 1 | 0 |
+| PowerOfAttorney | 248 | 47 | 15 | 0 | 0 | 82 | 7 | 14 | 11 | 0 | 4 | 1 | 2 | 0 | 0 | 1 | 1 | 0 |
+| Prenup | 183 | 46 | 10 | 0 | 0 | 106 | 8 | 19 | 5 | 0 | 2 | 0 | 1 | 0 | 0 | 6 | 0 | 0 |
+| PromissoryNote | 295 | 49 | 12 | 0 | 0 | 90 | 7 | 21 | 6 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
+| RentersInsurance | 353 | 70 | 16 | 0 | 0 | 109 | 8 | 21 | 11 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 | 0 |
+| ReturnPolicy | 158 | 47 | 6 | 0 | 0 | 90 | 8 | 14 | 8 | 0 | 0 | 0 | 3 | 2 | 0 | 0 | 0 | 0 |
+| Roommates | 296 | 76 | 14 | 0 | 0 | 95 | 9 | 18 | 16 | 0 | 1 | 0 | 6 | 0 | 0 | 0 | 2 | 0 |
+| Settlement | 226 | 47 | 9 | 0 | 0 | 87 | 8 | 15 | 11 | 0 | 2 | 0 | 1 | 1 | 0 | 0 | 0 | 0 |
+| **Total (20)** | **5542** | **1211** | **259** | **0** | **0** | **1885** | **167** | **339** | **218** | **0** | **50** | **4** | **54** | **17** | **10** | **14** | **16** | **6** |

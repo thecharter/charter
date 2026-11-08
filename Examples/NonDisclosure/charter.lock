@@ -1,0 +1,57 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "4036989d8218551d725f3393b200cc6c26680fa02d708cf8838bdc0ea292d6c9",
+   "path": "nda.charter"},
+  {"sha256": "2a367410d7fb24d38738fad15adc89d78a774f4a37f4d295ff91a5f84fd9494f",
+   "path": "nda.md"}],
+ "clauses":
+ [{"textSha256":
+   "a645412dac3219d04df6c337843a96a32553bf52b155e56199345ea3280da177",
+   "rulesSha256":
+   "3effc0e690eb5a4b94200a97c29fbd61222a9081dbc7ed5d2d3041c93113a342",
+   "id": "1.1/1"},
+  {"textSha256":
+   "5213cbd27b5fefd29ad65710902c3dc2afbf3bcda1725cc20bd9c61a661878c2",
+   "rulesSha256":
+   "9e2c5a32f6f6fbe23a74eb8225bfca1bda1bf169d8092bf1d72a0dccf57cba22",
+   "id": "1.1/2"},
+  {"textSha256":
+   "2b4be7ffa814c5b790f3401a8ef8e2553d489071a838823ec72af43be67ca151",
+   "rulesSha256":
+   "1f549f67eea869a7d62d8bdce625551fb06c9e6ed3ef903a8445e5c043927e25",
+   "id": "1.2/1"},
+  {"textSha256":
+   "fbcf3ef2f001cddc6844c37ad4293c7342c64af56c8ff9402b9d457783531b26",
+   "rulesSha256":
+   "8906e21b2107d5697cc9f55df3f519b088b5956fe22b5a68a4cf3aeabccd2410",
+   "id": "1.2/2"},
+  {"textSha256":
+   "98d58bb73906dc217c0a9ef5ae88e631473d9bc2bda1ae521ef370f34eed1934",
+   "rulesSha256":
+   "9a0c2d38376214b6c071a8597c8fa70559a5b313cd2a0b5d48e20b1dd8ac181e",
+   "id": "2.1"},
+  {"textSha256":
+   "094d75d34438b1109cc579aa0181e6cb76861684a7b927240875c21a469940b4",
+   "rulesSha256":
+   "9e50de9e952da1d6b17fb6c1934e3805ccafc1c0d9bb547184f78a07365e9758",
+   "id": "2.2"},
+  {"textSha256":
+   "ae7e1aa387afaa785dfc436a70187c12879ed5416353d579c7208dabd74140ca",
+   "rulesSha256":
+   "38a0b9f9937ea48494e1912555d7fce570760ff17b2887ed28abdd54f4a14fc0",
+   "id": "3.1"},
+  {"textSha256":
+   "390573e3fbe119c79f9582bcdd084cc05914f6c36efced659c48001a321ee1f1",
+   "rulesSha256":
+   "d658dd48b4f1657c235fbf013ba3232a3558d683066049d900891434b52adf90",
+   "id": "3.2"},
+  {"textSha256":
+   "42f7ebff097e8e7f3a6c3dfcdf3fa7589615f1a8c7a59af9ad941f368d2e2d39",
+   "rulesSha256":
+   "a79b00916417091c2da2037766058d37c3e6a6c2f7044f92f9d69ce5e30e8136",
+   "id": "4.1"},
+  {"textSha256":
+   "65c2cec2542c13047878f10b85a4d2518e9aafc754c7af4154451d69fd30d745",
+   "rulesSha256":
+   "b1c1ff1d8dab9631f5ca67ccf73923b045fbc4d24a0e31eff203b074f465b84f",
+   "id": "5.1"}]}

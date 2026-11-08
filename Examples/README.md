@@ -69,16 +69,17 @@ A case file declares no acts, duties or rules. It names the people and things of
 
 1. Write the English first, as numbered clauses under headings. Keep it to what a careful
    layperson would write: one or two pages.
-2. Declare who and what the text talks about. Name each role with a `Placeholder`
-   (`Placeholder grantor For person`), so acts read `Actor grantor Recipient grantee` and
-   conditions can leave arguments implicit (`signed()`, `lien()`).
-3. For each sentence that says what someone may, must or cannot do, write the act, duty or
-   power it means. Say `Valid when` where the text says something "has no effect" or "is void";
-   say `Holds when` where it says something is permitted or a breach.
-4. Quote the text in `Clause` blocks, one per numbered clause, splitting it into spans and
-   naming the rules each normative span means.
-5. Run `tools/approve-clauses FILE.charter` to stamp each clause's approval, once you have read
-   each span against the rule it names.
+2. Declare who and what the text talks about. Name fixed or derived parties with `Role`
+   (`Role seller Is Grace`, `Role executor For person First of Daniel, Priya Unless ...`) or open
+   party slots with `Placeholder` (`Placeholder grantor For person`).
+3. For each sentence that says what someone may, must or cannot do, write the act, duty,
+   prohibition, protection, or power it means. Say `Valid when` where the text says something "has
+   no effect" or "is void" (`Power` defaults `Holds when` to `Valid when` when omitted); say
+   `Holds when` where lawfulness and validity differ.
+4. Cite each numbered clause by reference (`Clause 1.1 => ...`, or `Clause 1.2/1 => ...` by
+   sentence where sentences mean different rules), naming the declarations and rules it grounds.
+5. Run `charter approve --lock --restamp FILE.charter` to record both the verbatim text digest and
+   the formal rule digest in `charter.lock`, once you have read each clause against the rules it names.
 6. Write cases: for each sentence, a scenario in which it makes a difference.
 
 ## Checking

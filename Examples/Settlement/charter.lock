@@ -1,0 +1,52 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "fa8fdd1eaf9c5032b78c6415894c65d002a63a807d28ee9000ea33ad27a0c8b1",
+   "path": "settlement.charter"},
+  {"sha256": "60226178127d4d4fff01e3034fa1ea3b248754f841a4001e2c09895c2069dbcc",
+   "path": "settlement.md"}],
+ "clauses":
+ [{"textSha256":
+   "d3e62c809f6964e117d22b3590e038e7b0274a6b31db981244fb0738b672c102",
+   "rulesSha256":
+   "75da87dd56186ee17a72055a3f952d6abbf52da68e382a625958fe7e5870009d",
+   "id": "1.1"},
+  {"textSha256":
+   "c8eab7b3047e92f5ebdca073cb6592e19cb6d79726ed8b43bf01e0c0d73dd0b1",
+   "rulesSha256":
+   "f8350a2db12a35f60f11d0650e79b2fb93bc663241812d5af05c31450617e9fa",
+   "id": "1.2"},
+  {"textSha256":
+   "fce093f4fdd9a5c434db71992ff5a31fa612230acca1518e20cd368170653707",
+   "rulesSha256":
+   "450ab908191dffd4ad102879b5e8f16037330a74655e521f99b6eb5d6e7b62e4",
+   "id": "2.1"},
+  {"textSha256":
+   "3d7331c32d07aa7732ec881bef596f67d10110b2bb786e507a72a436365e5dcd",
+   "rulesSha256":
+   "6a4456ad7d6613a961621b619b1e0fe78a68b6fcf8ad89f5b3daf7136421f871",
+   "id": "3.1"},
+  {"textSha256":
+   "1932bed618aa94b8995e6e2f7805507060ef1913ac25a4dfb17759694577c5fa",
+   "rulesSha256":
+   "e14941a84dedcaa4c284f036d23ca334385efb1833405c0ad91e0e675759e5c8",
+   "id": "3.2"},
+  {"textSha256":
+   "d8e5d60224ccc9f6bc6ea43168d890208c3ba28d8fed712c0ea3d550343f7351",
+   "rulesSha256":
+   "895c0fd09a23cae9b8fcfaa8442167d7e6702fe4de7ec22e9d177af5a04d4eb1",
+   "id": "3.3"},
+  {"textSha256":
+   "ef794762439ec36f5dfb212e4ba35b8c95277443e67174d1efce6393abe4152b",
+   "rulesSha256":
+   "e14a02e68b8b563e61af81702c51e8e7cb7153c670da3d2f14d427be7d56dffc",
+   "id": "4.1"},
+  {"textSha256":
+   "a3170acebefee30b65e783b5efae09b13da6dae4f23b7c428ee7f74a506012db",
+   "rulesSha256":
+   "a379c798e01b7cc4589a6c12ca52221879fa73a17281076312a1f42df611d9ce",
+   "id": "5.1"},
+  {"textSha256":
+   "8ab0342dab328ead00739c6aaf804a753a1ea56c8bddaccce3ce77c70ebd0e3a",
+   "rulesSha256":
+   "c0a8645bc877108b97ece4886c881837390ae36531071b53c58aa38445066543",
+   "id": "6.1"}]}

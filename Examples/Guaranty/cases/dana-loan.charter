@@ -3,97 +3,97 @@
 
 Scenario the-guarantor-pays-and-takes-over-the-claim {
   @ 90.
-  ?in-default().
-  give-notice(Ines, Victor).
-  demand(Ines, Victor, 300000).
-  ?guaranty-due(Victor, Ines).
+  ?in-default.
+  give-notice().
+  demand($3,000.00).
+  ?guaranty-due().
   @ 104.
-  ?!violated guaranty-due(Victor, Ines).
+  ?!violated guaranty-due().
   @ 105.
-  ?violated guaranty-due(Victor, Ines).
-  pay-guaranty(Victor, Ines, 300000).
-  ?!guaranty-due(Victor, Ines).
-  ?balance(500000). ?claim(300000).              // Dana owes Ines $3,000.00 less, and owes it to Victor
-  ?reimburse(Dana, Victor).
-  repay-guarantor(Dana, Victor, 300000).
-  ?!reimburse(Dana, Victor).
+  ?violated guaranty-due().
+  pay-guaranty($3,000.00).
+  ?!guaranty-due().
+  ?balance($5,000.00). ?claim($3,000.00).        // Dana owes Ines $3,000.00 less, and owes it to Victor
+  ?reimburse().
+  repay-guarantor($3,000.00).
+  ?!reimburse().
 }
 
 Scenario no-default-no-duty {
-  ?!guaranty-due(Victor, Ines).
+  ?!guaranty-due().
   @ 89.
-  ?!in-default().
-  ?!lawful demand(Ines, Victor, 300000). ?!valid demand(Ines, Victor, 300000).
-  demand(Ines, Victor, 300000).                  // the lender asks anyway
-  ?!guaranty-due(Victor, Ines). ?called(0).
-  pay-loan(Dana, Ines, 800000).
+  ?!in-default.
+  ?!lawful demand($3,000.00). ?!valid demand($3,000.00).
+  demand($3,000.00).                             // the lender asks anyway
+  ?!guaranty-due(). ?called($0).
+  pay-loan($8,000.00).
   @ 90.
-  ?!in-default(). ?!notice-due(Ines, Victor).
+  ?!in-default. ?!notice-due().
 }
 
 Scenario five-thousand-dollars-in-all {
   @ 90.
-  give-notice(Ines, Victor).
-  demand(Ines, Victor, 300000).
-  ?!valid demand(Ines, Victor, 300000).          // $6,000.00 in all
-  demand(Ines, Victor, 300000).
-  ?unpaid(300000).
-  ?valid demand(Ines, Victor, 200000).
-  demand(Ines, Victor, 200000).
-  pay-guaranty(Victor, Ines, 500000).
-  ?balance(300000).
-  ?!valid demand(Ines, Victor, 1).               // the limit is spent though Dana still owes $3,000.00
+  give-notice().
+  demand($3,000.00).
+  ?!valid demand($3,000.00).                     // $6,000.00 in all
+  demand($3,000.00).
+  ?unpaid($3,000.00).
+  ?valid demand($2,000.00).
+  demand($2,000.00).
+  pay-guaranty($5,000.00).
+  ?balance($3,000.00).
+  ?!valid demand($0.01).                         // the limit is spent though Dana still owes $3,000.00
 }
 
 Scenario no-more-than-the-borrower-owes {
-  pay-loan(Dana, Ines, 700000).
+  pay-loan($7,000.00).
   @ 90.
-  give-notice(Ines, Victor).
-  ?!valid demand(Ines, Victor, 200000).
-  ?valid demand(Ines, Victor, 100000).
+  give-notice().
+  ?!valid demand($2,000.00).
+  ?valid demand($1,000.00).
 }
 
 Scenario notice-thirty-one-days-after-the-default {
   @ 90.
-  ?notice-due(Ines, Victor).
-  ?!valid demand(Ines, Victor, 300000).          // no notice yet
+  ?notice-due().
+  ?!valid demand($3,000.00).                     // no notice yet
   @ 119.
-  ?valid give-notice(Ines, Victor).
+  ?valid give-notice().
   @ 120.
-  ?violated notice-due(Ines, Victor).
-  ?!valid give-notice(Ines, Victor).
-  give-notice(Ines, Victor).
-  ?!notified(). ?!valid demand(Ines, Victor, 300000).
+  ?violated notice-due().
+  ?!valid give-notice().
+  give-notice().
+  ?!notified. ?!valid demand($3,000.00).
 }
 
 Scenario a-change-without-consent-releases-the-guarantor {
-  ?!lawful change-terms(Ines, Dana).
-  change-terms(Ines, Dana).                      // a breach, and it has its effect
+  ?!lawful change-terms().
+  change-terms().                                // a breach, and it has its effect
   ?released(Victor).
   @ 90.
-  give-notice(Ines, Victor).
-  ?lawful demand(Ines, Victor, 300000). ?!valid demand(Ines, Victor, 300000).
-  demand(Ines, Victor, 300000).
-  ?!guaranty-due(Victor, Ines). ?called(0).
+  give-notice().
+  ?!valid demand($3,000.00).
+  demand($3,000.00).
+  ?!guaranty-due(). ?called($0).
 }
 
 Scenario a-change-the-guarantor-agreed-to {
-  consent-to-change(Victor, Ines).
-  ?lawful change-terms(Ines, Dana).
-  change-terms(Ines, Dana).
+  consent-to-change().
+  ?lawful change-terms().
+  change-terms().
   ?!released(Victor).
-  ?!lawful change-terms(Ines, Dana).             // one consent, one change
+  ?!lawful change-terms().                       // one consent, one change
   @ 90.
-  give-notice(Ines, Victor).
-  ?valid demand(Ines, Victor, 300000).
+  give-notice().
+  ?valid demand($3,000.00).
 }
 
 Scenario a-demand-made-before-the-change-stands {
   @ 90.
-  give-notice(Ines, Victor).
-  demand(Ines, Victor, 300000).
-  change-terms(Ines, Dana).
+  give-notice().
+  demand($3,000.00).
+  change-terms().
   ?released(Victor).
-  ?guaranty-due(Victor, Ines).
-  ?!valid demand(Ines, Victor, 100000).
+  ?guaranty-due().
+  ?!valid demand($1,000.00).
 }

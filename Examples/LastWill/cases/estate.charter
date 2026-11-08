@@ -4,10 +4,13 @@ Extend Fact person Identified by Wendy, Walt.
 +earlier-will("will of 2015").
 +debt("mortgage").
 
-Scenario distributed-as-written {
-  sign(Margaret). attest(Wendy). attest(Walt).
-  ?in-effect(). ?revoked("will of 2015").
+Scenario executed {
+  sign(). attest(Wendy). attest(Walt).
+  ?in-effect. ?revoked("will of 2015").
   death(Margaret).
+}
+
+Scenario distributed-as-written After executed {
   ?acting(Daniel). ?!acting(Priya).
   @ 29.
   ?!valid distribute(Daniel, Anna, House).     // the thirty days have not run
@@ -22,8 +25,8 @@ Scenario distributed-as-written {
 }
 
 Scenario one-witness-is-not-enough {
-  sign(Margaret). attest(Wendy).
-  ?!in-effect(). ?!revoked("will of 2015").
+  sign(). attest(Wendy).
+  ?!in-effect. ?!revoked("will of 2015").
   death(Margaret).
   @ 30.
   pay-debt(Daniel, "mortgage").
@@ -32,9 +35,7 @@ Scenario one-witness-is-not-enough {
   ?!received(House, Anna).
 }
 
-Scenario a-beneficiary-who-dies-within-thirty-days {
-  sign(Margaret). attest(Wendy). attest(Walt).
-  death(Margaret).
+Scenario a-beneficiary-who-dies-within-thirty-days After executed {
   @ 10.
   death(Ben).
   @ 30.
@@ -44,17 +45,15 @@ Scenario a-beneficiary-who-dies-within-thirty-days {
 }
 
 Scenario a-gift-to-a-witness-is-void {
-  sign(Margaret). attest(Wendy). attest(Anna).
-  ?in-effect().
+  sign(). attest(Wendy). attest(Anna).
+  ?in-effect.
   death(Margaret).
   @ 30.
   ?!valid distribute(Daniel, Anna, House).
   ?valid distribute(Daniel, Shelter, House).
 }
 
-Scenario the-substitute-executor-acts {
-  sign(Margaret). attest(Wendy). attest(Walt).
-  death(Margaret).
+Scenario the-substitute-executor-acts After executed {
   decline(Daniel).
   ?acting(Priya). ?!acting(Daniel).
   @ 30.
@@ -62,9 +61,7 @@ Scenario the-substitute-executor-acts {
   ?valid distribute(Priya, Anna, House).
 }
 
-Scenario a-gift-before-the-debts-is-a-breach-that-still-passes {
-  sign(Margaret). attest(Wendy). attest(Walt).
-  death(Margaret).
+Scenario a-gift-before-the-debts-is-a-breach-that-still-passes After executed {
   @ 30.
   ?!lawful distribute(Daniel, Anna, House).
   ?valid distribute(Daniel, Anna, House).

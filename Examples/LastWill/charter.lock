@@ -1,0 +1,52 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "4a7393ec34701d2439c9f29dc0e0f6111b8b5eaff3e1442530e6f8104d7eb053",
+   "path": "will.charter"},
+  {"sha256": "7248e3c812c47e7d3e12ecda0e3cc628e76fe127aa589b833d0ec88eeb91a55a",
+   "path": "will.md"}],
+ "clauses":
+ [{"textSha256":
+   "1e4c1ed572d11d48d82d18347045ad221a8a3d829c579d7e202234c9d312a284",
+   "rulesSha256":
+   "643e4c6e39ed98aef91423bd3262eea23f73c913bb0bdfc193414aa14eb6f2ed",
+   "id": "W.1"},
+  {"textSha256":
+   "c0110b1a58fc613955182fa7d4bff31dd0ee4905865c4f43a73fed435200b344",
+   "rulesSha256":
+   "3db362c253817972890c2caa74f93a5a1c860ba82bd0f8422faa267d32adad86",
+   "id": "W.2/1"},
+  {"textSha256":
+   "6234c09df8ce557d63215e74792a096b1b04a59b82b5822fd447582bfc37b552",
+   "rulesSha256":
+   "97ad76977cde49354ef4d15a8c454d6688b9b3073626b2809fbaf21c12fb481b",
+   "id": "W.2/2"},
+  {"textSha256":
+   "1d7972e0952c52c0d924d1544799e599944abc67097655916657c04aede55929",
+   "rulesSha256":
+   "22c85bc72d2dfc38230f6d0bc093bd200c55fe476194f814abe29171f8258aca",
+   "id": "W.3/1"},
+  {"textSha256":
+   "ceab6b180a8683dba7f6505ed299f08267eabed50432c73925ee69f60763f74b",
+   "rulesSha256":
+   "09d004aea9adbaabe0fc6e22174bed6edcda985f8aed111f09f4deaf962ba5b0",
+   "id": "W.3/2"},
+  {"textSha256":
+   "c9c08d18d69e20b7aae3fcd564222c5df5e30f65ff846a6b4cfbd26dd2834bc1",
+   "rulesSha256":
+   "73f89742f838c023aaaad0804b13e5277e1da1ec2705a72378ef879ccf5e0666",
+   "id": "W.4"},
+  {"textSha256":
+   "662bd645730a1733126caef1af2789487bcbdb9fc8db9029f2ce7e146cf5d641",
+   "rulesSha256":
+   "e55bf832447a732df9596bf115042bce6523613644ec102a85032f5101464eab",
+   "id": "W.5"},
+  {"textSha256":
+   "4b0e28d12cb5ca0e0fe6e5373a581a7b0dfc69d0ab84c0f2e0a8010d8e9b66ed",
+   "rulesSha256":
+   "5e981d54e125413517bf089e34fba03a2c7841f4f2631594075c828bfb2e6549",
+   "id": "W.6"},
+  {"textSha256":
+   "038e22a02bb7ba75329821f86d4cbfef90e066693152b223d08c7fd77fe109c6",
+   "rulesSha256":
+   "026069db751754a4ed41d0acbe03c723097a860d2a490831de4f79e5f1a5919b",
+   "id": "W.7"}]}

@@ -15,8 +15,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SPAN = re.compile(r'^\s+(Norm|Definition|Invariant|Acceptance|Commentary|Text)\s+"')
 QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
-DECL = re.compile(r'^(?:Evidenced |Entrenched |Open |Closed )?(Fact|Function|Var|Bool|Act|Power|Finding|Amend|Duty|Immunity|Event|Physical|Param|Invariant|Predicate)\s+([A-Za-z][A-Za-z0-9-]*)')
-RULE_KINDS = {"Act", "Power", "Finding", "Amend", "Duty", "Immunity", "Invariant"}
+DECL = re.compile(r'^(?:Evidenced |Entrenched |Input |Open |Closed )?(Fact|Function|Var|Bool|Role|Amount|Act|Power|Finding|Amend|Prohibited|Duty|Debt|Immunity|Protection|Event|Physical|Param|Invariant|Predicate)\s+([A-Za-z][A-Za-z0-9-]*)')
+RULE_KINDS = {"Act", "Power", "Finding", "Amend", "Prohibited", "Duty", "Debt", "Immunity", "Protection", "Invariant"}
 
 
 def blocks(lines):

@@ -1,0 +1,37 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "b3d3426e4c1bac3753011c380c7a3b876aeb1a19d460e948adf07d896d699dcb",
+   "path": "deed.charter"},
+  {"sha256": "5a62b253d01590d507790cf2b93de3b5664e7f28442bd023556d4529a7b4ce9a",
+   "path": "deed.md"}],
+ "clauses":
+ [{"textSha256":
+   "23dfabca7f9a7ceb5fdee1cdb64161db84bbb446ec6acf58f848429633db9968",
+   "rulesSha256":
+   "fa81e9a9c86cb203057c345bef24008e71b9fec1fc900b100c7c77737888a97f",
+   "id": "D.1"},
+  {"textSha256":
+   "9162c7698aa0bfec4e6f722ab61dee39451362e8901a0bb14043b528e5ddb08f",
+   "rulesSha256":
+   "be2b36b70eea733c58e7cbb35bb0347cd2cbea7bb87667fc6c0abc0d301066ce",
+   "id": "D.2"},
+  {"textSha256":
+   "f1e2eddee6bd322dd2e65670ac326fd36dece032fcd26d83b2b50ce4b537a473",
+   "rulesSha256":
+   "219d6c5bff666d2791f0a7a926906955ec05f51dca132f8334e90a07bfda5d3a",
+   "id": "D.3"},
+  {"textSha256":
+   "ef89639f0e2dcc840dbfdabd50480e622a79b800a738c37b48367e7d246d7230",
+   "rulesSha256":
+   "6e1340d47ea50af4d1f5003794898167dbb5a3f1fd0ed7e0c3e928a1adb127fe",
+   "id": "D.4/1"},
+  {"textSha256":
+   "cddda68e41e8a344c961bcd7bc887fd437fc5ce1d742a5114e7cbbc9b366a990",
+   "rulesSha256":
+   "1fc9b5ec8d61f8e5ee95fe81c6715eb2141b47403245877e3c2279bf2759a6ee",
+   "id": "D.4/2"},
+  {"textSha256":
+   "c4677f4e29cc695728320fcb974ca7f4500732327791c536e8c7596bfcc8698f",
+   "rulesSha256":
+   "e4abd0c1daaf503ad6cc6ce340af261a399420d9d38f9ee3af47a83a3a604051",
+   "id": "D.5"}]}

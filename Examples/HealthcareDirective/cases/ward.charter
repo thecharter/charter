@@ -3,7 +3,7 @@
 Extend Fact physician Identified by DrAdler, DrBose.
 Extend Fact treatment Identified by Surgery.
 +attending(DrAdler).
-sign(Walter).
+sign().
 
 Scenario capacity-is-presumed {
   ?Unresolved(lacks-capacity()).
@@ -35,17 +35,17 @@ Scenario physicians-disagree-and-the-committee-decides {
   ?undetermined decide(Walter, Surgery, Consent).
   ?!valid decide(Grace, Surgery, Consent).
   ?!valid decide(Walter, Surgery, Consent).
-  find-incapacity(EthicsCommittee).
+  rule-capacity(Incapacitated).
   ?Established(lacks-capacity()).
   ?valid decide(Grace, Surgery, Consent).
-  ?!valid find-capacity(EthicsCommittee).          // nothing is in dispute now
+  ?!valid rule-capacity(Capable).                  // nothing is in dispute now
 }
 
 Scenario the-committee-finds-capacity {
   determine-incapacity(DrAdler).
-  ?!valid find-capacity(EthicsCommittee).          // no one has disagreed
+  ?!valid rule-capacity(Capable).                  // no one has disagreed
   disagree(DrBose).
-  find-capacity(EthicsCommittee).
+  rule-capacity(Capable).
   ?Refuted(lacks-capacity()).
   ?valid decide(Walter, Surgery, Refuse).
   ?!valid decide(Grace, Surgery, Consent).

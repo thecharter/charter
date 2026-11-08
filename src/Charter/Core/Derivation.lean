@@ -85,7 +85,10 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .dimLit _ _ => []
     | .ite c t e =>
       deps spec fuel bound .neg c ++ deps spec fuel bound p t ++ deps spec fuel bound p e
-    | .doneAt t | .stampOf t | .overdueOf t =>
+    | .doneAt t | .stampOf t =>
+      let own := (typeOf spec t).toList.filter (!spec.triggerable ·) |>.map (·, p)
+      own ++ deps spec fuel bound p t
+    | .overdueOf t =>
       (typeOf spec t).toList.map (·, p) ++ deps spec fuel bound p t
     | .calOp1 _ t => deps spec fuel bound p t
     | .calOp2 _ t a => deps spec fuel bound p t ++ deps spec fuel bound p a

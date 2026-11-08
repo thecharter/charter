@@ -2,23 +2,19 @@
 Fact parent Identified by Rosa, Daniel
 Placeholder other For parent
 Param start : Time = 0
-Var with Identified by parent
+Var with Identified by parent = Rosa
 
 Bool rosa-week
-  Holds when (Current Time - start) - ((Current Time - start) / 14) * 14 < 7
+  Holds when (Current Time - start) % 14 < 7
 Bool handover-day
-  Holds when (Current Time - start) - ((Current Time - start) / 7) * 7 < 1
+  Holds when (Current Time - start) % 7 < 1
 Duty regular-week Holder parent Claimant other
-  Holds when rosa-week() && parent == Daniel && other == Rosa
-           , Not(rosa-week()) && parent == Rosa && other == Daniel
-  Violated when with(parent) && Not(handover-day())
+  Holds when rosa-week && parent == Daniel && other == Rosa
+           , !rosa-week && parent == Rosa && other == Daniel
+  Violated when with(parent) && !handover-day
 Act hand-over Actor parent Recipient other
   Holds when with(parent)
   Creates with(other)
 
-Clause 1.1 Approved "4473c5ddafcbf661079ff8a35c14ff25403a6b6af2617f33ae26276355c0c2b4"
-  Norm "Mia lives with her parents, Rosa Castellan and Daniel Castellan, in alternating weeks. The first week is Rosa's." => regular-week
-Clause 1.2 Approved "0dc27972c97137cb9e66f0c0b0b9641111bfd49216aaa1cd34bdd1c118daed76"
-  Norm "On the first day of a parent's week the other parent hands Mia over." => regular-week, hand-over
-.
-+with(Rosa).
+Clause 1.1 Definition => parent, start, rosa-week, with
+Clause 1.2 => handover-day, regular-week, hand-over.

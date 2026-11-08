@@ -1,0 +1,47 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "a0f5d160c2ca7074c9e55f7952a847536566d0f5c271dc3cdb59586b1d9d547d",
+   "path": "bill-of-sale.charter"},
+  {"sha256": "7232b1231928faaa100356687eebeff9038eedf260acf8b99c97571c2464ac3c",
+   "path": "bill-of-sale.md"}],
+ "clauses":
+ [{"textSha256":
+   "a13f8589eb42df13f6f1af48d67cffcb6bf70235b66cc7bd558f784c100f7a0b",
+   "rulesSha256":
+   "3a25f1c33b1934775a9f4fd37f5886e438ab250edb3b01a1622560bed183ee94",
+   "id": "1.1"},
+  {"textSha256":
+   "3a3953d55ea771e87726ef1ee4585698ff06c66891ed366e192e67d54c39fd9f",
+   "rulesSha256":
+   "983125b11ecf3a677fd65adfd2733d0bee0aaee9f1dbebb042872a9fa807c3d8",
+   "id": "2.1"},
+  {"textSha256":
+   "abdd88990260b4069415e7c9817db3057820f41a94ef0f3c9e53edecfd2261db",
+   "rulesSha256":
+   "88a786d8c4a425f310982cc2650821411ee491b738dfb75eb212053bb86f4a6b",
+   "id": "2.2"},
+  {"textSha256":
+   "11235defae0eaba3550ee36d1a22189213a237abfa6d1aedbd32ca1c0b9b580a",
+   "rulesSha256":
+   "06e9630ea49b252a612bda75c0afd31bd39c189baeeba7018dc2db76f747b463",
+   "id": "3.1"},
+  {"textSha256":
+   "0002748988386efd48cc4241338c481de3baa58801a9daf81ac16d552b05d765",
+   "rulesSha256":
+   "e67c7a1458bc1089f6841c8ce0c8afcf36a857925808447d1c7ac0fd9bb10701",
+   "id": "3.2"},
+  {"textSha256":
+   "ba52354ecf677c328b68f55d6e4f5d982fe9fd62266b412cee80515426ebc49c",
+   "rulesSha256":
+   "e08df268b3dc5d836a1ecf47ed80553e87cc4c4ba3a3e8f48cc94fba1ce92302",
+   "id": "3.3"},
+  {"textSha256":
+   "fdd583ee979661838e426f4f714e175e7205379baa89427e72ee868fbb62a918",
+   "rulesSha256":
+   "5cdaf40bdf7300ebc2d1963c368b91832bae10b7bed19cf3ac5c169dc5401308",
+   "id": "4.1"},
+  {"textSha256":
+   "9b81ea4bcf1f878b70699bc4886757f468885bee9834e7cc2b0206b297ce2bf5",
+   "rulesSha256":
+   "96c9328ca53d9e48b222c382a6f832c8a24e6ab373198f00d84e0ae1d0f76866",
+   "id": "4.2"}]}

@@ -6,29 +6,21 @@ Amend removal-by-motion Actor club
   Repeals remove
   Installs {
     Power remove Actor club Recipient incumbent
-      Holds when True
       Valid when removal-carried(incumbent)
       Terminates (Foreach office: officer(office, incumbent))
   }
-  Holds when True
-  Valid when amendment-two-thirds(RemovalByMotion) && Held(called()) For 14
+  Valid when amendment-two-thirds(RemovalByMotion) && Held(called) For 14 days
 Amend repeal-no-profit Actor club
   Repeals pay-profit
   Installs {
     Act pay-profit Actor club Recipient person Related to usd
       Holds when True
   }
-  Holds when True
-  Valid when amendment-two-thirds(RepealNoProfit) && Held(called()) For 14
+  Valid when amendment-two-thirds(RepealNoProfit) && Held(called) For 14 days
 Amend repeal-entrenchment Actor club
   Repeals entrenched
-  Holds when True
-  Valid when amendment-two-thirds(RepealEntrenchment) && Held(called()) For 14
+  Valid when amendment-two-thirds(RepealEntrenchment) && Held(called) For 14 days
 
-Clause S.1 Approved "2a940c69c6d674527a6b450d4a079fe1f9d432e68df7fd3fe0ceb38a023b0a55"
-  Norm "Clause 4.4 is amended to read: The members may remove an officer by a motion at a meeting." => removal-by-motion
-Clause S.2 Approved "f8167afa12b8472eefc3cb3122ca59f2a472c26e1a0a6bce955820e9f9ca3e96"
-  Norm "Clause 1.2 is repealed." => repeal-no-profit
-Clause S.3 Approved "ab0183cfa25810e83af7c1b487cce34117e0f00bafcb705a7623e4c179b35180"
-  Norm "Clause 5.2 is repealed." => repeal-entrenchment
-.
+Clause S.1 => removal-by-motion
+Clause S.2 => repeal-no-profit
+Clause S.3 => repeal-entrenchment.

@@ -1,0 +1,77 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "71be2ee076a807d80a5eb2dcfed4a7bb048e81d021e8c21bd6a1f2804df25156",
+   "path": "roommates.charter"},
+  {"sha256": "d875cd1991bd71ca7a984420d9be949aca683037cb33142d1bf87a54feaa491e",
+   "path": "roommates.md"}],
+ "clauses":
+ [{"textSha256":
+   "8ad565cf6ff61aec3bd08f5999ac975bc998f119e4054006ca01e6e40a9ced70",
+   "rulesSha256":
+   "84215c8ac636b198e4917abe313b42150be579eb94329b7d4142916eae9f4e4b",
+   "id": "M.1"},
+  {"textSha256":
+   "39bb943e7851448e9bbc5bcbe78531855d2f7a2e48efc7c91011c65611fbbb65",
+   "rulesSha256":
+   "f7f017e03f95a9ccf14bf525475d9db6d5993389564d529a54fe8a0dd383f21a",
+   "id": "M.2/1"},
+  {"textSha256":
+   "d04c8ae8889888e555b4f66f6e7f5de1a685b808263d84eb2342d6c263db2cea",
+   "rulesSha256":
+   "55c75884e429e2fd9827e777d56a4ee8458774fcd1688b18e24635733ccd668c",
+   "id": "M.2/2"},
+  {"textSha256":
+   "8b0d551bd113a8a10dd331a8e81b3753f96b2f51e05a7ba4a074e4bcd6e197f8",
+   "rulesSha256":
+   "6b678664caaa1bbd5b5829d09722f49a1cd8a44e2566b9278fd1d44c7d0553c6",
+   "id": "M.2/3"},
+  {"textSha256":
+   "650df79970aa679cbcfe51576644518a74d6eaa86219cc998f6792211bf8776e",
+   "rulesSha256":
+   "5c61b37874d446851351f2e8e22efda59e5d9808c22860a29e3ce1f831a63b18",
+   "id": "M.2/4"},
+  {"textSha256":
+   "213559ac72e256072cfa56a8ce27def044738438c3808b0984c486d2510bd472",
+   "rulesSha256":
+   "7ce682260ce268f1e8df2dfe70ae8bf7b57e69dfda72ba90e9e3d99bee47812f",
+   "id": "M.3"},
+  {"textSha256":
+   "ff03730f0d0612a022723b7319764328696c5b057b26676b31e7c2a5c8dc8af8",
+   "rulesSha256":
+   "4adee0a65559e95b3a270a23f9a94bc4dc2e08f0e5af11e668caea31079c9c1b",
+   "id": "M.4"},
+  {"textSha256":
+   "1a2bea4ffe3cd41409c381e26862e8a92781989717e982564d35c7348231d9d5",
+   "rulesSha256":
+   "3cbcb924a52a8f622ad4352506460c9d5010cbf8589a28e95477f31f57d4c348",
+   "id": "M.5/1"},
+  {"textSha256":
+   "fc5d4660e88133d51b1852908a2ffeca8220ad76a20679117934c3975d555a44",
+   "rulesSha256":
+   "e049a046777b10024433717d5e3223adee851db0e0b3862cd46bb813847e4e52",
+   "id": "M.5/2"},
+  {"textSha256":
+   "142d33a847db4cdd006b1559158c4be7c9699a856c48bf533e490f3ab43412e3",
+   "rulesSha256":
+   "f93e7383bed4c5caf0d883475aefeb55ceb1eb4b8d370d21e2b9f06a25f1fbbd",
+   "id": "M.5/3"},
+  {"textSha256":
+   "5c79f0c78de9c7708ea5371a97169cbaf48979e17044039345b5c036c7e1f2c4",
+   "rulesSha256":
+   "8081c3d2a7deeca75b475cca1f2b3121da60f6dbbe6f58f7450cbf7eeef046bf",
+   "id": "M.6/1"},
+  {"textSha256":
+   "caa8a187b3f81839779991717c85dc4d4bbd3873061844945042e282232233bf",
+   "rulesSha256":
+   "056df94c10efd6398ce3258c6cd78cd30159cabaed3a4ac6b5d2782bd52fa982",
+   "id": "M.6/2"},
+  {"textSha256":
+   "ece5da1356eaafb5ec4f42377de7cc86e2988e29a8cedbe520b3890bec14a331",
+   "rulesSha256":
+   "25bbe434c99638f7282926d548f5547214fa7394f63da618fa88980e371fe97b",
+   "id": "M.7/1"},
+  {"textSha256":
+   "4650f65b677cefcba12365d5d4d2f760f157e0440ea62fdaca91a5bf2373a655",
+   "rulesSha256":
+   "17279927e0e62f0e291853b073cb2ef8d0bc444dd811c3294a9f8457421b34b8",
+   "id": "M.7/2"}]}

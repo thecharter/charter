@@ -1,29 +1,29 @@
 // The Ellis family: a fund of $500,000.00, two physicians, both children under twenty-five.
 #require "../trust.charter".
 Extend Fact physician Identified by DrLee, DrOrtiz.
-settle(Margaret, 50000000).
+settle(Margaret, $500,000.00).
 
 Scenario the-settlor-draws-then-the-children-wait-for-twenty-five {
   ?trustee(Margaret).
-  pay-settlor(Margaret, 10000000).
-  ?fund(40000000).
-  ?!valid pay-settlor(Margaret, 40000001).       // more than the fund holds
+  pay-settlor(Margaret, $100,000.00).
+  ?fund($400,000.00).
+  ?!valid pay-settlor(Margaret, $400,000.01).    // more than the fund holds
   death(Margaret).
-  ?share(Anna, 20000000). ?share(Ben, 20000000). ?fund(0).
+  ?share(Anna, $200,000.00). ?share(Ben, $200,000.00). ?fund($0).
   ?trustee(Daniel). ?!trustee(Margaret).
   ?!valid pay-share(Daniel, Anna).               // Anna is not yet twenty-five
   +reached-twenty-five(Anna).
   pay-share(Daniel, Anna).
-  ?paid(Anna, 20000000). ?!share(Anna, 20000000). ?share(Ben, 20000000).
+  ?paid(Anna, $200,000.00). ?!share(Anna, $200,000.00). ?share(Ben, $200,000.00).
 }
 
 Scenario two-physicians-make-the-successor-trustee {
   certify-incapacity(DrLee).
-  ?trustee(Margaret). ?!incapacitated().
+  ?trustee(Margaret). ?!incapacitated.
   certify-incapacity(DrOrtiz).
-  ?incapacitated(). ?trustee(Daniel). ?!trustee(Margaret).
+  ?incapacitated. ?trustee(Daniel). ?!trustee(Margaret).
   ?!valid revoke(Margaret).                      // no capacity, no revocation
-  ?valid pay-settlor(Daniel, 100).               // the successor still pays her
+  ?valid pay-settlor(Daniel, $1.00).             // the successor still pays her
 }
 
 Scenario revocable-in-life-irrevocable-at-death {
@@ -34,7 +34,7 @@ Scenario revocable-in-life-irrevocable-at-death {
   ?trustee(Anna). ?!trustee(Daniel).
   ?!valid revoke(Margaret).
   revoke(Margaret).
-  ?in-force().                                   // the attempt changed nothing
+  ?in-force.                                     // the attempt changed nothing
 }
 
 Scenario a-sale-to-the-trustee-needs-every-beneficiary {

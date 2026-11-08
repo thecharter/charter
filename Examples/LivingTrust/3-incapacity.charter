@@ -2,21 +2,19 @@
 #require "1-creation.charter".
 Fact physician
 Fact certified Identified by physician
-Act certify-incapacity Actor physician Creates certified(physician)
+Act certify-incapacity Actor physician
+  Holds when True
+  Creates certified(physician)
 Bool incapacitated
-  Holds when Count(Foreach physician: physician When certified(physician)) >= 2
+  Holds when Count(certified) >= 2
 
-Var successor Identified by person
+Var successor Identified by person = Daniel
 Fact trustee Identified by person
-  Default settlor-is-trustee Holds when person == Margaret
+  Default settlor-is-trustee Holds when settlor(person)
   Exception settlor-cannot-act Overrides settlor-is-trustee
-    Rejects when person == Margaret && (incapacitated() || deceased(Margaret))
+    Rejects when settlor(person) && (incapacitated || deceased(Margaret))
   Default successor-steps-in
-    Holds when successor(person) && (incapacitated() || deceased(Margaret))
+    Holds when successor(person) && (incapacitated || deceased(Margaret))
 
-Clause 3.1 Approved "41eb4d22a0de578d4874691e57930c933fc210b23ea4163a7dcf0eed85db7aff"
-  Norm "The settlor is incapacitated when two physicians certify in writing that she cannot manage her affairs." => certify-incapacity
-Clause 3.2 Approved "72b14930871018e5aa065a1184e8b3177484e1574a5db4f606891e8f1a98b144"
-  Definition "While the settlor is incapacitated, and after her death, the successor trustee acts as trustee. The first successor trustee is Daniel Ellis."
-.
-+successor(Daniel).
+Clause 3.1 => certify-incapacity, certified, incapacitated
+Clause 3.2 Definition => successor, settlor-is-trustee, settlor-cannot-act, successor-steps-in, trustee.

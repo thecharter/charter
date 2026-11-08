@@ -6,36 +6,32 @@ Function offered Identified by seller * usd
 Fact accepted Identified by buyer * seller
 Act offer-interest Actor seller Related to usd
   Holds when member(seller)
-  Creates offered()
+  Creates offered(seller, usd)
 Power accept-offer Actor buyer Recipient seller
-  Holds when member(buyer) && buyer != seller
   Valid when member(buyer) && buyer != seller
-    && (Exists offered: offered.seller == seller && Not(Held(offered) For 30))
-  Creates accepted()
+    && (Exists offered: offered.seller == seller && !Held(offered) For 30 days)
+  Creates accepted(buyer, seller)
 Power sell-to-members Actor seller
   Holds when member(seller)
-  Valid when (Exists offered: offered.seller == seller && Held(offered) For 30)
-    && (Exists buyer: accepted())
+  Valid when (Exists offered: offered.seller == seller && Held(offered) For 30 days)
+    && (Exists buyer: accepted(buyer, seller))
   Creates (Foreach capital: capital(capital.person, capital.int
-              + MulDivRound(Sum(Foreach capital': capital'.int When capital'.person == seller), capital.int,
+              + MulDivRound(capital(seller), capital.int,
                             Sum(Foreach capital': capital'.int When accepted(capital'.person, seller)), Floor))
              When accepted(capital.person, seller))
         , capital(seller, 0)
-  Terminates member(seller), (Foreach offered: offered When offered.seller == seller), (Foreach buyer: accepted())
+  Terminates member(seller), (Foreach offered: offered When offered.seller == seller)
+           , (Foreach buyer: accepted(buyer, seller))
 Power sell-outside Actor seller Recipient buyer Related to usd
   Holds when member(seller)
-  Valid when (Exists offered: offered.seller == seller && Held(offered) For 30 && usd >= offered.usd)
-    && Not(Exists buyer': accepted(buyer', seller)) && member(buyer)
-  Creates capital(buyer, Sum(Foreach capital: capital.int When capital.person == seller)), capital(seller, 0)
+  Valid when (Exists offered: offered.seller == seller && Held(offered) For 30 days && usd >= offered.usd)
+    && !(Exists buyer': accepted(buyer', seller)) && member(buyer)
+  Creates capital(buyer, capital(seller)), capital(seller, 0)
   Terminates member(seller), (Foreach offered: offered When offered.seller == seller)
 
-Clause 4.1 Approved "af2564eb8d89be71efe06d9261b7de17e7dfeb3352711f3d0c978c2ef16275ef"
-  Norm "A member who wants to sell an interest first offers it to the other members at the price a buyer is willing to pay." => offer-interest
-Clause 4.2 Approved "c8d273143c76390267816e8c69751dca9b575a3a9cbeccf178e0695d15dcc708"
-  Norm "The other members have thirty days from the offer to accept it." => accept-offer
-  Norm " If both accept, they buy the interest in proportion to their percentage interests. If one accepts, that member buys all of it." => sell-to-members
-Clause 4.3 Approved "06924e9fa49b86219beacea849faae72344b8040e1de2c4845729d147d07016f"
-  Norm "If neither accepts within the thirty days, the member may sell the interest to the buyer for no less than the offered price, once the buyer has been admitted as a member." => sell-outside
-Clause 4.4 Approved "d8aad4dcc1e26b07bf712bfdc4b75039975e1d52d63a7a2958f3e85e0de643d2"
-  Norm "A sale of an interest that does not follow this article has no effect." => sell-to-members, sell-outside
-.
+Clause 4.1 => offer-interest, offered
+Clause 4.2/1 => accept-offer
+Clause 4.2/2 => sell-to-members
+Clause 4.2/3 => sell-to-members
+Clause 4.3 => sell-outside
+Clause 4.4 => sell-to-members, sell-outside.

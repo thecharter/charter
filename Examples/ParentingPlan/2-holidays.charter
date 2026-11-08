@@ -7,17 +7,13 @@ Event holiday-begins Related to holiday Creates in-progress(holiday)
 Bool resuming
 Event holiday-ends Related to holiday
   Terminates in-progress(holiday)
-  Creates resuming() For 1
+  Creates resuming For 1 day
 Duty holiday-time Holder other Claimant parent
-  Holds when parent != other && (Exists holiday: in-progress(holiday) && holiday-parent(holiday, parent))
-  Violated when with(other) && Held(holiday-time()) For 1
+  Holds when parent != other && (Exists holiday: in-progress(holiday) && holiday-parent(holiday) == parent)
+  Violated when with(other) && Held(holiday-time(other, parent)) For 1 day
+  Overrides regular-week(parent, other)
 Extend Duty regular-week
-  Overridden by holiday-time
-  Conditioned by Not(resuming())
+  Excused when resuming
 
-Clause 2.1 Approved "baa64b56b7ad4fef3b1ff0ddcd815cbf8432432912888ae81fa44432aabd5ac1"
-  Definition "Mia spends the winter holiday with Daniel and the spring holiday with Rosa."
-Clause 2.2 Approved "94f4e07f4d87053924fe31c959e39bf29a0cb4dc405765d4c974fe7e178fd8ec"
-  Norm "The holiday schedule overrides the regular schedule. While a holiday lasts, the parent who has the holiday keeps Mia even in the other parent's week." => holiday-time, regular-week
-.
-+holiday-parent(Winter, Daniel). +holiday-parent(Spring, Rosa).
+Clause 2.1 Definition => holiday-parent(Winter, Daniel), holiday-parent(Spring, Rosa)
+Clause 2.2 => holiday-begins, holiday-ends, holiday-time, regular-week.

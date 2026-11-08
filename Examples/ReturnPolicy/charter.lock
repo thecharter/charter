@@ -1,0 +1,37 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "ecd4e621867ddce01c8ada6e545a6acfa297d699f9148c80c3894063996aacc7",
+   "path": "policy.charter"},
+  {"sha256": "3d8c0a6fc0d6bf4e05d80f3d883979a0adf0f875fb7527eb603800a6381e9b38",
+   "path": "policy.md"}],
+ "clauses":
+ [{"textSha256":
+   "17875da241220e1b77c2485f82664251cd64f527f3e2cb41af7227d54a59247c",
+   "rulesSha256":
+   "7d3383a98663c41cd23ccb8f78029f0c7fdd650aa47b81d0519d465e847ffa2e",
+   "id": "1.1"},
+  {"textSha256":
+   "f3972859bc4a1472b587c2d13699eb19376951deac8e0858a97f6d9c36265e58",
+   "rulesSha256":
+   "8e09428606e2362bd1978e4708594f64f33cf68e44b2e6f98f69dbd242fa2abc",
+   "id": "1.2"},
+  {"textSha256":
+   "b8ace2674fd43bdd8123cd163dc7cf9b874394f9d9f3c6996611ae0dbd468512",
+   "rulesSha256":
+   "ee0f68e9168c17189f5e6fb5413f2a63e9890776d3edd23ed8cb298f005c1572",
+   "id": "1.3"},
+  {"textSha256":
+   "cb699c8b52587250f79e61f60ccb7fe6906df5fdd78a551aa96d5eea3dd5ac69",
+   "rulesSha256":
+   "5f49ea89ddbd1fd8c586d3607ac2609ceedc15da26639c6142da903511eaf757",
+   "id": "2.1"},
+  {"textSha256":
+   "48d885b4e598691e4d06ae73ad072b3079dc2cc16312ae076dbb482b28b011b6",
+   "rulesSha256":
+   "cf0506b68d4ae2e96a1f785caa1f96d2390e66eecd3624029d185d1c8f3a6457",
+   "id": "2.2"},
+  {"textSha256":
+   "49a52ccf11a50814abe490ea1f39195ddd9cb7d48b34716b0c3088b7a3061eeb",
+   "rulesSha256":
+   "e4caceb017a788496a20300733a0883409622b115d5913f8cac98b3e06c1e261",
+   "id": "3.1"}]}

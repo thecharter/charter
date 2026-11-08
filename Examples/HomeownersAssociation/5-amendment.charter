@@ -4,14 +4,11 @@ Fact amendment
 Fact voted Identified by owner * amendment
 Act vote Actor owner Related to amendment
   Holds when True
-  Valid when Not(lien(owner))
-  Creates voted()
+  Valid when !lien(owner)
+  Creates voted(owner, amendment)
 Fact carried Identified by amendment
   Holds when Count(Foreach owner: owner When voted(owner, amendment)) * 3
-               >= Count(Foreach owner: owner) * 2
+               >= Count(owner) * 2
 
-Clause 5.1 Approved "785c7661d4a0ef02859adfb1b8a6bfb8bf50df96fd90a0901ac8b09b6ac2bfa0"
-  Norm "These rules are amended only by the votes of two thirds of the owners." => vote
-Clause 5.2 Approved "141fd2e6a7425a07e3ba2b872ea4d7b3a8e6f4792111d4b00e550d55c51ef5e8"
-  Norm "An owner whose house is under a lien has no vote." => vote
-.
+Clause 5.1 => carried, vote
+Clause 5.2 => vote.

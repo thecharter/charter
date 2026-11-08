@@ -1,83 +1,73 @@
 // Victor Lang's guaranty of Dana Cole's loan from Ines Marlow (guaranty.md).
-Document "guaranty.md"
+Document "guaranty.md".
 
-Fact lender Identified by Ines
-Fact borrower Identified by Dana
-Fact guarantor Identified by Victor
-Fact usd Identified by Money(USD, 2)
-Param loan : Money(USD, 2) = 800000
-Param limit : Money(USD, 2) = 500000
+Role lender Is Ines
+Role borrower Is Dana
+Role guarantor Is Victor
+Param loan = $8,000.00
+Param limit = $5,000.00
 Param term : Duration = 90
 Param notice-window : Duration = 30
 
 // 1.1 The loan, and default on it
-Var balance Identified by Money(USD, 2)
+Var balance : USD = loan
 Duty repay Holder borrower Claimant lender
-  Holds when balance > 0
+  Holds when balance > $0
   Due within term
-Act pay-loan Actor borrower Recipient lender Related to usd
-  Holds when usd <= balance
-  Creates balance(balance - usd)
-Bool in-default Holds when Violated(repay())
+Act pay-loan Actor borrower Recipient lender Related to amount : USD
+  Holds when amount <= balance
+  Creates balance(balance - amount)
+Bool in-default Holds when Violated(repay(Dana, Ines))
 
 // 3. Notice of default, within thirty days
 Bool notified
 Duty notice-due Holder lender Claimant guarantor
-  Holds when in-default() && Not(notified())
-  Violated when Held(repay()) For term + notice-window
+  Holds when in-default && !notified
+  Violated when Held(repay(Dana, Ines)) For term + notice-window
 Power give-notice Actor lender Recipient guarantor
   Holds when True
-  Valid when notice-due() && Not(Violated(notice-due()))
-  Creates notified()
+  Valid when notice-due(Ines, Victor) && !Violated(notice-due(Ines, Victor))
+  Creates notified
 
 // 1.2 and 2. Demand, within the limit, and payment in fifteen days
-Var called Identified by Money(USD, 2)
-Var unpaid Identified by Money(USD, 2)
-Power demand Actor lender Recipient guarantor Related to usd
-  Holds when in-default() && notified() && called + usd <= limit && unpaid + usd <= balance
-  Valid when in-default() && notified() && called + usd <= limit && unpaid + usd <= balance
-  Creates called(called + usd), unpaid(unpaid + usd)
+Var called : USD = $0
+Var unpaid : USD = $0
+Power demand Actor lender Recipient guarantor Related to amount : USD
+  Valid when in-default && notified && called + amount <= limit && unpaid + amount <= balance
+  Creates called(called + amount), unpaid(unpaid + amount)
 Duty guaranty-due Holder guarantor Claimant lender
-  Holds when unpaid > 0
-  Due within 15
+  Holds when unpaid > $0
+  Due within 15 days
 
 // 5. The guarantor who pays takes over the claim
-Var claim Identified by Money(USD, 2)
-Act pay-guaranty Actor guarantor Recipient lender Related to usd
-  Holds when usd <= unpaid
-  Creates unpaid(unpaid - usd), balance(balance - usd), claim(claim + usd)
+Var claim : USD = $0
+Act pay-guaranty Actor guarantor Recipient lender Related to amount : USD
+  Holds when amount <= unpaid
+  Creates unpaid(unpaid - amount), balance(balance - amount), claim(claim + amount)
 Duty reimburse Holder borrower Claimant guarantor
-  Holds when claim > 0
-Act repay-guarantor Actor borrower Recipient guarantor Related to usd
-  Holds when usd <= claim
-  Creates claim(claim - usd)
+  Holds when claim > $0
+Act repay-guarantor Actor borrower Recipient guarantor Related to amount : USD
+  Holds when amount <= claim
+  Creates claim(claim - amount)
 
 // 4. A change without consent releases the guarantor
 Bool consent
 Act consent-to-change Actor guarantor Recipient lender
   Holds when True
-  Creates consent()
+  Creates consent
 Act change-terms Actor lender Recipient borrower
-  Holds when consent()
-  Creates released(guarantor) When Not(consent())
-  Terminates consent()
+  Holds when consent
+  Creates released(guarantor) When !consent
+  Terminates consent
 Immunity released Holder guarantor Against demand
 
-Clause 1.1 Approved "5151c51fd5ae69f1d34111b51860e1a3e4a761d7dbf53ac17e2629458edad838"
-  Definition "Victor Lang, the guarantor, guarantees to Ines Marlow, the lender, the loan of eight thousand dollars that the lender has made to Dana Cole, the borrower."
-  Norm " The borrower is in default if the loan is not repaid in full within ninety days after the date of this guaranty." => repay, pay-loan
-Clause 1.2 Approved "f6bf507aedd30bb8a2684271afabd5a3251a2787046184717b86f663dfa63e67"
-  Norm "While the borrower is in default the lender may demand payment from the guarantor." => demand
-  Norm " The guarantor pays what the lender has demanded within fifteen days after the demand." => guaranty-due, pay-guaranty
-Clause 2.1 Approved "845c79322d1a3e6ddde0cb41dfa3e50fc09b81da2e53da8ac9b9517e604a4b5d"
-  Norm "The guarantor's liability under this guaranty is limited to five thousand dollars in all. The lender may not demand more than remains of that limit, or more than the borrower then owes, and a demand for more has no effect." => demand
-Clause 3.1 Approved "d538ca2e2fca21042815be0b2939711a21ae6c98bfea05d41eab4b0429b21040"
-  Norm "The lender gives the guarantor notice of the borrower's default within thirty days after the default." => notice-due, give-notice
-  Norm " The lender may not demand payment unless that notice was given in time, and a demand made without it has no effect." => demand, give-notice
-Clause 4.1 Approved "183acb17eaf24f2be8202efa8c5f4751ecb3ad701cdc9914fdc3dd46ce24cf96"
-  Norm "The lender does not change the terms of the loan without the guarantor's consent." => change-terms, consent-to-change
-  Norm " If the lender does, the guarantor is released, and no demand made after the change has any effect." => released, change-terms
-Clause 5.1 Approved "2826fca41284d59dbedc70aa46ac49d85b47ef736730cda8aa846fcaae60e425"
-  Norm "A guarantor who pays the lender takes over the lender's claim against the borrower for the amount paid. The borrower then owes that amount to the guarantor and no longer owes it to the lender." => pay-guaranty, reimburse, repay-guarantor
-.
-+balance(loan). +called(0). +unpaid(0). +claim(0).
+Clause 1.1/1 Definition => lender, borrower, guarantor, loan
+Clause 1.1/2 => term, repay, pay-loan, in-default
+Clause 1.2/1 => demand
+Clause 1.2/2 => guaranty-due, pay-guaranty
+Clause 2.1 => limit, demand
+Clause 3.1/1 => notice-window, notice-due, give-notice
+Clause 3.1/2 => demand, give-notice
+Clause 4.1/1 => change-terms, consent-to-change
+Clause 4.1/2 => released, change-terms
+Clause 5.1 => pay-guaranty, reimburse, repay-guarantor.

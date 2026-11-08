@@ -1,90 +1,75 @@
 // A durable power of attorney for finances, from Helen Brooks to Marcus Brooks (poa.md).
-Document "poa.md"
+Document "poa.md".
 
 Fact person Identified by Helen, Marcus
-Placeholder agent For person
+Role principal Is Helen
+Role agent Is Marcus
 Placeholder third For person
-Fact usd Identified by Money(USD, 2)
-Param gift-limit : Money(USD, 2) = 50000
+Param gift-limit = $500.00
 
 // P.1, P.4, P.5: when the agent has authority
-Bool signed
-Bool revoked
-Bool deceased
 Bool incapacitated
-Event loses-capacity Creates incapacitated()
-Event regains-capacity Terminates incapacitated()
-Event death Creates deceased()
+Event loses-capacity Creates incapacitated
+Event regains-capacity Terminates incapacitated
+Event death
 Bool authority
-  Holds when signed() && Not(revoked()) && Not(deceased())
-Act sign Actor person
-  Holds when person == Helen
-  Creates signed()
-Power revoke Actor person
-  Holds when person == Helen && authority() && Not(incapacitated())
-  Valid when person == Helen && authority() && Not(incapacitated())
-  Creates revoked()
+  Holds when Done(sign(Helen)) && !Done(revoke(Helen)) && !Done(death())
+Act sign Actor principal
+  Holds when True
+Power revoke Actor principal
+  Valid when authority && !incapacitated
 
-// P.6: whom a dealing binds
+// P.6: whom a dealing binds (third party without notice is protected)
 Fact notice Identified by third
 Act give-notice Actor person Recipient third
-  Holds when signed() && Not(authority())
-  Creates notice()
-Fact binding Identified by agent * third
-  Holds when agent == Marcus && signed() && (authority() || Not(notice()))
+  Holds when Done(sign(Helen)) && !authority
+  Creates notice(third)
+Protection third-without-notice Holder third For pay, transfer
+  Unless !Done(sign(Helen)) || notice(third)
 
 // P.2, P.3: what the agent may do
-Fact dealt Identified by third * usd
-Fact unrecorded Identified by third * usd
-Power pay Actor agent Recipient third Related to usd
-  Holds when agent == Marcus && authority()
-  Valid when binding()
-  Creates dealt(), unrecorded()
-Power transfer Actor agent Recipient third Related to usd
-  Holds when agent == Marcus && authority()
-  Valid when binding()
-  Creates dealt(), unrecorded()
-Power give Actor agent Recipient third Related to usd
-  Holds when agent == Marcus && authority() && usd <= gift-limit
-  Valid when binding() && usd <= gift-limit
-  Creates dealt(), unrecorded()
+Fact dealt Identified by third * amount : USD
+Fact unrecorded Identified by third * amount : USD
+Power pay, transfer Actor agent Recipient third Related to amount : USD
+  Holds when authority
+  Valid when authority
+  Creates dealt(third, amount), unrecorded(third, amount)
+Power give Actor agent Recipient third Related to amount : USD
+  Holds when authority && amount <= gift-limit
+  Valid when Done(sign(Helen)) && (authority || !notice(third)) && amount <= gift-limit
+  Creates dealt(third, amount), unrecorded(third, amount)
+
 Fact account
 Function beneficiary Identified by account * person
-Power change-beneficiary Actor person Related to account, person'
-  Holds when person == Helen
-  Valid when person == Helen
-  Creates beneficiary(account, person')
+Power change-beneficiary Actor principal Related to account, person
+  Valid when True
+  Creates beneficiary(account, person)
 
 // P.7: records and the account
-Act record Actor agent Related to third, usd
-  Holds when agent == Marcus && unrecorded()
-  Terminates unrecorded()
-Duty account-due Holder agent Claimant person
-  Due within 30
+Act record Actor agent Related to third, amount : USD
+  Holds when unrecorded(third, amount)
+  Terminates unrecorded(third, amount)
+Duty account-due Holder agent Claimant Helen
+  Due within 30 days
   Created by request-account
   Terminated by give-account
-Act request-account Actor person Recipient agent
-  Holds when person == Helen && agent == Marcus
-Act give-account Actor agent Recipient person
-  Conditioned by Not(Exists unrecorded: unrecorded)
+Act request-account Actor principal Recipient agent
+  Holds when True
+Act give-account Actor agent Recipient principal
+  Conditioned by !(Exists unrecorded: unrecorded)
 
-Clause P.1 Approved "5c246399a0ec1192a019649ecb8c585091402ec2f3efda37134b813169e274dd"
-  Norm "I, Helen Brooks, the principal, appoint Marcus Brooks as my agent for my finances. This power of attorney takes effect when I sign it." => sign
-Clause P.2 Approved "d84e6d97d4eb4bf7530f510579635f47fe2d776a40bc1807591331588bf295b2"
-  Norm "The agent may pay my bills and move money between my accounts." => pay, transfer
-  Norm " What the agent does within this authority binds me as if I had done it myself." => pay, transfer, give
-Clause P.3 Approved "0a48dbc8e6630e53df94d91174228ae87005195dbfc8ee529516142aa2439f6a"
-  Norm "The agent may make a gift of my money of no more than five hundred dollars. A larger gift does not bind me." => give
-  Norm " The agent may not change the beneficiary of any account. An attempt by the agent to do so has no effect." => change-beneficiary
-Clause P.4 Approved "6fec6296a1baf8beef83a61d08f5f672b7216fa8421517e27befc36dee409c58"
-  Definition "This power of attorney is durable."
-  Norm " The agent's authority continues while I am incapacitated." => pay, transfer, give
-Clause P.5 Approved "ae98a074c0667864e190017cf9842b93f56de71f5bd3cb4e558bd9bd3ce7f0f4"
-  Norm "I may revoke this power of attorney at any time while I have capacity." => revoke
-  Norm " The agent's authority ends when I revoke it, and it ends at my death." => pay, transfer, give
-Clause P.6 Approved "87157423e7c24615db697d048530ab64a20a7bfd8ae6063d02e376091ac92bec"
-  Norm "A person who deals with the agent without notice that the agent's authority has ended is protected: the dealing binds me or my estate. Once that person has notice, it does not." => give-notice, pay, transfer, give
-Clause P.7 Approved "d566021308511f942543588094ad69ef91321bec87879168537d016ee57d15dd"
-  Norm "The agent keeps a record of every payment, transfer and gift made for me." => record
-  Norm " The agent gives me an account of them within thirty days of my request." => request-account, account-due, give-account
-.
+Clause P.1 => principal, agent, sign, authority
+Clause P.2/1 => pay, transfer
+Clause P.2/2 => pay, transfer, give
+Clause P.3/1 => gift-limit, give
+Clause P.3/2 => give
+Clause P.3/3 => change-beneficiary
+Clause P.3/4 => change-beneficiary
+Clause P.4/1 Definition
+Clause P.4/2 => loses-capacity, regains-capacity, authority
+Clause P.5/1 => revoke
+Clause P.5/2 => death, authority
+Clause P.6/1 => third-without-notice, give
+Clause P.6/2 => give-notice, third-without-notice, give
+Clause P.7/1 => record, unrecorded
+Clause P.7/2 => request-account, account-due, give-account.

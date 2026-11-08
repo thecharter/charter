@@ -1,0 +1,57 @@
+{"lockVersion": 1,
+ "files":
+ [{"sha256": "0b7078ee6c00ac7ec302cd989f46996042325d293711cd2acf23570638ac83ea",
+   "path": "guaranty.charter"},
+  {"sha256": "509b6c21979f02c080b836218ceff28f649fb582a234d39aeda6d66873e47de4",
+   "path": "guaranty.md"}],
+ "clauses":
+ [{"textSha256":
+   "3a3b4aae22f627d8060809f7f76e7f4035ed858e95371ccc8ac8b798e8dff146",
+   "rulesSha256":
+   "2a6fe59f61140eb769bcad27449e77d16e54af89f78f1e954c2c98641d19f6ec",
+   "id": "1.1/1"},
+  {"textSha256":
+   "fed4ce03036990a9a1b135bcb739272bbb09b1d12024e892d10aeaf3cb66f879",
+   "rulesSha256":
+   "ffb617c4167b265276e13cf1e63d89470f9453c3a5d653732eccaeb82f136d04",
+   "id": "1.1/2"},
+  {"textSha256":
+   "593b306a46537886be3a88ee0ea8c1466d92534cf60bfeb2c448005f735cc8b0",
+   "rulesSha256":
+   "05d577def7d3b8358f5fc4f04f6f959ffb1cc3147d0dff308f2dbb2e12fe04f6",
+   "id": "1.2/1"},
+  {"textSha256":
+   "bf9a6e6de7bbd1dfe38a4fcb7d6b03ab919ac30dbedc80fec27cf7ed6c531c97",
+   "rulesSha256":
+   "0fbbf3c0a84bfbc8f346e69dde0c19036459469cf0fa1897a6d1a09a6257c09b",
+   "id": "1.2/2"},
+  {"textSha256":
+   "845c79322d1a3e6ddde0cb41dfa3e50fc09b81da2e53da8ac9b9517e604a4b5d",
+   "rulesSha256":
+   "1ecc0e33f1fdfe9b0794556fa5e4608515cfba073c5397cea4a8d25d89a632b8",
+   "id": "2.1"},
+  {"textSha256":
+   "18918d83e0defbdd1e6a8bf032e42ee45970b36991795f0c283915f12e43bef3",
+   "rulesSha256":
+   "fe6dd736f8f08a815378013789577e972def25cf6e0810858be94249b810cfcd",
+   "id": "3.1/1"},
+  {"textSha256":
+   "ad17a9b74c736f75cf5ab24886e34fe13ece77506db253cd57bba8c8aa2508ed",
+   "rulesSha256":
+   "85dd1a303209c7f005cc2dffe50cb53e7fc13a844f970e9c3ae0c511b4d7d010",
+   "id": "3.1/2"},
+  {"textSha256":
+   "df3579ba2e135d1cf78c9d6c5729c49d64000d19beee6e0892c5274b9a8e63f4",
+   "rulesSha256":
+   "195d45441d98c13191d9742af5406be8afd4bf478e9454d5d9531477a4e82318",
+   "id": "4.1/1"},
+  {"textSha256":
+   "1d255ee31ce560a5bc378ba4e0711b98dcea58d1b35f485e5a13e3335d69ea98",
+   "rulesSha256":
+   "b4a89ea616dcacea967e69b880ce4e940e3baeef2aa88259a2f87066f673944c",
+   "id": "4.1/2"},
+  {"textSha256":
+   "2826fca41284d59dbedc70aa46ac49d85b47ef736730cda8aa846fcaae60e425",
+   "rulesSha256":
+   "8a9dcd89552c27deb70f558d38f3d51cdd4b26a4bd582022da1b7120fcf3b599",
+   "id": "5.1"}]}

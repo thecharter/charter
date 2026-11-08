@@ -2,131 +2,131 @@
 // and Wren, who would like to buy in.
 #require "../agreement.charter".
 Extend Fact person Identified by Wren.
-+cash(10000000). +book-value(20000000).
-+debt("kayak loan", 1500000).
++cash($100,000.00). +book-value($200,000.00).
++debt("kayak loan", $15,000.00).
 
 Scenario half-the-interests-is-not-an-ordinary-decision {
-  payout-vote(Iris, 100001).
-  ?!valid distribute(Tidewater, 100001).         // Iris holds exactly half
-  distribute(Tidewater, 100001).
-  ?cash(10000000).                               // it occurred and paid nothing
-  payout-vote(Kemal, 100001).
-  ?valid distribute(Tidewater, 100001).
-  distribute(Tidewater, 100001).
-  ?paid(Iris, 50000). ?paid(Jonah, 30000). ?paid(Kemal, 20000).
-  ?cash(9900000).                                // the odd cent stays with the company
-  ?!valid distribute(Tidewater, 100001).         // one decision, one distribution
+  payout-vote(Iris, $1,000.01).
+  ?!valid distribute($1,000.01).                 // Iris holds exactly half
+  distribute($1,000.01).
+  ?cash($100,000.00).                            // it occurred and paid nothing
+  payout-vote(Kemal, $1,000.01).
+  ?valid distribute($1,000.01).
+  distribute($1,000.01).
+  ?paid(Iris, $500.00). ?paid(Jonah, $300.00). ?paid(Kemal, $200.00).
+  ?cash($99,000.00).                             // the odd cent stays with the company
+  ?!valid distribute($1,000.01).                 // one decision, one distribution
 }
 
 Scenario only-members-vote-and-nobody-owes-more-capital {
-  ?!lawful payout-vote(Wren, 500000).
-  payout-vote(Wren, 500000). payout-vote(Jonah, 500000). payout-vote(Kemal, 500000).
-  ?!valid distribute(Tidewater, 500000).         // Wren's vote weighs nothing
-  ?!valid call-capital(Tidewater, Kemal, 1000000).
+  ?!lawful payout-vote(Wren, $5,000.00).
+  payout-vote(Wren, $5,000.00). payout-vote(Jonah, $5,000.00). payout-vote(Kemal, $5,000.00).
+  ?!valid distribute($5,000.00).                 // Wren's vote weighs nothing
+  ?!valid call-capital(Kemal, $10,000.00).
 }
 
 Scenario admission-needs-every-member {
   admission-vote(Iris, Wren). admission-vote(Jonah, Wren).
-  ?!valid admit(Tidewater, Wren).
-  admit(Tidewater, Wren).
+  ?!valid admit(Wren).
+  admit(Wren).
   ?!member(Wren).
   admission-vote(Kemal, Wren).
-  admit(Tidewater, Wren).
+  admit(Wren).
   ?member(Wren).
 }
 
 Scenario the-other-members-buy-in-proportion {
-  offer-interest(Kemal, 2500000).
+  offer-interest(Kemal, $25,000.00).
   accept-offer(Iris, Kemal). accept-offer(Jonah, Kemal).
   @ 29.
   ?!valid sell-to-members(Kemal).
   @ 30.
   sell-to-members(Kemal).
   ?capital(Iris, 62500). ?capital(Jonah, 37500). ?capital(Kemal, 0).
-  ?!member(Kemal). ?!dissolved().
+  ?!member(Kemal). ?!dissolved.
 }
 
 Scenario one-member-accepts-and-buys-it-all {
-  offer-interest(Kemal, 2500000).
+  offer-interest(Kemal, $25,000.00).
   @ 10.
   accept-offer(Jonah, Kemal).
   @ 30.
   ?!valid accept-offer(Iris, Kemal).             // the thirty days have run
-  ?!valid sell-outside(Kemal, Wren, 2500000).    // a member accepted
+  ?!valid sell-outside(Kemal, Wren, $25,000.00). // a member accepted
   sell-to-members(Kemal).
   ?capital(Iris, 50000). ?capital(Jonah, 50000).
 }
 
 Scenario an-outside-sale-follows-the-article-or-has-no-effect {
-  ?!valid sell-outside(Kemal, Wren, 2500000).    // never offered to the others
-  sell-outside(Kemal, Wren, 2500000).
+  ?!valid sell-outside(Kemal, Wren, $25,000.00). // never offered to the others
+  sell-outside(Kemal, Wren, $25,000.00).
   ?capital(Kemal, 20000). ?member(Kemal).
-  offer-interest(Kemal, 2500000).
+  offer-interest(Kemal, $25,000.00).
   @ 30.
-  ?!valid sell-outside(Kemal, Wren, 2500000).    // Wren has not been admitted
+  ?!valid sell-outside(Kemal, Wren, $25,000.00). // Wren has not been admitted
   admission-vote(Iris, Wren). admission-vote(Jonah, Wren). admission-vote(Kemal, Wren).
-  admit(Tidewater, Wren).
-  ?!valid sell-outside(Kemal, Wren, 2499999).    // below the offered price
-  sell-outside(Kemal, Wren, 2500000).
+  admit(Wren).
+  ?!valid sell-outside(Kemal, Wren, $24,999.99). // below the offered price
+  sell-outside(Kemal, Wren, $25,000.00).
   ?capital(Wren, 20000). ?capital(Kemal, 0). ?member(Wren). ?!member(Kemal).
 }
 
 Scenario a-withdrawing-member-is-bought-out-at-a-discount {
   give-notice(Jonah).
   @ 89.
-  ?!valid buy-out(Tidewater, Jonah).
+  ?!valid buy-out(Jonah).
   @ 90.
-  buy-out(Tidewater, Jonah).
-  ?buyout-due(Tidewater, Jonah, 5400000).        // 30% of $200,000.00, less ten percent
+  buy-out(Jonah).
+  ?buyout-due(Jonah, $54,000.00).                // 30% of $200,000.00, less ten percent
   ?!member(Jonah). ?capital(Jonah, 0).
   @ 149.
-  ?!violated buyout-due(Tidewater, Jonah, 5400000).
+  ?!violated buyout-due(Jonah, $54,000.00).
   @ 150.
-  ?violated buyout-due(Tidewater, Jonah, 5400000).
-  pay-buyout(Tidewater, Jonah, 5400000).
-  ?!buyout-due(Tidewater, Jonah, 5400000). ?cash(4600000).
+  ?violated buyout-due(Jonah, $54,000.00).
+  pay-buyout(Jonah, $54,000.00).
+  ?!buyout-due(Jonah, $54,000.00). ?cash($46,000.00).
 }
 
 Scenario seventy-percent-cannot-amend {
   amendment-vote(Iris, FirstAmendment). amendment-vote(Kemal, FirstAmendment).
-  ?!valid first-amendment(Tidewater).
-  first-amendment(Tidewater).
+  ?!valid first-amendment().
+  first-amendment().
   give-notice(Jonah).
   @ 90.
-  buy-out(Tidewater, Jonah).
-  ?buyout-due(Tidewater, Jonah, 5400000).        // clause 5.2 still reads as signed
+  buy-out(Jonah).
+  ?buyout-due(Jonah, $54,000.00).                // clause 5.2 still reads as signed
 }
 
 Scenario eighty-percent-amends-the-price {
   amendment-vote(Iris, FirstAmendment). amendment-vote(Jonah, FirstAmendment).
-  ?valid first-amendment(Tidewater).
-  first-amendment(Tidewater).
+  ?valid first-amendment().
+  first-amendment().
   give-notice(Jonah).
   @ 90.
-  buy-out(Tidewater, Jonah).
-  ?buyout-due(Tidewater, Jonah, 6000000).        // no discount after the amendment
+  buy-out(Jonah).
+  ?buyout-due(Jonah, $60,000.00).                // no discount after the amendment
 }
 
 Scenario dissolution-pays-debts-first {
   matter-vote(Iris, Dissolve). matter-vote(Jonah, Dissolve).
-  ?!valid dissolve(Tidewater).
+  ?!valid dissolve().
   matter-vote(Kemal, Dissolve).
-  dissolve(Tidewater).
-  ?dissolved().
-  ?!lawful wind-up(Tidewater).                   // the loan is unpaid
-  pay-debt(Tidewater, "kayak loan", 1500000).
-  ?lawful wind-up(Tidewater).
-  wind-up(Tidewater).
-  ?paid(Iris, 4250000). ?paid(Jonah, 2550000). ?paid(Kemal, 1700000). ?cash(0).
-  payout-vote(Iris, 100). payout-vote(Jonah, 100).
-  ?!valid distribute(Tidewater, 100).            // no other distribution after dissolution
+  dissolve().
+  ?dissolved.
+  ?!lawful wind-up().                            // the loan is unpaid
+  pay-debt("kayak loan", $15,000.00).
+  ?lawful wind-up().
+  wind-up().
+  ?paid(Iris, $42,500.00). ?paid(Jonah, $25,500.00). ?paid(Kemal, $17,000.00). ?cash($0).
+  payout-vote(Iris, $1.00). payout-vote(Jonah, $1.00).
+  ?!valid distribute($1.00).                     // no other distribution after dissolution
 }
 
 Scenario one-member-left-dissolves-the-company {
   give-notice(Jonah). give-notice(Kemal).
   @ 90.
-  buy-out(Tidewater, Jonah).
-  ?!dissolved().
-  buy-out(Tidewater, Kemal).
-  ?dissolved().
+  buy-out(Jonah).
+  ?!dissolved.
+  buy-out(Kemal).
+  ?dissolved.
 }

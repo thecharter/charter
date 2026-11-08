@@ -1,4 +1,4 @@
-// Mia's first year under the plan. Day 0 is the first day of Rosa's first week and of a month.
+// Mia's first year under the plan. Day 0 is the first day of Rosa's first week and of month 0.
 #require "../plan.charter".
 
 Scenario weeks-alternate {
@@ -66,30 +66,32 @@ Scenario the-holiday-parent-is-owed-the-holiday {
 }
 
 Scenario support-is-due-by-the-fifth-with-three-days-of-grace {
-  month-begins(1).
-  ?support-due(Daniel, Rosa, 1).
+  ?support-due(Daniel, Rosa, 0).
+  @ 5.
+  ?late support-due(Daniel, Rosa, 0).              // past the fifth: late, not yet in breach
+  ?!violated support-due(Daniel, Rosa, 0).
   @ 7.
-  ?!violated support-due(Daniel, Rosa, 1).         // inside the grace period
+  ?!violated support-due(Daniel, Rosa, 0).         // still inside the grace period
   @ 8.
-  ?violated support-due(Daniel, Rosa, 1).
-  ?!valid pay-support(Daniel, Rosa, 1, 60000).     // not the amount
-  pay-support(Daniel, Rosa, 1, 60000).
-  ?support-due(Daniel, Rosa, 1).                   // it occurred and discharged nothing
-  pay-support(Daniel, Rosa, 1, 65000).
-  ?!support-due(Daniel, Rosa, 1).
+  ?violated support-due(Daniel, Rosa, 0).
+  ?!valid pay-support(Daniel, Rosa, 0, $600.00).   // not the amount
+  pay-support(Daniel, Rosa, 0, $600.00).
+  ?support-due(Daniel, Rosa, 0).                   // it occurred and discharged nothing
+  pay-support(Daniel, Rosa, 0, $650.00).
+  ?!support-due(Daniel, Rosa, 0).
 }
 
 Scenario two-months-unpaid-are-two-debts {
-  month-begins(1).
   @ 30.
-  month-begins(2).
-  pay-support(Daniel, Rosa, 1, 65000).
-  ?!support-due(Daniel, Rosa, 1).
-  ?support-due(Daniel, Rosa, 2).                   // the second month is still owed
+  ?support-due(Daniel, Rosa, 0).
+  ?support-due(Daniel, Rosa, 1).
+  pay-support(Daniel, Rosa, 0, $650.00).
+  ?!support-due(Daniel, Rosa, 0).
+  ?support-due(Daniel, Rosa, 1).                   // the second month is still owed
   @ 37.
-  ?!violated support-due(Daniel, Rosa, 2).
+  ?!violated support-due(Daniel, Rosa, 1).
   @ 38.
-  ?violated support-due(Daniel, Rosa, 2).
+  ?violated support-due(Daniel, Rosa, 1).
 }
 
 Scenario relocation-needs-sixty-days-notice {
@@ -105,15 +107,14 @@ Scenario relocation-needs-sixty-days-notice {
 }
 
 Scenario only-the-court-changes-the-support-amount {
-  agree-to-change(Rosa, Daniel, 50000).
-  agree-to-change(Daniel, Rosa, 50000).
-  ?support(65000).                                 // the agreement changed nothing
-  month-begins(1).
-  ?!valid pay-support(Daniel, Rosa, 1, 50000).
-  ?!valid order-support(Rosa, 50000).              // a parent is not the court
-  order-support(Rosa, 50000).
-  ?support(65000).
-  order-support(FamilyCourt, 50000).
-  ?support(50000). ?!support(65000).
-  ?valid pay-support(Daniel, Rosa, 1, 50000).
+  agree-to-change(Rosa, Daniel, $500.00).
+  agree-to-change(Daniel, Rosa, $500.00).
+  ?support($650.00).                               // the agreement changed nothing
+  ?!valid pay-support(Daniel, Rosa, 0, $500.00).
+  ?!valid order-support(Rosa, $500.00).            // a parent is not the court
+  order-support(Rosa, $500.00).
+  ?support($650.00).
+  order-support(FamilyCourt, $500.00).
+  ?support($500.00). ?!support($650.00).
+  ?valid pay-support(Daniel, Rosa, 0, $500.00).
 }

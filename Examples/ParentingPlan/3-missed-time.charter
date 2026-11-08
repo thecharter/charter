@@ -1,13 +1,12 @@
 // Article 3. Missed time.
 #require "2-holidays.charter".
 Duty make-up-due Holder parent Claimant other
-  Due within 60
+  Due within 60 days
   Terminated by give-make-up-time
 Act give-make-up-time Actor parent Recipient other
 Extend Act hand-over
-  Creates make-up-due(parent, other) When Violated(regular-week(parent, other)) || Violated(holiday-time(parent, other))
+  Creates make-up-due(parent, other)
+    When Violated(regular-week(parent, other)) || Violated(holiday-time(parent, other))
 
-Clause 3.1 Approved "5654f1dadf4659ea5ec78ef3d2ed9bff8b51ea1cb43745dce1d16fddeba72b45"
-  Norm "A parent who keeps Mia more than a day into the other parent's time owes the other parent make-up time." => hand-over, make-up-due
-  Norm " The make-up time is given within sixty days." => make-up-due, give-make-up-time
-.
+Clause 3.1/1 => hand-over, make-up-due
+Clause 3.1/2 => make-up-due, give-make-up-time.

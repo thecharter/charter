@@ -1,75 +1,68 @@
 // The last will and testament of Margaret Ellis (will.md).
-Document "will.md"
+Document "will.md".
 
 Fact person Identified by Margaret, Daniel, Priya, Anna, Ben, Shelter
+Role testator Is Margaret
+Role residuary Is Shelter
 Placeholder witness For person
-Placeholder executor For person
 Placeholder beneficiary For person
 Fact asset Identified by House, Cash
-Fact earlier-will
+Input Fact earlier-will
 Param survivorship : Duration = 30
 
 // W.2 Execution: signed, and witnessed by two
-Bool signed
 Fact witnessed Identified by witness
 Bool in-effect
-  Holds when signed() && Count(Foreach witness: witness When witnessed()) >= 2
-Act sign Actor person Holds when person == Margaret Creates signed()
-Act attest Actor witness Holds when signed() && witness != Margaret Creates witnessed()
+  Holds when Done(sign(Margaret)) && Count(witnessed) >= 2
+Act sign Actor testator
+  Holds when True
+Act attest Actor witness
+  Holds when Done(sign(Margaret)) && witness != Margaret
+  Creates witnessed(witness)
 
 // W.1 Revocation
 Fact revoked Identified by earlier-will
-  Holds when in-effect()
+  Holds when in-effect
 
 // W.3 Executor: Daniel, or Priya if Daniel cannot act; authority begins at death
 Fact deceased Identified by person
 Fact declined Identified by person
-Fact lapsed Identified by beneficiary
 Event death Related to person
   Creates deceased(person)
-        , lapsed(person) When person != Margaret && Not(Held(deceased(Margaret)) For survivorship)
-Act decline Actor executor Creates declined(executor)
-Fact acting Identified by executor
-  Default named-executor Holds when executor == Daniel
-  Exception daniel-cannot-act Overrides named-executor
-    Rejects when executor == Daniel && (declined(Daniel) || deceased(Daniel))
-  Default substitute-executor
-    Holds when executor == Priya && (declined(Daniel) || deceased(Daniel))
+Act decline Actor person
+  Holds when True
+  Creates declined(person)
+Role acting For person First of Daniel, Priya Unless declined(person) || deceased(person)
 
 // W.4 Debts
-Fact debt Identified by string
-Act pay-debt Actor executor Related to string
-  Holds when acting() && debt()
-  Terminates debt()
+Input Fact debt Identified by string
+Act pay-debt Actor acting Related to string
+  Holds when debt(string)
+  Terminates debt(string)
 
 // W.5 to W.7 Gifts, survivorship, residue
 Fact named Identified by asset * beneficiary
+Fact lapsed Identified by beneficiary
+  Holds when beneficiary != Margaret
+    && (deceased(beneficiary) Before deceased(Margaret)
+        || deceased(beneficiary) Within survivorship Of deceased(Margaret))
 Fact failed Identified by asset
-  Holds when (Exists beneficiary: named() && (lapsed() || witnessed(beneficiary)))
+  Holds when (Exists beneficiary: named(asset, beneficiary) && (lapsed(beneficiary) || witnessed(beneficiary)))
 Fact entitled Identified by asset * beneficiary
-  Holds when (named() && Not(failed())) || (beneficiary == Shelter && failed())
+  Holds when (named(asset, beneficiary) && !failed(asset)) || (residuary(beneficiary) && failed(asset))
 Fact received Identified by asset * beneficiary
-Act distribute Actor executor Recipient beneficiary Related to asset
-  Holds when Not(Exists debt: debt)
-  Valid when in-effect() && acting() && entitled()
+Act distribute Actor person Recipient beneficiary Related to asset
+  Holds when acting(person) && !(Exists debt: debt)
+  Valid when in-effect && acting(person) && entitled(asset, beneficiary)
     && Held(deceased(Margaret)) For survivorship
-  Creates received()
+  Creates received(asset, beneficiary)
 
-Clause W.1 Approved "1e4c1ed572d11d48d82d18347045ad221a8a3d829c579d7e202234c9d312a284"
-  Definition "I revoke every will I made before this one."
-Clause W.2 Approved "7b112f6fdaefdafc391145a75313a9b5db25b8d89d8083d81da452a8fe5e3e41"
-  Norm "This will takes effect only if I sign it in the presence of two witnesses who each sign it too." => sign, attest
-  Norm " A gift to a person who witnessed this will is void." => distribute
-Clause W.3 Approved "dcdd71845a81616f5516f6a623886fe6d0f1e96263d6c2ed3ad398cbfd498884"
-  Norm "I appoint Daniel Ellis as my executor. If Daniel is unable or unwilling to act, I appoint Priya Shah in his place." => decline, distribute
-  Norm " The executor's authority begins at my death." => distribute
-Clause W.4 Approved "c9c08d18d69e20b7aae3fcd564222c5df5e30f65ff846a6b4cfbd26dd2834bc1"
-  Norm "The executor pays my debts before distributing any gift." => pay-debt, distribute
-Clause W.5 Approved "662bd645730a1733126caef1af2789487bcbdb9fc8db9029f2ce7e146cf5d641"
-  Norm "I give my house to Anna Ellis. I give twenty thousand dollars to Ben Ellis." => distribute
-Clause W.6 Approved "4b0e28d12cb5ca0e0fe6e5373a581a7b0dfc69d0ab84c0f2e0a8010d8e9b66ed"
-  Norm "A beneficiary who does not survive me by thirty days is treated as having died before me, and that beneficiary's gift falls into the residue." => distribute
-Clause W.7 Approved "038e22a02bb7ba75329821f86d4cbfef90e066693152b223d08c7fd77fe109c6"
-  Norm "I give the rest of my estate to the Harbor Animal Shelter." => distribute
-.
-+named(House, Anna). +named(Cash, Ben).
+Clause W.1 Definition => revoked
+Clause W.2/1 => sign, attest, in-effect
+Clause W.2/2 => failed, distribute
+Clause W.3/1 => acting, decline
+Clause W.3/2 => distribute
+Clause W.4 => pay-debt, distribute
+Clause W.5 => named(House, Anna), named(Cash, Ben)
+Clause W.6 => survivorship, lapsed, failed
+Clause W.7 => residuary, entitled, distribute.

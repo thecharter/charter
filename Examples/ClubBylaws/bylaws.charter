@@ -1,5 +1,5 @@
 // Bylaws of the Elm Street Garden Club (bylaws.md): the articles, in the document's order.
-Document "bylaws.md".
+Document "bylaws.md"
 #require "1-purpose.charter".
 #require "2-members.charter".
 #require "3-meetings.charter".

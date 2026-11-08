@@ -1,14 +1,11 @@
 // Article 5. Amendment.
 #require "3-meetings.charter".
 Fact amendment
-Use motion(amendment) As amendment
+Use motion(amendment) As amendment From 5.1
 Immunity entrenched Holder club
   Against Amend
-  Protects pay-profit
+  Protects Clause 1.2
   Holds when True
 
-Clause 5.1 Approved "e98de91b407a8359f00847955938228f4bbc3961b651a6066987a1b350d2f9a2"
-  Norm "The members may amend these bylaws by a vote of two thirds of the members voting, at a meeting called with at least fourteen days' notice." => amendment-vote-aye, amendment-vote-nay
-Clause 5.2 Approved "9b3c89d8e1a96768a10c771ba9e2343de79418ac9e5b32fdb5eb4234f00435c1"
-  Norm "Article 1 cannot be amended, and neither can this clause." => entrenched
-.
+Clause 5.1 => amendment-vote-aye, amendment-vote-nay
+Clause 5.2 => entrenched.

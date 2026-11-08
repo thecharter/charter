@@ -1117,7 +1117,7 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .atom "Decides" =>
     if k != .act then return none
     advance
-    let target ← expression
+    let target ← orExpr exprFuel
     let cond ← (do
       if ← isCtxAtom "By" then
         advance

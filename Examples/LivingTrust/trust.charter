@@ -1,5 +1,5 @@
 // The Ellis Family Revocable Living Trust (trust.md): the articles, in the document's order.
-Document "trust.md".
+Document "trust.md"
 #require "1-creation.charter".
 #require "2-revocation.charter".
 #require "3-incapacity.charter".

@@ -4,115 +4,115 @@
 Scenario a-theft-is-paid-less-the-deductible {
   loss-happens("laptop").
   @ 3.
-  give-notice(Nora, HarborMutual, "laptop").
-  prove-loss(Nora, HarborMutual, "laptop", Theft, 120000).
-  ?covered("laptop"). ?payable("laptop", 70000).
-  ?claim-due(HarborMutual, Nora, "laptop").
-  ?!valid pay-claim(HarborMutual, Nora, "laptop", 60000).              // short of what is owed
-  pay-claim(HarborMutual, Nora, "laptop", 60000).
-  ?claim-due(HarborMutual, Nora, "laptop").
+  give-notice("laptop").
+  prove-loss("laptop", Theft, $1,200.00).
+  ?covered("laptop"). ?payable("laptop", $700.00).
+  ?claim-due("laptop").
+  ?!valid pay-claim("laptop", $600.00).                                // short of what is owed
+  pay-claim("laptop", $600.00).
+  ?claim-due("laptop").
   @ 32.
-  ?!violated claim-due(HarborMutual, Nora, "laptop").
+  ?!violated claim-due("laptop").
   @ 33.
-  ?violated claim-due(HarborMutual, Nora, "laptop").                   // thirty days from the proof
-  pay-claim(HarborMutual, Nora, "laptop", 70000).
-  ?!claim-due(HarborMutual, Nora, "laptop").
+  ?violated claim-due("laptop").                                       // thirty days from the proof
+  pay-claim("laptop", $700.00).
+  ?!claim-due("laptop").
 }
 
 Scenario the-limit-caps-a-large-loss-and-a-small-one-pays-nothing {
   loss-happens("everything"). loss-happens("kettle").
-  give-notice(Nora, HarborMutual, "everything"). give-notice(Nora, HarborMutual, "kettle").
-  prove-loss(Nora, HarborMutual, "everything", Fire, 3500000).
-  prove-loss(Nora, HarborMutual, "kettle", Fire, 4000).
-  ?payable("everything", 2000000). ?!payable("everything", 3450000).
-  ?covered("kettle"). ?!claim-due(HarborMutual, Nora, "kettle").       // under the deductible
+  give-notice("everything"). give-notice("kettle").
+  prove-loss("everything", Fire, $35,000.00).
+  prove-loss("kettle", Fire, $40.00).
+  ?payable("everything", $20,000.00). ?!payable("everything", $34,500.00).
+  ?covered("kettle"). ?!claim-due("kettle").                           // under the deductible
 }
 
 Scenario late-notice-forfeits-the-claim {
   loss-happens("laptop").
   @ 29.
-  ?!violated notice-due(Nora, HarborMutual, "laptop").
-  ?valid give-notice(Nora, HarborMutual, "laptop").
+  ?!violated notice-due("laptop").
+  ?valid give-notice("laptop").
   @ 30.
-  ?violated notice-due(Nora, HarborMutual, "laptop").
-  ?!valid give-notice(Nora, HarborMutual, "laptop").
-  give-notice(Nora, HarborMutual, "laptop").
+  ?violated notice-due("laptop").
+  ?!valid give-notice("laptop").
+  give-notice("laptop").
   ?!noticed("laptop").                                                 // the late notice changed nothing
-  ?!lawful prove-loss(Nora, HarborMutual, "laptop", Theft, 120000).    // a proof follows a notice
-  prove-loss(Nora, HarborMutual, "laptop", Theft, 120000).
+  ?!lawful prove-loss("laptop", Theft, $1,200.00).                     // a proof follows a notice
+  prove-loss("laptop", Theft, $1,200.00).
   ?Established(caused-by("laptop", Theft)).                            // it was a theft all the same
-  ?!covered("laptop"). ?!claim-due(HarborMutual, Nora, "laptop").
+  ?!covered("laptop"). ?!claim-due("laptop").
 }
 
 Scenario exclusions-defeat-a-fire-claim {
   loss-happens("sofa").
-  give-notice(Nora, HarborMutual, "sofa").
-  prove-loss(Nora, HarborMutual, "sofa", Fire, 150000).
+  give-notice("sofa").
+  prove-loss("sofa", Fire, $1,500.00).
   ?covered("sofa").
-  state-cause(HarborMutual, Nora, "sofa", OwnAct).                     // the insurer says she set it
-  ?!covered("sofa"). ?!claim-due(HarborMutual, Nora, "sofa").
+  state-cause("sofa", OwnAct).                                         // the insurer says she set it
+  ?!covered("sofa"). ?!claim-due("sofa").
 }
 
 Scenario a-disputed-cause-waits-for-the-adjuster {
   loss-happens("sofa").
-  give-notice(Nora, HarborMutual, "sofa").
-  prove-loss(Nora, HarborMutual, "sofa", Fire, 150000).
+  give-notice("sofa").
+  prove-loss("sofa", Fire, $1,500.00).
   ?!lawful dispute-cause(Nora, "sofa", Fire).                          // her own statement
-  ?!valid decide-cause(Ines, "sofa", Fire, Yes).                              // nothing is disputed yet
+  ?!valid decide-cause("sofa", Fire, Yes).                             // nothing is disputed yet
   @ 10.
-  state-cause(HarborMutual, Nora, "sofa", Flood).
+  state-cause("sofa", Flood).
   dispute-cause(Nora, "sofa", Flood).
   ?Conflicted(caused-by("sofa", Flood)).
-  ?!claim-due(HarborMutual, Nora, "sofa").
+  ?!claim-due("sofa").
   @ 25.
-  decide-cause(Ines, "sofa", Flood, No).
+  decide-cause("sofa", Flood, No).
   ?Refuted(caused-by("sofa", Flood)).
-  ?covered("sofa"). ?payable("sofa", 100000).
+  ?covered("sofa"). ?payable("sofa", $1,000.00).
   @ 54.
-  ?!violated claim-due(HarborMutual, Nora, "sofa").                    // thirty days from the finding
+  ?!violated claim-due("sofa").                                        // thirty days from the finding
   @ 55.
-  ?violated claim-due(HarborMutual, Nora, "sofa").
+  ?violated claim-due("sofa").
 }
 
 Scenario the-adjuster-finds-flood {
   loss-happens("sofa").
-  give-notice(Nora, HarborMutual, "sofa").
-  prove-loss(Nora, HarborMutual, "sofa", Fire, 150000).
-  state-cause(HarborMutual, Nora, "sofa", Flood).
+  give-notice("sofa").
+  prove-loss("sofa", Fire, $1,500.00).
+  state-cause("sofa", Flood).
   dispute-cause(Nora, "sofa", Flood).
-  decide-cause(Ines, "sofa", Flood, Yes).
+  decide-cause("sofa", Flood, Yes).
   ?!covered("sofa").
-  ?!valid pay-claim(HarborMutual, Nora, "sofa", 100000).
+  ?!valid pay-claim("sofa", $1,000.00).
 }
 
 Scenario cancellation-for-an-unpaid-premium {
   month-begins().
-  ?!valid give-cancellation-notice(HarborMutual, Nora).                // not yet overdue
-  give-cancellation-notice(HarborMutual, Nora).
-  ?!cancellation-noticed().
+  ?!valid give-cancellation-notice().                                  // not yet overdue
+  give-cancellation-notice().
+  ?!cancellation-noticed.
   @ 1.
-  ?violated premium-due(Nora, HarborMutual).
-  give-cancellation-notice(HarborMutual, Nora).
+  ?violated premium-due().
+  give-cancellation-notice().
   @ 10.
-  ?in-force().
-  ?!valid pay-premium(Nora, HarborMutual, 1500).                       // not the whole premium
+  ?in-force.
+  ?!valid pay-premium($15.00).                                         // not the whole premium
   @ 11.
-  ?!in-force().
-  pay-premium(Nora, HarborMutual, 2000).
-  ?!in-force().                                                        // too late to save the policy
+  ?!in-force.
+  pay-premium($20.00).
+  ?!in-force.                                                          // too late to save the policy
   loss-happens("laptop").
-  give-notice(Nora, HarborMutual, "laptop").
-  prove-loss(Nora, HarborMutual, "laptop", Theft, 120000).
+  give-notice("laptop").
+  prove-loss("laptop", Theft, $1,200.00).
   ?!covered("laptop").
 }
 
 Scenario paying-within-ten-days-saves-the-policy {
   month-begins().
   @ 1.
-  give-cancellation-notice(HarborMutual, Nora).
+  give-cancellation-notice().
   @ 10.
-  pay-premium(Nora, HarborMutual, 2000).
+  pay-premium($20.00).
   @ 40.
-  ?in-force().
-  ?!premium-due(Nora, HarborMutual).
+  ?in-force.
+  ?!premium-due().
 }

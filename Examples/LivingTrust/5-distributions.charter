@@ -1,27 +1,23 @@
 // Article 5. Distributions.
 #require "3-incapacity.charter".
-Power pay-settlor Actor person Related to usd
-  Holds when trustee(person) && Not(deceased(Margaret))
-  Valid when trustee(person) && Not(deceased(Margaret)) && usd <= fund.usd
-  Creates fund(fund.usd - usd)
+Power pay-settlor Actor trustee Related to amount : USD
+  Valid when !deceased(Margaret) && amount <= fund
+  Creates fund(fund - amount)
 
-Function share Identified by person * usd
+Function share Identified by beneficiary * amount : USD
 Extend Event death
-  Creates share(Anna, MulDivRound(fund.usd, 1, 2, Floor)), share(Ben, MulDivRound(fund.usd, 1, 2, Floor)), fund(0)
-    When person == Margaret
+  Creates share(Anna, MulDivRound(fund, 1, 2, Floor))
+        , share(Ben, MulDivRound(fund, 1, 2, Floor))
+        , fund($0)
+    When settlor(person)
 
-Fact reached-twenty-five Identified by person
-Fact paid Identified by person * usd
-Power pay-share Actor person Recipient person'
-  Holds when trustee(person)
-  Valid when trustee(person) && reached-twenty-five(person')
-  Creates (Foreach share: paid(person', share.usd) When share.person == person')
-  Terminates (Foreach share: share When share.person == person')
+Input Fact reached-twenty-five Identified by beneficiary
+Fact paid Identified by beneficiary * amount : USD
+Power pay-share Actor trustee Recipient beneficiary
+  Valid when reached-twenty-five(beneficiary)
+  Creates (Foreach share: paid(beneficiary, share.amount) When share.beneficiary == beneficiary)
+  Terminates (Foreach share: share When share.beneficiary == beneficiary)
 
-Clause 5.1 Approved "a26b59b003be98cf7ea76c47b8cef17014f0deb8808bfb5a772e7167619729d1"
-  Norm "During the settlor's life the trustee pays the settlor whatever she requests from the trust fund." => pay-settlor
-Clause 5.2 Approved "956598b47f36adaff9c64f925ae366fa3a89bba55ce5275a51e042e55d341640"
-  Definition "At the settlor's death the trust fund is divided between Anna Ellis and Ben Ellis in equal shares."
-Clause 5.3 Approved "70a2c19f9316597cdafe205dbd19c60be8ddbd9f0904daded846b2f5b7bfd2be"
-  Norm "The trustee holds a beneficiary's share until that beneficiary reaches the age of twenty-five, and then pays it to the beneficiary." => pay-share
-.
+Clause 5.1 => pay-settlor
+Clause 5.2 Definition => share
+Clause 5.3 => reached-twenty-five, pay-share, paid.

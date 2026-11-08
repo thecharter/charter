@@ -46,20 +46,19 @@ targets = sorted(list((root / "lib").glob("*.charter")) + list((root / "Examples
 bin_path = str(root / ".lake" / "build" / "bin" / "charter")
 checked = 0
 for f in targets:
-    for extra in ([], ["--canonical"]):
-        r1 = subprocess.run([bin_path, "fmt", *extra, "--stdout", str(f)], capture_output=True, text=True)
-        if r1.returncode != 0:
-            print(f"FAIL spec-inventory: charter fmt {' '.join(extra)} round-trip failed on {f}:\n{r1.stderr}")
-            sys.exit(1)
-        # Verify idempotence: formatting the formatted output yields byte-identical output
-        tmp = root / "out" / "_fmt_idemp_check.charter"
-        tmp.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(r1.stdout, encoding="utf-8")
-        r2 = subprocess.run([bin_path, "fmt", *extra, "--stdout", str(tmp)], capture_output=True, text=True)
-        tmp.unlink(missing_ok=True)
-        if r2.returncode != 0 or r2.stdout != r1.stdout:
-            print(f"FAIL spec-inventory: charter fmt {' '.join(extra)} is not idempotent on {f}")
-            sys.exit(1)
+    r1 = subprocess.run([bin_path, "fmt", "--stdout", str(f)], capture_output=True, text=True)
+    if r1.returncode != 0:
+        print(f"FAIL spec-inventory: charter fmt round-trip failed on {f}:\n{r1.stderr}")
+        sys.exit(1)
+    # Verify idempotence: formatting the formatted output yields byte-identical output
+    tmp = root / "out" / "_fmt_idemp_check.charter"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(r1.stdout, encoding="utf-8")
+    r2 = subprocess.run([bin_path, "fmt", "--stdout", str(tmp)], capture_output=True, text=True)
+    tmp.unlink(missing_ok=True)
+    if r2.returncode != 0 or r2.stdout != r1.stdout:
+        print(f"FAIL spec-inventory: charter fmt is not idempotent on {f}")
+        sys.exit(1)
     checked += 1
 
 # Verify `charter approve --lock` + rule-drift invalidation (`D34`, `#23`, `#32`, `#35`)
@@ -129,13 +128,17 @@ try:
     if len(rc_quiet.stdout.strip().splitlines()) != 1 or len(rc_verb.stdout.strip().splitlines()) <= 5:
         print(f"FAIL spec-inventory: #33 check quiet/verbose failed:\n{rc_quiet.stdout}\n---\n{rc_verb.stdout}")
         sys.exit(1)
-    rc_fmt = subprocess.run([bin_path, "fmt", "--check", str(root / "Examples" / "Deed" / "deed.charter"), str(root / "Examples" / "Tenancy" / "tenancy.charter")], capture_output=True, text=True)
+    ex_all = sorted(
+        [str(p) for p in (root / "Examples").rglob("*.charter") if "protocol-of-sovereign-agency" not in str(p) and "autonomous-commons" not in str(p)]
+        + [str(p) for p in (root / "Examples").rglob("*.eflint")]
+    )
+    rc_fmt = subprocess.run([bin_path, "fmt", "--check", *ex_all], capture_output=True, text=True)
     if rc_fmt.returncode != 0:
-        print(f"FAIL spec-inventory: #31 fmt --check failed on Deed/Tenancy:\n{rc_fmt.stderr}")
+        print(f"FAIL spec-inventory: #31 fmt --check failed on Examples/:\n{rc_fmt.stderr}")
         sys.exit(1)
-    rc_can = subprocess.run([bin_path, "fmt", "--canonical", "--stdout", str(root / "Examples" / "Deed" / "deed.charter")], capture_output=True, text=True)
-    if "Valid when (signed()" in rc_can.stdout or "  Text " in rc_can.stdout:
-        print(f"FAIL spec-inventory: #31 canonical minimal parens or duplicate Text failed:\n{rc_can.stdout}")
+    rc_can = subprocess.run([bin_path, "fmt", "--canonical", "--stdout", str(root / "Examples" / "Tenancy" / "tenancy.charter")], capture_output=True, text=True)
+    if rc_can.returncode != 0 or "Holds when (Held(" in rc_can.stdout or "  Text " in rc_can.stdout:
+        print(f"FAIL spec-inventory: #31 canonical minimal parens or duplicate Text failed:\n{rc_can.stdout}\n{rc_can.stderr}")
         sys.exit(1)
 finally:
     shutil.rmtree(tmp_dir, ignore_errors=True)

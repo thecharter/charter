@@ -1,5 +1,5 @@
 // The mutual non-disclosure agreement of Tidewater Robotics and Juniper Analytics (nda.md).
-Document "nda.md"
+Document "nda.md".
 
 Fact party Identified by Tidewater, Juniper
 Placeholder discloser For party
@@ -10,66 +10,53 @@ Param term : Duration = 1095
 
 // 1. Handing over, and 4. the three years that run from it
 Fact knew Identified by recipient * item
-Event learns-elsewhere Related to recipient, item Creates knew()
-Fact handed-over Identified by discloser * recipient * item
+Event learns-elsewhere Related to recipient, item Creates knew(recipient, item)
 Fact in-term Identified by discloser * recipient * item
 Fact already-known Identified by discloser * recipient * item
 Act hand-over Actor discloser Recipient recipient Related to item
   Holds when discloser != recipient
-  Creates handed-over(), in-term() For term, already-known() When knew()
+  Creates in-term(discloser, recipient, item) For term
+        , already-known(discloser, recipient, item) When knew(recipient, item)
 
 // 3.1 What the secrecy and use clauses do not apply to
 Fact public Identified by item
-Event publication Related to item Creates public()
+Event publication Related to item Creates public(item)
 Fact developed Identified by recipient * item
-Event independent-development Related to recipient, item Creates developed()
+Event independent-development Related to recipient, item Creates developed(recipient, item)
 Fact confidential Identified by discloser * recipient * item
-  Default handed-over-in-confidence Holds when in-term()
-  Exception public-information Overrides handed-over-in-confidence Rejects when public()
-  Exception known-before Overrides handed-over-in-confidence Rejects when already-known()
-  Exception independently-developed Overrides handed-over-in-confidence Rejects when developed()
+  Default handed-over-in-confidence Holds when in-term(discloser, recipient, item)
+  Exception public-information Overrides handed-over-in-confidence Rejects when public(item)
+  Exception known-before Overrides handed-over-in-confidence Rejects when already-known(discloser, recipient, item)
+  Exception independently-developed Overrides handed-over-in-confidence Rejects when developed(recipient, item)
 
 // 3.2 Disclosure a court orders
-Fact ordered Identified by recipient * item
-Event court-order Related to recipient, item Creates ordered()
-Fact notified Identified by recipient * discloser * item
+Event court-order Related to recipient, item
 Act notify-of-order Actor recipient Recipient discloser Related to item
-  Holds when ordered()
-  Creates notified()
+  Holds when Done(court-order(recipient, item))
 
 // 2. Secrecy and use
-Act disclose Actor recipient Related to discloser, item
-  Holds when Not(confidential())
-  Holds when ordered() && notified()
-Act use Actor recipient Related to discloser, item, purpose
-  Holds when Not(confidential()) || purpose == ConsideringTheVenture
+Prohibited disclose Actor recipient Related to discloser, item
+  When confidential(discloser, recipient, item)
+  Unless Done(court-order(recipient, item)) && Done(notify-of-order(recipient, discloser, item))
+Prohibited use Actor recipient Related to discloser, item, purpose
+  When confidential(discloser, recipient, item) && purpose != ConsideringTheVenture
 
 // 5. Return
 Power request-return Actor discloser Recipient recipient Related to item
-  Holds when handed-over()
-  Valid when handed-over()
+  Valid when Done(hand-over(discloser, recipient, item))
 Duty return-due Holder recipient Claimant discloser Related to item
-  Due within 10
+  Due within 10 days
   Created by request-return
   Terminated by return-or-destroy
 Act return-or-destroy Actor recipient Recipient discloser Related to item
 
-Clause 1.1 Approved "100030edb58bdc476acb7f6ec1a1902996b5f1d677605d553147d06141e25413"
-  Definition "Tidewater Robotics and Juniper Analytics are the parties."
-  Norm " Each may disclose confidential information to the other while they consider a joint venture, which is the purpose of this agreement." => hand-over
-Clause 1.2 Approved "7d6de387e752734b5a3a868ec906649ffe19f566d2b42322617e3d4cb817d01d"
-  Norm "Confidential information is whatever a party marks as confidential when it hands it to the other." => hand-over
-  Definition " The party handing it over is the discloser and the party receiving it is the recipient."
-Clause 2.1 Approved "98d58bb73906dc217c0a9ef5ae88e631473d9bc2bda1ae521ef370f34eed1934"
-  Norm "The recipient does not disclose the discloser's confidential information to anyone else." => disclose
-Clause 2.2 Approved "094d75d34438b1109cc579aa0181e6cb76861684a7b927240875c21a469940b4"
-  Norm "The recipient uses the discloser's confidential information only for the purpose." => use
-Clause 3.1 Approved "ae7e1aa387afaa785dfc436a70187c12879ed5416353d579c7208dabd74140ca"
-  Norm "Clauses 2.1 and 2.2 do not apply to information that is public, that the recipient already knew before it was handed over, or that the recipient developed independently." => disclose, use, hand-over
-Clause 3.2 Approved "390573e3fbe119c79f9582bcdd084cc05914f6c36efced659c48001a321ee1f1"
-  Norm "The recipient may disclose confidential information that a court orders it to disclose, but only after notifying the discloser of the order." => disclose, notify-of-order
-Clause 4.1 Approved "42f7ebff097e8e7f3a6c3dfcdf3fa7589615f1a8c7a59af9ad941f368d2e2d39"
-  Norm "Clauses 2.1 and 2.2 bind the recipient for three years from the day the information was handed over, and not after." => hand-over, disclose, use
-Clause 5.1 Approved "65c2cec2542c13047878f10b85a4d2518e9aafc754c7af4154451d69fd30d745"
-  Norm "The recipient returns or destroys the discloser's confidential information within ten days after the discloser asks for it." => request-return, return-due, return-or-destroy
-.
+Clause 1.1/1 Definition => party
+Clause 1.1/2 => purpose, hand-over
+Clause 1.2/1 => handed-over-in-confidence, hand-over
+Clause 1.2/2 Definition => discloser, recipient
+Clause 2.1 => disclose
+Clause 2.2 => use
+Clause 3.1 => public-information, known-before, independently-developed, publication, learns-elsewhere, independent-development
+Clause 3.2 => court-order, notify-of-order, disclose
+Clause 4.1 => term, in-term, hand-over
+Clause 5.1 => request-return, return-due, return-or-destroy.
