@@ -1035,21 +1035,35 @@ def compileDefeasibleRule (ty : DomId) (tspec : TypeSpec) (r : DefeasibleRule) :
   refuseBareEvidenced ty c'
   let cfs ← freeVarsChecked c'
   let unbound := diff cfs boundVars
-  let condCompiled := if unbound.isEmpty then c' else .exists_ unbound c'
-  let conseq' ← match r.conseq, tspec.restriction, tspec.domain with
-    | .holdsBool b, none, _ => pure (.holdsBool b)
-    | .holdsBool _, some _, _ =>
-      err "CHR012" s!"{ty}: `Function` / `Var` defeasible rule `{r.id}` must use `Yields <expr> When <cond>`"
-    | .yieldsVal vt, some .function, .products [_, vVar] => do
-      let vDom := spec.removeDecoration vVar
-      let vt' ← convertTerm termFuel vt (.tagged vDom)
-      pure (.yieldsVal vt')
-    | .yieldsVal vt, some .var, _ => do
-      let vt' ← convertTerm termFuel vt (.tagged ty)
-      pure (.yieldsVal vt')
-    | .yieldsVal _, _, _ =>
-      err "CHR012" s!"{ty}: `Yields` applies to a `Function` or `Var`, not an unrestricted `Fact`"
-  return { r with cond := condCompiled, conseq := conseq' }
+  match r.conseq, tspec.restriction, tspec.domain with
+  | .holdsBool b, none, _ =>
+    warnJudgedBinders unbound
+    let condCompiled := if unbound.isEmpty then c' else .exists_ unbound c'
+    return { r with freeVars := [], cond := condCompiled, conseq := .holdsBool b }
+  | .holdsBool _, some _, _ =>
+    err "CHR012" s!"{ty}: `Function` / `Var` defeasible rule `{r.id}` must use `Yields <expr> When <cond>`"
+  | .yieldsVal vt, some .function, .products [_, vVar] => do
+    let vDom := spec.removeDecoration vVar
+    let vt' ← convertTerm termFuel vt (.tagged vDom)
+    refuseBareEvidenced ty vt'
+    let vfs ← freeVarsChecked vt'
+    let jointUnbound := diff (cfs ++ vfs).eraseDups boundVars
+    warnJudgedBinders jointUnbound
+    return { r with freeVars := jointUnbound, cond := c', conseq := .yieldsVal vt' }
+  | .yieldsVal vt, some .var, dom => do
+    let vt' ← match dom with
+      | .products [cVar] => do
+        let cDom := spec.removeDecoration cVar
+        let inner ← convertTerm termFuel vt (.tagged cDom)
+        pure (.app ty (.pos [inner]))
+      | _ => convertTerm termFuel vt (.tagged ty)
+    refuseBareEvidenced ty vt'
+    let vfs ← freeVarsChecked vt'
+    let jointUnbound := diff (cfs ++ vfs).eraseDups boundVars
+    warnJudgedBinders jointUnbound
+    return { r with freeVars := jointUnbound, cond := c', conseq := .yieldsVal vt' }
+  | .yieldsVal _, _, _ =>
+    err "CHR012" s!"{ty}: `Yields` applies to a `Function` or `Var`, not an unrestricted `Fact`"
 
 /-- Every name in `as` must be a declared act (Charter's `Except under` and `Against`). -/
 def checkActs (what : String) (as : List DomId) : Stc Unit := do

@@ -1,0 +1,7 @@
+// 011.7 (#20): `#require` loads each canonical file at most once, even when required back
+// under another relative spelling of its path.
+//! deny-warnings
+Fact x Identified by A.
++x(A).
+?x(A).
+#require "include/require-back-011-7b.charter".

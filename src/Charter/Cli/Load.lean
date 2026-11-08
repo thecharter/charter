@@ -95,7 +95,8 @@ def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (
     let src ← try IO.FS.readFile path catch _ => pure ""
     if !(← path.pathExists) then
       return ([], [Diagnostic.error "CHR005" s!"cannot read {pathS}"], seen, dirs)
-    let seen := seen ++ [pathS]
+    let canonPath ← (try (·.toString) <$> IO.FS.realPath path catch _ => pure pathS)
+    let seen := if seen.contains canonPath then seen else seen ++ [canonPath]
     let dir := dirOf path
     let dirs := if dirs.contains dir then dirs else dirs ++ [dir]
     let rel? ← relativeDir top dir
@@ -120,8 +121,8 @@ def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (
           match ← findIncluded dirs name with
           | none => diags := diags ++ [(Diagnostic.error "CHR005" s!"cannot find {name} (looked in {dirs})" it.pos).withFile pathS]
           | some f =>
-            let fS := f.toString
-            if once && seen.contains fS then pure ()
+            let fCanon ← (try (·.toString) <$> IO.FS.realPath f catch _ => pure f.toString)
+            if once && seen.contains fCanon then pure ()
             else
               let (its, ds, seen', dirs') ← loadFile eflint top f seen dirs depth
               acc := acc ++ its

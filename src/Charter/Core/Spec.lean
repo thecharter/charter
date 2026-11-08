@@ -505,22 +505,33 @@ def insertTemporal (s : Spec) (tp : TemporalSpec) : Spec :=
 def insertScenario (s : Spec) (name : String) (spans : List (ClauseId × String)) : Spec :=
   { s with scenarios := s.scenarios.filter (·.1 != name) ++ [(name, spans)] }
 
-/-- The rules a provenance check must account for: acts, duties, immunities, and invariants. -/
+/-- The rules a provenance check must account for: acts, duties, immunities, and invariants
+(including normative rules declared inside `Amend ... Installs { ... }`, `012.6`, `#24`). -/
 def ruleIds (s : Spec) : List DomId :=
-  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
-    | .act _ | .duty _ | .immunity _ => some p.1
-    | .fact f => if f.invariant then some p.1 else none
-    | _ => none
+  let isRuleKind : Kind → Bool
+    | .act _ | .duty _ | .immunity _ => true
+    | .fact f => f.invariant
+    | _ => false
+  let topRules := s.decls.filterMap fun (p : DomId × TypeSpec) =>
+    if isRuleKind p.2.kind then some p.1 else none
+  let installedRules := s.amendBodies.flatMap fun (_, ds) =>
+    ds.filterMap fun
+      | .typeDecl bty bts => if isRuleKind bts.kind then some bty else none
+      | _ => none
+  (topRules ++ installedRules).eraseDups
 
 /-- All formal identifiers a `Clause` span may cite (`012.5`, `D34`, `#36`): every declared type
 (facts, derived facts, parameters, events, acts, powers, findings, amendments, duties, immunities,
-invariants), placeholders, and named `Default`/`Exception` rule IDs (`r` and `ty.r`). -/
+invariants, including those in `Installs { ... }`), placeholders, and named `Default`/`Exception` rule IDs (`r` and `ty.r`). -/
 def citeableIds (s : Spec) : List String :=
   let declNames := s.decls.map (·.1)
+  let installedDecls : List (DomId × TypeSpec) := s.amendBodies.flatMap fun (_, ds) =>
+    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
+  let instNames := installedDecls.map (·.1)
   let aliasNames := s.aliases.map (·.1)
-  let defRules := s.decls.flatMap fun (ty, ts) =>
+  let defRules := (s.decls ++ installedDecls).flatMap fun (ty, ts) =>
     ts.defeasibleRules.flatMap fun r => [r.id, s!"{ty}.{r.id}"]
-  (declNames ++ aliasNames ++ defRules).eraseDups
+  (declNames ++ instNames ++ aliasNames ++ defRules).eraseDups
 
 /-- Follow placeholder aliases (eFLINT `chase_alias`); fuel bounds a cycle. -/
 def chaseAlias (s : Spec) (d : DomId) : DomId :=

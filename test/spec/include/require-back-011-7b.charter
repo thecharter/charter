@@ -1,0 +1,5 @@
+//! deny-warnings
+#require "../spec_011_7b_require_canonical_once.charter".
+Fact y Identified by x.
++y(A).
+?y(A).

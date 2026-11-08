@@ -16,7 +16,7 @@ A file is a sequence of phrases and directives. Each phrase is a step: it is res
 
 **11.6 Declarations.** A block of declarations is a phrase; its types and placeholders are introduced together, so they may refer to each other in any order, and extensions apply after. `test/spec/spec_011_6_declarations_are_phrases.eflint`
 
-**11.7 Directives.** `#include "f"` splices the items of `f` at that point; `#require "f"` does so once per file. `f` is resolved against the including file's directory, the directories of every file included so far, and the working directory, with `.eflint` appended when needed; a file that cannot be found is CHR005. `test/spec/spec_011_7_include_require.eflint`
+**11.7 Directives.** `#include "f"` splices the items of `f` at that point; `#require "f"` does so once per file. `f` is resolved against the including file's directory, the directories of every file included so far, and the working directory, with `.eflint` appended when needed; a file that cannot be found is CHR005. `test/spec/spec_011_7_include_require.eflint`, `spec_011_7b_require_canonical_once.charter`
 
 **11.8 Terminators.** Every phrase ends with `.`; the last phrase of a file may omit it. A declaration block ends with `.` like any phrase: a `+` after an unterminated declaration continues the declaration (as a list or an expression), never starts a phrase. `test/spec/spec_011_8_terminator.eflint`, `spec_011_10_declarations_need_terminator.eflint`
 

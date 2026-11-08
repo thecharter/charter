@@ -1,0 +1,17 @@
+// 004.12, 014.1 (#19): `Default` / `Exception` rules with `Yields` on a `Function` or `Var`
+// may read declared `Param`s and free holding facts without triggering `CHR102`.
+Fact k Identified by A, B.
+Param base = 5.
+Fact override-rate Identified by k * int.
+
+Function fee Identified by k * int
+  Default base-fee Yields base When True
+  Exception custom-fee Overrides base-fee Yields override-rate.int When override-rate.k == k.
+
+Var cap : Int
+  Default base-cap Yields base * 2 When True.
+
++override-rate(B, 12).
+?fee(A, 5).
+?fee(B, 12).
+?cap(10).

@@ -1,0 +1,18 @@
+// 012.6, 012.10 (#24): a normative rule declared inside `Amend ... Installs { ... }` must be
+// grounded by English just like a top-level rule; omitting its span fails `--require-provenance`.
+//! require-provenance
+//! expect-error: CHR029
+Document "include/tenancy.md".
+Fact p Identified by A.
+Bool off.
+Amend change Actor p
+  Installs {
+    Power stop Actor p
+      Holds when True
+      Valid when True
+      Creates off()
+  }
+  Holds when True
+  Valid when True.
+Clause T.1 Approved "86b3e3ec5210d42d759e02e1685609c84eab9d45d45774634f7cbfd6e7ffa149"
+  Norm "The tenant pays the rent on the first of each month." => change.

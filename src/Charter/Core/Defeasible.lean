@@ -46,12 +46,13 @@ structure DefeasibleRule where
   id        : String
   isDefault : Bool := true
   overrides : List String := []
+  freeVars  : List Var := []
   cond      : Term
   conseq    : DefeasibleConseq
   deriving Repr, Inhabited
 
 def DefeasibleRule.mapDom (f : DomId → DomId) (r : DefeasibleRule) : DefeasibleRule :=
-  { r with cond := r.cond.mapDom f, conseq := r.conseq.mapDom f }
+  { r with freeVars := r.freeVars.map (Var.mapDom f), cond := r.cond.mapDom f, conseq := r.conseq.mapDom f }
 
 /-- Outcome of evaluating a defeasible rule hierarchy on one instance/key (`T21`, `T22`). -/
 inductive DefeasibleResult (α : Type) where
@@ -363,6 +364,16 @@ theorem exception_to_exception_resolves :
     evalCompiledDAG dag (fun r => if r == "r0" then some 20 else if r == "r1" then some 0 else none) = .determined "r1" 0 ∧
     evalCompiledDAG dag (fun r => if r == "r0" then some 20 else if r == "r1" then some 0 else if r == "r2" then some 10 else none) = .determined "r2" 10 :=
   ⟨rfl, rfl, rfl⟩
+
+/-- `T21` (`#80`): Kleene conflict taint is preserved under negation (`Not(c)`) and non-short-circuiting
+conjunction/disjunction, while short-circuiting `false && _` / `true || _` discharges irrelevant taint. -/
+theorem kleene_conflict_taint_propagation :
+    TriBool.not .undetermined = .undetermined ∧
+    TriBool.and .yes .undetermined = .undetermined ∧
+    TriBool.or .no .undetermined = .undetermined ∧
+    TriBool.and .no .undetermined = .no ∧
+    TriBool.or .yes .undetermined = .yes :=
+  ⟨rfl, rfl, rfl, rfl, rfl⟩
 
 end Defeasible
 

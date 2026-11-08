@@ -195,7 +195,8 @@ def conflictFromBucket (now : Int) (te : Tagged) : List (Tagged × Info) → Opt
       | .prod [targetTe, (.str domName, _), (.str r1, _), (.str r2, _)] =>
         let directMatch := targetTe == te
         let funcKeyMatch := domName == te.2 && (match te.1 with | .prod (kTe :: _) => targetTe == kTe | _ => false)
-        if directMatch || funcKeyMatch then some (r1, r2)
+        let varMatch := domName == te.2 && targetTe == (.str domName, "string")
+        if directMatch || funcKeyMatch || varMatch then some (r1, r2)
         else conflictFromBucket now te rest
       | _ => conflictFromBucket now te rest
     else conflictFromBucket now te rest

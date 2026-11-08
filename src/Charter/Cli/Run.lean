@@ -460,6 +460,15 @@ def checkCommand (args : List String) : IO UInt32 := do
             let w := (w.withFile l.file).withPos l.item.pos
             emit o (diagJson w) w.render (toErr := true)
             warnings := warnings + 1
+          if p.hasDecls then
+            match Stratify.strata spec with
+            | .ok _ => pure ()
+            | .error cycle =>
+              let d := (Diagnostic.error "CHR020"
+                s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)"
+                l.item.pos).withFile l.file
+              emit o (diagJson d) d.render (toErr := true)
+              errors := errors + 1
     let (failedProv, loadedDocs, cov) ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
     errors := errors + failedProv
     for w in AssuranceGates.checkUncreatedImmunities f (items.map (·.item)) spec do

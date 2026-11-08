@@ -156,6 +156,18 @@ def lookupNormativeConflict (te : Tagged) : M (Option (String × String)) := ⟨
     .ok [State.conflictFromBucket c.state.time te bucket]
   else .ok [c.state.conflictOf te]⟩
 
+def hasAnyNormativeConflict : M Bool := ⟨fun c _ =>
+  let bucket := if c.indexed then (c.stateIdx.lookup defConflictDom).getD []
+                else c.state.contents.filter (·.1.2 == defConflictDom)
+  .ok [bucket.any (fun (_, i) => i.live c.state.time)]⟩
+
+def splitWhenSpine : Nat → Term → Term × List Term
+  | 0, t => (t, [])
+  | n + 1, .when body cond =>
+    let (h, cs) := splitWhenSpine n body
+    (h, cs ++ [cond])
+  | _ + 1, t => (t, [])
+
 def candidatesFromEvidenceOf (d : DomId) : M (List Tagged) := ⟨fun c _ =>
   let now := c.state.time
   let extract (bucket : List (Tagged × Info)) : List Tagged :=
@@ -636,8 +648,69 @@ def evalTermTri : Nat → Term → M (TriBool × List (Tagged × EvidenceStatus)
                 | .undetermined => pure (.undetermined, [(te, st)])
                 | v => pure (v, [])
           else
-            let b ← isHolds fuel te
-            pure (TriBool.ofBool b, [])
+            let anyConf ← hasAnyNormativeConflict
+            if !anyConf || tspec.derivation.isEmpty then
+              let b ← isHolds fuel te
+              pure (TriBool.ofBool b, [])
+            else
+              let assigned? ← lookupState te
+              let isExplicit := match assigned? with
+                | some i => !i.fromSat
+                | none => false
+              if isExplicit then
+                let b ← isHolds fuel te
+                pure (TriBool.ofBool b, [])
+              else if !(← isValidInstance fuel te) then pure (.no, [])
+              else
+                let drvPairs ← tspec.derivation.mapM fun drv => match drv with
+                  | .holdsWhen c =>
+                    withSubs (Tagged.bindings tspec.domain te) (evalTermTri fuel c)
+                  | .dv ys tm => do
+                    let (headTm, whenConds) := splitWhenSpine 32 tm
+                    let candPairs ← results (scopeWith (everyValidSubs fuel) ys do
+                      let candTe ← whenTagged (eval fuel headTm) pure
+                      if candTe != te then empty
+                      else
+                        let conj := whenConds.foldr Term.and (.boolLit true)
+                        evalTermTri fuel conj)
+                    if candPairs.any (fun p => p.1 == .yes) then pure (.yes, [])
+                    else if candPairs.all (fun p => p.1 == .no) then pure (.no, [])
+                    else pure (.undetermined, dedupUnmet (candPairs.flatMap fun p => if p.1 == .undetermined then p.2 else []))
+                  | .defeasibleDAG dag rules =>
+                    withSubs (Tagged.bindings tspec.domain te) do
+                      let rTri ← rules.mapM fun r => do
+                        let pairs ← results (scopeWith (everyValidSubs fuel) r.freeVars (evalTermTri fuel r.cond))
+                        let v : TriBool :=
+                          if pairs.any (fun p => p.1 == .yes) then .yes
+                          else if pairs.all (fun p => p.1 == .no) then .no
+                          else .undetermined
+                        let u := dedupUnmet (pairs.flatMap fun p => if p.1 == .undetermined then p.2 else [])
+                        pure (r.id, v, u)
+                      let yesIds := rTri.filterMap fun (rid, v, _) => if v == .yes then some rid else none
+                      let undetUnmet := rTri.flatMap fun (rid, v, u) =>
+                        if v != .undetermined then []
+                        else
+                          let dominated := match dag.find? (·.id == rid) with
+                            | some node => node.dominators.any yesIds.contains
+                            | none => false
+                          if dominated then [] else u
+                      if !undetUnmet.isEmpty then pure (.undetermined, dedupUnmet undetUnmet)
+                      else
+                        let b ← isHolds fuel te
+                        pure (TriBool.ofBool b, [])
+                let (dV, dU) := drvPairs.foldl (fun (accV, accU) (v, u) =>
+                  let nv := TriBool.or accV v
+                  (nv, if nv == .yes then [] else accU ++ u)) (TriBool.no, ([] : List (Tagged × EvidenceStatus)))
+                if dV == .no then pure (.no, [])
+                else
+                  let cPairs ← withSubs (Tagged.bindings tspec.domain te) (tspec.conditions.mapM (evalTermTri fuel))
+                  let (finV, finU) := cPairs.foldl (fun (accV, accU) (v, u) =>
+                    let nv := TriBool.and accV v
+                    (nv, if nv == .no then [] else accU ++ u)) (dV, dU)
+                  if finV == .undetermined then pure (.undetermined, dedupUnmet finU)
+                  else
+                    let b ← isHolds fuel te
+                    pure (TriBool.ofBool b, [])
     | .exists_ xs body => do
       let pairs ← results (scopeWith (everyValidSubs fuel) xs (evalTermTri fuel body))
       if pairs.any (fun p => p.1 == .yes) then pure (.yes, [])
@@ -686,7 +759,11 @@ def evalActTri : Nat → Tagged → M (TriBool × TriBool × List (Tagged × Evi
           pure (TriBool.ofBool b, [])
         else
           let now ← getTime
-          match ← lookupState te with
+          let explicitAssign? ← do
+            match ← lookupState te with
+            | some i => pure (if !i.fromSat then some i else none)
+            | none => pure none
+          match explicitAssign? with
           | some i =>
             if !(i.live now) then pure (TriBool.no, [])
             else

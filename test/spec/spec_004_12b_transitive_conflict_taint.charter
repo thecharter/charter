@@ -1,0 +1,43 @@
+// 004.12, 007.6 (T21, #80): a normative conflict on `c` taints intermediate derived facts
+// reading `c` positively or negatively, so dependent act/power guards become `undetermined`
+// (while two-valued saturation and explicit assignments `004.3` remain intact).
+Fact p Identified by A.
+Bool x.
+
+Fact c Identified by p
+  Default yes-rule Holds when x()
+  Default no-rule Rejects when x().
+
+Fact d-neg Identified by p Holds when Not(c(p)).
+Fact d-chain Identified by p Holds when d-neg(p).
+
+Power act-on-chain Actor p
+  Holds when d-chain(p)
+  Valid when d-chain(p).
+
+Scenario transitive-conflict-makes-guard-undetermined {
+  +x().
+  ?Conflict(c(A)).
+  ?d-neg(A).
+  ?d-chain(A).
+  ?undetermined act-on-chain(A).
+  ?!valid act-on-chain(A).
+  ?!lawful act-on-chain(A).
+}
+
+Scenario explicit-assignment-beats-taint {
+  +x().
+  +d-chain(A).
+  ?Conflict(c(A)).
+  ?valid act-on-chain(A).
+  ?lawful act-on-chain(A).
+}
+
+Scenario priority-clears-transitive-taint {
+  +x().
+  Extend Fact c Priority no-rule Over yes-rule.
+  ?!Conflict(c(A)).
+  ?d-chain(A).
+  ?valid act-on-chain(A).
+  ?lawful act-on-chain(A).
+}

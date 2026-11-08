@@ -249,14 +249,20 @@ def hydrateClausesFromDocs (spec : Spec) (loaded : LoadedDocs) : Spec :=
 def clauseRulesDigest (spec : Spec) (c : Clause) : String :=
   let spanPart := c.spans.map fun s => s!"{reprStr s.register}:{",".intercalate s.meaning}"
   let targets := (c.spans.flatMap (·.meaning)).eraseDups
+  let installedDecls : List (DomId × TypeSpec) := spec.amendBodies.flatMap fun (_, ds) =>
+    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
   let targetDefs := targets.map fun m =>
+    let instParts := (installedDecls.filter (·.1 == m)).map fun (_, bts) =>
+      s!"inst:{m}={reprStr { bts with spans := [] }}"
     match spec.findDecl m with
-    | some ts => s!"decl:{m}={reprStr { ts with spans := [] }}"
+    | some ts => "|".intercalate (s!"decl:{m}={reprStr { ts with spans := [] }}" :: instParts)
     | none =>
-      let defMatches := spec.decls.filterMap fun (ty, ts) =>
-        ts.defeasibleRules.find? (fun r => r.id == m || s!"{ty}.{r.id}" == m) |>.map fun r =>
-          s!"def:{ty}.{r.id}={reprStr r}"
-      "|".intercalate defMatches
+      if !instParts.isEmpty then "|".intercalate instParts
+      else
+        let defMatches := (spec.decls ++ installedDecls).filterMap fun (ty, ts) =>
+          ts.defeasibleRules.find? (fun r => r.id == m || s!"{ty}.{r.id}" == m) |>.map fun r =>
+            s!"def:{ty}.{r.id}={reprStr r}"
+        "|".intercalate defMatches
   Artifact.sha256String ("\n".intercalate (spanPart ++ targetDefs))
 
 /-- Multi-document, template-aware, & lockfile-backed SHA-256 provenance report (`012`, `D34`). -/
@@ -268,7 +274,10 @@ def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List Clau
   let scenarioNames := spec.scenarios.map (·.1) ++ spec.temporalProperties.map (·.name)
   let knownIds := (citeable ++ scenarioNames).eraseDups
   let invariants := spec.invariants
-  let fromSpans : List Span := spec.decls.flatMap fun (p : DomId × TypeSpec) =>
+  let installedDecls : List (DomId × TypeSpec) := spec.amendBodies.flatMap fun (_, ds) =>
+    ds.filterMap fun | .typeDecl bty bts => some (bty, bts) | _ => none
+  let allDecls := spec.decls ++ installedDecls
+  let fromSpans : List Span := allDecls.flatMap fun (p : DomId × TypeSpec) =>
     p.2.spans.map fun sp => ⟨sp.1, sp.2, .norm, [p.1]⟩
   let hasFromForClause (cid : ClauseId) : Bool :=
     fromSpans.any (·.clause == cid)
@@ -301,7 +310,7 @@ def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List Clau
       let msg := if ok then s!"{owner}: From {cid} quotes the clause" else s!"{owner}: From {cid} quotes text that is not in the clause"
       { ok := ok, check := "named", clause := cid, text := msg }
   let fromChecks :=
-    (spec.decls.flatMap fun (p : DomId × TypeSpec) => p.2.spans.map (checkFrom p.1)) ++
+    (allDecls.flatMap fun (p : DomId × TypeSpec) => p.2.spans.map (checkFrom p.1)) ++
     (spec.scenarios.flatMap fun (name, sps) => sps.map (checkFrom s!"Scenario {name}")) ++
     (spec.temporalProperties.flatMap fun tp => tp.spans.map (checkFrom s!"Property {tp.name}"))
   let docShaChecks : List ProvClaim := loaded.filterMap fun (sd, res) =>

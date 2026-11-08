@@ -140,10 +140,14 @@ def typeDeps (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Dep :=
     | .dv ys t => binderDeps spec ys .pos ++ deps spec fuel ys .pos t
     | .holdsWhen t => binderDeps spec xs .pos ++ deps spec fuel xs .pos t
     | .defeasibleDAG _ rules =>
-      binderDeps spec xs .neg ++
+      let domDeps := match tspec.domain with
+        | .products pxs => binderDeps spec pxs .pos
+        | _ => []
+      domDeps ++
       (rules.flatMap fun r =>
-        deps spec fuel xs .neg r.cond ++
-        (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => deps spec fuel xs .neg vt))
+        binderDeps spec r.freeVars .neg ++
+        deps spec fuel (xs ++ r.freeVars) .neg r.cond ++
+        (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => deps spec fuel (xs ++ r.freeVars) .neg vt))
   let fromConds := depsList spec fuel xs .pos tspec.conditions
   let fromFilter := deps spec fuel xs .pos tspec.domainConstraint
   fromDerivations ++ fromConds ++ fromFilter

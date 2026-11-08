@@ -58,16 +58,28 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
   | .defeasibleDAG dag rules =>
     let evalActiveRules : M (List (String × DefeasibleVal)) := do
       let pairs ← rules.mapM fun r => do
-        let bs ← results (whenBool (eval M.fuel r.cond) pure)
-        if !(bs.any id) then pure none
+        if r.freeVars.isEmpty then
+          let bs ← results (whenBool (eval M.fuel r.cond) pure)
+          if !(bs.any id) then pure none
+          else
+            match r.conseq with
+            | .holdsBool b => pure (some (r.id, DefeasibleVal.boolOut b))
+            | .yieldsVal vt =>
+              let vs ← results (whenTagged (eval M.fuel vt) pure)
+              match vs with
+              | vTe :: _ => pure (some (r.id, DefeasibleVal.elemOut vTe))
+              | [] => pure none
         else
-          match r.conseq with
-          | .holdsBool b => pure (some (r.id, DefeasibleVal.boolOut b))
-          | .yieldsVal vt =>
-            let vs ← results (whenTagged (eval M.fuel vt) pure)
-            match vs with
-            | vTe :: _ => pure (some (r.id, DefeasibleVal.elemOut vTe))
-            | [] => pure none
+          let outs ← foreach M.fuel r.freeVars do
+            checkTrue (eval M.fuel r.cond)
+            match r.conseq with
+            | .holdsBool b => pure (DefeasibleVal.boolOut b)
+            | .yieldsVal vt =>
+              let vTe ← whenTagged (eval M.fuel vt) pure
+              pure (DefeasibleVal.elemOut vTe)
+          match outs with
+          | v :: _ => pure (some (r.id, v))
+          | [] => pure none
       pure (pairs.filterMap id)
     let lookupAct (active : List (String × DefeasibleVal)) (id : String) : Option DefeasibleVal :=
       match active.find? (fun (p : String × DefeasibleVal) => p.1 == id) with
