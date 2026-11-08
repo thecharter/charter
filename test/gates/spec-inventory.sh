@@ -61,5 +61,25 @@ for f in targets:
         sys.exit(1)
     checked += 1
 
-print(f"ok   spec-inventory ({len(src_codes)} CHR codes, all lexer keywords, {checked} AST round-trips + idempotence)")
+# Verify `charter approve --lock` + rule-drift invalidation (`D34`, `#23`, `#32`, `#35`)
+import tempfile, shutil
+tmp_dir = pathlib.Path(tempfile.mkdtemp())
+try:
+    shutil.copy(root / "test" / "spec" / "include" / "byref_doc.md", tmp_dir / "doc.md")
+    lf = tmp_dir / "lock_spec.charter"
+    lf.write_text('//! require-provenance\nDocument "doc.md"\nFact person Identified by Anna\nAct pay-rent Actor person Holds when True\nClause 1.1 Definition\nClause 1.2/1 => pay-rent\nClause 1.2/2\nClause 1.3\n', encoding="utf-8")
+    ra = subprocess.run([bin_path, "approve", "--lock", str(lf)], capture_output=True, text=True)
+    rc = subprocess.run([bin_path, "check", "--require-provenance", "--deny-warnings", str(lf)], capture_output=True, text=True)
+    if ra.returncode != 0 or rc.returncode != 0:
+        print(f"FAIL spec-inventory: charter approve --lock check failed:\n{ra.stderr}\n{rc.stdout}\n{rc.stderr}")
+        sys.exit(1)
+    lf.write_text(lf.read_text(encoding="utf-8").replace("Holds when True", "Holds when False"), encoding="utf-8")
+    rd = subprocess.run([bin_path, "check", "--require-provenance", str(lf)], capture_output=True, text=True)
+    if rd.returncode == 0 or "STALE 1.2/1" not in (rd.stdout + rd.stderr):
+        print(f"FAIL spec-inventory: rule-drift STALE detection failed:\n{rd.stdout}\n{rd.stderr}")
+        sys.exit(1)
+finally:
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+print(f"ok   spec-inventory ({len(src_codes)} CHR codes, all lexer keywords, {checked} AST round-trips + idempotence, lockfile rule-drift check)")
 PY

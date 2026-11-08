@@ -123,8 +123,10 @@ def docCommand (args : List String) : IO UInt32 := do
       | .error ds => for d in ds do IO.eprintln d.render; return 1
   let dir := (System.FilePath.mk f).parent.getD "."
   let loaded ← readDocuments spec dir
+  let locks ← readClauseLocks dir
+  spec := hydrateClausesFromDocs spec loaded
   let claims := if spec.clauses.isEmpty && spec.document.isNone && spec.documents.isEmpty then []
-                else provenanceReportDocs spec loaded
+                else provenanceReportDocs spec loaded locks
   let cov := computeProvenanceCoverage spec loaded claims
   let (md, j) := renderRulebook f spec cov
   let outStr := if opts.json then j.pretty ++ "\n" else md

@@ -1,0 +1,41 @@
+// lib/debt — Partial-payment & deadline-tracked debt obligation (`D34`, `#45`, `#62`):
+// - Tracks principal balance per `debt-id`, owed by `debtor` to `creditor` in `amount` units
+//   (polymorphic over `Int`, `Money(CUR, SCALE)`, or `Quantity(UNIT)`, and safe even when
+//   `debtor` and `creditor` are instantiated with the same party type).
+// - Partial payments reduce `remaining` without discharging `payment-due` until `remaining == 0`.
+// - Preserves `debt-never-negative`: no payment can reduce `remaining` below zero.
+
+Module debt-obligation(debtor, creditor, debt-id, amount) {
+
+  Function debtor-of Identified by debt-id * debtor
+  Function creditor-of Identified by debt-id * creditor'
+  Function remaining Identified by debt-id * amount
+  Function paid-total Identified by debt-id * amount
+
+  Duty payment-due Holder debtor Claimant creditor' Related to debt-id
+    Holds when (Exists remaining:
+      remaining.debt-id == debt-id && remaining.amount > 0
+      && debtor-of(debt-id, debtor) && creditor-of(debt-id, creditor'))
+
+  Power incur-debt Actor creditor' Recipient debtor Related to debt-id, amount
+    Holds when amount > 0 && !(Exists remaining: remaining.debt-id == debt-id)
+    Valid when amount > 0 && !(Exists remaining: remaining.debt-id == debt-id)
+    Creates debtor-of(debt-id, debtor)
+          , creditor-of(debt-id, creditor')
+          , remaining(debt-id, amount)
+          , paid-total(debt-id, 0)
+
+  Act pay-debt Actor debtor Recipient creditor' Related to debt-id, amount
+    Holds when amount > 0
+      && debtor-of(debt-id, debtor) && creditor-of(debt-id, creditor')
+      && (Exists remaining: remaining.debt-id == debt-id && amount <= remaining.amount)
+    Valid when amount > 0
+      && debtor-of(debt-id, debtor) && creditor-of(debt-id, creditor')
+      && (Exists remaining: remaining.debt-id == debt-id && amount <= remaining.amount)
+    Creates (Foreach remaining: remaining(debt-id, remaining.amount - amount) When remaining.debt-id == debt-id)
+          , (Foreach paid-total: paid-total(debt-id, paid-total.amount + amount) When paid-total.debt-id == debt-id)
+
+  Invariant debt-never-negative When
+    !(Exists remaining: remaining.amount < 0)
+
+}

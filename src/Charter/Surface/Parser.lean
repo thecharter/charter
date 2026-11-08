@@ -571,6 +571,10 @@ def clauseId : P String := do
         | .ident s => advance; advance; more (acc ++ "." ++ s) fuel
         | .int n => advance; advance; more (acc ++ "." ++ toString n) fuel
         | _ => return acc
+      | .kw "/" =>
+        match ← peekAt 1 with
+        | .int n => advance; advance; return acc ++ "/" ++ toString n
+        | _ => return acc
       | _ => return acc
   more first 32
 
@@ -618,18 +622,40 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     else return false
   | _ => return false
 
-/-- The items of a `Clause` frame: `Text "…"` and register spans `Norm "…" => ids`. -/
-def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span)
-  | 0 => return (none, [])
+/-- Parse a defeasible rule identifier (`r-base`, `r1`, or `R1`). -/
+def ruleId : P String := do
+  match ← peek with
+  | .atom s => advance; return s
+  | _ => toString <$> var
+
+/-- Parse one target after `=>` in a `Clause` (`D34`, `#36`): a type/rule id, a qualified
+defeasible rule `ty.r`, or a ground-fact constructor `f(args)` that also initializes state. -/
+def spanTarget : P (String × Option Term) := do
+  let base ← ruleId
+  match ← peek with
+  | .projDot =>
+    advance
+    let sub ← ruleId
+    return (s!"{base}.{sub}", none)
+  | .kw "(" =>
+    advance
+    let args ← arguments exprFuel
+    expectKw ")"
+    return (base, some (.app base args))
+  | _ =>
+    return (base, none)
+
+def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span × List Term)
+  | 0 => return (none, [], [])
   | fuel + 1 => do
     match ← peek with
     | .atom "Text" | .kw "Text" =>
       if (match ← peekAt 1 with | .str _ => true | _ => false) then
         advance
         match ← peek with
-        | .str t => advance; let (_, spans) ← clauseItems cid fuel; return (some t, spans)
+        | .str t => advance; let (_, spans, inits) ← clauseItems cid fuel; return (some t, spans, inits)
         | k => fail "CHR003" s!"expected the clause text in double quotes after `Text` but found {k.describe}"
-      else return (none, [])
+      else return (none, [], [])
     | k =>
       match registerOf k with
       | some reg =>
@@ -637,17 +663,13 @@ def clauseItems (cid : ClauseId) : Nat → P (Option String × List Span)
         match ← peekAt 1 with
         | .str text =>
           advance; advance
-          let ids ← (do if ← isKw "=>" then advance; sepBy1 ident "," 1000 else return [])
-          let (txt, spans) ← clauseItems cid fuel
-          return (txt, ⟨cid, text, reg, ids⟩ :: spans)
-        | _ => return (none, [])
-      | none => return (none, [])
-
-/-- Parse a defeasible rule identifier (`r-base`, `r1`, or `R1`). -/
-def ruleId : P String := do
-  match ← peek with
-  | .atom s => advance; return s
-  | _ => toString <$> var
+          let targets ← (do if ← isKw "=>" then advance; sepBy1 spanTarget "," 1000 else return [])
+          let ids := targets.map (·.1)
+          let hereInits := targets.filterMap (·.2)
+          let (txt, spans, moreInits) ← clauseItems cid fuel
+          return (txt, ⟨cid, text, reg, ids⟩ :: spans, hereInits ++ moreInits)
+        | _ => return (none, [], [])
+      | none => return (none, [], [])
 
 /-- Parse `(Holds when | Rejects when) <expr>` or `Yields <val> When <cond>` for a `Default` / `Exception` rule (`D23`). -/
 def defeasibleBody : P (Term × DefeasibleConseq) := do
@@ -730,14 +752,13 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     if k != .duty then return none
     advance; return some (.dueWithin (← expression))
   | .atom "From" | .kw "From" =>
-    -- `From CLAUSE "span"` on an act, duty, immunity, or fact (an Invariant)
-    if k == .event then return none
+    -- `From CLAUSE ["span"]` on an act, duty, immunity, event, or fact (`D34`)
     if !(match ← peekAt 1 with | .atom _ | .ident _ | .int _ => true | _ => false) then return none
     advance
     let cid ← clauseId
     match ← peek with
     | .str text => advance; return some (.fromSpan cid text)
-    | kk => fail "CHR003" s!"expected the span text in double quotes after `From {cid}` but found {kk.describe}"
+    | _ => return some (.fromSpan cid "")
   | .kw "Valid when" =>
     if k != .act then return none
     advance; return some (.validWhen (← exprList))
@@ -833,16 +854,15 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     | some ds => return some (.derivation ds)
     | none => return none
 
-/-- Zero or more `From CLAUSE "span"` clauses on an `Invariant`, `Predicate`, or `Scenario`. -/
+/-- Zero or more `From CLAUSE ["span"]` clauses on an `Invariant`, `Predicate`, `Use`, or `Scenario`. -/
 def fromClauses : Nat → P (List (ClauseId × String))
   | 0 => return []
   | fuel + 1 => do
     if ← isCtxAtom "From" then
       advance
       let cid ← clauseId
-      match ← peek with
-      | .str text => advance; return (cid, text) :: (← fromClauses fuel)
-      | kk => fail "CHR003" s!"expected the span text in double quotes after `From {cid}` but found {kk.describe}"
+      let txt ← (do match ← peek with | .str text => advance; return text | _ => return "")
+      return (cid, txt) :: (← fromClauses fuel)
     else return []
 
 def clauses (k : FrameKind) : Nat → P (List ModClause)
@@ -1116,7 +1136,8 @@ def frame : Nat → P (List Decl)
     let args ← (do if ← isKw ")" then return [] else sepBy1 ident "," 1000)
     expectKw ")"
     let pre ← (do if ← isCtxAtom "As" then advance; return some (← ident) else return none)
-    return [.use name args pre]
+    let fs ← fromClauses 100
+    return [.use name args pre fs]
   | .atom "Param" | .kw "Param" =>
     advance
     let name ← ident
@@ -1191,11 +1212,34 @@ def frame : Nat → P (List Decl)
         | .int n => advance; return (n.toUInt64, none)
         | k => fail "CHR003" s!"expected approval hash or SHA-256 hex string after `Approved` but found {k.describe}"
       else return ((0 : UInt64), none))
-    let (txt, spans) ← clauseItems cid 1000
-    let source := match txt with
-      | some t => t
-      | none => String.join (spans.map (·.text))
-    return [.clause { id := cid, source, spans, approvedHash := approvedFnv, docId := docId?, approvedSha256 := approvedSha? }]
+    let (txt, spans, inits) ← clauseItems cid 1000
+    if txt.isNone && spans.isEmpty then
+      -- `D34` (`#35`): heading/paragraph citation by reference (`Clause 1.3 [Reg] [=> r1, ...]`)
+      let k ← peek
+      let isNextInvFrame ← (do
+        if k == .kw "Invariant" then
+          match ← peekAt 2 with
+          | .kw "When" | .kw "Where" | .atom "Assumes" => return true
+          | _ => return false
+        else return false)
+      let regOpt ← if isNextInvFrame then pure none else match registerOf k with
+        | some r => advance; pure (some r)
+        | none => pure none
+      let targets ← (do if ← isKw "=>" then advance; sepBy1 spanTarget "," 1000 else return [])
+      let ids := targets.map (·.1)
+      let refInits := targets.filterMap (·.2)
+      let reg := match regOpt with
+        | some r => r
+        | none => if ids.isEmpty then .commentary else .norm
+      return (.clause { id := cid, source := "", spans := [⟨cid, "", reg, ids⟩],
+                        approvedHash := approvedFnv, docId := docId?,
+                        approvedSha256 := approvedSha?, byRef := true }) :: refInits.map .spanInit
+    else
+      let source := match txt with
+        | some t => t
+        | none => String.join (spans.map (·.text))
+      return (.clause { id := cid, source, spans, approvedHash := approvedFnv,
+                        docId := docId?, approvedSha256 := approvedSha?, byRef := false }) :: inits.map .spanInit
   | k => fail "CHR003" s!"expected a declaration but found {k.describe}"
 
 end

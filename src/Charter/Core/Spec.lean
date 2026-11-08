@@ -144,6 +144,8 @@ structure FactSpec where
   audiences    : List String := []
   /-- Charter (D11, D25, G3.5): `Entrenched Invariant` protected across `Amend` trajectories. -/
   entrenched   : Bool := false
+  /-- Charter (D34, `#59`): initial integer value for a `Param` (or initialized `Var`). -/
+  defaultVal   : Option Int := none
   deriving Repr, Inhabited
 
 /-- Charter (D22, G3.2, Law 3): institutional `Finding` target and named proof standard. -/
@@ -335,8 +337,10 @@ inductive Decl where
   | param (name : DomId) (dom : Domain) (value : Int)
   /-- Charter (D8): `Module name(params) { declarations }`. -/
   | module (name : DomId) (params : List DomId) (body : List Decl)
-  /-- Charter (D8): `Use name(args) [As prefix]`: instantiate a module. -/
-  | use (name : DomId) (args : List DomId) (pre : Option String)
+  /-- Charter (D8, D34, `#62`): `Use name(args) [As prefix] [From ...]`: instantiate a module. -/
+  | use (name : DomId) (args : List DomId) (pre : Option String) (spans : List (ClauseId × String) := [])
+  /-- Charter (D34, `#36`): ground-fact initial assertion from a `Clause` span (`=> named(House, Anna)`). -/
+  | spanInit (t : Term)
   /-- Charter (D20): `Property name [Assumes ...] When <TemporalFormula> [From ...]`. -/
   | property (tp : TemporalSpec)
   /-- Charter (D11, D25, G3.5): `Installs { decls }` attached to an `Amend` act. -/
@@ -354,6 +358,7 @@ def Decl.isInitial : Decl → Bool
   | .param .. => true
   | .module .. => true
   | .use .. => true
+  | .spanInit .. => false
   | .property .. => false
   | .amendInstall .. => false
   | .regime .. => false
@@ -366,7 +371,8 @@ def Decl.name : Decl → DomId
   | .document p _ _ _ => p
   | .param n _ _ => n
   | .module n _ _ => n
-  | .use n _ _ => n
+  | .use n _ _ _ => n
+  | .spanInit _ => ""
   | .property tp => tp.name
   | .amendInstall a _ => a
   | .regime r => r.name
@@ -449,6 +455,16 @@ def ruleIds (s : Spec) : List DomId :=
     | .act _ | .duty _ | .immunity _ => some p.1
     | .fact f => if f.invariant then some p.1 else none
     | _ => none
+
+/-- All formal identifiers a `Clause` span may cite (`012.5`, `D34`, `#36`): every declared type
+(facts, derived facts, parameters, events, acts, powers, findings, amendments, duties, immunities,
+invariants), placeholders, and named `Default`/`Exception` rule IDs (`r` and `ty.r`). -/
+def citeableIds (s : Spec) : List String :=
+  let declNames := s.decls.map (·.1)
+  let aliasNames := s.aliases.map (·.1)
+  let defRules := s.decls.flatMap fun (ty, ts) =>
+    ts.defeasibleRules.flatMap fun r => [r.id, s!"{ty}.{r.id}"]
+  (declNames ++ aliasNames ++ defRules).eraseDups
 
 /-- Follow placeholder aliases (eFLINT `chase_alias`); fuel bounds a cycle. -/
 def chaseAlias (s : Spec) (d : DomId) : DomId :=
@@ -833,7 +849,8 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .typeExt d cs k => .typeExt (f d) (cs.map (ModClause.mapDom f)) k
   | .placeholder a b => .placeholder (f a) (f b)
   | .param n dom v => .param (f n) dom v
-  | .use n args pre => .use n (args.map f) pre
+  | .use n args pre sps => .use n (args.map f) pre sps
+  | .spanInit t => .spanInit (t.mapDom f)
   | .property tp => .property (tp.mapDom f)
   | .amendInstall a ds => .amendInstall (f a) (Decl.mapDomList f ds)
   | .regime r => .regime { r with params := r.params.map fun (n, v) => (f n, v) }

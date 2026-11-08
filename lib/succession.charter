@@ -1,0 +1,29 @@
+// lib/succession — Primary and alternate officeholder succession (`D34`, `#40`, `#62`):
+// - The primary officeholder serves while available; if unavailable (declined, incapacitated,
+//   or deceased), the alternate automatically steps in via `Default` / `Exception`.
+
+Module role-succession(office, person) {
+
+  Function primary-for Identified by office * person
+  Function alternate-for Identified by office * person
+  Fact unavailable Identified by person
+
+  Fact acting-holder Identified by office * person
+    Default primary-serves
+      Holds when primary-for(office, person)
+    Exception primary-unavailable Overrides primary-serves
+      Rejects when primary-for(office, person) && unavailable(person)
+    Default alternate-serves
+      Holds when alternate-for(office, person)
+        && (Exists person': primary-for(office, person') && unavailable(person'))
+        && !unavailable(person)
+
+  Act mark-unavailable Actor person
+    Holds when !unavailable(person)
+    Creates unavailable(person)
+
+  Invariant single-acting-holder When
+    !(Exists office, person, person':
+      person != person' && acting-holder(office, person) && acting-holder(office, person'))
+
+}

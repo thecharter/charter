@@ -981,22 +981,70 @@ def expandUses : Nat → List Decl → Stc (List Decl)
       | _ => pure ()
     let spec ← getSpec
     let expanded ← ds.mapM fun d => match d with
-      | .use n args pre =>
+      | .use n args pre sps =>
         match spec.modules.find? (·.1 == n) with
         | none => err "CHR023" s!"Use {n}: no such module"
         | some (_, ps, body) =>
           if ps.length != args.length then
             err "CHR023" s!"Use {n}: the module takes {ps.length} parameter(s), {args.length} given"
-          else
+          else do
             let declared := declaredNames body
             let f (x : DomId) : DomId :=
               match (ps.zip args).find? (·.1 == x) with
               | some (_, a) => a
               | none => if declared.contains x then (match pre with | some p => p ++ "-" ++ x | none => x) else x
-            expandUses fuel (body.map (Decl.mapDom f))
+            let mapped ← expandUses fuel (body.map (Decl.mapDom f))
+            if sps.isEmpty then pure mapped
+            else
+              let attachSpans : Decl → Decl
+                | .typeDecl rd rts =>
+                  let isRule := match rts.kind with
+                    | .act _ | .duty _ | .immunity _ => true
+                    | .fact fs => fs.invariant
+                    | _ => false
+                  if isRule then .typeDecl rd { rts with spans := rts.spans ++ sps }
+                  else .typeDecl rd rts
+                | other => other
+              pure (mapped.map attachSpans)
       | .module .. => pure []
       | d => pure [d]
     return expanded.flatten
+
+mutual
+/-- Evaluate a ground constructor term (`named(House, Anna)`, `paid(0)`) statically to a `Tagged`
+instance for `Clause` span initializers (`D34`, `#36`). Structural (`termination_by`), so kernel
+reduction in `charter prove` introduces zero `WellFounded.fix` / `propext` / `Quot.sound` axioms. -/
+def evalGroundTagged (spec : Spec) : Nat → Term → Option Tagged
+  | 0, _ => none
+  | _ + 1, .tag (.intLit n) d => some (.int n, spec.chaseAlias d)
+  | _ + 1, .tag (.stringLit s) d => some (.str s, spec.chaseAlias d)
+  | fuel + 1, .app d (.named ms) =>
+    let d' := spec.chaseAlias d
+    match spec.lookupDecl d' with
+    | some { domain := .products xs, .. } =>
+      match evalGroundArgs spec fuel ms xs with
+      | some args => some (.prod args, d')
+      | none => none
+    | some _ =>
+      match ms with
+      | [] => some (.prod [], d')
+      | _ => none
+    | none => none
+  | _, _ => none
+termination_by structural n => n
+
+def evalGroundArgs (spec : Spec) : Nat → List (Var × Term) → List Var → Option (List Tagged)
+  | 0, _, _ => none
+  | _, _, [] => some []
+  | fuel + 1, ms, v :: vs =>
+    match ms.find? (·.1 == v) with
+    | some (_, tm) =>
+      match evalGroundTagged spec fuel tm, evalGroundArgs spec fuel ms vs with
+      | some te, some rest => some (te :: rest)
+      | _, _ => none
+    | none => none
+termination_by structural n => n
+end
 
 /-- Execute a block of declarations (eFLINT `compile_phrase (PDeclBlock ds)`):
 `Use`s expanded (D8); new types and placeholders first, as written; then each new type
@@ -1026,17 +1074,18 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .placeholder f t => modifySpec (·.insertAlias f t)
     | .clause c => modifySpec (·.insertClause c)
     | .document p docId? sha? rank? => modifySpec (·.insertDocument { id := docId?, path := p, expectedSha256 := sha?, rank := rank? })
-    | .param n dom _ =>
+    | .param n dom v =>
       let spec ← getSpec
       if (spec.lookupDecl n).isSome then
         warn "CHR019" s!"{n} is declared again; the new declaration replaces the earlier one (B9 pending)"
-      setSpec (spec.insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
+      setSpec (spec.insertDecl n { kind := .fact { defaultVal := some v }, domain := dom, restriction := some .var })
     | .module .. => pure ()
     | .use .. => pure ()
     | .typeExt .. => pure ()
     | .property .. => pure ()
     | .amendInstall .. => pure ()
     | .regime .. => pure ()
+    | .spanInit .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
@@ -1151,7 +1200,19 @@ def executeDecls (ds : List Decl) : Stc Store := do
       | some cyc =>
         err "CHR034" s!"{ty}: priority cycle among defeasible rules: {", ".intercalate cyc}"
       | none => pure ()
-  return init
+  -- 6. compile any ground-fact initializers declared in `Clause` spans (`D34`, `#36`)
+  let curSpec ← getSpec
+  let spanStoreLists ← exts.mapM fun d => match d with
+    | .spanInit rawTm => do
+      let (t', ty) ← compileTerm termFuel rawTm
+      match ty with
+      | .tagged _ =>
+        match evalGroundTagged curSpec 32 t' with
+        | some te => pure [(te, Assignment.holdsTrue none none)]
+        | none => err "CHR012" s!"`Clause` span initializer `{rawTm.pp}` must be a ground fact instance (concrete arguments only)"
+      | _ => err "CHR012" s!"`Clause` span initializer `{rawTm.pp}` is not a fact instance"
+    | _ => pure []
+  return init ++ spanStoreLists.flatten
 
 /-- Compile a transition phrase's term and bind its free variables (eFLINT
 `compile_trans_term`). -/

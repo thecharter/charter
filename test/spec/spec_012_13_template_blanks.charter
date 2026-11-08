@@ -1,0 +1,18 @@
+// 012.7 (D34, #59): a template `Document` with `{param}` and `{role}` blanks matches an instance
+// specification whose `Param`s and singleton `Fact`s supply those values.
+//! require-provenance
+Document "include/template_doc.md"
+
+Fact tenant Identified by Tess
+Fact landlord Identified by Lou
+Param rent = 1500
+Param grace : Duration = 5
+
+Act pay Actor tenant Recipient landlord Holds when True
+Duty rent-due Holder tenant Claimant landlord Due within grace Terminated by pay
+
+Clause L.1 Approved "5128668ad5005a5c5282f4c8c080ec3adde017666695b9592fd8906b68d71b3d"
+  Norm "Tess pays Lou 1500 within 5 days." => pay, rent-due
+.
++rent-due(Tess, Lou).
+?rent-due(Tess, Lou).

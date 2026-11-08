@@ -11,6 +11,7 @@ import Charter.Cli.Generate
 import Charter.Cli.Doc
 import Charter.Cli.Init
 import Charter.Cli.Doctor
+import Charter.Cli.Approve
 import Charter.Lsp.Server
 
 /-!
@@ -29,6 +30,7 @@ def helpText : String :=
   "usage: charter <command> [args] [file.charter ...]\n" ++
   "  init     [<directory>]                  scaffold project, charter.toml, lockfile, and UAT\n" ++
   "  check    <file.charter> ...             resolve phrases and verify clause provenance\n" ++
+  "  approve  [--lock] [--restamp] <file>    stamp reviewed clause approvals in lockfile or source\n" ++
   "  build    <file.charter> [-o <artifact>] compile to a signed SHA-256 content-addressed CIR artifact\n" ++
   "  fmt      [--check] <file.charter> ...   format source canonically with round-trip AST verification\n" ++
   "  doc      <file.charter> [-o <out.md>]   emit consolidated legal prose & CIR decision rulebook\n" ++
@@ -60,6 +62,7 @@ def main (args : List String) : IO UInt32 := do
     return 0
   | "init" :: rest => initCommand rest
   | "check" :: rest => checkCommand rest
+  | "approve" :: rest => approveCommand rest
   | "build" :: rest => buildCommand rest
   | "fmt" :: rest => fmtCommand rest
   | "doc" :: rest => docCommand rest

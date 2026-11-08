@@ -199,7 +199,8 @@ partial def declToJson : Decl → Json
   | .document p id? sha? rk? => Json.mkObj [("k", "doc"), ("p", Json.str p), ("id", toJson id?), ("sha", toJson sha?), ("rk", toJson rk?)]
   | .param n dom v => Json.mkObj [("k", "pa"), ("n", Json.str n), ("dom", toJson dom), ("v", Json.num v)]
   | .module n ps body => Json.mkObj [("k", "mod"), ("n", Json.str n), ("ps", toJson ps), ("b", Json.arr (body.map declToJson).toArray)]
-  | .use n args pre => Json.mkObj [("k", "use"), ("n", Json.str n), ("args", toJson args), ("pre", toJson pre)]
+  | .use n args pre sps => Json.mkObj [("k", "use"), ("n", Json.str n), ("args", toJson args), ("pre", toJson pre), ("sps", toJson sps)]
+  | .spanInit t => Json.mkObj [("k", "si"), ("t", toJson t)]
   | .property tp => Json.mkObj [("k", "prop"), ("tp", toJson tp)]
   | .amendInstall a body => Json.mkObj [("k", "ai"), ("a", Json.str a), ("b", Json.arr (body.map declToJson).toArray)]
   | .regime r => Json.mkObj [("k", "reg"), ("r", toJson r)]
@@ -225,7 +226,13 @@ partial def declFromJson (j : Json) : Except String Decl := do
   | "mod" => do
     let arr ← j.getObjValAs? (Array Json) "b"
     .module <$> j.getObjValAs? String "n" <*> j.getObjValAs? (List DomId) "ps" <*> arr.toList.mapM declFromJson
-  | "use" => .use <$> j.getObjValAs? String "n" <*> j.getObjValAs? (List DomId) "args" <*> j.getObjValAs? (Option String) "pre"
+  | "use" => do
+    let n ← j.getObjValAs? String "n"
+    let args ← j.getObjValAs? (List DomId) "args"
+    let pre ← j.getObjValAs? (Option String) "pre"
+    let sps := (j.getObjValAs? (List (ClauseId × String)) "sps").toOption.getD []
+    .ok (.use n args pre sps)
+  | "si" => .spanInit <$> j.getObjValAs? Term "t"
   | "prop" => .property <$> j.getObjValAs? TemporalSpec "tp"
   | "ai" => do
     let arr ← j.getObjValAs? (Array Json) "b"

@@ -183,7 +183,7 @@ def fmtModClause : ModClause → String
   | .against as => "Against " ++ ", ".intercalate as
   | .unlessCond ts => "Unless " ++ fmtTermList ts
   | .dueWithin d => "Due within " ++ fmtTerm d
-  | .fromSpan cid txt => "From " ++ cid ++ " " ++ showString txt
+  | .fromSpan cid txt => if txt.isEmpty then "From " ++ cid else "From " ++ cid ++ " " ++ showString txt
   | .evidenced => ""
   | .confidential [] => "Confidential"
   | .confidential auds => "Confidential To " ++ ", ".intercalate auds
@@ -222,16 +222,50 @@ def fmtRegister : Register → String
   | .acceptance => "Acceptance"
   | .commentary => "Commentary"
 
-def fmtClauseBlock (indent : String) (c : Clause) : String :=
+def takeSpanInits : List Decl → List Term × List Decl
+  | .spanInit t :: rest =>
+    let (ts, rem) := takeSpanInits rest
+    (t :: ts, rem)
+  | ds => ([], ds)
+
+def renderSpanMeaning (m : List String) (inits : List Term) : String × List Term :=
+  let step (acc : List String × List Term) (id : String) : List String × List Term :=
+    let (outRev, rem) := acc
+    match rem.findIdx? (fun | .app d _ => d == id | _ => false) with
+    | some idx =>
+      match rem[idx]? with
+      | some tm => (fmtTerm tm :: outRev, rem.eraseIdx idx)
+      | none => (id :: outRev, rem)
+    | none => (id :: outRev, rem)
+  let (revStrs, rem') := m.foldl step ([], inits)
+  (if revStrs.isEmpty then "" else " => " ++ ", ".intercalate revStrs.reverse, rem')
+
+def fmtClauseBlockWithInits (indent : String) (c : Clause) (inits : List Term) : String :=
   let inDoc := match c.docId with | some id => s!" In {id}" | none => ""
   let app := match c.approvedSha256 with
     | some hex => s!" Approved {showString hex}"
     | none => if c.approvedHash == 0 then "" else s!" Approved {c.approvedHash}"
-  let txtLine := s!"{indent}  Text {showString c.source}"
-  let spanLines := c.spans.map fun s =>
-    let ids := if s.meaning.isEmpty then "" else " => " ++ ", ".intercalate s.meaning
-    s!"{indent}  {fmtRegister s.register} {showString s.text}{ids}"
-  "\n".intercalate ((s!"{indent}Clause {c.id}{inDoc}{app}") :: txtLine :: spanLines)
+  if c.byRef then
+    match c.spans with
+    | [s] =>
+      let regPart := match s.register with
+        | .norm => ""
+        | .commentary => if s.meaning.isEmpty then "" else " Commentary"
+        | r => " " ++ fmtRegister r
+      let (ids, _) := renderSpanMeaning s.meaning inits
+      s!"{indent}Clause {c.id}{inDoc}{app}{regPart}{ids}"
+    | _ => s!"{indent}Clause {c.id}{inDoc}{app}"
+  else
+    let (spanLinesRev, _) := c.spans.foldl (fun (acc, rem) s =>
+      let (ids, rem') := renderSpanMeaning s.meaning rem
+      (s!"{indent}  {fmtRegister s.register} {showString s.text}{ids}" :: acc, rem')) ([], inits)
+    let spanLines := spanLinesRev.reverse
+    let joinedMatches := String.join (c.spans.map (·.text)) == c.source && !c.spans.isEmpty
+    let bodyLines := if joinedMatches then spanLines else (s!"{indent}  Text {showString c.source}") :: spanLines
+    "\n".intercalate ((s!"{indent}Clause {c.id}{inDoc}{app}") :: bodyLines)
+
+def fmtClauseBlock (indent : String) (c : Clause) : String :=
+  fmtClauseBlockWithInits indent c []
 
 def stripPhysicalDefault : List ModClause → List ModClause
   | .derivation [.holdsWhen (.boolLit true)] :: rest => rest
@@ -344,7 +378,8 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
   | fuel + 1, .placeholder f t :: rest =>
     s!"{indent}Placeholder {f} For {t}" :: fmtDecls indent fuel rest
   | fuel + 1, .clause c :: rest =>
-    fmtClauseBlock indent c :: fmtDecls indent fuel rest
+    let (inits, rest') := takeSpanInits rest
+    fmtClauseBlockWithInits indent c inits :: fmtDecls indent fuel rest'
   | fuel + 1, .document p docId? sha? rank? :: rest =>
     let idPart := match docId? with | some id => s!" {id}" | none => ""
     let shaPart := match sha? with | some h => s!" SHA256 {showString h}" | none => ""
@@ -362,12 +397,17 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     let inner := fmtDecls (indent ++ "  ") fuel body
     let bodyStr := if inner.isEmpty then "" else "\n" ++ (".\n").intercalate inner ++ "."
     s!"{indent}Module {name}({", ".intercalate params}) \{{bodyStr}\n{indent}}" :: fmtDecls indent fuel rest
-  | fuel + 1, .use name args pre :: rest =>
+  | fuel + 1, .use name args pre sps :: rest =>
     let asPart := match pre with | some p => s!" As {p}" | none => ""
-    s!"{indent}Use {name}({", ".intercalate args}){asPart}" :: fmtDecls indent fuel rest
+    let fromPart := String.join (sps.map fun (c, s) => if s.isEmpty then s!" From {c}" else s!" From {c} {showString s}")
+    s!"{indent}Use {name}({", ".intercalate args}){asPart}{fromPart}" :: fmtDecls indent fuel rest
+  | fuel + 1, .spanInit t :: rest =>
+    -- emitted alongside its `Clause` during initial parsing; rendered as no-op standalone decl if orphaned
+    let _ := t
+    fmtDecls indent fuel rest
   | fuel + 1, .property tp :: rest =>
     let assPart := if tp.assumptions.isEmpty then "" else " Assumes " ++ ", ".intercalate tp.assumptions
-    let fromPart := String.join (tp.spans.map fun (c, s) => s!"\n{indent}  From {c} {showString s}")
+    let fromPart := String.join (tp.spans.map fun (c, s) => if s.isEmpty then s!"\n{indent}  From {c}" else s!"\n{indent}  From {c} {showString s}")
     s!"{indent}Property {tp.name}{assPart} When {fmtTemporalFormula tp.formula}{fromPart}" :: fmtDecls indent fuel rest
   | fuel + 1, .amendInstall actId body :: rest =>
     let inner := fmtDecls (indent ++ "    ") fuel body

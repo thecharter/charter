@@ -1,0 +1,55 @@
+// lib/ballot — Reusable per-motion ballot with configurable weights, quorum, majority, and
+// two-thirds supermajority (`D34`, `#50`, `#62`).
+
+Module weighted-ballot(motion, voter) {
+
+  Fact eligible-voter Identified by voter
+  Function voter-weight Identified by voter * int
+  Fact ballot-open Identified by motion
+  Fact voted-yes Identified by motion * voter
+  Fact voted-no Identified by motion * voter
+
+  Fact total-eligible-weight Identified by int
+    Derived from total-eligible-weight(
+      Sum(Foreach voter-weight: voter-weight.int When eligible-voter(voter-weight.voter)))
+
+  Fact yes-weight Identified by motion * int
+    Derived from (Foreach motion: yes-weight(motion,
+      Sum(Foreach voter-weight: voter-weight.int
+        When eligible-voter(voter-weight.voter) && voted-yes(motion, voter-weight.voter)))
+      When ballot-open(motion))
+
+  Fact no-weight Identified by motion * int
+    Derived from (Foreach motion: no-weight(motion,
+      Sum(Foreach voter-weight: voter-weight.int
+        When eligible-voter(voter-weight.voter) && voted-no(motion, voter-weight.voter)))
+      When ballot-open(motion))
+
+  Fact carried-majority Identified by motion
+    Holds when (Exists yes-weight, total-eligible-weight:
+      yes-weight.motion == motion && total-eligible-weight.int > 0
+      && yes-weight.int * 2 > total-eligible-weight.int)
+
+  Fact carried-two-thirds Identified by motion
+    Holds when (Exists yes-weight, total-eligible-weight:
+      yes-weight.motion == motion && total-eligible-weight.int > 0
+      && yes-weight.int * 3 >= total-eligible-weight.int * 2)
+
+  Act open-ballot Actor voter Related to motion
+    Holds when eligible-voter(voter) && !ballot-open(motion)
+    Creates ballot-open(motion)
+
+  Act cast-yes Actor voter Related to motion
+    Holds when eligible-voter(voter) && ballot-open(motion)
+    Creates voted-yes(motion, voter)
+    Terminates voted-no(motion, voter)
+
+  Act cast-no Actor voter Related to motion
+    Holds when eligible-voter(voter) && ballot-open(motion)
+    Creates voted-no(motion, voter)
+    Terminates voted-yes(motion, voter)
+
+  Invariant no-double-stance When
+    !(Exists motion, voter: voted-yes(motion, voter) && voted-no(motion, voter))
+
+}

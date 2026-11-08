@@ -309,9 +309,11 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located) : IO 
 /-- Print the provenance report of a resolved spec (Law 8); returns `(failedChecks, loadedDocs, coverage)`. -/
 def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × LoadedDocs × ProvenanceCoverage) := do
   let loaded ← readDocuments spec programDir
+  let locks ← readClauseLocks programDir
+  let spec := hydrateClausesFromDocs spec loaded
   if spec.clauses.isEmpty && spec.document.isNone && spec.documents.isEmpty then
     return (0, loaded, computeProvenanceCoverage spec loaded [])
-  let claims := provenanceReportDocs spec loaded
+  let claims := provenanceReportDocs spec loaded locks
   let cov := computeProvenanceCoverage spec loaded claims
   let mut failed := 0
   for c in claims do
@@ -486,6 +488,9 @@ def traceCommand (cid : String) (args : List String) : IO UInt32 := do
         | .ok (spec', _, _) => spec := spec'
         | .error _ => pure ()
       | .inl _ => pure ()
+    let dir := (System.FilePath.mk f).parent.getD "."
+    let loaded ← readDocuments spec dir
+    spec := hydrateClausesFromDocs spec loaded
     match spec.clauses.find? (·.id == cid) with
     | some c => IO.println (traceTable c); return 0
     | none => IO.println s!"no clause {cid}; known: {", ".intercalate (spec.clauses.map (·.id))}"; return 1

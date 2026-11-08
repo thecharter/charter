@@ -101,6 +101,8 @@ structure Clause where
   approvedHash   : UInt64 := 0
   docId          : Option String := none
   approvedSha256 : Option String := none
+  /-- `D34` (`#35`): when `true`, `source` is extracted by heading/paragraph reference from `Document`. -/
+  byRef          : Bool := false
   deriving Repr, DecidableEq, Inhabited
 
 /-- Has the English drifted from what was approved? Uses cryptographic SHA-256 when

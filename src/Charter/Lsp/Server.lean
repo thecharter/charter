@@ -94,7 +94,9 @@ def analyzeDocument (uri content : String) : IO (Spec × Array Json) := do
     if !spec.clauses.isEmpty || spec.document.isSome || !spec.documents.isEmpty then
       let dir := (System.FilePath.mk path).parent.getD "."
       let loaded ← Cli.readDocuments spec dir
-      let claims := Cli.provenanceReportDocs spec loaded
+      let locks ← Cli.readClauseLocks dir
+      spec := Cli.hydrateClausesFromDocs spec loaded
+      let claims := Cli.provenanceReportDocs spec loaded locks
       for c in claims do
         if !c.ok then
           lspDiags := lspDiags.push (mkLspDiag 1 1 1 "LAW8" c.text)

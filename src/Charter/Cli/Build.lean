@@ -72,7 +72,9 @@ def buildCommand (args : List String) : IO UInt32 := do
       let finalSpec := (prog.epochs.getLast?.map (·.spec)).getD emptySpec
       let dir := (System.FilePath.mk f).parent.getD "."
       let loadedDocs ← readDocuments finalSpec dir
-      let provClaims := if finalSpec.clauses.isEmpty && finalSpec.document.isNone && finalSpec.documents.isEmpty then [] else provenanceReportDocs finalSpec loadedDocs
+      let locks ← readClauseLocks dir
+      let finalSpec := hydrateClausesFromDocs finalSpec loadedDocs
+      let provClaims := if finalSpec.clauses.isEmpty && finalSpec.document.isNone && finalSpec.documents.isEmpty then [] else provenanceReportDocs finalSpec loadedDocs locks
       let cov := computeProvenanceCoverage finalSpec loadedDocs provClaims
       let failedProv := provClaims.filter (!·.ok)
       for c in failedProv do IO.eprintln c.render

@@ -1,0 +1,24 @@
+// 012.2, 012.8 (D34, #35, #36): `Clause <ID> => ...` extracts the clause text by heading/number
+// from `Document` without retyping it, supports sentence indices `1.2/1`, `1.2/2`, and allows
+// citing `Param`s, `Fact`s, `Event`s, `Default`/`Exception` rule IDs, and ground-fact assertions.
+//! require-provenance
+Document "include/byref_doc.md"
+
+Fact person Identified by Anna
+Fact asset Identified by House
+Param base-rent = 1200
+Fact named Identified by asset * person
+Fact exempt Identified by person
+Fact owes-fee Identified by person
+  Default fee-applies Holds when True
+  Exception fee-waived Overrides fee-applies Rejects when exempt(person)
+Event due-day
+Act pay-rent Actor person Holds when True
+
+Clause 1.1 Approved "a83478129c1d2d3880a6b3d7aa9aecc9057f815411df5244edcc1aba5b1d3680" Definition => base-rent
+Clause 1.2/1 Approved "3afb3b028233a24ca1fa6984c2bddae1a561b94cfb6d322e2cf7efd7f664fd71" => pay-rent, due-day
+Clause 1.2/2 Approved "b576c1b03bd41c4e7217b5c2038a0c74173c78d39f3f315e8c2d32dde86ad092" => owes-fee.fee-applies, fee-waived
+Clause 1.3 Approved "469ec0b1f9888d3dfb5ce1f0622e318f1a7e8f4508faa0081c9e487eba8dfe61" => named(House, Anna)
+.
+?named(House, Anna).
+?owes-fee(Anna).
