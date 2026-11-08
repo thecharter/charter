@@ -56,7 +56,7 @@
       "scope": "live-evaluator",
       "artifact": "src/Charter/Eval/Properties.lean",
       "symbol": "evalPhrase_sound",
-      "summary": "Every live runPhrase step satisfies the declarative DeclPhraseStep specification, preserving state on errors (Law 9, G1.4)."
+      "summary": "Driver-structural soundness: every live runPhrase step matches the DeclPhraseStep driver case-structure (error rollback, stratification guard, clock step, invariant check; paired with evaluator-independent Charter.Core.Meaning, D41, #65)."
     },
     {
       "id": "eval.phrase_complete",
@@ -64,7 +64,31 @@
       "scope": "live-evaluator",
       "artifact": "src/Charter/Eval/Properties.lean",
       "symbol": "evalPhrase_complete",
-      "summary": "Every valid DeclPhraseStep derivation is computed identically by runPhrase (Law 9, G1.4)."
+      "summary": "Driver-structural completeness: every DeclPhraseStep driver derivation is computed identically by runPhrase (paired with evaluator-independent Charter.Core.Meaning, D41, #65)."
+    },
+    {
+      "id": "meaning.decl_eval_complete",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "declEval_implies_eval",
+      "summary": "Evaluator-independent expression completeness: every judgment derivable in the fuel-free relational semantics DeclEval (Charter.Core.Meaning) is computed identically by M.eval once fuel bounds term depth (Law 9, D41, #65)."
+    },
+    {
+      "id": "meaning.decl_eval_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "eval_implies_declEval",
+      "summary": "Evaluator-independent expression soundness: every value returned by M.eval on IsDeclCoreTerm satisfies the fuel-free relational semantics DeclEval without referencing M or DomMap caches (Law 9, D41, #65)."
+    },
+    {
+      "id": "meaning.phrase_step_correspondence",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Eval/Properties.lean",
+      "symbol": "declCPhraseMeaning_agrees_with_step",
+      "summary": "Evaluator-independent compiled phrase correspondence: DeclCPhraseMeaning (which calls no evaluator function) agrees identically with Interp.evalClockStep and Interp.semPhrase (Law 9, D41, #65)."
     },
     {
       "id": "eval.replay_deterministic",

@@ -1,4 +1,5 @@
 import Charter.Core.Transition
+import Charter.Core.Meaning
 
 /-!
 # Charter.Eval.Properties — What the evaluator is proved to do
@@ -1577,6 +1578,810 @@ theorem saturateStratum_idempotent (spec : Spec) (specIdx : Spec.SpecIndex)
     (hp : Saturate.pass spec specIdx prev types s = .ok (s, false)) :
     Saturate.saturateStratum spec specIdx prev types (fuel + 1) s = .ok s := by
   simp [Saturate.saturateStratum, hp]
+
+/-! ## Evaluator-Independent Relational Semantics Correspondence (`D41`, `#65`, `Law 9`) -/
+
+section DeclMeaningProofs
+
+private theorem m_bind_singleton {α β} (m : M α) (f : α → M β) (c : Ctx) (subs : Subs) (a : α)
+    (hm : m.run c subs = .ok [a]) :
+    (m >>= f).run c subs = (f a).run c subs := by
+  show (do let as ← m.run c subs; let bss ← as.mapM (fun x => (f x).run c subs); pure bss.flatten) = _
+  rw [hm]
+  show (do let bss ← [a].mapM (fun x => (f x).run c subs); pure bss.flatten) = _
+  cases hf : (f a).run c subs with
+  | error e => simp [List.mapM, List.mapM.loop, hf, Bind.bind, Except.bind]
+  | ok ys => simp [List.mapM, List.mapM.loop, hf, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem m_map_singleton {α β} (g : α → β) (m : M α) (c : Ctx) (subs : Subs) (a : α)
+    (hm : m.run c subs = .ok [a]) :
+    (g <$> m).run c subs = .ok [g a] := by
+  show (m >>= fun x => pure (g x)).run c subs = .ok [g a]
+  rw [m_bind_singleton m _ c subs a hm]
+  rfl
+
+private theorem whenInt_singleton {α} (m : M Value) (f : Int → M α) (c : Ctx) (subs : Subs) (i : Int)
+    (hm : m.run c subs = .ok [.int i]) :
+    (M.whenInt m f).run c subs = (f i).run c subs := by
+  unfold M.whenInt
+  exact m_bind_singleton m _ c subs (.int i) hm
+
+private theorem whenBool_singleton {α} (m : M Value) (f : Bool → M α) (c : Ctx) (subs : Subs) (b : Bool)
+    (hm : m.run c subs = .ok [.bool b]) :
+    (M.whenBool m f).run c subs = (f b).run c subs := by
+  unfold M.whenBool
+  exact m_bind_singleton m _ c subs (.bool b) hm
+
+private theorem whenTagged_singleton {α} (m : M Value) (f : Tagged → M α) (c : Ctx) (subs : Subs) (te : Tagged)
+    (hm : m.run c subs = .ok [.tagged te]) :
+    (M.whenTagged m f).run c subs = (f te).run c subs := by
+  unfold M.whenTagged
+  exact m_bind_singleton m _ c subs (.tagged te) hm
+
+/-- Completeness of `M.eval` for `DeclEval` (`Law 9`, `#65`): every judgment derivable in the
+fuel-free, evaluator-independent relational semantics `DeclEval` is computed identically by
+`M.eval` in any context `c` with `c.spec = spec ∧ c.state = s` once `t.evalDepth ≤ fuel`. -/
+theorem declEval_implies_eval {spec : Spec} {s : State} {subs : Subs} {t : Term} {v : Value}
+    (hd : DeclEval spec s subs t v) :
+    ∀ {fuel : Nat} {c : Ctx}, c.spec = spec → c.state = s → t.evalDepth ≤ fuel →
+      (M.eval fuel t).run c subs = .ok [v] := by
+  induction hd with
+  | currentTime =>
+    intro fuel c _ hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      simp only [M.eval]
+      have hg : M.getTime.run c subs = .ok [s.time] := by simp [M.getTime, hst]
+      exact m_map_singleton Value.int M.getTime c subs s.time hg
+  | intLit i =>
+    intro fuel c _ _ hle
+    cases fuel with | zero => simp [Term.evalDepth] at hle | succ f => rfl
+  | dimLit dom n =>
+    intro fuel c _ _ hle
+    cases fuel with | zero => simp [Term.evalDepth] at hle | succ f => rfl
+  | stringLit str =>
+    intro fuel c _ _ hle
+    cases fuel with | zero => simp [Term.evalDepth] at hle | succ f => rfl
+  | boolLit b =>
+    intro fuel c _ _ hle
+    cases fuel with | zero => simp [Term.evalDepth] at hle | succ f => rfl
+  | ref x x' el d0 hfind =>
+    intro fuel c hsp _ hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      simp only [M.eval]
+      have hsub : (M.substituteVar x).run c subs = .ok [(el, spec.removeDecoration x)] := by
+        unfold M.substituteVar
+        rw [m_bind_singleton M.getSpec _ c subs spec (by simp [M.getSpec, hsp])]
+        rw [m_bind_singleton M.getSubs _ c subs subs rfl]
+        simp [hfind]; rfl
+      exact m_map_singleton Value.tagged (M.substituteVar x) c subs _ hsub
+  | tagInt t i d _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f t) _ c subs (.int i) (ih hsp hst hf)]
+      rfl
+  | tagStr t str d _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f t) _ c subs (.str str) (ih hsp hst hf)]
+      rfl
+  | tagTagged t el d0 d _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f t) _ c subs (.tagged (el, d0)) (ih hsp hst hf)]
+      rfl
+  | untagInt t i d0 _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f t) _ c subs (.tagged (.int i, d0)) (ih hsp hst hf)]
+      rfl
+  | untagStr t str d0 _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f t) _ c subs (.tagged (.str str, d0)) (ih hsp hst hf)]
+      rfl
+  | not t b _ ih =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hf : t.evalDepth ≤ f := Nat.le_of_succ_le_succ hle
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f t) _ c subs b (ih hsp hst hf)]
+      rfl
+  | andFalse a b _ iha =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f a) _ c subs false (iha hsp hst hfa)]
+      rfl
+  | andTrue a b vb _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f a) _ c subs true (iha hsp hst hfa)]
+      rw [whenBool_singleton (M.eval f b) _ c subs vb (ihb hsp hst hfb)]
+      rfl
+  | orTrue a b _ iha =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f a) _ c subs true (iha hsp hst hfa)]
+      rfl
+  | orFalse a b vb _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f a) _ c subs false (iha hsp hst hfa)]
+      rw [whenBool_singleton (M.eval f b) _ c subs vb (ihb hsp hst hfb)]
+      rfl
+  | iteTrue cond th el v _ _ ihc iht =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hsub := Nat.le_of_succ_le_succ hle
+      have hfc : cond.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) hsub
+      have hft : th.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_trans (Nat.le_max_right _ _) hsub)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f cond) _ c subs true (ihc hsp hst hfc)]
+      exact iht hsp hst hft
+  | iteFalse cond th el v _ _ ihc ihe =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hsub := Nat.le_of_succ_le_succ hle
+      have hfc : cond.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) hsub
+      have hfe : el.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_trans (Nat.le_max_right _ _) hsub)
+      simp only [M.eval]
+      rw [whenBool_singleton (M.eval f cond) _ c subs false (ihc hsp hst hfc)]
+      exact ihe hsp hst hfe
+  | leq a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | le a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | geq a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | ge a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | add a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | sub a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | mult a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | div a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | mod a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [whenInt_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | eq a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [m_bind_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | neq a b x y _ _ iha ihb =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hfa : a.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_of_succ_le_succ hle)
+      have hfb : b.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_of_succ_le_succ hle)
+      simp only [M.eval]
+      rw [m_bind_singleton (M.eval f a) _ c subs x (iha hsp hst hfa)]
+      rw [m_bind_singleton (M.eval f b) _ c subs y (ihb hsp hst hfb)]
+      rfl
+  | mulDivRound x num den mode vx vn vd res _ _ _ hmd ihx ihn ihd =>
+    intro fuel c hsp hst hle
+    cases fuel with
+    | zero => simp [Term.evalDepth] at hle
+    | succ f =>
+      have hsub := Nat.le_of_succ_le_succ hle
+      have hfx : x.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) hsub
+      have hfn : num.evalDepth ≤ f := Nat.le_trans (Nat.le_max_left _ _) (Nat.le_trans (Nat.le_max_right _ _) hsub)
+      have hfd : den.evalDepth ≤ f := Nat.le_trans (Nat.le_max_right _ _) (Nat.le_trans (Nat.le_max_right _ _) hsub)
+      simp only [M.eval]
+      rw [whenInt_singleton (M.eval f x) _ c subs vx (ihx hsp hst hfx)]
+      rw [whenInt_singleton (M.eval f num) _ c subs vn (ihn hsp hst hfn)]
+      rw [whenInt_singleton (M.eval f den) _ c subs vd (ihd hsp hst hfd)]
+      simp [hmd]; rfl
+
+private theorem evalEffect_cAll_ground (n : Nat) (t : Term) (c : Ctx) (te : Tagged)
+    (hRun : (M.eval n t).run c [] = .ok [.tagged te]) :
+    (M.evalEffect (n + 1) (.cAll [] t none [])).run c [] =
+      .ok [([(te, .holdsTrue none none)], [])] := by
+  simp only [M.evalEffect, M.foreachWith, M.scopeWith]
+  have hwt : (M.whenTagged (M.eval n t) pure).run c [] = .ok [te] := by
+    rw [whenTagged_singleton (M.eval n t) _ c [] te hRun]; rfl
+  have hres : (M.results (M.whenTagged (M.eval n t) pure)).run c [] = .ok [[te]] := by
+    simp [M.results, hwt, Except.map]
+  rw [m_bind_singleton _ _ c [] [te] hres]; rfl
+
+private theorem evalEffect_tAll_ground (n : Nat) (t : Term) (c : Ctx) (te : Tagged)
+    (hRun : (M.eval n t).run c [] = .ok [.tagged te]) :
+    (M.evalEffect (n + 1) (.tAll [] t [])).run c [] =
+      .ok [([(te, .holdsFalse none)], [])] := by
+  simp only [M.evalEffect, M.foreachWith, M.scopeWith]
+  have hwt : (M.whenTagged (M.eval n t) pure).run c [] = .ok [te] := by
+    rw [whenTagged_singleton (M.eval n t) _ c [] te hRun]; rfl
+  have hres : (M.results (M.whenTagged (M.eval n t) pure)).run c [] = .ok [[te]] := by
+    simp [M.results, hwt, Except.map]
+  rw [m_bind_singleton _ _ c [] [te] hres]; rfl
+
+private theorem evalEffect_oAll_ground (n : Nat) (t : Term) (c : Ctx) (te : Tagged)
+    (hRun : (M.eval n t).run c [] = .ok [.tagged te]) :
+    (M.evalEffect (n + 1) (.oAll [] t [])).run c [] =
+      .ok [([(te, .unknown)], [])] := by
+  simp only [M.evalEffect, M.foreachWith, M.scopeWith]
+  have hwt : (M.whenTagged (M.eval n t) pure).run c [] = .ok [te] := by
+    rw [whenTagged_singleton (M.eval n t) _ c [] te hRun]; rfl
+  have hres : (M.results (M.whenTagged (M.eval n t) pure)).run c [] = .ok [[te]] := by
+    simp [M.results, hwt, Except.map]
+  rw [m_bind_singleton _ _ c [] [te] hres]; rfl
+
+private theorem semPhrase_effect_of_ok (ctx : Ctx) (e : Effect) (p : Tagged × Assignment)
+    (he : (M.evalEffect M.fuel e).run ctx [] = .ok [([p], [])]) :
+    Interp.semPhrase.effect ctx e = (some [p], []) := by
+  unfold Interp.semPhrase.effect
+  rw [he]
+  rfl
+
+/-- Evaluator-independent phrase-step correspondence (`Law 9`, `#65`): any step derived by
+`DeclCPhraseMeaning` (which calls no evaluator function) agrees identically with
+`Interp.evalClockStep` and `Interp.semPhrase` over any `SpecIndex` whenever `M.fuel` bounds
+the expression depth. -/
+theorem declCPhraseMeaning_agrees_with_step
+    {spec : Spec} {specIdx : Spec.SpecIndex} {s : State} {pFuel : Nat}
+    {cp : CPhrase} {nt : Option Int} {store : Store} {qvs : List Bool}
+    (hm : DeclCPhraseMeaning spec s cp nt store qvs)
+    (hDepth : match cp with
+      | .setTime t | .query t => t.evalDepth ≤ M.fuel
+      | .create [] t | .terminate [] t | .obfuscate [] t => t.evalDepth + 1 ≤ M.fuel
+      | _ => True) :
+    Interp.evalClockStep spec specIdx s cp = .ok nt ∧
+    Interp.semPhrase spec specIdx s (pFuel + 1) cp = (some store, qvs.map Output.queryRes) := by
+  have hsp : (Ctx.ofIdx spec specIdx s).spec = spec := rfl
+  have hst : (Ctx.ofIdx spec specIdx s).state = s := rfl
+  have hFuelSucc : ∃ n : Nat, M.fuel = n + 1 ∧ ∀ k, k + 1 ≤ M.fuel → k ≤ n :=
+    ⟨M.fuel - 1, rfl, fun _ hk => Nat.le_sub_one_of_lt hk⟩
+  rcases hFuelSucc with ⟨nFuel, hEqF, hLeF⟩
+  have hFnEq : M.evalEffect M.fuel = M.evalEffect (nFuel + 1) := congrArg M.evalEffect hEqF
+  cases hm with
+  | onlyDecls init =>
+    exact ⟨rfl, rfl⟩
+  | tick =>
+    exact ⟨rfl, rfl⟩
+  | setTime t t' hEval hMono =>
+    have hRun := declEval_implies_eval hEval hsp hst hDepth
+    have hNotLt : ¬(t' < s.time) := Int.not_lt.mpr hMono
+    constructor
+    · simp [Interp.evalClockStep, hRun, hNotLt]
+    · rfl
+  | query t b hEval =>
+    have hRun := declEval_implies_eval hEval hsp hst hDepth
+    constructor
+    · rfl
+    · simp only [Interp.semPhrase, hRun, List.all_cons, List.all_nil, Bool.and_true]
+      cases b <;> rfl
+  | createGround t te hEval =>
+    have hRun := declEval_implies_eval hEval hsp hst (hLeF _ hDepth)
+    have hEff : (M.evalEffect M.fuel (.cAll [] t none [])).run (Ctx.ofIdx spec specIdx s) [] =
+        .ok [([(te, .holdsTrue none none)], [])] := by
+      rw [hFnEq]; exact evalEffect_cAll_ground nFuel t (Ctx.ofIdx spec specIdx s) te hRun
+    exact ⟨rfl, semPhrase_effect_of_ok _ _ _ hEff⟩
+  | terminateGround t te hEval =>
+    have hRun := declEval_implies_eval hEval hsp hst (hLeF _ hDepth)
+    have hEff : (M.evalEffect M.fuel (.tAll [] t [])).run (Ctx.ofIdx spec specIdx s) [] =
+        .ok [([(te, .holdsFalse none)], [])] := by
+      rw [hFnEq]; exact evalEffect_tAll_ground nFuel t (Ctx.ofIdx spec specIdx s) te hRun
+    exact ⟨rfl, semPhrase_effect_of_ok _ _ _ hEff⟩
+  | obfuscateGround t te hEval =>
+    have hRun := declEval_implies_eval hEval hsp hst (hLeF _ hDepth)
+    have hEff : (M.evalEffect M.fuel (.oAll [] t [])).run (Ctx.ofIdx spec specIdx s) [] =
+        .ok [([(te, .unknown)], [])] := by
+      rw [hFnEq]; exact evalEffect_oAll_ground nFuel t (Ctx.ofIdx spec specIdx s) te hRun
+    exact ⟨rfl, semPhrase_effect_of_ok _ _ _ hEff⟩
+
+private def MSubsingleton {α} (m : M α) : Prop :=
+  ∀ c subs, (∃ e, m.run c subs = .error e) ∨ m.run c subs = .ok [] ∨ (∃ a, m.run c subs = .ok [a])
+
+private theorem m_bind_subsingleton {α β} {m : M α} {f : α → M β}
+    (hm : MSubsingleton m) (hf : ∀ a, MSubsingleton (f a)) :
+    MSubsingleton (m >>= f) := by
+  intro c subs
+  rcases hm c subs with ⟨e, he⟩ | hemp | ⟨a, ha⟩
+  · left; refine ⟨e, ?_⟩
+    show (do let as ← m.run c subs; let bss ← as.mapM (fun x => (f x).run c subs); pure bss.flatten) = .error e
+    simp [he, Bind.bind, Except.bind]
+  · right; left
+    show (do let as ← m.run c subs; let bss ← as.mapM (fun x => (f x).run c subs); pure bss.flatten) = .ok []
+    simp [hemp, Bind.bind, Except.bind, List.mapM, List.mapM.loop, Pure.pure, Except.pure]
+  · rw [m_bind_singleton m f c subs a ha]
+    exact hf a c subs
+
+private theorem m_bind_inv_singleton {α β} {m : M α} {f : α → M β} {c : Ctx} {subs : Subs} {w : β}
+    (hm : MSubsingleton m) (h : (m >>= f).run c subs = .ok [w]) :
+    ∃ a, m.run c subs = .ok [a] ∧ (f a).run c subs = .ok [w] := by
+  rcases hm c subs with ⟨e, he⟩ | hemp | ⟨a, ha⟩
+  · exfalso
+    have : (m >>= f).run c subs = .error e := by
+      show (do let as ← m.run c subs; let bss ← as.mapM (fun x => (f x).run c subs); pure bss.flatten) = .error e
+      simp [he, Bind.bind, Except.bind]
+    rw [this] at h; cases h
+  · exfalso
+    have : (m >>= f).run c subs = .ok [] := by
+      show (do let as ← m.run c subs; let bss ← as.mapM (fun x => (f x).run c subs); pure bss.flatten) = .ok []
+      simp [hemp, Bind.bind, Except.bind, List.mapM, List.mapM.loop, Pure.pure, Except.pure]
+    rw [this] at h; cases h
+  · rw [m_bind_singleton m f c subs a ha] at h
+    exact ⟨a, ha, h⟩
+
+private theorem eval_core_subsingleton :
+    ∀ (fuel : Nat) (t : Term), IsDeclCoreTerm t = true → MSubsingleton (M.eval fuel t)
+  | 0, _, _ => fun _ _ => .inl ⟨_, rfl⟩
+  | f + 1, t, hcore => by
+    cases t with
+    | currentTime => intro c _; exact .inr (.inr ⟨.int c.state.time, rfl⟩)
+    | stringLit s => intro _ _; exact .inr (.inr ⟨.str s, rfl⟩)
+    | boolLit b => intro _ _; exact .inr (.inr ⟨.bool b, rfl⟩)
+    | intLit i => intro _ _; exact .inr (.inr ⟨.int i, rfl⟩)
+    | dimLit _ n => intro _ _; exact .inr (.inr ⟨.int n, rfl⟩)
+    | ref x =>
+      intro c subs
+      simp only [M.eval]
+      show (∃ e, (Value.tagged <$> M.substituteVar x).run c subs = .error e) ∨ _
+      have hspec : M.getSpec.run c subs = .ok [c.spec] := rfl
+      have hsubs : M.getSubs.run c subs = .ok [subs] := rfl
+      have hsv : (M.substituteVar x).run c subs =
+          (match subs.find? (fun p => p.1 == x) with
+           | some (_, (v, _)) => .ok [(v, c.spec.removeDecoration x)]
+           | none => .error (.missingSubstitution x)) := by
+        unfold M.substituteVar
+        rw [m_bind_singleton M.getSpec _ c subs c.spec hspec]
+        rw [m_bind_singleton M.getSubs _ c subs subs hsubs]
+        cases subs.find? (fun p => p.1 == x) <;> rfl
+      show (∃ e, (M.substituteVar x >>= fun te => pure (Value.tagged te)).run c subs = .error e) ∨ _
+      rcases hfind : subs.find? (fun p => p.1 == x) with _ | ⟨x', el, d0⟩
+      · rw [hfind] at hsv
+        left; refine ⟨.missingSubstitution x, ?_⟩
+        show (do let as ← (M.substituteVar x).run c subs; let bss ← as.mapM _; pure bss.flatten) = _
+        simp [hsv, Bind.bind, Except.bind]
+      · rw [hfind] at hsv
+        right; right
+        exact ⟨.tagged (el, c.spec.removeDecoration x), m_map_singleton Value.tagged (M.substituteVar x) c subs _ hsv⟩
+    | tag a d =>
+      simp only [IsDeclCoreTerm] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore) fun v => by
+        cases v with
+        | int _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+        | str _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+        | bool _ => intro _ _; exact .inr (.inl rfl)
+        | tagged _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+    | untag a =>
+      simp only [IsDeclCoreTerm] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore) fun v => by
+        cases v with
+        | tagged te =>
+          rcases te with ⟨el, _⟩
+          cases el with
+          | int _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+          | str _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+          | prod _ => intro _ _; exact .inr (.inl rfl)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | not a =>
+      simp only [IsDeclCoreTerm] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore) fun v => by
+        cases v with
+        | bool _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | and a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore.1) fun v => by
+        cases v with
+        | bool vb =>
+          cases vb with
+          | false => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+          | true =>
+            exact m_bind_subsingleton (eval_core_subsingleton f b hcore.2) fun v2 => by
+              cases v2 with
+              | bool _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+              | _ => intro _ _; exact .inr (.inl rfl)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | or a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore.1) fun v => by
+        cases v with
+        | bool vb =>
+          cases vb with
+          | true => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+          | false =>
+            exact m_bind_subsingleton (eval_core_subsingleton f b hcore.2) fun v2 => by
+              cases v2 with
+              | bool _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+              | _ => intro _ _; exact .inr (.inl rfl)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | ite cond th el =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f cond hcore.1.1) fun v => by
+        cases v with
+        | bool vb =>
+          cases vb with
+          | false => exact eval_core_subsingleton f el hcore.2
+          | true => exact eval_core_subsingleton f th hcore.1.2
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | leq a b | le a b | geq a b | ge a b | add a b | sub a b | mult a b | div a b | mod a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore.1) fun v => by
+        cases v with
+        | int _ =>
+          exact m_bind_subsingleton (eval_core_subsingleton f b hcore.2) fun v2 => by
+            cases v2 with
+            | int _ => intro _ _; exact .inr (.inr ⟨_, rfl⟩)
+            | _ => intro _ _; exact .inr (.inl rfl)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | eq a b | neq a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f a hcore.1) fun _ =>
+        m_bind_subsingleton (eval_core_subsingleton f b hcore.2) fun _ _ _ => .inr (.inr ⟨_, rfl⟩)
+    | mulDivRound x n d mode =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      exact m_bind_subsingleton (eval_core_subsingleton f x hcore.1.1) fun v1 => by
+        cases v1 with
+        | int vx =>
+          exact m_bind_subsingleton (eval_core_subsingleton f n hcore.1.2) fun v2 => by
+            cases v2 with
+            | int vn =>
+              exact m_bind_subsingleton (eval_core_subsingleton f d hcore.2) fun v3 => by
+                cases v3 with
+                | int vd =>
+                  intro c0 s0
+                  dsimp only
+                  rcases mulDivRound vx vn vd mode with msg | r
+                  · exact .inl ⟨_, rfl⟩
+                  · exact .inr (.inr ⟨_, rfl⟩)
+                | _ => intro _ _; exact .inr (.inl rfl)
+            | _ => intro _ _; exact .inr (.inl rfl)
+        | _ => intro _ _; exact .inr (.inl rfl)
+    | app _ _ | exists_ _ _ | forall_ _ _ | count _ _ | sum _ _ | max _ _ | min _ _
+    | when _ _ | present _ | violated _ | enabled _ | project _ _ | heldFor _ _
+    | evStatus _ _ | hasConflict _ | fnApp _ _ | doneAt _ | stampOf _ | calOp1 _ _
+    | calOp2 _ _ _ | overdueOf _ =>
+      simp [IsDeclCoreTerm] at hcore
+
+/-- Soundness of `M.eval` for `DeclEval` on `IsDeclCoreTerm` (`Law 9`, `#65`): whenever
+`M.eval` produces `v`, the evaluator-independent relation `DeclEval` derives `v`. -/
+theorem eval_implies_declEval :
+    ∀ {fuel : Nat} {c : Ctx} {subs : Subs} {t : Term} {v : Value},
+      IsDeclCoreTerm t = true →
+      (M.eval fuel t).run c subs = .ok [v] →
+      DeclEval c.spec c.state subs t v
+  | 0, _, _, _, _, _, h => by simp [M.eval, M.err] at h
+  | f + 1, c, subs, t, v, hcore, h => by
+    cases t with
+    | currentTime =>
+      simp [M.eval, Functor.map, M.getTime, Bind.bind, Except.bind, List.mapM, List.mapM.loop, Pure.pure, Except.pure] at h
+      subst h; exact .currentTime
+    | stringLit s =>
+      simp [M.eval, Pure.pure] at h; subst h; exact .stringLit s
+    | boolLit b =>
+      simp [M.eval, Pure.pure] at h; subst h; exact .boolLit b
+    | intLit i =>
+      simp [M.eval, Pure.pure] at h; subst h; exact .intLit i
+    | dimLit dom n =>
+      simp [M.eval, Pure.pure] at h; subst h; exact .dimLit dom n
+    | ref x =>
+      have hsvSub : MSubsingleton (M.substituteVar x) := by
+        intro c0 s0
+        have hspec : M.getSpec.run c0 s0 = .ok [c0.spec] := rfl
+        have hsubs : M.getSubs.run c0 s0 = .ok [s0] := rfl
+        unfold M.substituteVar
+        rw [m_bind_singleton M.getSpec _ c0 s0 c0.spec hspec]
+        rw [m_bind_singleton M.getSubs _ c0 s0 s0 hsubs]
+        cases s0.find? (fun p => p.1 == x) with
+        | none => exact .inl ⟨_, rfl⟩
+        | some p => exact .inr (.inr ⟨_, rfl⟩)
+      simp only [M.eval] at h
+      have hbind : (M.substituteVar x >>= fun te => pure (Value.tagged te)).run c subs = .ok [v] := h
+      rcases m_bind_inv_singleton hsvSub hbind with ⟨te, hte, hv⟩
+      have hvEq : Value.tagged te = v := by
+        have hrun : (pure (Value.tagged te) : M Value).run c subs = .ok [Value.tagged te] := rfl
+        rw [hrun] at hv
+        injection hv with hlist
+        injection hlist
+      have hspec : M.getSpec.run c subs = .ok [c.spec] := rfl
+      have hsubs : M.getSubs.run c subs = .ok [subs] := rfl
+      unfold M.substituteVar at hte
+      rw [m_bind_singleton M.getSpec _ c subs c.spec hspec, m_bind_singleton M.getSubs _ c subs subs hsubs] at hte
+      rcases hfind : subs.find? (fun p => p.1 == x) with _ | ⟨x', el, d0⟩
+      · rw [hfind] at hte; simp [M.err] at hte
+      · rw [hfind] at hte
+        have hteEq : (el, c.spec.removeDecoration x) = te := by
+          have hrun : (pure (el, c.spec.removeDecoration x) : M Tagged).run c subs = .ok [(el, c.spec.removeDecoration x)] := rfl
+          rw [hrun] at hte
+          injection hte with hl
+          injection hl
+        rw [← hvEq, ← hteEq]
+        exact .ref x x' el d0 hfind
+    | tag a d =>
+      simp only [IsDeclCoreTerm] at hcore
+      simp only [M.eval] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore) h with ⟨va, ha, hv⟩
+      have da := eval_implies_declEval hcore ha
+      cases va with
+      | int i => simp [M.tagValue, Pure.pure] at hv; subst hv; exact .tagInt a i d da
+      | str s => simp [M.tagValue, Pure.pure] at hv; subst hv; exact .tagStr a s d da
+      | bool _ => simp [M.tagValue, M.empty, M.nd] at hv
+      | tagged te => rcases te with ⟨el, d0⟩; simp [M.tagValue, Pure.pure] at hv; subst hv; exact .tagTagged a el d0 d da
+    | untag a =>
+      simp only [IsDeclCoreTerm] at hcore
+      simp only [M.eval] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore) h with ⟨va, ha, hv⟩
+      have da := eval_implies_declEval hcore ha
+      cases va with
+      | tagged te =>
+        rcases te with ⟨el, d0⟩
+        cases el with
+        | int i => simp [M.untagValue, Pure.pure] at hv; subst hv; exact .untagInt a i d0 da
+        | str s => simp [M.untagValue, Pure.pure] at hv; subst hv; exact .untagStr a s d0 da
+        | prod _ => simp [M.untagValue, M.empty, M.nd] at hv
+      | _ => simp [M.untagValue, M.empty, M.nd] at hv
+    | not a =>
+      simp only [IsDeclCoreTerm] at hcore
+      simp only [M.eval, M.whenBool] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore) h with ⟨va, ha, hv⟩
+      cases va with
+      | bool b => simp [Pure.pure] at hv; subst hv; exact .not a b (eval_implies_declEval hcore ha)
+      | _ => simp [M.empty, M.nd] at hv
+    | and a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      simp only [M.eval, M.whenBool] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with
+      | bool ba =>
+        cases ba with
+        | false => simp [Pure.pure] at hv; subst hv; exact .andFalse a b (eval_implies_declEval hcore.1 ha)
+        | true =>
+          rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩
+          cases vb with
+          | bool bb => simp [Pure.pure] at hv2; subst hv2; exact .andTrue a b bb (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)
+          | _ => simp [M.empty, M.nd] at hv2
+      | _ => simp [M.empty, M.nd] at hv
+    | or a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      simp only [M.eval, M.whenBool] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with
+      | bool ba =>
+        cases ba with
+        | true => simp [Pure.pure] at hv; subst hv; exact .orTrue a b (eval_implies_declEval hcore.1 ha)
+        | false =>
+          rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩
+          cases vb with
+          | bool bb => simp [Pure.pure] at hv2; subst hv2; exact .orFalse a b bb (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)
+          | _ => simp [M.empty, M.nd] at hv2
+      | _ => simp [M.empty, M.nd] at hv
+    | ite cond th el =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore
+      simp only [M.eval, M.whenBool] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f cond hcore.1.1) h with ⟨vc, hc, hv⟩
+      cases vc with
+      | bool bc =>
+        cases bc with
+        | true => exact .iteTrue cond th el v (eval_implies_declEval hcore.1.1 hc) (eval_implies_declEval hcore.1.2 hv)
+        | false => exact .iteFalse cond th el v (eval_implies_declEval hcore.1.1 hc) (eval_implies_declEval hcore.2 hv)
+      | _ => simp [M.empty, M.nd] at hv
+    | leq a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .leq a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | le a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .le a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | geq a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .geq a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | ge a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .ge a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | add a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .add a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | sub a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .sub a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | mult a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .mult a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | div a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .div a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | mod a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      cases va with | int x => (rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩; cases vb with | int y => (simp [Pure.pure] at hv2; subst hv2; exact .mod a b x y (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)) | _ => simp [M.empty, M.nd] at hv2) | _ => simp [M.empty, M.nd] at hv
+    | eq a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩
+      simp [Pure.pure] at hv2; subst hv2
+      exact .eq a b va vb (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)
+    | neq a b =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f a hcore.1) h with ⟨va, ha, hv⟩
+      rcases m_bind_inv_singleton (eval_core_subsingleton f b hcore.2) hv with ⟨vb, hb, hv2⟩
+      simp [Pure.pure] at hv2; subst hv2
+      exact .neq a b va vb (eval_implies_declEval hcore.1 ha) (eval_implies_declEval hcore.2 hb)
+    | mulDivRound x n d mode =>
+      simp only [IsDeclCoreTerm, Bool.and_eq_true] at hcore; simp only [M.eval, M.whenInt] at h
+      rcases m_bind_inv_singleton (eval_core_subsingleton f x hcore.1.1) h with ⟨v1, h1, r1⟩
+      cases v1 with
+      | int vx =>
+        dsimp only at r1
+        rcases m_bind_inv_singleton (eval_core_subsingleton f n hcore.1.2) r1 with ⟨v2, h2, r2⟩
+        cases v2 with
+        | int vn =>
+          dsimp only at r2
+          rcases m_bind_inv_singleton (eval_core_subsingleton f d hcore.2) r2 with ⟨v3, h3, r3⟩
+          cases v3 with
+          | int vd =>
+            dsimp only at r3
+            rcases hmd : mulDivRound vx vn vd mode with msg | res
+            · rw [hmd] at r3; simp [M.err] at r3
+            · rw [hmd] at r3
+              have hvEq : Value.int res = v := by
+                have hrun : (pure (Value.int res) : M Value).run c subs = .ok [Value.int res] := rfl
+                rw [hrun] at r3
+                injection r3 with hl; injection hl
+              rw [← hvEq]
+              exact .mulDivRound x n d mode vx vn vd res
+                (eval_implies_declEval hcore.1.1 h1)
+                (eval_implies_declEval hcore.1.2 h2)
+                (eval_implies_declEval hcore.2 h3) hmd
+          | _ => simp [M.empty, M.nd] at r3
+        | _ => simp [M.empty, M.nd] at r2
+      | _ => simp [M.empty, M.nd] at r1
+    | app _ _ | exists_ _ _ | forall_ _ _ | count _ _ | sum _ _ | max _ _ | min _ _
+    | when _ _ | present _ | violated _ | enabled _ | project _ _ | heldFor _ _
+    | evStatus _ _ | hasConflict _ | fnApp _ _ | doneAt _ | stampOf _ | calOp1 _ _
+    | calOp2 _ _ _ | overdueOf _ =>
+      simp [IsDeclCoreTerm] at hcore
+
+end DeclMeaningProofs
+
+#print axioms declEval_implies_eval
+#print axioms eval_implies_declEval
+#print axioms declCPhraseMeaning_agrees_with_step
 
 #print axioms evalPhrase_sound
 #print axioms evalPhrase_complete

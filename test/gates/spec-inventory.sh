@@ -140,6 +140,12 @@ try:
     if rc_can.returncode != 0 or "Holds when (Held(" in rc_can.stdout or "  Text " in rc_can.stdout:
         print(f"FAIL spec-inventory: #31 canonical minimal parens or duplicate Text failed:\n{rc_can.stdout}\n{rc_can.stderr}")
         sys.exit(1)
+
+    # Verify #65 (D41): Charter.Core.Meaning imports zero Charter.Eval modules
+    meaning_txt = (root / "src" / "Charter" / "Core" / "Meaning.lean").read_text(encoding="utf-8")
+    if "Charter.Eval" in "\n".join(l for l in meaning_txt.splitlines() if l.startswith("import ")):
+        print("FAIL spec-inventory: #65 Charter.Core.Meaning must not import Charter.Eval.*")
+        sys.exit(1)
 finally:
     shutil.rmtree(tmp_dir, ignore_errors=True)
 

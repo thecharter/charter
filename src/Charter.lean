@@ -39,6 +39,7 @@ import Charter.Core.Spec
 import Charter.Core.Amend
 import Charter.Core.State
 import Charter.Core.Derivation
+import Charter.Core.Meaning
 import Charter.Artifact.Hash
 import Charter.Artifact.Cert
 import Charter.Artifact.Runtime
