@@ -6,7 +6,7 @@
 
 ## Rulings Implemented
 
-### D34 (`B17`, `B18`, `B26`, `#62`, `#35`, `#36`, `#59`, `#23`, `#31`, `#32`) — Heading-resolved `Clause` citations, rule-aware `charter.lock` approvals, full span targets, template blanks, and `Use ... From`
+### D34 (`B17`, `B18`, `B26`, `#62`, `#35`, `#36`, `#59`, `#23`, `#30`, `#32`; partial `#31`) — Heading-resolved `Clause` citations, rule-aware `charter.lock` approvals, full span targets, template blanks, and `Use ... From`
 - `Clause <ID> [Register] [=> targets]` extracts paragraphs and `/k` sentences directly from `Document` without retyping prose (`#35`).
 - `charter approve [--lock] [--restamp]` writes both `textSha256` and `rulesSha256` into `charter.lock` (`#23`, `#32`).
 - Spans may cite any declared `Fact`, `Param`, `Event`, or `Default`/`Exception` rule ID, and assert ground initial facts (`=> named(House, Anna)`, `#36`).

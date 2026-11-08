@@ -1,6 +1,6 @@
 # What twenty ordinary agreements cost to write in Charter
 
-**Date:** 2026-11-07. **Status:** findings and proposals for ruling. Nothing here is decided.
+**Date:** 2026-11-07. **Status:** ruled and implemented (`D29`–`D38`, 2026-11-08; tracked in [#79](https://github.com/thecharter/charter/issues/79)). All 18 runnable reproductions formerly in `reproductions/` have been fixed and replaced by `test/spec/` conformance fixtures, and all 27 language ergonomics proposals ([#35](https://github.com/thecharter/charter/issues/35)–[#61](https://github.com/thecharter/charter/issues/61)) plus standard-library provenance ([#62](https://github.com/thecharter/charter/issues/62)) are implemented. Remaining compiler/tooling/verification items remain tracked in [#79](https://github.com/thecharter/charter/issues/79).
 
 Twenty agreements a person might actually sign were written in Charter 1.0.1, each with its
 English, its specification and cases: `Examples/` (index in `Examples/README.md`). The purpose

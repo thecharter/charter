@@ -6,7 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
-- [D34–D38 — Language ergonomics (`#35`–`#61`), standard-library provenance (`#62`), and companion fixes (`#13`–`#18`, `#22`, `#23`, `#26`, `#31`, `#32`)](2026-11-07-D34-D38-ergonomics-and-stdlib-provenance.md)
+- [D34–D38 — Language ergonomics (`#35`–`#61`), standard-library provenance (`#62`), and companion fixes (`#13`–`#18`, `#21`–`#23`, `#25`, `#26`, `#30`, `#32`)](2026-11-07-D34-D38-ergonomics-and-stdlib-provenance.md)
 - [D30–D33 — End-state invariant checks in `test`, status-explicit `Evidenced` derivations (`CHR038`), missing-input `Var`/`Function` effects (`CHR100`), source-keyed evidence + `Retracts !e` + `CHR109`, and binder/count warnings (`CHR039`, `CHR040`; issues #3, #6, #8, #9, #11, #12)](2026-11-07-D30-D33-end-states-evidence-and-missing-input.md)
 - [D29 — A spelling that is accepted and gives a wrong answer is fixed where it is a bug and refused where it is not (`CHR036`, `CHR037`; issues #2, #4, #5, #7, #10)](2026-11-07-D29-silent-wrong-answers-are-refused-or-fixed.md)
 - [D28 — Live `CIR` projections (`solidity`, `abi`, `quint`, `prompt`), `CHR035` fragment rejection, and truthful target boundaries (`T32`, `T33`)](2026-11-06-D28-live-cir-projections-and-target-boundaries.md)
