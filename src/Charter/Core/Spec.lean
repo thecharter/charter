@@ -241,6 +241,25 @@ and a decided program must depend on no axioms (Law 10, 013.4). -/
 def Kind.lowerName : Kind → String
   | .fact _ => "fact" | .act _ => "act" | .duty _ => "duty" | .event _ => "event" | .immunity _ => "immunity"
 
+/-- Priority edge synthesized from `Document ... Rank n` (`012.1`, `D40`, `#73`):
+`higherRule` (grounded in `higherDoc` at `higherRank`) prevails over `lowerRule` (grounded
+in `lowerDoc` at `lowerRank`, with `higherRank < lowerRank`). -/
+structure RankPriorityEdge where
+  higherRule : String
+  lowerRule  : String
+  higherDoc  : String
+  higherRank : Int
+  lowerDoc   : String
+  lowerRank  : Int
+  deriving Repr, Inhabited
+
+def RankPriorityEdge.beq (a b : RankPriorityEdge) : Bool :=
+  a.higherRule == b.higherRule && a.lowerRule == b.lowerRule &&
+  a.higherDoc == b.higherDoc && a.higherRank == b.higherRank &&
+  a.lowerDoc == b.lowerDoc && a.lowerRank == b.lowerRank
+
+instance : BEq RankPriorityEdge := ⟨RankPriorityEdge.beq⟩
+
 /-- One type declaration (eFLINT `TypeSpec`). `closed = none` means closed by
 default and still openable; `some b` is an explicit setting. -/
 structure TypeSpec where
@@ -494,6 +513,7 @@ structure Spec where
   amendProcedure : List Term := []
   /-- Charter (D38, `#49`, `#43`): `true` when `Done`/`Since`/`Before`/`Within`/`?occurred` is used, enabling `$occ` transition stamping. -/
   tracksHistory : Bool := false
+  rankEdges     : List (DomId × RankPriorityEdge) := []
   deriving Repr, Inhabited
 
 namespace Spec
@@ -769,13 +789,19 @@ def stringDecl : TypeSpec := { kind := .fact {}, domain := .anyString }
 def emptySpec : Spec :=
   { decls := [("int", intDecl), ("string", stringDecl), ("actor", actorDecl)], aliases := [] }
 
-/-- Recompute the compiled topological decision DAG inside `t.derivation` from `t.defeasibleRules` and `t.priorityEdges`. -/
-def TypeSpec.syncDefeasibleDAG (t : TypeSpec) : TypeSpec :=
+/-- Recompute the compiled topological decision DAG inside `t.derivation` from `t.defeasibleRules`,
+`t.priorityEdges`, and any `Document Rank` edges `rankPairs` not superseded by explicit `Overrides`/`Priority` (`D23`, `D40`). -/
+def TypeSpec.syncDefeasibleDAG (t : TypeSpec) (rankPairs : List (String × String) := []) : TypeSpec :=
   let nonDef := t.derivation.filter fun | .defeasibleDAG _ _ => false | _ => true
   if t.defeasibleRules.isEmpty then { t with derivation := nonDef }
   else
     let ovEdges := t.defeasibleRules.flatMap fun r => r.overrides.map (r.id, ·)
-    let allEdges := ovEdges ++ t.priorityEdges
+    let explicitEdges := ovEdges ++ t.priorityEdges
+    let fuel := t.defeasibleRules.length + 2
+    let activeRank := rankPairs.filter fun (hi, lo) =>
+      !Defeasible.reaches fuel explicitEdges hi lo &&
+      !Defeasible.reaches fuel explicitEdges lo hi
+    let allEdges := explicitEdges ++ activeRank
     let dag := Defeasible.compileDefeasibleDAG (t.defeasibleRules.map (·.id)) allEdges
     { t with derivation := nonDef ++ [.defeasibleDAG dag t.defeasibleRules] }
 

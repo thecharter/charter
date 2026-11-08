@@ -274,6 +274,139 @@
       "eflintOutcome": "passes",
       "charterOutcome": "fails",
       "reason": "The program ends with an invariant violated. eFLINT's test mode prints no violations; Charter requires every end state to satisfy every invariant."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/truth/infinite_even.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares type `even` to overwrite its earlier domain and derivation; Charter rejects duplicate declarations with static error CHR019 (use `Extend` or `Amend`)."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/parallel-comp/no_violations.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares type `bar` to erase its earlier `Holds when True` rule; Charter rejects duplicate declarations with static error CHR019 (use `Extend` or `Amend`)."
+    },
+    {
+      "fixture": "test/eflint-corpus/tests/open-types/insurance_insurer.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/buyer_seller.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/help_with_homework.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/terms.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/dipg_regulatory.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/gdpr_union.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/access_union.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/scenario1.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/dex-dipg/scenario2.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/smart-access/usage-control/provenance.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/smart-access/usage-control/case_provenance1.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/smart-access/usage-control/case_provenance2.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/smart-access/usage-control/case_provenance3.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v1/contract_instantiation.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v1/scenario.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v2/contract_instantiation.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
+    },
+    {
+      "fixture": "test/eflint-corpus/examples/symboleo-meat-sales/v2/scenario.eflint",
+      "decision": "D39",
+      "eflintOutcome": "passes",
+      "charterOutcome": "fails",
+      "reason": "Redeclares an already-declared type (instead of `Extend`) directly or via `#require`; Charter rejects duplicate declarations statically with CHR019."
     }
   ]
 }

@@ -33,7 +33,7 @@ more errors); `warning` does not.
 | CHR016 | error | projection `e.x` on a value that is not a product containing `x` | `Charter.Resolve` |
 | CHR017 | error | a `Syncs with` operand that is not an instance expression | `Charter.Resolve` |
 | CHR018 | error | a primitive type applied to other than exactly one argument | `Charter.Resolve` |
-| CHR019 | warning (pending ruling B9) | a type declared twice; the later declaration replaces the earlier | `Charter.Resolve` |
+| CHR019 | error | a type, parameter, or amount declared twice (`003.11`, `D39`; use `Extend` or `Amend`) | `Charter.Resolve` |
 | CHR020 | error | derivation not stratifiable: a cycle through negation, naming the types on the cycle (D6) | `Charter.Resolve` |
 | CHR021 | error | a type used in a position that needs a composite (product) type | `Charter.Resolve` |
 | CHR022 | error | `Except under` or `Against` names something that is not an act | `Charter.Resolve` |

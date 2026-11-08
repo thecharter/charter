@@ -22,7 +22,7 @@
 
 **3.10 Extending a domain.** `Extend Fact x Identified by …` (or `Domain …`) adds atoms to a string enumeration or integers to an integer enumeration, and turns `String`/`Int` into an enumeration. On a product type, or on an act, duty, or event, it is CHR014. `test/spec/spec_003_10_extend_domain.eflint`, `spec_003_10b_extend_domain_error.eflint`
 
-**3.11 Redeclaration.** Declaring a type a second time replaces the first declaration entirely and warns CHR019. (B9, awaiting ruling: whether this becomes an error.) `test/spec/spec_003_11_redeclaration_warns.eflint`
+**3.11 Redeclaration (`D39`, `B9`).** Declaring a type, parameter, or amount a second time in the same specification is refused statically with `CHR019`; `Extend` adds clauses to an existing type and `Amend` replaces rules at run time (`D11`). `test/spec/spec_003_11_redeclaration_warns.eflint`
 
 **3.12 Static types.** Resolution gives every term one of: string, integer, boolean, or instance of a named type, and inserts the conversions of 010.4. A value where another type is needed, with no conversion, is CHR012.
 

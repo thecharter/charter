@@ -1,0 +1,42 @@
+// 004.12, 012.1 (D40, #73): when two otherwise-unranked `Default`/`Exception` rules are
+// grounded in `Document`s with distinct `Rank`s (`Rank 1` > `Rank 2`, smaller integer = higher
+// authority), `Resolve` synthesizes the `lex superior` priority edge so the higher-ranked
+// document's rule prevails without a normative conflict, while explicit `Overrides`/`Priority`
+// edges and same-rank conflicts (`T21`) remain intact.
+Document TENANCY "include/tenancy.md" Rank 1.
+Document BYLAW "include/bylaw.md" Rank 2.
+
+Bool active.
+
+Bool obligation-applies
+  Default statute-rule Holds when active
+  Default bylaw-rule Rejects when active.
+
+Bool same-rank-check
+  Default r-yes Holds when active
+  Default r-no Rejects when active.
+
+Clause T.1 In TENANCY Approved "86b3e3ec5210d42d759e02e1685609c84eab9d45d45774634f7cbfd6e7ffa149"
+  Norm "The tenant pays the rent on the first of each month." => statute-rule, r-yes, r-no.
+
+Clause B.1 In BYLAW Approved "6ac4054cc9ee87ed421c9de60e053a45d961a994c92f0eeaf41eda8550cdc754"
+  Norm "The board may authorize a share issuance only when quorum holds." => bylaw-rule.
+
+Scenario higher-rank-prevails-over-lower-rank {
+  +active.
+  ?!Conflict(obligation-applies()).
+  ?obligation-applies.
+}
+
+Scenario explicit-priority-can-delegate-to-lower-rank {
+  +active.
+  Extend Bool obligation-applies Priority bylaw-rule Over statute-rule.
+  ?!Conflict(obligation-applies()).
+  ?!obligation-applies.
+}
+
+Scenario same-rank-rules-still-conflict {
+  +active.
+  ?Conflict(same-rank-check()).
+  ?!same-rank-check.
+}

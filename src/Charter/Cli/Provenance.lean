@@ -372,7 +372,10 @@ def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List Clau
         { ok := false, check := "approved", clause := c.id,
           text := s!"STALE {c.id}: formal rule mapping or rule body changed since charter.lock approval (run `charter approve --lock --restamp`)" }
       else { ok := true, check := "approved", clause := c.id, text := s!"{c.id}: approved mapping current" }
-  perClause ++ [named] ++ fromChecks ++ docShaChecks ++ verbatim ++ approved
+  let rankChecks : List ProvClaim := spec.rankEdges.map fun (ty, e) =>
+    { ok := true, check := "rank",
+      text := s!"{ty}: lex superior `{e.higherRule}` ({e.higherDoc}, Rank {e.higherRank}) prevails over `{e.lowerRule}` ({e.lowerDoc}, Rank {e.lowerRank})" }
+  perClause ++ [named] ++ fromChecks ++ docShaChecks ++ rankChecks ++ verbatim ++ approved
 
 /-- Classify provenance completeness (`docs/rfc.md` §4.5, `G3.1`, `T08`). -/
 def computeProvenanceCoverage (spec : Spec) (loaded : LoadedDocs) (claims : List ProvClaim) : ProvenanceCoverage :=

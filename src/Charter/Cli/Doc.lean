@@ -76,7 +76,12 @@ def renderRulebook (file : String) (spec : Spec) (cov : ProvenanceCoverage) : St
           | .holdsBool false => "Rejects"
           | .yieldsVal v => s!"Yields `{v.pp}`"
         s!"| `{r.id}` | {kind} | `{r.cond.pp}` | {csq} |"
-      some (s!"### Decision Table: `{d}`\n\n| Rule ID | Tier / Overrides | Condition | Consequence |\n|---|---|---|---|\n" ++ "\n".intercalate rows)
+      let rEdges := (spec.rankEdges.filter (·.1 == d)).map (·.2)
+      let rankNote := if rEdges.isEmpty then ""
+        else "\n\n**Document-Rank Priorities (`lex superior`):**\n" ++
+          "\n".intercalate (rEdges.map fun e =>
+            s!"- `{e.higherRule}` (`{e.higherDoc}`, Rank {e.higherRank}) prevails over `{e.lowerRule}` (`{e.lowerDoc}`, Rank {e.lowerRank})")
+      some (s!"### Decision Table: `{d}`\n\n| Rule ID | Tier / Overrides | Condition | Consequence |\n|---|---|---|---|\n" ++ "\n".intercalate rows ++ rankNote)
   let md :=
     s!"# Institutional Rulebook — `{file}`\n\n" ++
     s!"- **Provenance Coverage**: `{cov.asString}`\n" ++

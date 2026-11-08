@@ -257,9 +257,14 @@ def buildReasonGraph (spec : Spec) (state : State) (te : Tagged) : ReasonGraph :
         let h := (runM (M.isHolds M.fuel te)).headD false
         let tri := TriBool.ofBool h
         let orig := match state.lookup te with | some i => i.origin.render | none => "not holding"
+        let rEdges := (spec.rankEdges.filter (·.1 == te.2)).map (·.2)
+        let rankNotes := rEdges.map fun e =>
+          s!"lex superior: {e.higherRule} ({e.higherDoc}, Rank {e.higherRank}) > {e.lowerRule} ({e.lowerDoc}, Rank {e.lowerRank})"
+        let detail := if rankNotes.isEmpty then orig else orig ++ " [" ++ "; ".intercalate rankNotes ++ "]"
         { subject := te.pp, lawful := tri, valid := tri,
+          defeatedExceptions := rankNotes,
           nodes := [{ id := te.pp, kind := "fact", status := tri.asString, spans := tspec.spans,
-                      confidential := fs.confidential, allowedAudiences := fs.audiences, detail := orig }] }
+                      confidential := fs.confidential, allowedAudiences := fs.audiences, detail }] }
     | _ =>
       let h := (runM (M.isHolds M.fuel te)).headD false
       let tri := TriBool.ofBool h

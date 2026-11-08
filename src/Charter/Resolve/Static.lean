@@ -1482,28 +1482,35 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | _ => none
   -- 1. insert the raw declarations so that mutually referring types resolve
   -- (`forM`, not `for`: see AGENTS.md, common mistakes)
+  let isPartyCarrier (s : String) : Bool :=
+    match s.toList with
+    | '_' :: 'p' :: 'a' :: 'r' :: 't' :: 'y' :: '_' :: _ => true
+    | _ => false
   inits.forM fun rawD =>
     let (dp, d) := rawD.unpos
     withPos dp do
     match d with
     | .typeDecl ty tspec =>
       let spec ← getSpec
-      if (spec.lookupDecl ty).isSome && !builtins.contains ty then
-        warn "CHR019" s!"{ty} is declared again; the new declaration replaces the earlier one (B9 pending)"
-      -- a `Function` is a product of exactly two components (003.7); eFLINT silently
-      -- ignores every assignment to one that is not, so Charter refuses the declaration
-      if tspec.restriction == some .function then
-        match tspec.domain with
-        | .products [_, _] => pure ()
-        | _ => err "CHR024" s!"Function {ty}: the domain must be a product of exactly two components"
-      setSpec (spec.insertDecl ty tspec)
+      if isPartyCarrier ty && (spec.lookupDecl ty).isSome then
+        pure ()
+      else do
+        if (spec.lookupDecl ty).isSome && !builtins.contains ty then
+          err "CHR019" s!"`{ty}` is already declared; use `Extend` to add clauses to an existing type or `Amend` to replace a rule at run time (003.11)"
+        -- a `Function` is a product of exactly two components (003.7); eFLINT silently
+        -- ignores every assignment to one that is not, so Charter refuses the declaration
+        if tspec.restriction == some .function then
+          match tspec.domain with
+          | .products [_, _] => pure ()
+          | _ => err "CHR024" s!"Function {ty}: the domain must be a product of exactly two components"
+        setSpec (spec.insertDecl ty tspec)
     | .placeholder f t => modifySpec (·.insertAlias f t)
     | .clause c => modifySpec (·.insertClause c)
     | .document p docId? sha? rank? => modifySpec (·.insertDocument { id := docId?, path := p, expectedSha256 := sha?, rank := rank? })
     | .param n dom v =>
       let spec ← getSpec
       if (spec.lookupDecl n).isSome then
-        warn "CHR019" s!"{n} is declared again; the new declaration replaces the earlier one (B9 pending)"
+        err "CHR019" s!"`{n}` is already declared; use `Creates {n}(…)` in an act or `Regime` to change a parameter's value (003.11)"
       setSpec (spec.insertDecl n { kind := .fact { defaultVal := some v }, domain := dom, restriction := some .var })
     | .module .. => pure ()
     | .use .. => pure ()
@@ -1514,8 +1521,11 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .spanInit .. => pure ()
     | .amendProcedure conds => modifySpec fun s => { s with amendProcedure := conds }
     | .amountDef n dom? _ =>
+      let spec ← getSpec
+      if (spec.lookupDecl n).isSome then
+        err "CHR019" s!"`{n}` is already declared; an `Amount` name must be unique (003.11)"
       let dom := dom?.getD .anyInt
-      setSpec ((← getSpec).insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
+      setSpec (spec.insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
     | .ensureCarrier n dom =>
       let spec ← getSpec
       if (spec.lookupDecl n).isNone then
@@ -1707,27 +1717,65 @@ def executeDecls (ds : List Decl) : Stc Store := do
       | _ => pure ()
     | _ => pure ()
   let finalSpec ← getSpec
-  -- 5. validate defeasible rule IDs, override targets, and priority acyclicity (`CHR034`, 004.12, 007.6)
+  -- 5. validate defeasible rule IDs, override targets, priority acyclicity (`CHR034`, 004.12, 007.6),
+  --    and synthesize `Document ... Rank n` (`lex superior`) priority edges (`D40`, `#73`)
   let posOfDecl (ty : DomId) : Pos :=
     match ds.findSome? (fun rd => let (p, d) := rd.unpos; if d.name == ty && p != {} then some p else none) with
     | some p => p
     | none => {}
+  let hasRankedDocs := finalSpec.documents.any (·.rank.isSome)
+  let ruleDocRank (ty : DomId) (rid : String) : Option (String × Int) :=
+    if !hasRankedDocs then none
+    else
+      let qual := ty ++ "." ++ rid
+      let hits : List (String × Int) := finalSpec.clauses.filterMap fun c =>
+        let citesRule := c.spans.any fun s => s.meaning.contains rid || s.meaning.contains qual
+        if !citesRule then none
+        else
+          let sd? := match c.docId with
+            | some did => finalSpec.documents.find? (fun (sd : SourceDoc) => sd.id == some did)
+            | none => finalSpec.documents.head?
+          match sd? with
+          | some sd => sd.rank.map fun rk => (sd.id.getD sd.path, rk)
+          | none => none
+      match hits with
+      | [] => none
+      | h0 :: rest => some (rest.foldl (fun best cur => if cur.2 < best.2 then cur else best) h0)
   finalSpec.decls.forM fun (ty, ts) =>
     withPos (posOfDecl ty) do
     if !ts.defeasibleRules.isEmpty then
       let rids := ts.defeasibleRules.map (·.id)
       if rids.eraseDups.length != rids.length then
         err "CHR034" s!"{ty}: duplicate defeasible rule identifier in {", ".intercalate rids}"
-      let allEdges := (ts.defeasibleRules.flatMap fun r => r.overrides.map (r.id, ·)) ++ ts.priorityEdges
-      allEdges.forM fun (hi, lo) => do
+      let explicitEdges := (ts.defeasibleRules.flatMap fun r => r.overrides.map (r.id, ·)) ++ ts.priorityEdges
+      explicitEdges.forM fun (hi, lo) => do
         if !rids.contains hi then
           err "CHR010" s!"{ty}: undeclared defeasible rule `{hi}` in priority edge"
         if !rids.contains lo then
           err "CHR010" s!"{ty}: undeclared defeasible rule `{lo}` in `Overrides` / `Over`"
-      match Defeasible.findPriorityCycle rids allEdges with
+      match Defeasible.findPriorityCycle rids explicitEdges with
       | some cyc =>
         err "CHR034" s!"{ty}: priority cycle among defeasible rules: {", ".intercalate cyc}"
-      | none => pure ()
+      | none =>
+        if hasRankedDocs then
+          let rFuel := rids.length + 2
+          let synthEdges : List RankPriorityEdge := ts.defeasibleRules.flatMap fun r1 =>
+            ts.defeasibleRules.filterMap fun r2 =>
+              if r1.id == r2.id then none
+              else match ruleDocRank ty r1.id, ruleDocRank ty r2.id with
+                | some (d1, k1), some (d2, k2) =>
+                  if k1 < k2 &&
+                     !Defeasible.reaches rFuel explicitEdges r1.id r2.id &&
+                     !Defeasible.reaches rFuel explicitEdges r2.id r1.id then
+                    some { higherRule := r1.id, lowerRule := r2.id,
+                           higherDoc := d1, higherRank := k1, lowerDoc := d2, lowerRank := k2 }
+                  else none
+                | _, _ => none
+          let rankPairs := synthEdges.map fun e => (e.higherRule, e.lowerRule)
+          modifySpec fun s =>
+            let rem := s.rankEdges.filter (fun p => p.1 != ty)
+            let s1 := { s with rankEdges := rem ++ synthEdges.map (ty, ·) }
+            s1.adjustDecl ty fun ts' => TypeSpec.syncDefeasibleDAG ts' rankPairs
   -- 6. compile any ground-fact initializers (`Clause` spans `#36`, `Var x = init` `#42`)
   let curSpec ← getSpec
   let spanStoreLists ← exts.mapM fun rawD =>

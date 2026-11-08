@@ -4,7 +4,7 @@ Source: `docs/plans/2026-10-22-redesign.md` §2.1 lists two eFLINT differences s
 
 ---
 
-## B9. Duplicate declarations (blocks nothing in Phase 1; implementation keeps eFLINT's meaning with a warning until ruled)
+## B9. Duplicate declarations (ruled 2026-11-08 as `D39`: static error `CHR019`)
 
 **Question.** When a program declares a type a second time (`Fact x …` after an earlier `Fact x …`, not an `Extend`), does the second declaration replace the first (eFLINT), or is it an error?
 

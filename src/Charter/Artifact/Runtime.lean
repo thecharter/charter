@@ -203,6 +203,7 @@ deriving instance ToJson, FromJson for DutySpec
 deriving instance ToJson, FromJson for EventSpec
 deriving instance ToJson, FromJson for Kind
 deriving instance ToJson, FromJson for Pos
+deriving instance ToJson, FromJson for RankPriorityEdge
 deriving instance ToJson, FromJson for TypeSpec
 deriving instance ToJson, FromJson for ModClause
 deriving instance ToJson, FromJson for TemporalFormula
