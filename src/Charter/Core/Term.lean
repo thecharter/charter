@@ -339,4 +339,56 @@ def Domain.mapDom (f : DomId → DomId) : Domain → Domain
   | .products xs => .products (xs.map (Var.mapDom f))
   | d => d
 
+mutual
+/-- Substitute free variable references according to `sub` (`D35`, `#57`). Structurally
+recursive on `Term` so kernel reduction in `charter prove` introduces zero axioms. -/
+def Term.substVars (sub : List (Var × Var)) : Term → Term
+  | .not t => .not (t.substVars sub)
+  | .and a b => .and (a.substVars sub) (b.substVars sub)
+  | .or a b => .or (a.substVars sub) (b.substVars sub)
+  | .boolLit b => .boolLit b
+  | .leq a b => .leq (a.substVars sub) (b.substVars sub)
+  | .geq a b => .geq (a.substVars sub) (b.substVars sub)
+  | .ge a b => .ge (a.substVars sub) (b.substVars sub)
+  | .le a b => .le (a.substVars sub) (b.substVars sub)
+  | .sub a b => .sub (a.substVars sub) (b.substVars sub)
+  | .add a b => .add (a.substVars sub) (b.substVars sub)
+  | .mult a b => .mult (a.substVars sub) (b.substVars sub)
+  | .mod a b => .mod (a.substVars sub) (b.substVars sub)
+  | .div a b => .div (a.substVars sub) (b.substVars sub)
+  | .intLit n => .intLit n
+  | .stringLit s => .stringLit s
+  | .eq a b => .eq (a.substVars sub) (b.substVars sub)
+  | .neq a b => .neq (a.substVars sub) (b.substVars sub)
+  | .exists_ xs t => .exists_ xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .forall_ xs t => .forall_ xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .count xs t => .count xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .sum xs t => .sum xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .max xs t => .max xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .min xs t => .min xs (t.substVars (sub.filter fun p => !xs.contains p.1))
+  | .when a b => .when (a.substVars sub) (b.substVars sub)
+  | .present t => .present (t.substVars sub)
+  | .violated t => .violated (t.substVars sub)
+  | .enabled t => .enabled (t.substVars sub)
+  | .project t x => .project (t.substVars sub) x
+  | .tag t d => .tag (t.substVars sub) d
+  | .untag t => .untag (t.substVars sub)
+  | .ref x => match sub.find? (·.1 == x) with | some (_, y) => .ref y | none => .ref x
+  | .app d args => .app d (args.substVars sub)
+  | .currentTime => .currentTime
+  | .heldFor t d => .heldFor (t.substVars sub) (d.substVars sub)
+  | .evStatus want t => .evStatus want (t.substVars sub)
+  | .hasConflict t => .hasConflict (t.substVars sub)
+  | .mulDivRound x n d m => .mulDivRound (x.substVars sub) (n.substVars sub) (d.substVars sub) m
+def Args.substVars (sub : List (Var × Var)) : Args → Args
+  | .pos ts => .pos (Term.substVarsList sub ts)
+  | .named ms => .named (Term.substVarsMods sub ms)
+def Term.substVarsList (sub : List (Var × Var)) : List Term → List Term
+  | [] => []
+  | t :: ts => t.substVars sub :: Term.substVarsList sub ts
+def Term.substVarsMods (sub : List (Var × Var)) : List (Var × Term) → List (Var × Term)
+  | [] => []
+  | (x, t) :: ms => (x, t.substVars sub) :: Term.substVarsMods sub ms
+end
+
 end Charter

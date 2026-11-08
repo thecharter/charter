@@ -351,7 +351,10 @@ def isHolds : Nat → Tagged → M Bool
       let (tspec, _, judged) ← getTypeEntry te.2
       if tspec.isEvidencedFact then
         let st ← lookupEvidenceStatus te
-        pure (st == .established)
+        match st, tspec.factPresumed with
+        | .established, _ => pure true
+        | .unresolved, some b => pure b
+        | _, _ => pure false
       else
         let now ← getTime
         match ← lookupState te with
@@ -425,31 +428,35 @@ def isValid : Nat → Tagged → M Bool
         let amBlocked ← amendImmunityBlocks fuel te.2 a
         if amBlocked then pure false
         else
-          let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
-          if !(conds.all id) then pure false
-          else
-            match tspec.domain, te.1, a.hasRecipient with
+          let (blocked, protSaved) ← match tspec.domain, te.1, a.hasRecipient with
             | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
-              let blocked ← immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
-              pure (!blocked)
+              let b ← immunityBlocks fuel false te.2 recipient (actRelVars.zip restArgs)
+              let p ← immunityBlocks fuel true te.2 recipient (actRelVars.zip restArgs)
+              pure (b, p)
             | _, .prod (_ :: recipient :: _), true => do
-              let blocked ← immunityBlocks fuel te.2 recipient []
-              pure (!blocked)
-            | _, _, _ => pure true
+              let b ← immunityBlocks fuel false te.2 recipient []
+              let p ← immunityBlocks fuel true te.2 recipient []
+              pure (b, p)
+            | _, _, _ => pure (false, false)
+          if blocked then pure false
+          else
+            let conds ← withSubs (Tagged.bindings tspec.domain te) (a.validWhen.mapM (fun c => whenBool (eval fuel c) pure))
+            pure (conds.all id || protSaved)
     | _ => pure true
 termination_by structural n => n
 
-/-- Whether some immunity instance that holds protects `party` against the act `act`:
-its holder is `party`, `act` is in its `Against`, any `Related to` components shared
-with the act match `actRel` (007.4, as 007.2 and 007.3 share components), and none of
-its `Unless` conditions hold. -/
-def immunityBlocks : Nat → DomId → Tagged → List (Var × Tagged) → M Bool
-  | 0, _, _, _ => err (.fuelExhausted "checking immunities")
-  | fuel + 1, act, party, actRel => do
+/-- Whether some immunity (`wantProt = false`) or protection (`wantProt = true`, `D35`, `#52`)
+instance that holds applies to `party` on the act `act`: its holder is `party`, `act` is in its
+target list, any shared `Related to` components match `actRel`, and none of its `Unless`
+conditions hold. -/
+def immunityBlocks : Nat → Bool → DomId → Tagged → List (Var × Tagged) → M Bool
+  | 0, _, _, _, _ => err (.fuelExhausted "checking immunities")
+  | fuel + 1, wantProt, act, party, actRel => do
     let spec ← getSpec
     let state ← getState
     let same (a b : Tagged) : Bool := spec.chaseAlias a.2 == spec.chaseAlias b.2 && Elem.beq a.1 b.1
-    let rs ← (spec.immunitiesAgainst act).mapM fun entry => do
+    let candidates := if wantProt then spec.protectionsFor act else spec.immunitiesAgainst act
+    let rs ← candidates.mapM fun entry => do
       let d := entry.1
       let tspec := entry.2.1
       let i := entry.2.2
@@ -501,7 +508,10 @@ def amendImmunityBlocks : Nat → DomId → ActSpec → M Bool
       let spec ← getSpec
       let state ← getState
       let installs := (spec.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
-      let touched := Amend.touchedIds a.repeals installs
+      let effTargets := a.effects.filterMap fun
+        | .cAll _ tm _ _ | .tAll _ tm _ | .oAll _ tm _ => Stratify.typeOf spec tm
+        | _ => none
+      let touched := actId :: (Amend.touchedIds a.repeals installs ++ effTargets)
       let rs ← (spec.immunitiesAgainstAmend actId).mapM fun entry => do
         let imId := entry.1
         let imTs := entry.2.1
@@ -542,7 +552,9 @@ def evalViolationCondition : Nat → Tagged → Option (List Term) → M Bool
       else
         match tspec.kind with
         | .duty ds =>
-          if ds.overriddenBy.isEmpty then pure true
+          let exc ← ds.excusedWhen.mapM (fun c => whenBool (eval fuel c) pure)
+          if exc.any id then pure false
+          else if ds.overriddenBy.isEmpty then pure true
           else
             let spec ← getSpec
             let subs ← getSubs
@@ -600,9 +612,12 @@ def evalTermTri : Nat → Term → M (TriBool × List (Tagged × EvidenceStatus)
             if !(← isValidInstance fuel te) then pure (.no, [])
             else
               let st ← lookupEvidenceStatus te
-              match TriBool.ofEvidenceStatus st with
-              | .undetermined => pure (.undetermined, [(te, st)])
-              | v => pure (v, [])
+              match st, tspec.factPresumed with
+              | .unresolved, some b => pure (TriBool.ofBool b, [])
+              | _, _ =>
+                match TriBool.ofEvidenceStatus st with
+                | .undetermined => pure (.undetermined, [(te, st)])
+                | v => pure (v, [])
           else
             let b ← isHolds fuel te
             pure (TriBool.ofBool b, [])
@@ -634,14 +649,20 @@ def evalActTri : Nat → Tagged → M (TriBool × TriBool × List (Tagged × Evi
         let folded := ps.foldl (fun (accV, accU) (v, u) =>
           let nv := TriBool.and accV v
           (nv, if nv == .no then [] else accU ++ u)) (TriBool.yes, ([] : List (Tagged × EvidenceStatus)))
-        let immBlocked ← match tspec.domain, te.1, a.hasRecipient with
-          | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true =>
-            immunityBlocks fuel te.2 recipient (actRelVars.zip restArgs)
-          | _, .prod (_ :: recipient :: _), true =>
-            immunityBlocks fuel te.2 recipient []
-          | _, _, _ => pure false
+        let (immBlocked, protSaved) ← match tspec.domain, te.1, a.hasRecipient with
+          | .products (_ :: _ :: actRelVars), .prod (_ :: recipient :: restArgs), true => do
+            let b ← immunityBlocks fuel false te.2 recipient (actRelVars.zip restArgs)
+            let p ← immunityBlocks fuel true te.2 recipient (actRelVars.zip restArgs)
+            pure (b, p)
+          | _, .prod (_ :: recipient :: _), true => do
+            let b ← immunityBlocks fuel false te.2 recipient []
+            let p ← immunityBlocks fuel true te.2 recipient []
+            pure (b, p)
+          | _, _, _ => pure (false, false)
         let amBlocked ← amendImmunityBlocks fuel te.2 a
-        if immBlocked || amBlocked then pure (TriBool.no, []) else pure folded
+        if immBlocked || amBlocked then pure (TriBool.no, [])
+        else if protSaved then pure (TriBool.yes, [])
+        else pure folded
       let (lTri, lUnmet) ← (do
         if !a.exceptUnder.isEmpty then
           let b ← isEnabled fuel te

@@ -103,7 +103,7 @@ def specThresholdWitnesses (spec : Spec) (stateInts : List Int) : List Int :=
         (a.effects.flatMap fun | .cAll _ tm md _ => termIntConsts tm ++ (md.map termIntConsts).getD []
                                | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
                                | .amendOp _ => [])
-      | .duty du => du.violatedWhen.flatMap termIntConsts
+      | .duty du => (du.violatedWhen ++ du.excusedWhen).flatMap termIntConsts
       | .immunity im => im.unlessConds.flatMap termIntConsts
       | .event ev => ev.effects.flatMap fun | .cAll _ tm md _ => termIntConsts tm ++ (md.map termIntConsts).getD []
                                             | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => termIntConsts tm
@@ -128,7 +128,7 @@ def isSingleThresholdFragment (spec : Spec) : Bool :=
         a.effects.all (fun | .cAll _ tm md _ => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
                            | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm
                            | .amendOp _ => true)
-      | .duty du => du.violatedWhen.all (!hasComplexArith ·)
+      | .duty du => (du.violatedWhen ++ du.excusedWhen).all (!hasComplexArith ·)
       | .immunity im => im.unlessConds.all (!hasComplexArith ·)
       | .event ev => ev.effects.all (fun | .cAll _ tm md _ => !hasComplexArith tm && (md.map (!hasComplexArith ·)).getD true
                                          | .tAll _ tm _ | .oAll _ tm _ | .evOp _ _ tm _ | .findingOp _ _ tm _ => !hasComplexArith tm

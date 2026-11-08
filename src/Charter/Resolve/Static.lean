@@ -917,6 +917,53 @@ def compileExt (ty : DomId) (clauses : List ModClause) : Stc (List (DomId × Lis
         let std := (clauses.findSome? fun | .standard s => some s | _ => none).getD "default"
         let eff ← compileEffect' (fun ys _ u => .findingOp pol ys u std) xs [] target
         return [(ty, [.resolves pol t', .postCond [eff]])]
+      | .decides target cond =>
+        let t' ← checkEvidencedTarget "Decides" target
+        let std := (clauses.findSome? fun | .standard s => some s | _ => none).getD "default"
+        let posTm := Term.when target cond
+        let negTm := Term.when target (.not cond)
+        let effPos ← compileEffect' (fun ys _ u => .findingOp true ys u std) xs [] posTm
+        let effNeg ← compileEffect' (fun ys _ u => .findingOp false ys u std) xs [] negTm
+        return [(ty, [.resolves true t', .postCond [effPos, effNeg]])]
+      | .presumed b =>
+        if !tspec.isEvidencedFact && !(clauses.any fun | .evidenced => true | _ => false) then
+          err "CHR033" s!"`Presumed` on `{ty}` requires `{ty}` to be declared `Evidenced`"
+        else return [(ty, [.presumed b])]
+      | .excusedWhen vts =>
+        match tspec.kind with
+        | .duty _ => return [(ty, [.excusedWhen (← vts.mapM (compileViolationCondition ty))])]
+        | k => err "CHR003" s!"`Excused when` applies to a Duty, not {k.lowerName}"
+      | .overridesDuties targets =>
+        match tspec.kind with
+        | .duty _ =>
+          let curSpec ← getSpec
+          let parts ← targets.mapM fun (dLo, args?) => do
+            match curSpec.findDecl dLo with
+            | none => err "CHR010" s!"undeclared duty `{dLo}` in `Overrides`"
+            | some { kind := .duty _, domain := loDom, .. } =>
+              match args? with
+              | none => return (dLo, [ModClause.overriddenBy [ty]])
+              | some rawArgs =>
+                let zs := match loDom with | .products ps => ps | _ => [⟨dLo, ""⟩]
+                let hiFresh := xs.map fun v => (v, { v with dec := v.dec ++ "'''" })
+                let freshVars := hiFresh.map (·.2)
+                let hiApp := Term.app ty (.pos (freshVars.map .ref))
+                let rawArgTerms ← match rawArgs with
+                  | .pos ts =>
+                    if ts.length == zs.length then pure (zs.zip ts)
+                    else err "CHR011" s!"{dLo} has {zs.length} component(s), {ts.length} given in `Overrides`"
+                  | .named ms => pure ms
+                let eqs := rawArgTerms.map fun (zVar, argTm) =>
+                  Term.eq (.ref zVar) (argTm.substVars hiFresh)
+                let conj := eqs.foldr Term.and (.present hiApp)
+                let excRaw := if freshVars.isEmpty then conj else Term.exists_ freshVars conj
+                let excCompiled ← compileViolationCondition dLo excRaw
+                return (dLo, [ModClause.excusedWhen [excCompiled]])
+            | some tsLo => err "CHR026" s!"`Overrides` names {dLo}, which is {tsLo.kind.lowerName}, not a duty"
+          return parts
+        | k => err "CHR003" s!"`Overrides` on a duty applies to a Duty, not {k.lowerName}"
+      | .protectsClauses cids =>
+        return [(ty, [.protectsClauses cids])]
       | .standard s => return [(ty, [.standard s])]
       | .evEffect op ts src? =>
         let opLabel := match op with
@@ -1086,6 +1133,7 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .amendInstall .. => pure ()
     | .regime .. => pure ()
     | .spanInit .. => pure ()
+    | .amendProcedure conds => modifySpec fun s => { s with amendProcedure := conds }
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
@@ -1167,23 +1215,62 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | none => err "CHR010" s!"Regime {r.name}: undeclared parameter `{pname}`"
       modifySpec (·.insertRegime r)
     | _ => pure ()
-  -- 4. enforce `Power` competence requirement (`CHR032`, 005.10): every declared `Power`
-  --    must have at least one `Valid when` clause after extensions apply
-  let finalSpec ← getSpec
+  -- 4. enforce `Power`/`Finding`/`Amend` competence (`CHR032`, 005.10–005.11), `Amend Procedure`
+  --    inheritance (`#54`), `Power` `Holds when` default (`#37`), `Protection` `Holds when True`
+  --    default (`#52`), `Clause`-based `Protects` expansion (`#54`), and `Except under` warning (`CHR042`, `#13`)
+  let preCheckSpec ← getSpec
   inits.forM fun d => do
     match d with
-    | .typeDecl ty { kind := .act { isPower := true, .. }, .. } =>
-      match finalSpec.lookupDecl ty with
-      | some { kind := .act a, .. } =>
-        if a.validWhen.isEmpty then
-          let kw := if a.isFinding then "Finding" else if a.isAmend then "Amend" else "Power"
-          err "CHR032" s!"{kw} {ty}: an institutional `{kw}` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
-        else if a.isAmend && !(a.effects.any fun | .amendOp _ => true | _ => false) then
-          modifySpec fun s => s.adjustDecl ty fun ts => match ts.kind with
-            | .act a' => { ts with kind := .act { a' with effects := .amendOp ty :: a'.effects } }
-            | _ => ts
+    | .typeDecl ty _ =>
+      match (← getSpec).lookupDecl ty with
+      | some ts@{ kind := .act a, .. } => do
+        -- Warn `CHR042` (`#13`) if an `Act` declares both `Except under` and `Holds when`
+        if !a.exceptUnder.isEmpty && !ts.derivation.isEmpty then
+          warn "CHR042" s!"{ty} declares both `Except under` and `Holds when`; `Holds when` on `{ty}` is ignored when `Except under` is present (007.2)"
+        -- Inherit `Amend Procedure` when an `Amend` omits `Valid when` (`#54`)
+        let a ← if a.isAmend && a.validWhen.isEmpty && !preCheckSpec.amendProcedure.isEmpty then do
+          let inherited ← preCheckSpec.amendProcedure.mapM (convertPrecon ty ts)
+          let aUpd := { a with validWhen := inherited }
+          modifySpec fun s => s.adjustDecl ty fun ts' => { ts' with kind := .act aUpd }
+          pure aUpd
+        else pure a
+        if a.isPower then
+          if a.validWhen.isEmpty then
+            let kw := if a.isFinding then "Finding" else if a.isAmend then "Amend" else "Power"
+            err "CHR032" s!"{kw} {ty}: an institutional `{kw}` must specify `Valid when <expr>` (use `Act` when validity defaults to `True`)"
+          else do
+            -- `Finding` must also declare `Resolves` or `Decides` (`#18`, `#26`)
+            if a.isFinding && a.finding.isNone then
+              err "CHR032" s!"Finding {ty}: a `Finding` must specify `Resolves [!]e` or `Decides e` (use `Power` when not resolving an `Evidenced` fact, 005.11)"
+            if a.isAmend && !(a.effects.any fun | .amendOp _ => true | _ => false) then
+              modifySpec fun s => s.adjustDecl ty fun ts' => match ts'.kind with
+                | .act a' => { ts' with kind := .act { a' with effects := .amendOp ty :: a'.effects } }
+                | _ => ts'
+            -- `D35` (`#37`): on `Power`/`Finding`/`Amend` omitting `Holds when`, default `Holds when` to `Valid when`
+            let latestTs := ((← getSpec).lookupDecl ty).getD ts
+            if latestTs.derivation.isEmpty && latestTs.defeasibleRules.isEmpty && a.exceptUnder.isEmpty then
+              let conjValid := a.validWhen.foldr Term.and (.boolLit true)
+              modifySpec fun s => s.adjustDecl ty fun ts' =>
+                { ts' with derivation := [.holdsWhen conjValid] }
+      | some ts@{ kind := .immunity im, .. } => do
+        -- `Protection` (`#52`) defaults to `Holds when True` when no `Holds when` is written
+        if im.isProtection && ts.derivation.isEmpty && ts.defeasibleRules.isEmpty then
+          modifySpec fun s => s.adjustDecl ty fun ts' =>
+            { ts' with derivation := [.holdsWhen (.boolLit true)] }
+        -- Expand `Protects Clause <CID>` (`#54`)
+        if !im.protectsClauses.isEmpty then
+          let curS ← getSpec
+          let fromClauseSpans := curS.clauses.flatMap fun c =>
+            if im.protectsClauses.contains c.id then c.spans.flatMap (·.meaning) else []
+          let fromDeclSpans := curS.decls.filterMap fun (rName, rTs) =>
+            if rTs.spans.any (fun (cid, _) => im.protectsClauses.contains cid) then some rName else none
+          let extraProtects := (fromClauseSpans ++ fromDeclSpans).filter fun p => (curS.findDecl p).isSome
+          modifySpec fun s => s.adjustDecl ty fun ts' => match ts'.kind with
+            | .immunity im' => { ts' with kind := .immunity { im' with protects := (im'.protects ++ extraProtects).eraseDups } }
+            | _ => ts'
       | _ => pure ()
     | _ => pure ()
+  let finalSpec ← getSpec
   -- 5. validate defeasible rule IDs, override targets, and priority acyclicity (`CHR034`, 004.12, 007.6)
   finalSpec.decls.forM fun (ty, ts) => do
     if !ts.defeasibleRules.isEmpty then

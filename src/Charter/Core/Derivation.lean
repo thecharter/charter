@@ -51,9 +51,13 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
     | .violated t =>
       let own := (typeOf spec t).toList.map (·, p)
       let conds := match typeOf spec t with
-        | some d => match spec.findViolationCond d with
-          | some cs => depsList spec fuel (spec.components d) p cs
-          | none => []
+        | some d =>
+          match spec.findDecl d with
+          | some { kind := .duty ds, .. } =>
+            depsList spec fuel (spec.components d) p ds.violatedWhen ++
+            depsList spec fuel (spec.components d) .neg ds.excusedWhen ++
+            ds.overriddenBy.map (·, .neg)
+          | _ => []
         | none => []
       own ++ conds ++ deps spec fuel bound p t
     | .enabled t =>

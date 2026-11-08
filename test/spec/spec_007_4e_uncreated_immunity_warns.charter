@@ -1,0 +1,6 @@
+// 007.4 (D35, #15): an `Immunity` with no `Holds when` and no creator warns CHR041.
+//! expect-warning: CHR041
+Fact p Identified by A
+Act hit Actor p Recipient p' Holds when True
+Immunity shield Holder p Against hit.
+?valid hit(A, A).

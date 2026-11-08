@@ -66,9 +66,9 @@ Single-word uppercase Charter additions (`Immunity`, `Clause`, `Document`, `Scen
 `Text`, `Norm`, `Definition`, `Acceptance`, `Commentary`) lex as `.atom` tokens and `tick`
 lexes as `.ident "tick"`, matched contextually by `Parser` / `Resolve` (D17). -/
 def wordKeywords : List String :=
-  [ "Derived externally", "Conditioned by", "Identified by", "Terminated by", "Violated when", "Overridden by",
-    "Present when", "Current Time", "Derived from", "Except under", "Rejects when", "Enforced by", "Related to", "Syncs with",
-    "Valid when", "Created by", "Due within", "Holds when",
+  [ "Derived externally", "Conditioned by", "Forbidden when", "Identified by", "Terminated by", "Violated when", "Overridden by",
+    "Present when", "Current Time", "Derived from", "Except under", "Excused when", "Qualifies as", "Rejects when", "Enforced by", "Related to", "Syncs with",
+    "Valid when", "Created by", "Due within", "Holds when", "Void when",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",
     "Physical", "Claimant", "Function", "Violated", "Enabled", "Creates", "Current", "Derived",
     "Present", "Foreach", "Exists", "Forall", "Extend", "Closed", "Domain", "Holder", "String",

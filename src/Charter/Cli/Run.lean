@@ -352,6 +352,9 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
     for d in AssuranceGates.checkCompleteExploreGate path.toString cfg.spec o.explore do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
+  for w in AssuranceGates.checkUncreatedImmunities path.toString (items.map (·.item)) cfg.spec do
+    if o.assurance.denyWarnings || !o.testMode || o.json then emit o (diagJson w) w.render (toErr := true)
+    stats := { stats with warnings := stats.warnings + 1, codes := stats.codes ++ [w.code] }
   if o.scenarioFilter.isEmpty then
     let topPhrases := items.filterMap fun l => match l.item.val with
       | .inr (.scenario ..) => none
@@ -458,6 +461,9 @@ def checkCommand (args : List String) : IO UInt32 := do
             warnings := warnings + 1
     let (failedProv, loadedDocs, cov) ← reportProvenance o spec ((System.FilePath.mk f).parent.getD ".")
     errors := errors + failedProv
+    for w in AssuranceGates.checkUncreatedImmunities f (items.map (·.item)) spec do
+      emit o (diagJson w) w.render (toErr := true)
+      warnings := warnings + 1
     if fl.assurance.requireProvenance then
       for d in AssuranceGates.checkProvenanceGate f spec loadedDocs cov do
         emit o (diagJson d) d.render (toErr := true)

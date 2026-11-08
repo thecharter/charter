@@ -1,8 +1,0 @@
-// DEFECT (accepted). A `Finding` with no `Resolves` is a `Power` under another name (005.11
-// gives `Resolves` as part of the form). Expected: an error or a warning.
-Fact court Identified by C
-Bool ordered
-Finding order Actor court Holds when True Valid when True Creates ordered()
-.
-order(C).
-?ordered().

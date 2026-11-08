@@ -1,0 +1,23 @@
+// 014.3, 014.5 (D35, #54): `Amend Procedure Valid when ...` sets the default competence rule for
+// `Amend` declarations, and `Protects Clause <ID>` entrenches every rule/param grounded in `<ID>`.
+Fact board Identified by Board, Rogue
+Bool supermajority
+Param fee = 10
+Param cap = 100
+Clause 2.1 Approved "34f93075e814ba0a082a2194e0de290bcbc661d9c7b6cf606d95e9f47e5f5408"
+  Norm "The cap is entrenched." => cap, raise-cap, core-ratchet
+Clause 2.2 Approved "76e4d5aed0d4b9d352bf6888010ca7e5023a8cdd629f0ab77c95884cbc095a87"
+  Norm "The board may amend the fee by supermajority." => raise-fee, lower-fee
+Amend Procedure Actor board Valid when board == Board && supermajority()
+Amend raise-fee Actor board Valid when board == Board && supermajority() Creates fee(20)
+Amend lower-fee Actor board Creates fee(5)
+Amend raise-cap Actor board Creates cap(200)
+Immunity core-ratchet Holder board Against Amend Protects Clause 2.1 Holds when True
+.
+?!valid lower-fee(Board).
++supermajority().
+?valid lower-fee(Board).
+lower-fee(Board).
+?fee(5).
+// Clause 2.1 entrenches `cap` / `raise-cap` (and via reflexive ratchet, any repeal of `core-ratchet`):
+?!valid raise-cap(Board).

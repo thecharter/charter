@@ -1,5 +1,6 @@
 import Charter.Surface.Ast
 import Charter.Core.Spec
+import Charter.Core.Derivation
 
 /-!
 # Charter.Resolve.AssuranceGates — Opt-In Static Assurance Gates
@@ -68,6 +69,45 @@ def checkCompleteExploreGate (file : String) (spec : Spec) (exploreDepth : Nat) 
     [(Diagnostic.error "CHR031"
       s!"invariants declared ({", ".intercalate spec.invariants}) without a positive exploration depth; pass `--explore <depth>` or add `//! explore: <depth>` (--require-complete-explore)").withFile file]
   else []
+
+/-- Whether `t` mentions `d` as a created instance head (`+d(...)`). -/
+def termCreatesDom (spec : Spec) (d : DomId) : Term → Bool
+  | .app d' _ => spec.chaseAlias d' == d
+  | .ref v => spec.removeDecoration v == d
+  | .when a _ => termCreatesDom spec d a
+  | _ => false
+
+def phraseCreatesDom (spec : Spec) (d : DomId) : Nat → Phrase → Bool
+  | 0, _ => false
+  | _ + 1, .create _ t => termCreatesDom spec d t
+  | fuel + 1, .par ps => ps.any (phraseCreatesDom spec d fuel)
+  | fuel + 1, .scenario _ ps _ => ps.any (phraseCreatesDom spec d fuel)
+  | _, _ => false
+
+/-- `CHR041` (`007.4`, `D35`, `#15`): warn when an `Immunity` has no `Holds when` / `Default`
+rule and neither an act's `Creates` nor any `+` phrase in the program ever creates an instance. -/
+def checkUncreatedImmunities (file : String) (items : List Item) (spec : Spec) : List Diagnostic :=
+  let createdByActs : List DomId := spec.decls.flatMap fun (_, ts) =>
+    let effs := match ts.kind with
+      | .act a => a.effects
+      | .event e => e.effects
+      | _ => []
+    effs.filterMap fun
+      | .cAll _ tm _ _ => Stratify.typeOf spec tm
+      | _ => none
+  spec.decls.filterMap fun (d, ts) =>
+    match ts.kind with
+    | .immunity im =>
+      if im.isProtection || !ts.derivation.isEmpty || !ts.defeasibleRules.isEmpty then none
+      else if createdByActs.contains d then none
+      else
+        let createdInItems := items.any fun it => match it.val with
+          | .inr p => phraseCreatesDom spec d 32 p
+          | .inl _ => false
+        if createdInItems then none
+        else some ((Diagnostic.warning "CHR041"
+          s!"Immunity `{d}` has no `Holds when` rule and nothing creates an instance of it, so it protects no one; write `Holds when True` if every holder is shielded by default (007.4)").withFile file)
+    | _ => none
 
 end AssuranceGates
 

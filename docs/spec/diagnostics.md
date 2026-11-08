@@ -55,6 +55,8 @@ more errors); `warning` does not.
 | CHR038 | error | a rule that derives a fact, a duty's violation, or an immunity reads an `Evidenced` fact without naming a status (004.11; only an act's `Holds when` and `Valid when` are three-valued) | `Charter.Resolve` |
 | CHR039 | warning | `Count(Foreach x: f(x))` without `When` constructs an instance of `f` for every domain element of `x` without testing whether `f(x)` holds (010.7) | `Charter.Resolve` |
 | CHR040 | warning | a binder over an unrestricted, non-derived, closed `Money`, `Quantity`, `Duration`, or built-in `int`/`string` carrier type ranges over held instances of that type itself, of which none are asserted (004.7) | `Charter.Resolve` |
+| CHR041 | warning | an `Immunity` has no `Holds when` / `Default` rule and nothing creates an instance of it, so it protects no one (007.4) | `Charter.Resolve.AssuranceGates` |
+| CHR042 | warning | an `Act` declares both `Except under` and `Holds when` (`Holds when` is ignored when `Except under` is present, 007.2) | `Charter.Resolve` |
 
 ## Evaluation (CHR100–CHR149)
 

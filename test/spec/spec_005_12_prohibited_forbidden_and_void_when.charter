@@ -1,0 +1,21 @@
+// 005.12 (D35, #51): `Prohibited`, `Forbidden when`, and `Void when`.
+Fact person Identified by Agent, Principal
+Bool consented
+Bool mixed
+Prohibited mix-funds Actor person Recipient person'
+  Unless consented()
+  Creates mixed()
+Power self-deal Actor person
+  Valid when person == Agent
+  Forbidden when !consented()
+  Void when !consented()
+  Creates mixed()
+.
+?!lawful mix-funds(Agent, Principal).
+?valid mix-funds(Agent, Principal).
+?!lawful self-deal(Agent).
+?!valid self-deal(Agent).
++consented().
+?lawful mix-funds(Agent, Principal).
+?lawful self-deal(Agent).
+?valid self-deal(Agent).

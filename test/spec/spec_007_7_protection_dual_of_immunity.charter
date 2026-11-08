@@ -1,0 +1,24 @@
+// 007.7 (D35, #52): `Protection` is the dual of `Immunity`: an act whose authority ended still
+// takes valid institutional effect for a protected recipient unless an `Unless` condition holds.
+Fact person Identified by Agent, Buyer
+Bool authorized
+Fact notice Identified by person
+Fact sold Identified by person
+Power sell Actor person Recipient person'
+  Holds when authorized()
+  Valid when authorized()
+  Creates sold(person')
+Protection apparent-authority Holder person' For sell
+  Unless notice(person')
+.
+// Agent's authority is gone, Buyer has no notice: unlawful for Agent, valid for Buyer!
+?!lawful sell(Agent, Buyer).
+?valid sell(Agent, Buyer).
+sell(Agent, Buyer).
+?sold(Buyer).
+// Once Buyer receives notice, protection lifts and a further sale is void:
+-sold(Buyer).
++notice(Buyer).
+?!valid sell(Agent, Buyer).
+sell(Agent, Buyer).
+?!sold(Buyer).

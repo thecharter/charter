@@ -188,7 +188,7 @@ theorem applyInstallDecls_lookupDecl_not_mem (r : DomId) :
       simp only [applyInstallDecls, applyInstallDecl]
       rw [applyInstallDecls_lookupDecl_not_mem r ds _ hnm.2, adjustDecl_lookupDecl_ne s k r _ hkr]
     | placeholder _ _ | clause _ | document _ _ _ _ | param _ _ _
-    | module _ _ _ | use _ _ _ _ | spanInit _ | property _ | amendInstall _ _ | regime _ =>
+    | module _ _ _ | use _ _ _ _ | spanInit _ | property _ | amendInstall _ _ | regime _ | amendProcedure _ =>
       simp only [touchedByDecls] at hnm
       simp only [applyInstallDecls, applyInstallDecl]
       exact applyInstallDecls_lookupDecl_not_mem r ds s hnm

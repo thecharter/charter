@@ -1,0 +1,16 @@
+// 005.10 (D35, #37): on a `Power`, `Finding`, or `Amend` that omits `Holds when`, `Holds when`
+// defaults to `Valid when` so the single competence condition governs both lawfulness and validity.
+Fact person Identified by Alice, Bob
+Bool ready
+Bool granted
+Power grant Actor person Valid when person == Alice && ready() Creates granted()
+.
+?!lawful grant(Alice).
+?!valid grant(Alice).
++ready().
+?lawful grant(Alice).
+?valid grant(Alice).
+?!lawful grant(Bob).
+?!valid grant(Bob).
+grant(Alice).
+?granted().

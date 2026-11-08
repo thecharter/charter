@@ -1,0 +1,6 @@
+// 007.2 (D35, #13): `Holds when` alongside `Except under` is ignored and warns CHR042.
+//! expect-warning: CHR042
+Fact p Identified by A
+Act sub Actor p Holds when False
+Act main Actor p Holds when True Except under sub.
+?!lawful main(A).

@@ -1,0 +1,7 @@
+// 005.9 (D35, #38): `,` inside `Valid when` is rejected so authors write `&&` or `||` explicitly.
+//! expect-error: CHR003
+Bool a
+Bool b
+Fact p Identified by A
+Power x Actor p Valid when a(), b()
+.

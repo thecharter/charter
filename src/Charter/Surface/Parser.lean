@@ -593,8 +593,11 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
-      return (match ← peekAt (idx + 1) with | .ident _ => true | _ => false)
+    if ["Immunity", "Protection", "Prohibited", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
+      return (match ← peekAt (idx + 1) with
+        | .ident _ => true
+        | .atom "Procedure" => s == "Amend"
+        | _ => false)
     else if s == "Entrenched" then
       return (match ← peekAt (idx + 1) with | .kw "Invariant" | .kw "Predicate" => true | _ => false)
     else if s == "Regime" then
@@ -603,7 +606,7 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
       return (match t1, t2 with
         | .ident _, .kw "{" | .atom _, .kw "{" | .str _, .kw "{" => true
         | _, _ => false)
-    else if s == "Evidenced" then
+    else if s == "Evidenced" || s == "Input" then
       let t1 ← peekAt (idx + 1)
       let t2 ← peekAt (idx + 2)
       return (match t1, t2 with
@@ -733,9 +736,41 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     advance
     let ss ← sepBy1 optForeach "," 1000
     return some (.sync (ss.map fun (xs, t) => ⟨xs, t⟩))
+  | .kw "Qualifies as" | .atom "QualifiesAs" =>
+    if k == .fact || k == .duty || k == .immunity then return none
+    advance
+    let ss ← sepBy1 optForeach "," 1000
+    return some (.sync (ss.map fun (xs, t) => ⟨xs, t⟩))
+  | .atom "Qualifies" =>
+    if k == .fact || k == .duty || k == .immunity then return none
+    if (← peekAt 1) != .atom "As" then return none
+    advance; advance
+    let ss ← sepBy1 optForeach "," 1000
+    return some (.sync (ss.map fun (xs, t) => ⟨xs, t⟩))
   | .kw "Violated when" =>
     if k != .duty then return none
     advance; return some (.violation (← exprList))
+  | .kw "Excused when" =>
+    if k != .duty then return none
+    advance
+    return some (.excusedWhen (← exprList))
+  | .atom "Excused" =>
+    if k != .duty then return none
+    if (← peekAt 1) != .kw "When" then return none
+    advance; advance
+    return some (.excusedWhen (← exprList))
+  | .atom "Overrides" =>
+    if k != .duty then return none
+    advance
+    let parseOvTarget : P (DomId × Option Args) := do
+      let d ← ident
+      if ← isKw "(" then
+        advance
+        let args ← arguments exprFuel
+        expectKw ")"
+        return (d, some args)
+      else return (d, none)
+    return some (.overridesDuties (← sepBy1 parseOvTarget "," 1000))
   | .kw "Enforced by" =>
     if k != .duty then return none
     advance; return some (.enforcingActs (← idList))
@@ -761,10 +796,43 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     | _ => return some (.fromSpan cid "")
   | .kw "Valid when" =>
     if k != .act then return none
-    advance; return some (.validWhen (← exprList))
+    advance
+    let e ← expression
+    if ← isKw "," then
+      fail "CHR003" "do not separate `Valid when` conditions with `,` (after `Holds when`, `,` means `||`); write `&&` for both or `||` for either (005.9)"
+    return some (.validWhen [e])
+  | .kw "Forbidden when" =>
+    if k != .act then return none
+    advance
+    let e ← expression
+    return some (.derivation [.holdsWhen (.not e)])
+  | .atom "Forbidden" =>
+    if k != .act then return none
+    if (← peekAt 1) != .kw "When" then return none
+    advance; advance
+    let e ← expression
+    return some (.derivation [.holdsWhen (.not e)])
+  | .kw "Void when" =>
+    if k != .act then return none
+    advance
+    let e ← expression
+    return some (.validWhen [.not e])
+  | .atom "Void" =>
+    if k != .act then return none
+    if (← peekAt 1) != .kw "When" then return none
+    advance; advance
+    let e ← expression
+    return some (.validWhen [.not e])
   | .kw "Except under" =>
     if k != .act then return none
     advance; return some (.exceptUnder (← idList))
+  | .atom "Presumed" =>
+    if k != .fact then return none
+    advance
+    match ← peek with
+    | .kw "True" => advance; return some (.presumed true)
+    | .kw "False" => advance; return some (.presumed false)
+    | kk => fail "CHR003" s!"expected `True` or `False` after `Presumed` but found {kk.describe}"
   | .atom "Confidential" =>
     if k != .fact then return none
     advance
@@ -809,6 +877,21 @@ def clause (k : FrameKind) : P (Option ModClause) := do
     let neg ← optKw "!"
     let target ← expression
     return some (.resolves (!neg) target)
+  | .atom "Decides" =>
+    if k != .act then return none
+    advance
+    let target ← expression
+    let cond ← (do
+      if ← isCtxAtom "By" then
+        advance
+        let v ← var
+        return (.eq (.ref v) (.stringLit "Yes"))
+      else if (← isKw "When") || (← peek) == .ident "when" then
+        advance
+        expression
+      else
+        fail "CHR003" "expected `By <component>` or `When <cond>` after `Decides <fact>`")
+    return some (.decides target cond)
   | .atom "Repeals" =>
     if k != .act then return none
     advance
@@ -817,8 +900,13 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .atom "Protects" =>
     if k != .immunity then return none
     advance
-    let ps ← idList
-    return some (.protects ps)
+    if ← isCtxAtom "Clause" then
+      advance
+      let cids ← sepBy1 clauseId "," 1000
+      return some (.protectsClauses cids)
+    else
+      let ps ← idList
+      return some (.protects ps)
   | .atom "Standard" =>
     if k != .act then return none
     advance
@@ -846,8 +934,12 @@ def clause (k : FrameKind) : P (Option ModClause) := do
       if ← isCtxAtom "Amend" then advance; return "Amend"
       else ident
     return some (.against (← sepBy1 parseAgainstTarget "," 1000))
-  | .atom "Unless" | .kw "Unless" =>
+  | .kw "For" =>
     if k != .immunity then return none
+    advance
+    return some (.against (← idList))
+  | .atom "Unless" | .kw "Unless" =>
+    if k != .immunity && k != .act then return none
     advance; return some (.unlessCond (← exprList))
   | _ =>
     match ← derivationClause with
@@ -872,18 +964,22 @@ def clauses (k : FrameKind) : Nat → P (List ModClause)
     | some c => return c :: (← clauses k fuel)
     | none => return []
 
-def openness : P (Bool × Bool) := do
+def openness : P (Bool × Bool × Bool) := do
   match ← peek with
-  | .kw "Closed" => advance; return (true, false)
+  | .kw "Closed" => advance; return (true, false, false)
   | .kw "Open" =>
     advance
-    if ← isCtxAtom "Evidenced" then advance; return (false, true)
-    else return (false, false)
+    if ← isCtxAtom "Evidenced" then advance; return (false, true, false)
+    else return (false, false, false)
   | .atom "Evidenced" =>
     advance
     let _ ← optKw "Open"
-    return (false, true)
-  | _ => return (true, false)
+    return (false, true, false)
+  | .atom "Input" =>
+    advance
+    let _ ← optKw "Open"
+    return (true, false, true)
+  | _ => return (true, false, false)
 
 def domainConstraint : P Term := do
   match ← peek with
@@ -894,9 +990,10 @@ def relatedTo : P (List Var) := do
   if ← isKw "Related to" then advance; vars else return []
 
 def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId) (dom : Domain)
-    (filter : Term) (cls : List ModClause) (isEv : Bool := false) (isEnt : Bool := false) : List Decl :=
-  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor, evidenced := isEv, entrenched := isEnt }, domain := dom,
-                  domainConstraint := filter, restriction := restr, derivation := [],
+    (filter : Term) (cls : List ModClause) (isEv : Bool := false) (isEnt : Bool := false)
+    (isInp : Bool := false) : List Decl :=
+  [ .typeDecl d { kind := .fact { invariant := inv, actor := isActor, evidenced := isEv, entrenched := isEnt, isInput := isInp },
+                  domain := dom, domainConstraint := filter, restriction := restr, derivation := [],
                   closed := if isClosed && !isEv then none else some false, conditions := [] },
     .typeExt d cls ]
 
@@ -1004,7 +1101,7 @@ def moduleBody : Nat → P (List Decl)
 def frame : Nat → P (List Decl)
   | 0 => fail "CHR003" "declarations nest too deeply"
   | fuel + 1 => do
-  let (isClosed, isEv) ← openness
+  let (isClosed, isEv, isInp) ← openness
   match ← peek with
   | .kw "Fact" | .kw "Var" | .kw "Function" =>
     let restr : Option Restriction ← (do match ← peek with
@@ -1015,12 +1112,12 @@ def frame : Nat → P (List Decl)
     let dom ← (do if ← isKw "Identified by" then advance; typeExpr else return .anyString)
     let filter ← domainConstraint
     let cls ← clauses .fact 1000
-    return mkFact false false isClosed restr d dom filter cls isEv
+    return mkFact false false isClosed restr d dom filter cls isEv false isInp
   | .kw "Bool" =>
     advance
     let d ← ident
     let cls ← clauses .fact 1000
-    return mkFact false false isClosed none d (.products []) (.boolLit true) cls isEv
+    return mkFact false false isClosed none d (.products []) (.boolLit true) cls isEv false isInp
   | .kw "Predicate" | .kw "Invariant" | .atom "Entrenched" =>
     let isEnt ← if ← isCtxAtom "Entrenched" then advance; pure true else pure false
     let inv := (← peek) == .kw "Invariant"
@@ -1034,12 +1131,21 @@ def frame : Nat → P (List Decl)
     let t ← expression
     let fs ← fromClauses 100
     return mkFact inv false true none d (.products []) (.boolLit true)
-      (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s)) false isEnt
+      (.derivation [.holdsWhen t] :: fs.map (fun (c, s) => .fromSpan c s)) false isEnt false
   | .kw "Act" | .atom "Power" | .kw "Power" | .atom "Finding" | .kw "Finding" | .atom "Amend" | .kw "Amend" =>
     let cur ← peek
     let isFind := cur == .atom "Finding" || cur == .kw "Finding"
     let isAm := cur == .atom "Amend" || cur == .kw "Amend"
     let isPow := isFind || isAm || cur != .kw "Act"
+    if isAm && (← peekAt 1) == .atom "Procedure" then
+      advance; advance
+      let _ ← optKw "With"
+      let _ ← (do if ← isKw "Actor" then advance; let _ ← var; pure () else pure ())
+      let _ ← (do if ← isKw "Recipient" then advance; let _ ← var; pure () else pure ())
+      let _ ← relatedTo
+      expectKw "Valid when"
+      let e ← expression
+      return [.amendProcedure [e]]
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -1054,6 +1160,31 @@ def frame : Nat → P (List Decl)
                            domain := .products (actorV :: (recip.toList ++ objs)),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ] ++ instDecls
+  | .atom "Prohibited" =>
+    advance
+    let d ← ident
+    let _ ← optKw "With"
+    let actor ← (do if ← isKw "Actor" then advance; return some (← var) else return none)
+    let recip ← (do if ← isKw "Recipient" then advance; return some (← var) else return none)
+    let objs ← relatedTo
+    let whenCond? ← (do
+      match ← peek with
+      | .kw "When" | .ident "when" => advance; return some (← expression)
+      | _ => return none)
+    let (cls, _) ← parseActExtras fuel 1000
+    let unlessTerms := cls.flatMap fun | .unlessCond ts => ts | _ => []
+    let cleanCls := cls.filter fun | .unlessCond _ => false | _ => true
+    let excOr := unlessTerms.foldr Term.or (.boolLit false)
+    let lawfulTerm : Term := match whenCond?, unlessTerms.isEmpty with
+      | none, true => .boolLit false
+      | none, false => excOr
+      | some wc, true => .not wc
+      | some wc, false => .or (.not wc) excOr
+    let actorV := actor.getD ⟨"actor", ""⟩
+    return [ .typeDecl d { kind := .act { hasRecipient := recip.isSome },
+                           domain := .products (actorV :: (recip.toList ++ objs)),
+                           closed := if isClosed then none else some false },
+             .typeExt d (.derivation [.holdsWhen lawfulTerm] :: cleanCls) ]
   | .kw "Physical" =>
     advance
     let d ← ident
@@ -1090,7 +1221,8 @@ def frame : Nat → P (List Decl)
     return [ .typeDecl d { kind := .duty {}, domain := .products (holder :: claimant :: objs),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
-  | .atom "Immunity" | .kw "Immunity" =>
+  | .atom "Immunity" | .kw "Immunity" | .atom "Protection" =>
+    let isProt := (← peek) == .atom "Protection"
     advance
     let d ← ident
     let _ ← optKw "With"
@@ -1099,13 +1231,14 @@ def frame : Nat → P (List Decl)
     let objs ← relatedTo
     let filter ← domainConstraint
     let cls ← clauses .immunity 1000
-    return [ .typeDecl d { kind := .immunity {}, domain := .products (holder :: objs),
+    return [ .typeDecl d { kind := .immunity { isProtection := isProt }, domain := .products (holder :: objs),
                            domainConstraint := filter, closed := if isClosed then none else some false },
              .typeExt d cls ]
   | .kw "Extend" =>
     advance
     match ← peek with
     | .atom "Immunity" | .kw "Immunity" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000) "Immunity"]
+    | .atom "Protection" => advance; let d ← ident; return [.typeExt d (← clauses .immunity 1000) "Protection"]
     | .kw "Fact" => advance; let d ← ident; return [.typeExt d (← clauses .fact 1000) "Fact"]
     | .kw "Act" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Act"]
     | .atom "Power" | .kw "Power" => advance; let d ← ident; return [.typeExt d (← clauses .act 1000) "Power"]
@@ -1248,7 +1381,7 @@ end
 def startsFrame : P Bool := do
   match ← peek with
   | .kw "Open" | .kw "Closed" => isFrameHeadAt 1
-  | .atom "Evidenced" => isFrameHeadAt 0
+  | .atom "Evidenced" | .atom "Input" => isFrameHeadAt 0
   | _ => isFrameHeadAt 0
 
 def declarations : Nat → P (List Decl)

@@ -188,6 +188,7 @@ def fmtModClause : ModClause → String
   | .confidential [] => "Confidential"
   | .confidential auds => "Confidential To " ++ ", ".intercalate auds
   | .resolves pol t => "Resolves " ++ (if pol then "" else "!") ++ fmtTerm t
+  | .decides tgt cnd => s!"Decides {fmtTerm tgt} When {fmtTerm cnd}"
   | .standard s => "Standard " ++ fmtAtomOrStr s
   | .evEffect op ts src? =>
     let kw := match op with
@@ -208,7 +209,13 @@ def fmtModClause : ModClause → String
   | .priorityEdge hi los => s!"Priority {hi} Over {", ".intercalate los}"
   | .repeals rs => s!"Repeals {", ".intercalate rs}"
   | .protects ps => s!"Protects {", ".intercalate ps}"
+  | .protectsClauses cids => s!"Protects Clause {", ".intercalate cids}"
   | .entrenched => ""
+  | .presumed b => s!"Presumed {if b then "True" else "False"}"
+  | .excusedWhen ts => "Excused when " ++ fmtTermList ts
+  | .overridesDuties targets =>
+    "Overrides " ++ ", ".intercalate (targets.map fun (d, args?) =>
+      match args? with | none => d | some a => fmtTerm (.app d a))
 
 def fmtModClauses (indent : String) (cls : List ModClause) : String :=
   let rendered := (cls.map fmtModClause).filter (!·.isEmpty)
@@ -286,7 +293,7 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
   let childIndent := indent ++ "  "
   match t.kind with
   | .fact f =>
-    let factPrefix := if f.evidenced then "Evidenced " else openPrefix
+    let factPrefix := if f.evidenced then "Evidenced " else if f.isInput then "Input " else openPrefix
     if f.invariant && t.domain == .products [] && reprStr t.domainConstraint == reprStr (Term.boolLit true) && t.closed.isNone then
       let entPref := if f.entrenched then "Entrenched " else ""
       match extractInvariantForm cls with
@@ -339,13 +346,23 @@ def fmtTypeDeclAndExt (indent : String) (d : DomId) (t : TypeSpec) (cls : List M
       let relPart := if objs.isEmpty then "" else " Related to " ++ fmtVars objs
       s!"{indent}{openPrefix}Duty {d} Holder {h} Claimant {c}{relPart}{wherePart}{fmtModClauses childIndent cls}"
     | _ => s!"{indent}{openPrefix}Duty {d}{wherePart}{fmtModClauses childIndent cls}"
-  | .immunity _ =>
+  | .immunity im =>
+    let kw := if im.isProtection then "Protection" else "Immunity"
+    let cls' := if im.isProtection then cls.map (fun
+      | .against as => .against as -- rendered below via `For` when `isProtection`
+      | c => c) else cls
     let comps := match t.domain with | .products xs => xs | _ => []
+    let clauseStr := if im.isProtection then
+      let rendered := (cls'.map fun
+        | .against as => "For " ++ ", ".intercalate as
+        | c => fmtModClause c).filter (!·.isEmpty)
+      if rendered.isEmpty then "" else "\n" ++ "\n".intercalate (rendered.map (childIndent ++ ·))
+    else fmtModClauses childIndent cls'
     match comps with
     | h :: objs =>
       let relPart := if objs.isEmpty then "" else " Related to " ++ fmtVars objs
-      s!"{indent}{openPrefix}Immunity {d} Holder {h}{relPart}{wherePart}{fmtModClauses childIndent cls}"
-    | [] => s!"{indent}{openPrefix}Immunity {d}{wherePart}{fmtModClauses childIndent cls}"
+      s!"{indent}{openPrefix}{kw} {d} Holder {h}{relPart}{wherePart}{clauseStr}"
+    | [] => s!"{indent}{openPrefix}{kw} {d}{wherePart}{clauseStr}"
 
 def fmtTemporalFormula : TemporalFormula → String
   | .always phi => "Always " ++ fmtTerm phi
@@ -417,6 +434,8 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
     let rows := r.params.map fun (k, v) => s!"{indent}  {k} = {v}"
     let bodyStr := if rows.isEmpty then "" else "\n" ++ (",\n").intercalate rows ++ "\n" ++ indent
     s!"{indent}Regime {fmtAtomOrStr r.name} \{{bodyStr}}" :: fmtDecls indent fuel rest
+  | fuel + 1, .amendProcedure conds :: rest =>
+    s!"{indent}Amend Procedure Valid when {fmtTermList conds}" :: fmtDecls indent fuel rest
 
 mutual
 

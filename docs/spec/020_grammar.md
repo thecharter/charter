@@ -132,22 +132,22 @@ act_clause      ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Creates' create_eff (',' create_eff)*
                   | 'Terminates' opt_foreach (',' opt_foreach)*
                   | 'Obfuscates' opt_foreach (',' opt_foreach)*
-                  | 'Syncs with' opt_foreach (',' opt_foreach)*
-                  | 'Valid when' expr_list | 'Except under' idents
+                  | ('Syncs with' | 'Qualifies as' | 'QualifiesAs') opt_foreach (',' opt_foreach)*
+                  | 'Valid when' expr | 'Forbidden when' expr | 'Void when' expr | 'Except under' idents
                   | 'Repeals' idents | 'Installs' '{' (frame | '.')* '}'
-                  | 'Resolves' '!'? expr | 'Standard' (ident | atom | str_lit)
-                  | ('Supports' | 'Rebuts' | 'Retracts') expr_list
+                  | 'Resolves' '!'? expr | 'Decides' expr ('By' var | 'When' expr) | 'Standard' (ident | atom | str_lit)
+                  | ('Supports' | 'Rebuts' | 'Retracts' '!'?) expr_list ('By' expr)?
                   | from_clause | deriv_clause
 event_clause    ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Creates' create_eff (',' create_eff)*
                   | 'Terminates' opt_foreach (',' opt_foreach)*
                   | 'Obfuscates' opt_foreach (',' opt_foreach)*
-                  | 'Syncs with' opt_foreach (',' opt_foreach)*
+                  | ('Syncs with' | 'Qualifies as' | 'QualifiesAs') opt_foreach (',' opt_foreach)*
                   | deriv_clause
 duty_clause     ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
-                  | 'Violated when' expr_list | 'Enforced by' idents
+                  | 'Violated when' expr_list | 'Excused when' expr_list | 'Enforced by' idents
                   | 'Terminated by' idents | 'Created by' idents
-                  | 'Overridden by' idents | 'Due within' expr
+                  | 'Overridden by' idents | 'Overrides' idents | 'Due within' expr
                   | from_clause | deriv_clause
 immunity_clause ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Against' (ident | 'Amend') (',' (ident | 'Amend'))*

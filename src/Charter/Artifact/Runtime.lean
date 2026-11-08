@@ -204,6 +204,7 @@ partial def declToJson : Decl → Json
   | .property tp => Json.mkObj [("k", "prop"), ("tp", toJson tp)]
   | .amendInstall a body => Json.mkObj [("k", "ai"), ("a", Json.str a), ("b", Json.arr (body.map declToJson).toArray)]
   | .regime r => Json.mkObj [("k", "reg"), ("r", toJson r)]
+  | .amendProcedure conds => Json.mkObj [("k", "ap"), ("c", toJson conds)]
 
 partial def declFromJson (j : Json) : Except String Decl := do
   let k ← j.getObjValAs? String "k"
@@ -238,6 +239,7 @@ partial def declFromJson (j : Json) : Except String Decl := do
     let arr ← j.getObjValAs? (Array Json) "b"
     .amendInstall <$> j.getObjValAs? String "a" <*> arr.toList.mapM declFromJson
   | "reg" => .regime <$> j.getObjValAs? RegimeSpec "r"
+  | "ap" => .amendProcedure <$> j.getObjValAs? (List Term) "c"
   | other => .error s!"unknown Decl kind `{other}`"
 
 instance : ToJson Decl := ⟨declToJson⟩

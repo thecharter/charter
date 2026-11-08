@@ -1,0 +1,27 @@
+// 007.3, 008.3 (D35, #55, #57, #60): `Duty ... Overrides other(args)` with swapped roles,
+// `Excused when` on `Extend Duty`, `Input Fact`, and `Qualifies as`.
+Fact parent Identified by Daniel, Rosa
+Input Bool storm
+Bool handed
+Duty hand-over Holder parent Claimant parent' Due within 1
+Duty make-up Holder parent Claimant parent'
+  Overrides hand-over(parent', parent)
+Extend Duty hand-over Excused when storm()
+Act deliver Actor parent Recipient parent' Holds when True Creates handed()
+Act courier-drop Actor parent Recipient parent' Holds when True
+  Qualifies as deliver(parent, parent')
+.
++hand-over(Daniel, Rosa).
+@ 1.
+?violated hand-over(Daniel, Rosa).
+// Storm excuses violation while `hand-over` itself still holds:
++storm().
+?hand-over(Daniel, Rosa).
+?!violated hand-over(Daniel, Rosa).
+-storm().
+?violated hand-over(Daniel, Rosa).
+// Rosa's make-up duty overrides Daniel->Rosa hand-over (swapped roles!):
++make-up(Rosa, Daniel).
+?!violated hand-over(Daniel, Rosa).
+courier-drop(Daniel, Rosa).
+?handed().

@@ -1,0 +1,6 @@
+// 005.11 (D35, #18, #26): a `Finding` must declare `Resolves` or `Decides` (CHR032).
+//! expect-error: CHR032
+Fact court Identified by C
+Bool ordered
+Finding order Actor court Valid when True Creates ordered()
+.

@@ -47,8 +47,8 @@ Module sortition-court(arbiter, party, dispute, registrar) {
   Act seat-panel Actor registrar Related to dispute
     Holds when filed(dispute) && Not(ruled(dispute)) && Not(Exists arbiter: seated(arbiter, dispute))
     Valid when (Forall arbiter: Not(drawn(arbiter, dispute)) || eligible(arbiter, dispute))
-             , Count(Foreach arbiter: arbiter When drawn(arbiter, dispute)) <= panel-size
-             , Not(Exists cluster, cluster': cluster.arbiter != cluster'.arbiter && cluster.int == cluster'.int
+            && Count(Foreach arbiter: arbiter When drawn(arbiter, dispute)) <= panel-size
+            && Not(Exists cluster, cluster': cluster.arbiter != cluster'.arbiter && cluster.int == cluster'.int
                      && drawn(cluster.arbiter, dispute) && drawn(cluster'.arbiter, dispute))
     Creates (Foreach arbiter: seated(arbiter, dispute) When drawn(arbiter, dispute))
           , decide-tier(registrar, dispute)

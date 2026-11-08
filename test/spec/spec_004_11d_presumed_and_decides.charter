@@ -1,0 +1,26 @@
+// 004.11, 005.11 (D35, #53): `Presumed False | True` on `Evidenced` facts supplies a default
+// polarity while `Unresolved` (without masking `Conflicted`), and `Decides` resolves either way.
+Fact person Identified by Walter, DrAdler, DrBose, Judge
+Fact answer Identified by Yes, No
+Evidenced Bool lacks-capacity Presumed False
+Bool treated
+Power consent-treatment Actor person
+  Valid when person == Walter && !lacks-capacity()
+  Creates treated()
+Act certify-incapacity Actor person Holds when True Supports lacks-capacity()
+Act certify-capacity Actor person Holds when True Rebuts lacks-capacity()
+Finding rule-capacity Actor person Related to answer
+  Decides lacks-capacity() By answer
+  Valid when person == Judge && Conflicted(lacks-capacity())
+.
+?Unresolved(lacks-capacity()).
+?valid consent-treatment(Walter).
+certify-incapacity(DrAdler).
+?Established(lacks-capacity()).
+?!valid consent-treatment(Walter).
+certify-capacity(DrBose).
+?Conflicted(lacks-capacity()).
+?undetermined consent-treatment(Walter).
+rule-capacity(Judge, No).
+?Refuted(lacks-capacity()).
+?valid consent-treatment(Walter).
