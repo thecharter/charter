@@ -5,6 +5,23 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-08 (3): all remaining design briefs ruled and implemented (`D39`–`D42`: `B9`, `#73`, `#65`, `#66`)
+
+## Where
+
+- `main`, pushed in atomic, battery-green commits (`4d85a6a`, `38feea3`, plus `D42`).
+- `tools/battery`: **PASS** across all 25 steps (52 backed claims in `docs/claims.json`, 204/204 spec conformance tests, 13/13 stdlib suites, 4/4 zero-axiom `prove`, 14/14 `verify`, 7/7 `projections`, 196/196 eFLINT corpus, 20/20 worked examples); `/Users/eric/psa/tools/verify-psa`: **PASS** across all 6 stages.
+- Zero `needs-ruling` issues or pending briefs remain anywhere in the repository (`#79`: **65 closed / 13 open**).
+
+## What landed (`D39`–`D42`)
+
+- **`D39` (`B9`, `4d85a6a`)**: Promoted `CHR019` duplicate type/parameter/amount declarations from warning to static error (`003.11`, closing the non-`Amend` rule-replacement bypass on entrenched rules) and recorded all 19 upstream eFLINT redeclaration files in `tolerances.json` / `tolerances.md`.
+- **`D40` (`B29`, `#73`, `4d85a6a`)**: `Document ... Rank n` (`Rank 1 > Rank 2`) synthesizes `RankPriorityEdge`s (`Spec.rankEdges`) between otherwise-unranked cross-document `Default`/`Exception` rules, preserving explicit `Overrides`/`Priority` delegation and same-rank `Conflict` (`T21`), and surfacing rank edges in `check --verbose`, `doc`, and `explain` (`spec_012_9c`).
+- **`D41` (`B27`, `#65`, `38feea3`)**: Added `src/Charter/Core/Meaning.lean` (zero `Charter.Eval` imports, enforced in `spec-inventory.sh`) defining fuel-free relational `DeclEval` and `DeclCPhraseMeaning`, proved `declEval_implies_eval`, `eval_implies_declEval`, and `declCPhraseMeaning_agrees_with_step` in `Eval/Properties.lean`, and separated driver-structural vs. evaluator-independent claims in `docs/claims.json`.
+- **`D42` (`B28`, `#66`)**: Enforced strict `Law 10` tags across all target headers/JSON (`proved`, `checked`, `assumed`, plus `advisoryOnly: true` on `prompt`), added `src/Charter/Project/SolidityIR.lean` compiling real finite/scalar guard predicates and half-open expiry storage mutations with proved `execSolStep_sound` and `compileScalarExpr_sound_for_declEval`, upgraded `--verify-output` to 3-way stateful differential trace checking (`SolidityIR` / `GuardIR` / `charter-server`), and added `.github/workflows/differential-targets.yml` + `tools/differential-targets-check` (`solc`/Foundry, `quint`, `z3`).
+
+---
+
 # Handoff — 2026-11-08 (2): remaining 10 bugs & diagnostics closed (`#80`, `#19`, `#20`, `#24`, `#27`–`#29`, `#31`, `#33`, `#34`) and all 20 worked `Examples/` rewritten in `D34`–`D38` Charter
 
 ## Where

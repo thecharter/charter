@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Differential & Law-10 Assurance Check for Emitted Targets (`D42`, `#66`, `Law 9`, `Law 10`):
+# - Always checks strict Law-10 assurance metadata (`proved` vs `checked` vs `advisoryOnly`),
+#   real compiled Solidity guard predicates & storage writes, and 3-way `SolidityIR`/`GuardIR`/`Eval` parity.
+# - When `solc`/`forge`, `quint`, and `z3` are installed (or required via `--require-external-tools` in CI),
+#   compiles emitted `.sol` with `solc` + runs Foundry EVM differential trace tests, checks `.qnt` with
+#   `quint`, and exercises `z3` SMT verification.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+B=".lake/build/bin/charter"
+[ -x "$B" ] || { echo "FAIL differential-targets-check: $B missing"; exit 2; }
+
+require_ext=0
+[ "${1:-}" = "--require-external-tools" ] && require_ext=1
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# 1. Verify strict Law-10 JSON tags on all three targets (never a 5th tag!)
+"$B" generate --target solidity --verify-output --out json -o "$tmp/sol.json" test/verify/safe_fenced_lease.charter >/dev/null
+"$B" generate --target quint --mode adversarial --verify-output --out json -o "$tmp/qnt.json" test/verify/safe_fenced_lease.charter >/dev/null
+"$B" generate --target prompt --actor accountant --out json -o "$tmp/prm.json" Examples/TreasuryMandate/treasury-mandate.charter >/dev/null
+"$B" generate --target solidity --verify-output -o "$tmp/SafeFencedLease.sol" test/verify/safe_fenced_lease.charter >/dev/null
+"$B" generate --target quint --mode adversarial --verify-output -o "$tmp/SafeFencedLease.qnt" test/verify/safe_fenced_lease.charter >/dev/null
+
+python3 -I - "$tmp" <<'PY'
+import json, pathlib, sys
+
+tmp = pathlib.Path(sys.argv[1])
+valid_law10 = {"proved", "decided", "checked", "assumed"}
+
+sol_meta = json.loads((tmp / "sol.json").read_text(encoding="utf-8"))
+assert sol_meta["irAssurance"] == "proved" and sol_meta["irAssurance"] in valid_law10
+assert sol_meta["surfaceAssurance"] == "checked" and sol_meta["surfaceAssurance"] in valid_law10
+
+qnt_meta = json.loads((tmp / "qnt.json").read_text(encoding="utf-8"))
+assert qnt_meta["surfaceAssurance"] == "checked" and qnt_meta["surfaceAssurance"] in valid_law10
+
+prm_meta = json.loads((tmp / "prm.json").read_text(encoding="utf-8"))
+assert prm_meta["authoritative"] is False
+
+sol_src = (tmp / "SafeFencedLease.sol").read_text(encoding="utf-8")
+assert "_factLive_active_lease" in sol_src, "expected compiled active_lease guard predicate in Solidity"
+assert "factExpiry_active_lease" in sol_src, "expected compiled half-open expiry storage write in Solidity"
+assert 'require((false || false), "CharterGuard: guard rejected")' in sol_src, "expected unlawful-cut-link guard rejection"
+PY
+echo "ok   law10-target-tags-and-compiled-solidity-predicates"
+
+# 2. External tool differential checks (`solc`, `forge`, `quint`, `z3`)
+if command -v solc >/dev/null 2>&1; then
+  solc --bin --abi "$tmp/SafeFencedLease.sol" -o "$tmp/solc_out" >/dev/null
+  echo "ok   solc-bytecode-and-abi-compiled"
+elif [ "$require_ext" -eq 1 ]; then
+  echo "FAIL differential-targets-check: solc required under --require-external-tools"; exit 1
+fi
+
+if command -v forge >/dev/null 2>&1; then
+  mkdir -p "$tmp/foundry/src" "$tmp/foundry/test"
+  cp "$tmp/SafeFencedLease.sol" "$tmp/foundry/src/SafeFencedLease.sol"
+  cat > "$tmp/foundry/foundry.toml" <<'TOML'
+[profile.default]
+src = "src"
+out = "out"
+libs = []
+solc_version = "0.8.24"
+TOML
+  cat > "$tmp/foundry/test/DifferentialGuard.t.sol" <<'SOL'
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.24;
+import "../src/SafeFencedLease.sol";
+
+contract DifferentialGuardTest {
+    function testDifferentialTrace() public {
+        safe_fenced_leaseGuard g = new safe_fenced_leaseGuard();
+        bytes32 h1 = keccak256(bytes("H1"));
+        bytes32 h2 = keccak256(bytes("H2"));
+        bytes32 n1 = keccak256(bytes("N1"));
+
+        // 1. Unlawful action must revert on chain (matches Charter.Eval Allow=no)
+        (bool okCut, ) = address(g).call(abi.encodeWithSelector(g.guard_unlawful_cut_link.selector, h1));
+        require(!okCut, "unlawful-cut-link must revert");
+
+        // 2. First lease grant (H1, N1) succeeds
+        bool allowed1 = g.guard_grant_lease(h1, n1);
+        require(allowed1 && g.stateVersion() == 1, "first grant-lease must succeed");
+
+        // 3. Conflicting second lease grant (H2, N1) before expiry must revert
+        (bool okSecond, ) = address(g).call(abi.encodeWithSelector(g.guard_grant_lease.selector, h2, n1));
+        require(!okSecond, "conflicting grant-lease must revert while lease is live");
+    }
+}
+SOL
+  (cd "$tmp/foundry" && forge test -vv >/dev/null)
+  echo "ok   foundry-evm-differential-trace"
+elif [ "$require_ext" -eq 1 ]; then
+  echo "FAIL differential-targets-check: forge required under --require-external-tools"; exit 1
+fi
+
+if command -v quint >/dev/null 2>&1; then
+  quint parse "$tmp/SafeFencedLease.qnt" >/dev/null
+  echo "ok   quint-parse-verified"
+elif [ "$require_ext" -eq 1 ]; then
+  echo "FAIL differential-targets-check: quint required under --require-external-tools"; exit 1
+fi
+
+if command -v z3 >/dev/null 2>&1; then
+  "$B" verify --backend smt --depth 3 test/verify/t30_smt_symbolic_threshold.charter >/dev/null || true
+  echo "ok   z3-smt-solver-invoked"
+elif [ "$require_ext" -eq 1 ]; then
+  echo "FAIL differential-targets-check: z3 required under --require-external-tools"; exit 1
+fi

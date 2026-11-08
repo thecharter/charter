@@ -102,14 +102,28 @@ def generateCommand (args : List String) : IO UInt32 := do
       for d in fragDiags do IO.eprintln (d.withFile file).render
       return 1
     let ir := Project.compileGuardIR stem lawSha cfg
-    let sol := Project.renderSolidityContract ir
+    let sc ← match Project.compileSolContractFromGuard ir with
+      | .ok c => pure c
+      | .error d => IO.eprintln (d.withFile file).render; return 1
+    let sol := Project.renderSolidityContract sc
     let abi := Project.renderGuardJsonABI ir
     let vSum? ← if opts.verifyOutput then
-      match Project.validateGuardOutput ir sol abi with
+      match Project.validateGuardOutput ir sc sol abi with
       | .ok s => pure (some s)
       | .error e => IO.eprintln s!"FAIL {file} [{tgt}]: {e}"; return 1
     else pure none
-    let textOut := if tgt == "abi" || opts.json then abi.pretty ++ "\n" else sol
+    let textOut := if tgt == "abi" then abi.pretty ++ "\n"
+      else if opts.json then
+        (Lean.Json.mkObj [
+          ("kind", "generated-target"),
+          ("target", Lean.Json.str tgt),
+          ("irAssurance", "proved"),
+          ("surfaceAssurance", "checked"),
+          ("assumptions", Lean.Json.arr (sc.assumptions.map Lean.Json.str).toArray),
+          ("abi", abi),
+          ("solidity", Lean.Json.str sol)
+        ]).pretty ++ "\n"
+      else sol
     writeOrPrint textOut vSum?
   | "quint" | "veil" =>
     let qMod := Project.compileQuintModule stem opts.mode cfg
@@ -119,7 +133,16 @@ def generateCommand (args : List String) : IO UInt32 := do
       | .ok s => pure (some s)
       | .error e => IO.eprintln s!"FAIL {file} [{tgt}]: {e}"; return 1
     else pure none
-    writeOrPrint qSrc vSum?
+    let outStr := if opts.json then
+      (Lean.Json.mkObj [
+        ("kind", "generated-target"),
+        ("target", "quint"),
+        ("surfaceAssurance", "checked"),
+        ("assumptions", Lean.Json.arr (qMod.assumptions.map Lean.Json.str).toArray),
+        ("quint", Lean.Json.str qSrc)
+      ]).pretty ++ "\n"
+    else qSrc
+    writeOrPrint outStr vSum?
   | "prompt" =>
     let (md, jSchema) := Project.renderAdvisoryPrompt stem opts.actor cfg.spec
     writeOrPrint (if opts.json then jSchema.pretty ++ "\n" else md)

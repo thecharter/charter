@@ -70,6 +70,7 @@ import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
 import Charter.Project.Diff
+import Charter.Project.SolidityIR
 import Charter.Project.GuardTarget
 import Charter.Project.QuintTarget
 import Charter.Project.PromptTarget

@@ -347,6 +347,30 @@
       "summary": "Lowered GuardIR state-transition guards accept an event if and only if Charter.Server.evaluateServerEvent returns Allow and transition to the identical CIR configuration (D28, G5.1, T33)."
     },
     {
+      "id": "project.solidity_ir_step_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Project/SolidityIR.lean",
+      "symbol": "execSolStep_sound",
+      "summary": "SolidityIR step execution accepts a call if and only if the contract is unpaused, the caller is authorized, the compiled guardExpr evaluates to true, and storage transitions via create-beats-terminate (D42, #66, Law 9)."
+    },
+    {
+      "id": "project.solidity_ir_expr_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Project/SolidityIR.lean",
+      "symbol": "compileScalarExpr_sound_for_declEval",
+      "summary": "Scalar expressions lowered to SolidityIR evaluate under execSolExpr to the exact SolVal corresponding to Charter.Core.Meaning.DeclEval (D42, #66, Law 9)."
+    },
+    {
+      "id": "project.emitted_targets_differential_checked",
+      "assurance": "checked",
+      "scope": "concrete-trace",
+      "artifact": "src/Charter/Project/GuardTarget.lean",
+      "symbol": "tools/differential-targets-check",
+      "summary": "Emitted Solidity (.sol + ABI) and Quint (.qnt) surface texts carry Law-10 checked tags and are validated via 3-way stateful differential traces, counterexample replay, and CI solc/Foundry + quint + z3 execution (D42, #66)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

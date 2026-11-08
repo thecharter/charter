@@ -43,5 +43,9 @@ check_case "t32-quint-partition-counterexample-replayed" 0 "confirmed imported c
 check_case "prompt-advisory-stamp" 0 '"authoritative": false' \
   "$B" generate --target prompt --actor accountant --out json Examples/TreasuryMandate/treasury-mandate.charter
 
+# 5. D42 (#66): Law-10 target tags + compiled SolidityIR guard predicates & optional external solvers
+check_case "d42-differential-targets" 0 "ok   law10-target-tags-and-compiled-solidity-predicates" \
+  bash tools/differential-targets-check
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]
