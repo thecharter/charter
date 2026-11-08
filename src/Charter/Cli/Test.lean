@@ -167,6 +167,8 @@ def termStrConsts : Term → List String
   | .mulDivRound x n d _ =>
     termStrConsts x ++ termStrConsts n ++ termStrConsts d
   | .fnApp _ k => termStrConsts k
+  | .dimLit _ _ => []
+  | .ite c t e => termStrConsts c ++ termStrConsts t ++ termStrConsts e
   | .exists_ _ t | .forall_ _ t | .count _ t | .sum _ t | .max _ t | .min _ t => termStrConsts t
   | .app _ args => argsStrConsts args
   | .boolLit _ | .intLit _ | .ref _ | .currentTime => []
@@ -234,6 +236,7 @@ def permuteTerm (perm : List (String × String)) : Term → Term
   | .heldFor a b => .heldFor (permuteTerm perm a) (permuteTerm perm b)
   | .mulDivRound x n d m => .mulDivRound (permuteTerm perm x) (permuteTerm perm n) (permuteTerm perm d) m
   | .fnApp d k => .fnApp d (permuteTerm perm k)
+  | .ite c t e => .ite (permuteTerm perm c) (permuteTerm perm t) (permuteTerm perm e)
   | t => t
 
 def permuteArgs (perm : List (String × String)) : Args → Args

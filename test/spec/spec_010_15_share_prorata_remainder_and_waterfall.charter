@@ -1,0 +1,43 @@
+// 010.15 (D37, #56, #45): `Share` and `ProRata` with explicit `Remainder To` conserving every cent,
+// 2-argument `Min`/`Max`, and `Applies amt To v1, v2, ...` payment waterfalls.
+Fact spouse Identified by Elena, Sam
+Fact member Identified by Alice, Bob, Carol
+Param pool = $15,000.01
+Param dividend = $100.00
+Function shares Identified by member * int
+Fact spouse-award Identified by spouse * USD
+Fact member-payout Identified by member * USD
+
+Event split-marital
+  Creates (Foreach spouse: spouse-award(spouse, Share(pool Among spouse Remainder To Elena)))
+
+Event pay-dividend
+  Creates (Foreach member: member-payout(member, ProRata(dividend By shares Among member Remainder To Alice)))
+
+Role debtor Is Dana
+Role creditor Is Ines
+Var fees : USD = $50.00
+Var interest : USD = $120.00
+Var principal : USD = $1,000.00
+Act remit Actor debtor Recipient creditor Related to payment : USD
+  Holds when payment > $0
+  Applies payment To fees, interest, principal
+.
+split-marital().
+?spouse-award(Elena, $7,500.01).
+?spouse-award(Sam, $7,500.00).
+
++shares(Alice, 1). +shares(Bob, 1). +shares(Carol, 1).
+pay-dividend().
+?member-payout(Alice, $33.34).
+?member-payout(Bob, $33.33).
+?member-payout(Carol, $33.33).
+
+?(Min($80.00, $50.00) == $50.00).
+?(Max($80.00, $50.00) == $80.00).
+
+// Remitting $200 clears $50 fees, $120 interest, and $30 of principal -> $970 remaining:
+remit($200.00).
+?(fees == $0.00).
+?(interest == $0.00).
+?(principal == $970.00).

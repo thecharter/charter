@@ -376,6 +376,10 @@ inductive Decl where
   | amendProcedure (conds : List Term)
   /-- Charter (D36, `#46`): `Amount <name> [: <Dom>] Is <expr>` named derived scalar value. -/
   | amountDef (name : DomId) (dom? : Option Domain) (expr : Term)
+  /-- Charter (D37, `#42`): idempotently ensure carrier `Fact <name> Identified by <dom>`. -/
+  | ensureCarrier (name : DomId) (dom : Domain)
+  /-- Charter (D37, `#42`): initial value assignment `Var <name> : <dom> = <expr>` at Genesis. -/
+  | varInit (name : DomId) (expr : Term)
   deriving Repr, Inhabited
 
 def Decl.isInitial : Decl → Bool
@@ -393,6 +397,8 @@ def Decl.isInitial : Decl → Bool
   | .regime .. => false
   | .amendProcedure .. => true
   | .amountDef .. => true
+  | .ensureCarrier .. => true
+  | .varInit .. => false
 
 def Decl.name : Decl → DomId
   | .typeDecl d _ => d
@@ -409,6 +415,8 @@ def Decl.name : Decl → DomId
   | .regime r => r.name
   | .amendProcedure _ => ""
   | .amountDef n _ _ => n
+  | .ensureCarrier n _ => n
+  | .varInit n _ => n
 
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
@@ -535,6 +543,7 @@ def enumerableFuel (s : Spec) : Nat → Domain → Bool
   | _, .duration => false
   | _, .money _ _ => false
   | _, .quantity _ => false
+  | _, .rate => false
 
 def enumerable (s : Spec) (dom : Domain) : Bool := s.enumerableFuel (s.decls.length + 1) dom
 
@@ -655,6 +664,7 @@ def enumerableWithMap (s : Spec) (declMap : DomMap TypeSpec) : Nat → Domain �
   | _, .duration => false
   | _, .money _ _ => false
   | _, .quantity _ => false
+  | _, .rate => false
 
 def buildIndex (s : Spec) : SpecIndex :=
   let declMap : DomMap TypeSpec := s.decls.foldr (fun (d, t) m => m.insert d t) .empty
@@ -923,6 +933,8 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .regime r => .regime { r with params := r.params.map fun (n, v) => (f n, v) }
   | .amendProcedure conds => .amendProcedure (conds.map (Term.mapDom f))
   | .amountDef n dom? e => .amountDef (f n) (dom?.map (·.mapDom f)) (e.mapDom f)
+  | .ensureCarrier n dom => .ensureCarrier (f n) (dom.mapDom f)
+  | .varInit n e => .varInit (f n) (e.mapDom f)
   | d => d
 
 def Decl.mapDomList (f : DomId → DomId) : List Decl → List Decl

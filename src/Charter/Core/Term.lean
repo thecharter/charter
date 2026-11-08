@@ -124,10 +124,12 @@ inductive Domain where
   | money (currency : String) (scale : Nat)
   /-- Charter (D24, G3.4): `Quantity(UNIT)` units over exact `Int`. -/
   | quantity (unit : String)
+  /-- Charter (D37, `#58`): dimensionless `Rate` in basis points (`1 bp = 1/10000`). -/
+  | rate
   deriving Repr, Inhabited, BEq
 
 def Domain.isDimensionalInt : Domain → Bool
-  | .time | .duration | .money _ _ | .quantity _ => true
+  | .time | .duration | .money _ _ | .quantity _ | .rate => true
   | _ => false
 
 mutual
@@ -176,6 +178,10 @@ inductive Term where
   | mulDivRound (x : Term) (num : Term) (den : Term) (mode : RoundingMode)
   /-- Charter (D36, `#46`): `f(key)` 1-argument `Function` value lookup. -/
   | fnApp (d : DomId) (key : Term)
+  /-- Charter (D37, `#42`, `#58`): dimensional literal (`$100.00`, `6%`, `150 bps`). -/
+  | dimLit (dom : Domain) (val : Int)
+  /-- Charter (D37, `#45`, `#56`): conditional expression `If(cond, then_, else_)`. -/
+  | ite (cond : Term) (then_ : Term) (else_ : Term)
   deriving Repr, Inhabited
 /-- Arguments of an application: positional terms or named `x = e` modifiers. -/
 inductive Args where
@@ -198,11 +204,13 @@ inductive Ty where
   | money (currency : String) (scale : Nat)
   /-- Charter (D24, G3.4): `Quantity(UNIT)` units. -/
   | quantity (unit : String)
+  /-- Charter (D37, `#58`): dimensionless `Rate` in basis points (`1/10000`). -/
+  | rate
   deriving Repr, DecidableEq, Inhabited
 
 instance : ToString Ty := ⟨fun
   | .strings => "a string" | .ints => "an integer" | .bool => "a boolean" | .tagged d => s!"an instance of {d}"
-  | .time => "a time" | .duration => "a duration"
+  | .time => "a time" | .duration => "a duration" | .rate => "a rate"
   | .money c s => s!"Money({c}, {s})" | .quantity u => s!"Quantity({u})"⟩
 
 /-- Run-time values (eFLINT `Value`). -/
@@ -271,6 +279,16 @@ def Term.pp : Term → String
   | .hasConflict t => "Conflict(" ++ t.pp ++ ")"
   | .mulDivRound x n d m => "MulDivRound(" ++ x.pp ++ ", " ++ n.pp ++ ", " ++ d.pp ++ ", " ++ m.kwName ++ ")"
   | .fnApp d k => d ++ "(" ++ k.pp ++ ")"
+  | .dimLit (.money "USD" 2) n =>
+    let absN := n.natAbs
+    let sign := if n < 0 then "-" else ""
+    let d := absN / 100
+    let c := absN % 100
+    let pad := if c < 10 then s!"0{c}" else s!"{c}"
+    s!"{sign}${d}.{pad}"
+  | .dimLit .rate n => s!"{n} bps"
+  | .dimLit _ n => toString n
+  | .ite c t e => s!"If({c.pp}, {t.pp}, {e.pp})"
 def Args.pp : Args → String
   | .pos ts => Term.ppList ts
   | .named ms => Term.ppMods ms
@@ -328,6 +346,8 @@ def Term.mapDom (f : DomId → DomId) : Term → Term
   | .hasConflict t => .hasConflict (t.mapDom f)
   | .mulDivRound x n d m => .mulDivRound (x.mapDom f) (n.mapDom f) (d.mapDom f) m
   | .fnApp d k => .fnApp (f d) (k.mapDom f)
+  | .dimLit dom n => .dimLit dom n
+  | .ite c t e => .ite (c.mapDom f) (t.mapDom f) (e.mapDom f)
 def Args.mapDom (f : DomId → DomId) : Args → Args
   | .pos ts => .pos (Term.mapDomList f ts)
   | .named ms => .named (Term.mapDomMods f ms)
@@ -385,6 +405,8 @@ def Term.substVars (sub : List (Var × Var)) : Term → Term
   | .hasConflict t => .hasConflict (t.substVars sub)
   | .mulDivRound x n d m => .mulDivRound (x.substVars sub) (n.substVars sub) (d.substVars sub) m
   | .fnApp d k => .fnApp d (k.substVars sub)
+  | .dimLit dom n => .dimLit dom n
+  | .ite c t e => .ite (c.substVars sub) (t.substVars sub) (e.substVars sub)
 def Args.substVars (sub : List (Var × Var)) : Args → Args
   | .pos ts => .pos (Term.substVarsList sub ts)
   | .named ms => .named (Term.substVarsMods sub ms)
@@ -437,6 +459,8 @@ def Term.substAlias : Term → String → Term → Term
   | .hasConflict t, name, val => .hasConflict (t.substAlias name val)
   | .mulDivRound x n d m, name, val => .mulDivRound (x.substAlias name val) (n.substAlias name val) (d.substAlias name val) m
   | .fnApp d k, name, val => .fnApp d (k.substAlias name val)
+  | .dimLit dom n, _, _ => .dimLit dom n
+  | .ite c t e, name, val => .ite (c.substAlias name val) (t.substAlias name val) (e.substAlias name val)
 termination_by structural x => x
 
 def Args.substAlias : Args → String → Term → Args

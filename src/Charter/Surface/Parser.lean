@@ -310,20 +310,27 @@ def binderForm (isForall : Bool) : Nat → (List Var → Term → Term) → P Te
       | _, _ => body
     return mk xs body'
 
-/-- `Sum`/`Count`/`Max`/`Min` `(Foreach xs : body)` and `Count(pred)` (`D36`, `#46`). -/
-def aggregate (isCount : Bool := false) : Nat → (List Var → Term → Term) → P Term
+/-- `Sum`/`Count`/`Max`/`Min` `(Foreach xs : body)`, `Count(pred)`, and 2-arg `Min(a, b)` / `Max(a, b)`. -/
+def aggregate (kind : String) : Nat → (List Var → Term → Term) → P Term
   | 0, _ => fail "CHR003" "expression too deeply nested"
   | fuel + 1, mk => do
     expectKw "("
     if ← isKw "Foreach" then
       advance
       binderForm false fuel mk
-    else if isCount then
+    else if kind == "Count" then
       let p ← expr fuel
       expectKw ")"
       match p with
       | .ref v => return .count [v] (.when (.ref v) (.present (.ref v)))
       | _ => fail "CHR003" "expected `Foreach` or a fact name inside `Count(...)`"
+    else if kind == "Min" || kind == "Max" then
+      let a ← expr fuel
+      expectKw ","
+      let b ← expr fuel
+      expectKw ")"
+      let cmp := if kind == "Min" then Term.leq a b else Term.geq a b
+      return .ite cmp a b
     else
       expectKw "Foreach"
       binderForm false fuel mk
@@ -335,34 +342,109 @@ def primary : Nat → P Term
     | .kw "True" => advance; return .boolLit true
     | .kw "False" => advance; return .boolLit false
     | .kw "Current Time" => advance; return .currentTime
-    | .int n => advance; return .intLit n
+    | .int n =>
+      advance
+      if (← peek) == .ident "bps" then
+        advance
+        return .dimLit .rate n
+      else return .intLit n
+    | .moneyLit cents => advance; return .dimLit (.money "USD" 2) cents
+    | .pctLit bps => advance; return .dimLit .rate bps
     | .str s => advance; return .stringLit s
+    | .atom "If" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("
+        let c ← expr fuel
+        expectKw ","
+        let t ← expr fuel
+        expectKw ","
+        let e ← expr fuel
+        expectKw ")"
+        return .ite c t e
+      else advance; return .stringLit "If"
+    | .atom "Share" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("
+        let pool ← expr fuel
+        if !(← isCtxAtom "Among") then fail "CHR003" "expected `Among <party>` in `Share(pool Among party Remainder To target)`"
+        advance
+        let pVar ← var
+        if !(← isCtxAtom "Remainder") then
+          fail "CHR003" "`Share(...)` requires `Remainder To <recipient>` so rounding cents are never lost (#56)"
+        advance
+        if !(← isCtxAtom "To") then fail "CHR003" "expected `To <recipient>` after `Remainder`"
+        advance
+        let remTarget ← expr fuel
+        expectKw ")"
+        let pIter : Var := { pVar with dec := pVar.dec ++ "_sh" }
+        let nCnt := Term.count [pIter] (.ref pIter)
+        let base := Term.mulDivRound pool (.intLit 1) nCnt .floor
+        let rem := Term.sub pool (.mult base nCnt)
+        return .ite (.eq (.ref pVar) remTarget) (.add base rem) base
+      else advance; return .stringLit "Share"
+    | .atom "ProRata" =>
+      if (← peekAt 1) == .kw "(" then
+        advance; expectKw "("
+        let pool ← expr fuel
+        if !(← isCtxAtom "By") then fail "CHR003" "expected `By <weight-fn>` in `ProRata(pool By fn Among party Remainder To target)`"
+        advance
+        let wFn ← ident
+        if !(← isCtxAtom "Among") then fail "CHR003" "expected `Among <party>` in `ProRata(pool By fn Among party Remainder To target)`"
+        advance
+        let pVar ← var
+        if !(← isCtxAtom "Remainder") then
+          fail "CHR003" "`ProRata(...)` requires `Remainder To <recipient>` so rounding cents are never lost (#56)"
+        advance
+        if !(← isCtxAtom "To") then fail "CHR003" "expected `To <recipient>` after `Remainder`"
+        advance
+        let remTarget ← expr fuel
+        expectKw ")"
+        let pIter : Var := { pVar with dec := pVar.dec ++ "_pr" }
+        let totW := Term.sum [pIter] (.fnApp wFn (.ref pIter))
+        let myFloor := Term.mulDivRound pool (.fnApp wFn (.ref pVar)) totW .floor
+        let sumFloors := Term.sum [pIter] (.mulDivRound pool (.fnApp wFn (.ref pIter)) totW .floor)
+        let rem := Term.sub pool sumFloors
+        return .ite (.eq (.ref pVar) remTarget) (.add myFloor rem) myFloor
+      else advance; return .stringLit "ProRata"
     | .atom "MulDivRound" =>
       if (← peekAt 1) == .kw "(" then
         advance
         expectKw "("
         let x ← expr fuel
         expectKw ","
-        let num ← expr fuel
+        let arg2 ← expr fuel
         expectKw ","
-        let den ← expr fuel
-        expectKw ","
-        let mode : RoundingMode ← (do
+        -- 3-arg `MulDivRound(amt, rate, mode)` (`D37`, `#58`) or 4-arg `MulDivRound(x, num, den, mode)`
+        let parseMode : P RoundingMode := do
           match ← peek with
           | .atom "Floor" | .ident "floor" => advance; return .floor
           | .atom "Ceil" | .ident "ceil" => advance; return .ceil
           | .atom "NearestEven" | .ident "nearestEven" => advance; return .nearestEven
           | .atom "ExactOrReject" | .ident "exactOrReject" => advance; return .exactOrReject
-          | k => fail "CHR003" s!"expected rounding mode (`Floor`, `Ceil`, `NearestEven`, or `ExactOrReject`), found {k.describe}")
-        expectKw ")"
-        return .mulDivRound x num den mode
+          | k => fail "CHR003" s!"expected rounding mode (`Floor`, `Ceil`, `NearestEven`, or `ExactOrReject`), found {k.describe}"
+        let isModeNow := match ← peek with
+          | .atom "Floor" | .ident "floor" | .atom "Ceil" | .ident "ceil"
+          | .atom "NearestEven" | .ident "nearestEven" | .atom "ExactOrReject" | .ident "exactOrReject" =>
+            true
+          | _ => false
+        if isModeNow && (← peekAt 1) == .kw ")" then
+          let mode ← parseMode
+          expectKw ")"
+          -- Sentinel `.dimLit .rate 10000` tells `Static.lean` that `arg2` must be a `Rate`!
+          return .mulDivRound x arg2 (.dimLit .rate 10000) mode
+        else
+          let den ← expr fuel
+          expectKw ","
+          let mode ← parseMode
+          expectKw ")"
+          return .mulDivRound x arg2 den mode
       else
         advance; return .stringLit "MulDivRound"
     | .atom s => advance; return .stringLit s
-    | .kw "Sum" => advance; aggregate false fuel .sum
-    | .kw "Count" => advance; aggregate true fuel .count
-    | .kw "Max" => advance; aggregate false fuel .max
-    | .kw "Min" => advance; aggregate false fuel .min
+    | .kw "Sum" => advance; aggregate "Sum" fuel .sum
+    | .kw "Count" => advance; aggregate "Count" fuel .count
+    | .kw "Max" => advance; aggregate "Max" fuel .max
+    | .kw "Min" => advance; aggregate "Min" fuel .min
     | .kw "(" =>
       advance
       match ← peek with
@@ -419,6 +501,55 @@ def intsFromRange (lo hi : Int) : List Int :=
 def stringsFromRange (lo hi : Char) : List String :=
   if lo.toNat > hi.toNat then [] else
     (List.range (hi.toNat - lo.toNat + 1)).map (fun k => (Char.ofNat (lo.toNat + k)).toString)
+
+def currencyAtomDom : String → Option Domain
+  | "USD" => some (.money "USD" 2)
+  | "EUR" => some (.money "EUR" 2)
+  | "GBP" => some (.money "GBP" 2)
+  | "Rate" => some .rate
+  | _ => none
+
+def parseProductVarWithCarriers : P (Var × List Decl) := do
+  match ← peek with
+  | .atom s =>
+    match currencyAtomDom s with
+    | some dom =>
+      advance
+      let cname := "_cur_" ++ s
+      return (⟨cname, ""⟩, [.ensureCarrier cname dom])
+    | none =>
+      let v ← var
+      return (v, [])
+  | _ =>
+    let v ← var
+    if ← isKw ":" then
+      advance
+      let dom ← (do match ← peek with
+        | .kw "Int" => advance; return Domain.anyInt
+        | .kw "Time" => advance; return Domain.time
+        | .atom "Duration" | .kw "Duration" => advance; return Domain.duration
+        | .atom "Rate" => advance; return Domain.rate
+        | .atom s =>
+          match currencyAtomDom s with
+          | some cd => advance; return cd
+          | none =>
+            if s == "Money" then
+              advance; expectKw "("
+              let cur ← (do match ← peek with | .atom c | .ident c | .str c => advance; return c | k => fail "CHR003" s!"expected currency in Money(...), found {k.describe}")
+              expectKw ","
+              let sc ← intLit
+              expectKw ")"
+              return .money cur sc.toNat
+            else if s == "Quantity" then
+              advance; expectKw "("
+              let u ← (do match ← peek with | .atom c | .ident c | .str c => advance; return c | k => fail "CHR003" s!"expected unit in Quantity(...), found {k.describe}")
+              expectKw ")"
+              return .quantity u
+            else fail "CHR003" s!"unexpected domain `{s}` after `:`"
+        | k => fail "CHR003" s!"unexpected domain {k.describe} after `:`")
+      return (v, [.ensureCarrier v.dom dom])
+    else
+      return (v, [])
 
 /-- `Identified by …` domain (eFLINT `type_expr`). -/
 def typeExpr : P Domain := do
@@ -478,8 +609,8 @@ def typeExpr : P Domain := do
     expectKw ")"
     return .products xs
   | .ident _ =>
-    let xs ← sepBy1 var "*" 1000
-    return .products xs
+    let pairs ← sepBy1 parseProductVarWithCarriers "*" 1000
+    return .products (pairs.map (·.1))
   | k => fail "CHR003" s!"expected a domain after `Identified by` but found {k.describe}"
 where
   moreInts : P (List Int) := do
@@ -612,7 +743,7 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
     return ["Fact", "Var", "Function", "Bool", "Predicate", "Invariant", "Act", "Physical",
             "Event", "Duty", "Extend", "Placeholder"].contains s
   | .atom s =>
-    if ["Immunity", "Protection", "Prohibited", "Role", "Amount", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
+    if ["Immunity", "Protection", "Prohibited", "Role", "Amount", "Debt", "Module", "Use", "Param", "Property", "Power", "Finding", "Amend"].contains s then
       return (match ← peekAt (idx + 1) with
         | .ident _ => true
         | .atom "Procedure" => s == "Amend"
@@ -744,6 +875,21 @@ def clause (k : FrameKind) : P (Option ModClause) := do
   | .kw "Creates" =>
     if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← createsClause))
+  | .atom "Applies" =>
+    if k != .act then return none
+    advance
+    let amt ← expression
+    if !(← isCtxAtom "To") then fail "CHR003" "expected `To <var1, var2, ...>` after `Applies <amount>`"
+    advance
+    let targets ← sepBy1 var "," 100
+    let rec buildWaterfall (rem : Term) : List Var → List Effect
+      | [] => []
+      | v :: vs =>
+        let vTm := Term.ref v
+        let take := Term.ite (.leq rem vTm) rem vTm
+        let eff := Effect.cAll [] (.app v.dom (.pos [.sub vTm take])) none
+        eff :: buildWaterfall (.sub rem take) vs
+    return some (.postCond (buildWaterfall amt targets))
   | .kw "Terminates" =>
     if k == .fact || k == .immunity then return none
     advance; return some (.postCond (← effectClause .tAll))
@@ -1021,8 +1167,16 @@ def domainConstraint : P Term := do
   | .kw "When" | .kw "Where" => advance; expression
   | _ => return .boolLit true
 
+def relatedToWithCarriers : P (List Var × List Decl) := do
+  if ← isKw "Related to" then
+    advance
+    let pairs ← sepBy1 parseProductVarWithCarriers "," 1000
+    return (pairs.map (·.1), pairs.flatMap (·.2))
+  else return ([], [])
+
 def relatedTo : P (List Var) := do
-  if ← isKw "Related to" then advance; vars else return []
+  let (vs, _) ← relatedToWithCarriers
+  return vs
 
 def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId) (dom : Domain)
     (filter : Term) (cls : List ModClause) (isEv : Bool := false) (isEnt : Bool := false)
@@ -1032,7 +1186,7 @@ def mkFact (inv isActor isClosed : Bool) (restr : Option Restriction) (d : DomId
                   closed := if isClosed && !isEv then none else some false, conditions := [] },
     .typeExt d cls ]
 
-/-- `: Int | Time | Duration` after a `Param` name; `Int` when absent. -/
+/-- `: Int | Time | Duration | Rate | USD | Money(...) | Quantity(...)` after a `Param` or `Var`. -/
 def paramDomain : P Domain := do
   if ← isKw ":" then
     advance
@@ -1040,6 +1194,10 @@ def paramDomain : P Domain := do
     | .kw "Int" => advance; return Domain.anyInt
     | .kw "Time" => advance; return Domain.time
     | .atom "Duration" | .kw "Duration" => advance; return Domain.duration
+    | .atom "Rate" => advance; return Domain.rate
+    | .atom "USD" => advance; return .money "USD" 2
+    | .atom "EUR" => advance; return .money "EUR" 2
+    | .atom "GBP" => advance; return .money "GBP" 2
     | .atom "Money" =>
       advance; expectKw "("
       let cur ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected currency code in `Money(CUR, SCALE)`, found {k.describe}")
@@ -1053,7 +1211,7 @@ def paramDomain : P Domain := do
       let unit ← (do match ← peek with | .atom s | .ident s | .str s => advance; return s | k => fail "CHR003" s!"expected unit name in `Quantity(UNIT)`, found {k.describe}")
       expectKw ")"
       return .quantity unit
-    | k => fail "CHR003" s!"expected Int, Time, Duration, Money(CUR, SCALE), or Quantity(UNIT) after `:` but found {k.describe}"
+    | k => fail "CHR003" s!"expected Int, Time, Duration, Rate, USD, Money(CUR, SCALE), or Quantity(UNIT) after `:` but found {k.describe}"
   else return Domain.anyInt
 
 /-- Parse a `TemporalFormula` after `Property <name> [Assumes ...] When` (`D20`). -/
@@ -1144,10 +1302,34 @@ def frame : Nat → P (List Decl)
       | .kw "Function" => advance; return some .function
       | _ => advance; return none)
     let d ← ident
-    let dom ← (do if ← isKw "Identified by" then advance; typeExpr else return .anyString)
+    -- `Var paid : USD = $0` (`D37`, `#42`) alongside `Identified by ...`
+    let hasColon := (← isKw ":")
+    let (dom, extraCarriers) ← (do
+      if hasColon then
+        let dm ← paramDomain
+        return (dm, [])
+      else if ← isKw "Identified by" then
+        advance
+        -- Check product containing `USD`/`EUR`/`GBP` (`Identified by spouse * USD`)
+        match ← peek with
+        | .ident _ =>
+          let pairs ← sepBy1 parseProductVarWithCarriers "*" 1000
+          return (.products (pairs.map (·.1)), pairs.flatMap (·.2))
+        | .atom s =>
+          match currencyAtomDom s with
+          | some cd => advance; return (cd, [])
+          | none => return (← typeExpr, [])
+        | _ => return (← typeExpr, [])
+      else return (.anyString, []))
     let filter ← domainConstraint
+    let initDecls ← (do
+      if restr == some .var && (← isKw "=") then
+        advance
+        let initE ← expression
+        return [Decl.varInit d initE]
+      else return [])
     let cls ← clauses .fact 1000
-    return mkFact false false isClosed restr d dom filter cls isEv false isInp
+    return extraCarriers ++ mkFact false false isClosed restr d dom filter cls isEv false isInp ++ initDecls
   | .kw "Bool" =>
     advance
     let d ← ident
@@ -1186,7 +1368,7 @@ def frame : Nat → P (List Decl)
     let _ ← optKw "With"
     let actor ← (do if ← isKw "Actor" then advance; return some (← var) else return none)
     let recip ← (do if ← isKw "Recipient" then advance; return some (← var) else return none)
-    let objs ← relatedTo
+    let (objs, relCarriers) ← relatedToWithCarriers
     let filter ← domainConstraint
     let (cls, instBody) ← parseActExtras fuel 1000
     let actorV := actor.getD ⟨"actor", ""⟩
@@ -1196,7 +1378,7 @@ def frame : Nat → P (List Decl)
                       domain := .products (actorV :: (recip.toList ++ objs)),
                       domainConstraint := filter, closed := if isClosed then none else some false },
         .typeExt d cls ] ++ instDecls
-    return ds.flatMap mkOne
+    return relCarriers ++ ds.flatMap mkOne
   | .atom "Role" =>
     advance
     let d ← ident
@@ -1399,15 +1581,75 @@ def frame : Nat → P (List Decl)
     let pre ← (do if ← isCtxAtom "As" then advance; return some (← ident) else return none)
     let fs ← fromClauses 100
     return [.use name args pre fs]
+  | .atom "Debt" =>
+    -- `Debt <d> Holder h Claimant c Amount <amt> [Raised by <r>] [Paid by <p>] [Due within <dur>] [From ...]` (`D37`, `#45`, `#17`)
+    advance
+    let d ← ident
+    expectKw "Holder"
+    let holder ← var
+    expectKw "Claimant"
+    let claimant ← var
+    if !(← isCtxAtom "Amount") then fail "CHR003" s!"expected `Amount <expr>` in `Debt {d}`"
+    advance
+    let amtExpr ← expression
+    let raisedBy ← (do if ← isKw "Raised by" then advance; idList else return [])
+    let paidBy ← (do if ← isKw "Paid by" then advance; idList else return [])
+    let dueDur? ← (do if ← isKw "Due within" then advance; return some (← expression) else return none)
+    let fs ← fromClauses 100
+    let nextIdDom := d ++ "-next-id"
+    let remDom := d ++ "-remaining"
+    let curDom := "_cur_USD"
+    let intV : Var := ⟨"int", ""⟩
+    let curV : Var := ⟨curDom, ""⟩
+    let nextIdV : Var := ⟨nextIdDom, ""⟩
+    let dueCls := match dueDur? with | some dur => [ModClause.dueWithin dur] | none => []
+    let fromCls := fs.map fun (cid, txt) => ModClause.fromSpan cid txt
+    let raiseExts := raisedBy.map fun rAct =>
+      let createDuty := Effect.cAll [] (.app d (.pos [.ref holder, .ref claimant, .ref nextIdV])) none
+      let createRem := Effect.cAll [] (.app remDom (.pos [.ref nextIdV, amtExpr])) none
+      let bumpNext := Effect.cAll [] (.app nextIdDom (.pos [.add (.ref nextIdV) (.intLit 1)])) none
+      Decl.typeExt rAct [.postCond [createDuty, createRem, bumpNext]] "Act"
+    let payExts := paidBy.map fun pAct =>
+      -- Payment amount variable in `pAct` is its last component (after `int`)
+      let payV : Var := ⟨"payment", ""⟩
+      let curRem := Term.fnApp remDom (.ref intV)
+      let validAmt := ModClause.validWhen [.and (.ge (.ref payV) (.intLit 0)) (.leq (.ref payV) curRem)]
+      let updRem := Effect.cAll [] (.app remDom (.pos [.ref intV, .sub curRem (.ref payV)])) none
+      let clearDuty := Effect.tAll [] (.when (.app d (.pos [.ref holder, .ref claimant, .ref intV])) (.eq curRem (.ref payV)))
+      Decl.typeExt pAct [validAmt, .postCond [updRem, clearDuty]] "Act"
+    return [ .ensureCarrier curDom (.money "USD" 2),
+             .param nextIdDom .anyInt 1,
+             .typeDecl remDom { kind := .fact {}, domain := .products [intV, curV], restriction := some .function },
+             .typeDecl d { kind := .duty {}, domain := .products [holder, claimant, intV] },
+             .typeExt d (dueCls ++ fromCls) ] ++ raiseExts ++ payExts
   | .atom "Param" | .kw "Param" =>
     advance
     let name ← ident
-    let dom ← paramDomain
+    let explicitColon := (← isKw ":")
+    let dom0 ← paramDomain
     expectKw "="
     let neg ← optKw "-"
-    let n ← intLit
-    let value : Int := if neg then -n else n
-    return [.param name dom value]
+    match ← peek with
+    | .moneyLit cents =>
+      advance
+      let val : Int := if neg then -(cents : Int) else (cents : Int)
+      let dom := if explicitColon then dom0 else .money "USD" 2
+      return [.param name dom val]
+    | .pctLit bps =>
+      advance
+      let val : Int := if neg then -(bps : Int) else (bps : Int)
+      let dom := if explicitColon then dom0 else .rate
+      return [.param name dom val]
+    | _ =>
+      let n ← intLit
+      if (← peek) == .ident "bps" then
+        advance
+        let val : Int := if neg then -n else n
+        let dom := if explicitColon then dom0 else .rate
+        return [.param name dom val]
+      else
+        let val : Int := if neg then -n else n
+        return [.param name dom0 val]
   | .atom "Regime" | .kw "Regime" =>
     advance
     let rname ← (do match ← peek with

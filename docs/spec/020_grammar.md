@@ -148,7 +148,7 @@ event_clause    ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | deriv_clause
 duty_clause     ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Violated when' expr_list | 'Excused when' expr_list | 'Enforced by' idents
-                  | 'Terminated by' idents | 'Created by' idents
+                  | 'Terminated by' idents | 'Created by' idents | 'Raised by' idents | 'Paid by' idents
                   | 'Overridden by' idents | 'Overrides' idents | 'Due within' expr
                   | from_clause | deriv_clause
 immunity_clause ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'

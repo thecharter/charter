@@ -1,0 +1,31 @@
+// 006.8 (D37, #45, #17): `Debt` gives each raising its own obligation ID, independent deadline,
+// and remaining balance reduced by partial payments until discharged at zero.
+Fact tenant Identified by Tess
+Fact landlord Identified by Lou
+Act bill-rent Actor landlord Recipient tenant Holds when True
+Act pay-rent Actor tenant Recipient landlord Related to int, payment : USD Holds when True
+
+Debt rent-debt Holder tenant Claimant landlord Amount $1,200.00
+  Raised by bill-rent
+  Paid by pay-rent
+  Due within 5
+.
+bill-rent(Lou, Tess).
+?rent-debt(Tess, Lou, 1).
+?(rent-debt-remaining(1) == $1,200.00).
+@ 3.
+// Second month billed at t=3 gets its own ID (2) and its own 5-day clock:
+bill-rent(Lou, Tess).
+?rent-debt(Tess, Lou, 2).
+@ 5.
+// At t=5, month 1 is violated (5 - 0 >= 5), while month 2 is NOT violated yet (5 - 3 < 5)!
+?violated rent-debt(Tess, Lou, 1).
+?!violated rent-debt(Tess, Lou, 2).
+// Partial payment of $500 on month 1 leaves $700 still due; remaining $700 discharges month 1:
+pay-rent(Tess, Lou, 1, $500.00).
+?(rent-debt-remaining(1) == $700.00).
+?rent-debt(Tess, Lou, 1).
+pay-rent(Tess, Lou, 1, $700.00).
+?(rent-debt-remaining(1) == $0.00).
+?!rent-debt(Tess, Lou, 1).
+?rent-debt(Tess, Lou, 2).

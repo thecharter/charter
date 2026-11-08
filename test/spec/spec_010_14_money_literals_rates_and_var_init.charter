@@ -1,0 +1,23 @@
+// 003.14, 010.12, 010.14 (D37, #42, #58, #22): `$` money literals, `: USD` currency shorthand,
+// declaration-site `Var ... = init`, `%` and `bps` rate literals, and same-unit `MulDivRound` ratios.
+Role borrower Is Elena
+Role lender Is Marcus
+Param loan = $10,000.00
+Param annual-rate : Rate = 6%
+Param fee-bps : Rate = 150 bps
+Var principal : USD = loan
+Var paid : USD = $0
+
+Act pay Actor borrower Recipient lender Related to amount : USD
+  Holds when amount <= principal
+  Creates principal(principal - amount), paid(paid + amount)
+.
+?(principal == $10,000.00).
+?(paid == $0.00).
+?(MulDivRound(principal, annual-rate, NearestEven) == $600.00).
+?(MulDivRound(principal, fee-bps, Floor) == $150.00).
+pay($2,500.00).
+?(principal == $7,500.00).
+?(paid == $2,500.00).
+// Same-unit Money ratio (#22):
+?(MulDivRound($1,000.00, paid, loan, Floor) == $250.00).

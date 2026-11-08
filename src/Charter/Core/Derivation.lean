@@ -82,6 +82,9 @@ def deps (spec : Spec) : Nat → List Var → Pol → Term → List Dep
       deps spec fuel bound p x ++ deps spec fuel bound p n ++ deps spec fuel bound p d
     | .fnApp d k =>
       (spec.chaseAlias d, p) :: deps spec fuel bound p k
+    | .dimLit _ _ => []
+    | .ite c t e =>
+      deps spec fuel bound .neg c ++ deps spec fuel bound p t ++ deps spec fuel bound p e
     | .exists_ xs t => binderDeps spec xs p ++ deps spec fuel (bound ++ xs) p t
     | .forall_ xs t | .count xs t | .sum xs t | .max xs t | .min xs t =>
       binderDeps spec xs .neg ++ deps spec fuel (bound ++ xs) .neg t

@@ -35,6 +35,8 @@ inductive TokKind where
   | atom (s : String)
   | str (s : String)
   | int (n : Nat)
+  | moneyLit (cents : Nat)
+  | pctLit (bps : Nat)
   | chr (c : Char)
   /-- A projection dot (see the module header). -/
   | projDot
@@ -52,6 +54,8 @@ def TokKind.describe : TokKind → String
   | .atom s => s!"atom `{s}`"
   | .str s => s!"string {showStringLit s}"
   | .int n => s!"integer {n}"
+  | .moneyLit c => s!"money literal ({c} cents)"
+  | .pctLit b => s!"rate literal ({b} bps)"
   | .chr c => s!"character '{c}'"
   | .projDot => "`.`"
   | .eof => "end of input"
@@ -68,7 +72,7 @@ lexes as `.ident "tick"`, matched contextually by `Parser` / `Resolve` (D17). -/
 def wordKeywords : List String :=
   [ "Derived externally", "Conditioned by", "Forbidden when", "Identified by", "Terminated by", "Violated when", "Overridden by",
     "Present when", "Current Time", "Derived from", "Except under", "Excused when", "Qualifies as", "Rejects when", "Weighted by", "Enforced by", "Related to", "Syncs with",
-    "Decided by", "Valid when", "Created by", "Due within", "Holds when", "Void when", "At least", "First of",
+    "Decided by", "Valid when", "Created by", "Due within", "Holds when", "Raised by", "Void when", "At least", "First of", "Paid by",
     "Placeholder", "Obfuscates", "Terminates", "Identified", "Recipient", "Invariant", "Predicate",
     "Physical", "Claimant", "Function", "Violated", "Enabled", "Creates", "Current", "Derived",
     "Present", "Foreach", "Exists", "Forall", "Extend", "Closed", "Domain", "Holder", "String",
@@ -238,10 +242,60 @@ def step (s : St) : Except Diagnostic St := do
     | some k => return (s.advance k.length).push (.kw k) p
     | none =>
     if c == '"' then lexString s p
+    else if c == '$' && (match s.peek 1 with | some d => d.isDigit | none => false) then
+      -- `$400,000.00` or `$500` (`D37`, `#42`): exact USD cents
+      let rec scanMoneyDigits (j : Nat) (acc : String) (fuel : Nat) : Nat × String :=
+        match fuel with
+        | 0 => (j, acc)
+        | fuel + 1 =>
+          if h : j < s.cs.size then
+            let ch := s.cs[j]
+            if ch.isDigit then scanMoneyDigits (j + 1) (acc.push ch) fuel
+            else if (ch == ',' || ch == '_') && (if h2 : j + 1 < s.cs.size then s.cs[j + 1].isDigit else false) then
+              scanMoneyDigits (j + 1) acc fuel
+            else (j, acc)
+          else (j, acc)
+      let (j, wholeStr) := scanMoneyDigits (s.i + 1) "" (s.cs.size + 1)
+      let whole := wholeStr.toNat!
+      let hasDotDigit := (if h : j < s.cs.size then s.cs[j] == '.' else false)
+                      && (if h2 : j + 1 < s.cs.size then s.cs[j + 1].isDigit else false)
+      if hasDotDigit then
+        let k := takeWhileFrom s.cs (j + 1) Char.isDigit
+        let fracStr := sliceStr s.cs (j + 1) k
+        if fracStr.length != 2 then
+          throw (.error "CHR001" s!"`{sliceStr s.cs s.i k}` must have no fractional part or exactly 2 decimal digits (cents)" p)
+        let cents := whole * 100 + fracStr.toNat!
+        return (s.advance (k - s.i)).push (.moneyLit cents) p
+      else
+        return (s.advance (j - s.i)).push (.moneyLit (whole * 100)) p
     else if c.isDigit then
       let j := takeWhileFrom s.cs s.i Char.isDigit
       let n := (sliceStr s.cs s.i j).toNat!
-      return (s.advance (j - s.i)).push (.int n) p
+      -- Check `6%` or `5.25%` (`D37`, `#58`): exact basis points (`1% = 100 bps`)
+      let hasDotPct :=
+        if (if h : j < s.cs.size then s.cs[j] == '.' else false)
+           && (if h2 : j + 1 < s.cs.size then s.cs[j + 1].isDigit else false) then
+          let k := takeWhileFrom s.cs (j + 1) Char.isDigit
+          if (if h3 : k < s.cs.size then s.cs[k] == '%' else false)
+             && (if h4 : k + 1 < s.cs.size then !s.cs[k + 1].isAlphanum else true) then
+            some (k + 1, sliceStr s.cs (j + 1) k)
+          else none
+        else none
+      match hasDotPct with
+      | some (endIdx, fracS) =>
+        if fracS.length == 1 then
+          return (s.advance (endIdx - s.i)).push (.pctLit (n * 100 + fracS.toNat! * 10)) p
+        else if fracS.length == 2 then
+          return (s.advance (endIdx - s.i)).push (.pctLit (n * 100 + fracS.toNat!)) p
+        else
+          throw (.error "CHR001" s!"rate literal `{sliceStr s.cs s.i endIdx}` supports at most 2 decimal places (basis points)" p)
+      | none =>
+        let isPlainPct := (if h : j < s.cs.size then s.cs[j] == '%' else false)
+                       && (if h2 : j + 1 < s.cs.size then !s.cs[j + 1].isAlphanum else true)
+        if isPlainPct then
+          return (s.advance (j + 1 - s.i)).push (.pctLit (n * 100)) p
+        else
+          return (s.advance (j - s.i)).push (.int n) p
     else if c.isLower then
       let j := identEnd s.cs s.i
       return (s.advance (j - s.i)).push (.ident (sliceStr s.cs s.i j)) p

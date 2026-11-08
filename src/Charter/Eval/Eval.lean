@@ -262,6 +262,7 @@ def instantiateDomain : Nat → DomId → Domain → M Elem
     | .duration => err (.enumerateInfiniteDomain d)
     | .money _ _ => err (.enumerateInfiniteDomain d)
     | .quantity _ => err (.enumerateInfiniteDomain d)
+    | .rate => err (.enumerateInfiniteDomain d)
     | .strings ss => nd (ss.map .str)
     | .ints is => nd (is.map .int)
     | .products xs => do
@@ -981,6 +982,10 @@ def eval : Nat → Term → M Value
         | [] =>
           if !tspec.isClosed then err (.missingInput (.unassignedFunction d (some kVal)))
           else empty
+    | .dimLit _ n => pure (.int n)
+    | .ite c t e =>
+      whenBool (eval fuel c) fun b =>
+        if b then eval fuel t else eval fuel e
     | .exists_ xs t => do
       let rs ← results (scopeWith (everyValidSubs fuel) xs (checkTrue (eval fuel t)))
       pure (.bool !rs.isEmpty)

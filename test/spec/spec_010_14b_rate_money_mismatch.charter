@@ -1,0 +1,6 @@
+// 010.14 (D37, #58): a `Rate` (`6%`, `150 bps`) cannot be added directly to `Money` or `Int` (CHR012).
+//! expect-error: CHR012
+Param principal = $1,000.00
+Param r : Rate = 6%
+.
+?(principal + r > $0).

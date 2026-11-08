@@ -77,6 +77,16 @@ def fmtTerm : Term → String
   | .hasConflict t => "Conflict(" ++ fmtTerm t ++ ")"
   | .mulDivRound x n d m => "MulDivRound(" ++ fmtTerm x ++ ", " ++ fmtTerm n ++ ", " ++ fmtTerm d ++ ", " ++ m.kwName ++ ")"
   | .fnApp d k => d ++ "(" ++ fmtTerm k ++ ")"
+  | .dimLit (.money "USD" 2) n =>
+    let absN := n.natAbs
+    let sign := if n < 0 then "-" else ""
+    let dl := absN / 100
+    let ct := absN % 100
+    let pad := if ct < 10 then s!"0{ct}" else s!"{ct}"
+    s!"{sign}${dl}.{pad}"
+  | .dimLit .rate n => s!"{n} bps"
+  | .dimLit _ n => toString n
+  | .ite c t e => s!"If({fmtTerm c}, {fmtTerm t}, {fmtTerm e})"
 
 def fmtArgs : Args → String
   | .pos ts => fmtTermList ts
@@ -105,6 +115,7 @@ def fmtDomain : Domain → String
   | .duration => "Duration"
   | .money cur sc => s!"Money({cur}, {sc})"
   | .quantity unit => s!"Quantity({unit})"
+  | .rate => "Rate"
   | .strings [] => "'z'..'a'"
   | .strings ss => ", ".intercalate (ss.map fmtAtomOrStr)
   | .ints [] => "1..0"
@@ -412,6 +423,7 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
       | .duration => " : Duration"
       | .money cur sc => s!" : Money({cur}, {sc})"
       | .quantity unit => s!" : Quantity({unit})"
+      | .rate => " : Rate"
       | _ => ""
     s!"{indent}Param {name}{tyPart} = {value}" :: fmtDecls indent fuel rest
   | fuel + 1, .module name params body :: rest =>
@@ -446,9 +458,12 @@ def fmtDecls (indent : String) : Nat → List Decl → List String
       | some .duration => " : Duration"
       | some (.money cur sc) => s!" : Money({cur}, {sc})"
       | some (.quantity unit) => s!" : Quantity({unit})"
+      | some .rate => " : Rate"
       | some .anyInt => " : Int"
       | _ => ""
     s!"{indent}Amount {name}{tyPart} Is {fmtTerm e}" :: fmtDecls indent fuel rest
+  | fuel + 1, .ensureCarrier _ _ :: rest => fmtDecls indent fuel rest
+  | fuel + 1, .varInit _ _ :: rest => fmtDecls indent fuel rest
 
 mutual
 

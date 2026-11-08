@@ -105,9 +105,10 @@ def isZeroArityBoolVar (spec : Spec) (x : Var) : Bool :=
 
 mutual
 def freeVars (spec : Spec) : Term → List Var
-  | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => []
+  | .boolLit _ | .intLit _ | .stringLit _ | .currentTime | .dimLit _ _ => []
   | .ref x => if isZeroArityBoolVar spec x then [] else [x]
   | .fnApp _ k => freeVars spec k
+  | .ite c t e => union (freeVars spec c) (union (freeVars spec t) (freeVars spec e))
   | .app d args =>
     match spec.findDecl d with
     | some t =>
@@ -184,15 +185,17 @@ def matchDomain : Domain → Domain → Bool
   | .money _ _, _ => false
   | .quantity u1, .quantity u2 => u1 == u2
   | .quantity _, _ => false
+  | .rate, .rate => true
+  | .rate, _ => false
   | .products r, .products r' => r == r'
   | .products _, _ => false
 
 def _root_.Charter.Ty.isDimensionalInt : Ty → Bool
-  | .time | .duration | .money _ _ | .quantity _ => true
+  | .time | .duration | .money _ _ | .quantity _ | .rate => true
   | _ => false
 
 def _root_.Charter.Ty.isScalableDim : Ty → Bool
-  | .duration | .money _ _ | .quantity _ => true
+  | .duration | .money _ _ | .quantity _ | .rate => true
   | _ => false
 
 def matchType (ty : Ty) (dom : Domain) : Stc Bool := do
@@ -204,6 +207,7 @@ def matchType (ty : Ty) (dom : Domain) : Stc Bool := do
   | .duration => return match dom with | .duration => true | _ => false
   | .money c s => return match dom with | .money c' s' => c == c' && s == s' | _ => false
   | .quantity u => return match dom with | .quantity u' => u == u' | _ => false
+  | .rate => return match dom with | .rate => true | _ => false
   | .bool => return false
 
 /-- A term built only from literals and arithmetic: the only integer that converts to a
@@ -223,6 +227,7 @@ def arithTy (isSub : Bool) : Ty → Ty → Option Ty
   | .time, .time => if isSub then some .duration else none
   | .money c1 s1, .money c2 s2 => if c1 == c2 && s1 == s2 then some (.money c1 s1) else none
   | .quantity u1, .quantity u2 => if u1 == u2 then some (.quantity u1) else none
+  | .rate, .rate => some .rate
   | _, _ => none
 
 /-! ## Terms -/
@@ -319,6 +324,27 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
     | .stringLit _ => return (t0, .strings)
     | .intLit _ => return (t0, .ints)
     | .boolLit _ => return (t0, .bool)
+    | .dimLit dom n =>
+      let ty ← match dom with
+        | .money c s => pure (.money c s)
+        | .quantity u => pure (.quantity u)
+        | .duration => pure .duration
+        | .time => pure .time
+        | .rate => pure .rate
+        | _ => pure .ints
+      return (.intLit n, ty)
+    | .ite c t e =>
+      let c' ← convertTerm fuel c .bool
+      let (t1, tt1) ← compileTerm fuel t
+      let (e1, te1) ← compileTerm fuel e
+      if tt1 == te1 then return (.ite c' t1 e1, tt1)
+      else
+        let (t2, tt2) ← asNumber t1 tt1
+        let (e2, te2) ← asNumber e1 te1
+        if tt2 == te2 then return (.ite c' t2 e2, tt2)
+        else if tt2 == .ints && literalArith t2 && te2.isDimensionalInt then return (.ite c' t2 e2, te2)
+        else if te2 == .ints && literalArith e2 && tt2.isDimensionalInt then return (.ite c' t2 e2, tt2)
+        else convErr te1 tt1
     | .ref x =>
       checkKnownType [x]
       if isZeroArityBoolVar spec x then
@@ -357,6 +383,7 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
           | .duration => return (.untag t', .duration)
           | .money c s => return (.untag t', .money c s)
           | .quantity u => return (.untag t', .quantity u)
+          | .rate => return (.untag t', .rate)
           | _ => err "CHR003" "untagging is an internal operation"
       | _ => err "CHR003" "untagging is an internal operation"
     | .not t => do let t' ← convertTerm fuel t .bool; return (.not t', .bool)
@@ -400,10 +427,26 @@ def compileTerm : Nat → Term → Stc (Term × Ty)
       let (x1, tx1) ← compileTerm fuel x
       let (x2, tx2) ← asNumber x1 tx1
       if !(tx2 == .ints || tx2.isScalableDim) then
-        err "CHR012" s!"MulDivRound first operand must be Int, Duration, Money, or Quantity, not {tx1}"
-      let num' ← convertTerm fuel num .ints
-      let den' ← convertTerm fuel den .ints
-      return (.mulDivRound x2 num' den' mode, tx2)
+        err "CHR012" s!"MulDivRound first operand must be Int, Duration, Money, Quantity, or Rate, not {tx1}"
+      match den with
+      | .dimLit .rate 10000 =>
+        -- 3-argument `MulDivRound(amt, rate, mode)` (`D37`, `#58`): `num` must have type `Rate` (`1 bp = 1/10000`)
+        let num' ← convertTerm fuel num .rate
+        return (.mulDivRound x2 num' (.intLit 10000) mode, tx2)
+      | _ =>
+        let (n1, tn1) ← compileTerm fuel num
+        let (d1, td1) ← compileTerm fuel den
+        let (n2, tn2) ← asNumber n1 tn1
+        let (d2, td2) ← asNumber d1 td1
+        -- Allow either `(Int, Int)` or same-unit dimensional ratio `(Money, Money)` / `(Quantity, Quantity)` (`#22`)
+        if tn2 == .ints && td2 == .ints then
+          return (.mulDivRound x2 n2 d2 mode, tx2)
+        else if tn2 == td2 && tn2.isScalableDim then
+          return (.mulDivRound x2 n2 d2 mode, tx2)
+        else
+          let num' ← convertTerm fuel num .ints
+          let den' ← convertTerm fuel den .ints
+          return (.mulDivRound x2 num' den' mode, tx2)
     | .eq a b =>
       orElse
         (do let (a', ta) ← compileTerm fuel a; let b' ← convertTerm fuel b ta; return (.eq a' b', .bool))
@@ -566,6 +609,11 @@ def convertTerm : Nat → Term → Ty → Stc Term
       | .ints => if literalArith t' then return t' else convErr ty' ty
       | .tagged d => if matchDomain (← getDom d) (.quantity u) then return .untag t' else convErr ty' ty
       | _ => convErr ty' ty
+    | .rate =>
+      match ty' with
+      | .ints => if literalArith t' then return t' else convErr ty' ty
+      | .tagged d => if matchDomain (← getDom d) .rate then return .untag t' else convErr ty' ty
+      | _ => convErr ty' ty
 
 /-- An instance of an integer, time, duration, money, or quantity type (or a 1-component
 wrapper such as `Var balance Identified by usd`, `D36`, `#22`, `#46`) used as its value. -/
@@ -577,6 +625,7 @@ def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
     | .duration => pure (Term.untag t, Ty.duration)
     | .money c s => pure (Term.untag t, Ty.money c s)
     | .quantity u => pure (Term.untag t, Ty.quantity u)
+    | .rate => pure (Term.untag t, Ty.rate)
     | .products [v] =>
       let spec ← getSpec
       let vDomId := spec.removeDecoration v
@@ -587,6 +636,7 @@ def asNumber (t : Term) (ty : Ty) : Stc (Term × Ty) := do
       | .duration => pure (Term.untag inner, Ty.duration)
       | .money c s => pure (Term.untag inner, Ty.money c s)
       | .quantity u => pure (Term.untag inner, Ty.quantity u)
+      | .rate => pure (Term.untag inner, Ty.rate)
       | _ => convErr ty .ints
     | _ => convErr ty .ints
   | _ => pure (t, ty)
@@ -749,9 +799,10 @@ def bareEvidenced (spec : Spec) : Nat → Term → List DomId
   | 0, _ => []
   | fuel + 1, t =>
     match t with
-    | .boolLit _ | .intLit _ | .stringLit _ | .currentTime => []
+    | .boolLit _ | .intLit _ | .stringLit _ | .currentTime | .dimLit _ _ => []
     | .ref x => evidencedType spec (spec.removeDecoration x)
     | .app _ args => bareEvidencedArgs spec fuel args
+    | .ite c t e => bareEvidenced spec fuel c ++ bareEvidenced spec fuel t ++ bareEvidenced spec fuel e
     | .present u | .violated u | .enabled u =>
       ((headTypeOf spec u).toList.flatMap (evidencedType spec)) ++ bareEvidenced spec fuel u
     | .heldFor u d =>
@@ -1238,6 +1289,23 @@ def evalGroundArgs (spec : Spec) : Nat → List (Var × Term) → List Var → O
 termination_by structural n => n
 end
 
+/-- Evaluate a declaration-site `Var` initializer expression (`$0`, `loan`, `2 * loan`)
+structurally so kernel reduction in `charter prove` introduces zero axioms (`D37`, `#42`). -/
+def evalInitInt (spec : Spec) : Term → Option Int
+  | .intLit k => some k
+  | .dimLit _ k => some k
+  | .untag inner => evalInitInt spec inner
+  | .tag inner _ => evalInitInt spec inner
+  | .ref v =>
+    match spec.findDecl (spec.removeDecoration v) with
+    | some { kind := .fact fs, .. } => fs.defaultVal
+    | _ => none
+  | .add a b => Option.bind (evalInitInt spec a) fun va => (evalInitInt spec b).map (va + ·)
+  | .sub a b => Option.bind (evalInitInt spec a) fun va => (evalInitInt spec b).map (va - ·)
+  | .mult a b => Option.bind (evalInitInt spec a) fun va => (evalInitInt spec b).map (va * ·)
+  | _ => none
+termination_by structural x => x
+
 /-- Execute a block of declarations (eFLINT `compile_phrase (PDeclBlock ds)`):
 `Use`s expanded (D8); new types and placeholders first, as written; then each new type
 is compiled with every new name in scope; then the extensions. Returns the initial
@@ -1282,6 +1350,11 @@ def executeDecls (ds : List Decl) : Stc Store := do
     | .amountDef n dom? _ =>
       let dom := dom?.getD .anyInt
       setSpec ((← getSpec).insertDecl n { kind := .fact {}, domain := dom, restriction := some .var })
+    | .ensureCarrier n dom =>
+      let spec ← getSpec
+      if (spec.lookupDecl n).isNone then
+        setSpec (spec.insertDecl n { kind := .fact {}, domain := dom })
+    | .varInit .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
   inits.forM fun d => do
@@ -1466,7 +1539,7 @@ def executeDecls (ds : List Decl) : Stc Store := do
       | some cyc =>
         err "CHR034" s!"{ty}: priority cycle among defeasible rules: {", ".intercalate cyc}"
       | none => pure ()
-  -- 6. compile any ground-fact initializers declared in `Clause` spans (`D34`, `#36`)
+  -- 6. compile any ground-fact initializers (`Clause` spans `#36`, `Var x = init` `#42`)
   let curSpec ← getSpec
   let spanStoreLists ← exts.mapM fun d => match d with
     | .spanInit rawTm => do
@@ -1477,6 +1550,20 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | some te => pure [(te, Assignment.holdsTrue none none)]
         | none => err "CHR012" s!"`Clause` span initializer `{rawTm.pp}` must be a ground fact instance (concrete arguments only)"
       | _ => err "CHR012" s!"`Clause` span initializer `{rawTm.pp}` is not a fact instance"
+    | .varInit vName rawExpr => do
+      let vApp ← compileTerm termFuel (.app vName (.pos [rawExpr]))
+      let t' := vApp.1
+      match evalGroundTagged curSpec 32 t' with
+      | some te => pure [(te, Assignment.holdsTrue none none)]
+      | none =>
+        let (e', _) ← compileTerm termFuel rawExpr
+        match evalInitInt curSpec e' with
+        | some iv =>
+          modifySpec fun s => s.adjustDecl vName fun ts => match ts.kind with
+            | .fact fs => { ts with kind := .fact { fs with defaultVal := some iv } }
+            | _ => ts
+          pure [((.int iv, vName), Assignment.holdsTrue none none)]
+        | none => err "CHR012" s!"initial value for `Var {vName}` must be a constant or `Param` expression"
     | _ => pure []
   return init ++ spanStoreLists.flatten
 

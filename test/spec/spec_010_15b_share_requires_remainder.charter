@@ -1,0 +1,7 @@
+// 010.15 (D37, #56): omitting `Remainder To` in `Share` is rejected (CHR003) so rounding cents are never lost.
+//! expect-error: CHR003
+Fact spouse Identified by Elena, Sam
+Param pool = $15,000.01
+Fact award Identified by spouse * USD
+Event split Creates (Foreach spouse: award(spouse, Share(pool Among spouse)))
+.

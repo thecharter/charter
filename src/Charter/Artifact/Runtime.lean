@@ -93,6 +93,8 @@ partial def termToJson : Term → Json
   | .hasConflict t => Json.mkObj [("op", "hasConflict"), ("a", termToJson t)]
   | .mulDivRound x n d m => Json.mkObj [("op", "mdr"), ("x", termToJson x), ("n", termToJson n), ("d", termToJson d), ("m", toJson m)]
   | .fnApp d k => Json.mkObj [("op", "fna"), ("d", Json.str d), ("k", termToJson k)]
+  | .dimLit dom n => Json.mkObj [("op", "dl"), ("dom", toJson dom), ("n", Json.num n)]
+  | .ite c t e => Json.mkObj [("op", "ite"), ("c", termToJson c), ("t", termToJson t), ("e", termToJson e)]
 
 partial def argsToJson : Args → Json
   | .pos ts => Json.mkObj [("pos", Json.arr (ts.map termToJson).toArray)]
@@ -145,6 +147,8 @@ partial def termFromJson (j : Json) : Except String Term := do
   | "hasConflict" => .hasConflict <$> ga "a"
   | "mdr" => .mulDivRound <$> ga "x" <*> ga "n" <*> ga "d" <*> j.getObjValAs? RoundingMode "m"
   | "fna" => .fnApp <$> j.getObjValAs? String "d" <*> ga "k"
+  | "dl" => .dimLit <$> j.getObjValAs? Domain "dom" <*> j.getObjValAs? Int "n"
+  | "ite" => .ite <$> ga "c" <*> ga "t" <*> ga "e"
   | other => .error s!"unknown Term op `{other}`"
 
 partial def argsFromJson (j : Json) : Except String Args :=
@@ -208,6 +212,8 @@ partial def declToJson : Decl → Json
   | .regime r => Json.mkObj [("k", "reg"), ("r", toJson r)]
   | .amendProcedure conds => Json.mkObj [("k", "ap"), ("c", toJson conds)]
   | .amountDef n dom? e => Json.mkObj [("k", "am"), ("n", Json.str n), ("dom", toJson dom?), ("e", toJson e)]
+  | .ensureCarrier n dom => Json.mkObj [("k", "ec"), ("n", Json.str n), ("dom", toJson dom)]
+  | .varInit n e => Json.mkObj [("k", "vi"), ("n", Json.str n), ("e", toJson e)]
 
 partial def declFromJson (j : Json) : Except String Decl := do
   let k ← j.getObjValAs? String "k"
@@ -244,6 +250,8 @@ partial def declFromJson (j : Json) : Except String Decl := do
   | "reg" => .regime <$> j.getObjValAs? RegimeSpec "r"
   | "ap" => .amendProcedure <$> j.getObjValAs? (List Term) "c"
   | "am" => .amountDef <$> j.getObjValAs? String "n" <*> j.getObjValAs? (Option Domain) "dom" <*> j.getObjValAs? Term "e"
+  | "ec" => .ensureCarrier <$> j.getObjValAs? String "n" <*> j.getObjValAs? Domain "dom"
+  | "vi" => .varInit <$> j.getObjValAs? String "n" <*> j.getObjValAs? Term "e"
   | other => .error s!"unknown Decl kind `{other}`"
 
 instance : ToJson Decl := ⟨declToJson⟩

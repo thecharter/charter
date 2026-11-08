@@ -36,6 +36,8 @@ def findUnboundedBinder (spec : Spec) : Term → Option String
   | .mulDivRound x n d _ =>
     (findUnboundedBinder spec x).orElse (fun _ => (findUnboundedBinder spec n).orElse (fun _ => findUnboundedBinder spec d))
   | .fnApp _ k => findUnboundedBinder spec k
+  | .dimLit _ _ => none
+  | .ite c t e => (findUnboundedBinder spec c).orElse (fun _ => (findUnboundedBinder spec t).orElse (fun _ => findUnboundedBinder spec e))
   | .app _ args => findUnboundedArgs spec args
   | .boolLit _ | .intLit _ | .stringLit _ | .ref _ | .currentTime => none
 
