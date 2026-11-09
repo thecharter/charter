@@ -47,5 +47,9 @@ check_case "prompt-advisory-stamp" 0 '"authoritative": false' \
 check_case "d42-differential-targets" 0 "ok   law10-target-tags-and-compiled-solidity-predicates" \
   bash tools/differential-targets-check
 
+# 6. #77: Settlement contract target succeeds on large specifications rejected by `--target solidity` (e.g. TreasuryMandate & PSA)
+check_case "t77-settlement-target-large-spec" 0 "validated SettlementIR" \
+  "$B" generate --target settlement --verify-output -o "$tmp/TreasuryMandateSettlement.sol" Examples/TreasuryMandate/treasury-mandate.charter
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

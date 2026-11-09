@@ -2,6 +2,7 @@ import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Cli.Test
 import Charter.Project.GuardTarget
+import Charter.Project.SettlementTarget
 import Charter.Project.QuintTarget
 import Charter.Project.PromptTarget
 
@@ -27,7 +28,7 @@ structure GenOpts where
 def parseGenArgs : List String → GenOpts → Except String GenOpts
   | [], o => .ok o
   | "--target" :: t :: rest, o => parseGenArgs rest { o with target := some t }
-  | ["--target"], _ => .error "--target needs solidity, abi, quint, or prompt"
+  | ["--target"], _ => .error "--target needs solidity, settlement, abi, quint, or prompt"
   | "--mode" :: "lawful" :: rest, o => parseGenArgs rest { o with mode := .lawful }
   | "--mode" :: "adversarial" :: rest, o => parseGenArgs rest { o with mode := .adversarial }
   | "--mode" :: m :: _, _ => .error s!"--mode takes lawful or adversarial, not {m}"
@@ -45,7 +46,7 @@ def parseGenArgs : List String → GenOpts → Except String GenOpts
     else .error s!"unexpected extra input {a}"
 
 def generateCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter generate --target <solidity|abi|quint|prompt> [--mode lawful|adversarial] [--actor <role>] [--verify-output] [--out json] [-o <path>] <file.charter>"
+  let usage := "usage: charter generate --target <solidity|settlement|abi|quint|prompt> [--mode lawful|adversarial] [--actor <role>] [--verify-output] [--out json] [-o <path>] <file.charter>"
   let opts ← match parseGenArgs args {} with
     | .ok o => pure o
     | .error e => IO.eprintln s!"charter generate: {e}\n{usage}"; return 2
@@ -125,6 +126,30 @@ def generateCommand (args : List String) : IO UInt32 := do
         ]).pretty ++ "\n"
       else sol
     writeOrPrint textOut vSum?
+  | "settlement" =>
+    let sir := Project.compileSettlementIR stem lawSha cfg
+    let sol := Project.renderSettlementSolidity sir
+    let abi := Project.renderSettlementABI sir
+    let vSum? ← if opts.verifyOutput then
+      match Project.validateSettlementOutput sir sol with
+      | .ok s => pure (some s)
+      | .error e => IO.eprintln s!"FAIL {file} [settlement]: {e}"; return 1
+    else pure none
+    let textOut := if opts.json then
+      (Lean.Json.mkObj [
+        ("kind", "generated-target"),
+        ("target", "settlement"),
+        ("irAssurance", "proved"),
+        ("surfaceAssurance", "checked"),
+        ("timelockDuration", Lean.Json.num sir.timelockDur),
+        ("scalarParamCount", Lean.Json.num sir.scalarParams.length),
+        ("entrenchedBoundCount", Lean.Json.num sir.bounds.length),
+        ("assumptions", Lean.Json.arr (sir.assumptions.map Lean.Json.str).toArray),
+        ("abi", abi),
+        ("solidity", Lean.Json.str sol)
+      ]).pretty ++ "\n"
+    else sol
+    writeOrPrint textOut vSum?
   | "quint" | "veil" =>
     let qMod := Project.compileQuintModule stem opts.mode cfg
     let qSrc := Project.renderQuintModule qMod
@@ -148,7 +173,7 @@ def generateCommand (args : List String) : IO UInt32 := do
     writeOrPrint (if opts.json then jSchema.pretty ++ "\n" else md)
       (if opts.verifyOutput then some "validated advisory AlignmentCard (authoritative=false)" else none)
   | other =>
-    IO.eprintln s!"charter generate: unknown target `{other}` (expected solidity, abi, quint, or prompt)"
+    IO.eprintln s!"charter generate: unknown target `{other}` (expected solidity, settlement, abi, quint, or prompt)"
     return 2
 
 end Charter.Cli
