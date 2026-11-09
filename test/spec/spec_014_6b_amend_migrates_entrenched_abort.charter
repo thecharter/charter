@@ -1,0 +1,19 @@
+// 014.6b (#71): if `Migrates` violates an `Entrenched Invariant` on the migrated state,
+// the amendment is rejected with CHR051 and neither the law change nor the migration commits.
+//! expect-error: CHR051
+Fact member Identified by Alice.
+Function balance Identified by member * int.
+
+Entrenched Invariant nonnegative-balance When
+  (Forall balance: balance.int >= 0).
+
+Amend bad-migration Actor member
+  Holds when True
+  Valid when True
+  Migrates {
+    Creates (Foreach balance: balance(balance.member, balance.int - 500)).
+  }.
+
++balance(Alice, 100).
+bad-migration(Alice).
+?balance(Alice, 100).

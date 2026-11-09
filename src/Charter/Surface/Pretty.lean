@@ -477,6 +477,15 @@ def fmtDeclsRaw (indent : String) : Nat → List Decl → List String
       | some .anyInt => " : Int"
       | _ => ""
     s!"{indent}Amount {name}{tyPart} Is {fmtTerm e}" :: fmtDeclsRaw indent fuel rest
+  | fuel + 1, .expose cat targets :: rest =>
+    let catPart := if cat == "act" then " Act" else if cat == "input" then " Input" else ""
+    s!"{indent}Expose{catPart} {", ".intercalate targets}" :: fmtDeclsRaw indent fuel rest
+  | fuel + 1, .amendMigrate actId effs :: rest =>
+    let effLines := effs.map fun e => s!"{indent}    {fmtEffect e}"
+    let bodyStr := if effLines.isEmpty then "" else "\n" ++ (".\n").intercalate effLines ++ "."
+    s!"{indent}Extend Amend {actId}\n{indent}  Migrates \{{bodyStr}\n{indent}  }" :: fmtDeclsRaw indent fuel rest
+  | fuel + 1, .actorKey actor pk :: rest =>
+    s!"{indent}ActorKey {fmtAtomOrStr actor} {showString pk}" :: fmtDeclsRaw indent fuel rest
   | fuel + 1, .ensureCarrier _ _ :: rest => fmtDeclsRaw indent fuel rest
   | fuel + 1, .varInit _ _ :: rest => fmtDeclsRaw indent fuel rest
 

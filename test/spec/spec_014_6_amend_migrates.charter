@@ -1,0 +1,32 @@
+// 014.6 (#71): `Amend ... Installs { ... } Migrates { ... }` deterministically migrates held
+// state when an amendment takes effect and checks entrenched invariants before committing.
+Fact member Identified by Alice, Bob.
+Function balance Identified by member * int.
+
+Entrenched Invariant nonnegative-accounts When
+  (Forall balance: balance.int >= 0).
+
+Amend split-accounts Actor member
+  Holds when True
+  Valid when True
+  Repeals balance
+  Installs {
+    Function checking Identified by member * int.
+    Function savings Identified by member * int.
+  }
+  Migrates {
+    Creates (Foreach balance: checking(balance.member, balance.int - 40)),
+            (Foreach balance: savings(balance.member, 40)).
+    Terminates (Foreach balance: balance).
+  }.
+
+Scenario migration-splits-balances {
+  +balance(Alice, 100).
+  +balance(Bob, 60).
+  split-accounts(Alice).
+  ?!balance(Alice, 100).
+  ?checking(Alice, 60).
+  ?savings(Alice, 40).
+  ?checking(Bob, 20).
+  ?savings(Bob, 40).
+}

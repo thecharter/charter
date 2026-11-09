@@ -157,6 +157,12 @@ immunity_clause ::= 'Conditioned by' expr_list? | 'Open' | 'Closed'
                   | 'Protects' idents | 'Unless' expr_list
                   | from_clause | deriv_clause
 
+amend_extras    ::= 'Installs' '{' decl* '}' | 'Migrates' '{' migrate_stmt* '}'
+migrate_stmt    ::= ('Creates' | '+') create_eff (',' create_eff)* '.'?
+                  | ('Terminates' | '-') opt_foreach (',' opt_foreach)* '.'?
+expose_decl     ::= 'Expose' ('Act' | 'Event' | 'Input' | 'Fact')? idents
+actor_key_decl  ::= 'ActorKey' (atom | str_lit | ident) str_lit
+
 create_eff  ::= opt_foreach ('For' expr)?
 ```
 

@@ -63,6 +63,9 @@ more errors); `warning` does not.
 | CHR047 | error | `charter analyze`: two `Default` / `Exception` rules on a type prescribe distinct outcomes with no `Overrides` or `Document Rank` priority and non-disjoint conditions (`#69`) | `Charter.Cli.Analyze` |
 | CHR048 | error | `charter analyze`: dead rule — a `Power` that can never be valid, an undischargeable or dead `Duty`, an `Immunity` that never holds, or a derived `Fact` that can never be derived (`#69`) | `Charter.Cli.Analyze` |
 | CHR049 | error | `charter analyze`: an invariant is violated on a generated lawful scenario trace (`#69`) | `Charter.Cli.Analyze` |
+| CHR050 | error | `Expose` names an undeclared or internal/closed non-triggerable type, or `charter-server` refuses a request outside the declared service interface (`#67`) | `Charter.Resolve` / `Charter.Server` |
+| CHR051 | error | `Amend ... Migrates { ... }` violated an `Entrenched Invariant` on the migrated state; amendment did not take effect (`#71`) | `Charter.Eval.Step` / `Charter.Server` |
+| CHR052 | error | missing or invalid per-actor Schnorr public-key signature on a request naming a key-bound actor (`#76`) | `Charter.Server` |
 
 ## Evaluation (CHR100–CHR149)
 

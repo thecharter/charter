@@ -1,4 +1,5 @@
 import Charter.Server.Reservations
+import Charter.Eval.Plan
 
 /-!
 # Charter.Server.Protocol — Audience-Scoped `ReasonGraph`, `ClockPolicy`, & `certificate-at-office` (`G4.4`)
@@ -173,12 +174,24 @@ def installCertifiedAmendment (secretKey : String) (curCfg : Config)
     | some _, none =>
       .error s!"certificate-at-office refused: successor artifact sha256:{verifiedNew.artifactSha256} removes entrenched protection `{eid}`"
     | _, _ => pure ()
-  -- 4. Preserve already-accrued non-derived state (`T23`) and re-saturate under successor law!
+  -- 4. Preserve already-accrued non-derived state (`T23`), run any `Migrates` effects (`#71`),
+  --    and verify all `Entrenched Invariant`s on the migrated state before committing!
   let newStrata := verifiedNew.genesisConfig.strata
+  let newSpecIdx := newSpec.buildIndex
   let stateRebased := { curCfg.state with step := curCfg.state.step + 1 }.rebase
-  let nextState ← match Saturate.rebaseAndSat newSpec newStrata stateRebased with
+  let migEffs := ((curCfg.spec.amendMigrations.find? (·.1 == amendActName)).map (·.2) |>.getD []) ++
+                 ((newSpec.amendMigrations.find? (·.1 == amendActName)).map (·.2) |>.getD [])
+  let stateMigrated ← match Interp.runAmendMigrations newSpec newSpecIdx migEffs stateRebased with
+    | .ok st => .ok st
+    | .error e => .error s!"amendment migration failed: {e.message}"
+  let nextState ← match Saturate.rebaseAndSatWithIdx newSpec newSpecIdx newStrata stateMigrated with
     | .ok st => .ok st
     | .error e => .error s!"successor saturation failed: {e.message}"
+  match Interp.checkInvariants newSpec newSpecIdx nextState with
+  | .error e => .error s!"successor invariant evaluation failed: {e.message}"
+  | .ok invViol =>
+    if let some badInv := invViol.find? newSpec.entrenchedInvariants.contains then
+      .error s!"CHR051: amendment migration violated entrenched invariant `{badInv}`; amendment rejected"
   let nextCfg : Config := {
     spec := newSpec
     strata := newStrata
@@ -207,5 +220,72 @@ def coverageManifestJson (institutionId lawHash : String) (spec : Spec) : Json :
       Json.str "Side-effecting capabilities require gateway enforcement of short-lived AuthorizationTokens."
     ])
   ]
+
+/-- Evaluate an instance `d(args)` into `Tagged` inside `charter-server` without source parsing. -/
+def evalServerInstance (cfg : Config) (d : DomId) (args : List Elem) : Except String Tagged := do
+  let tm ← buildInstanceTerm cfg.spec d args
+  let ctx := Ctx.of cfg.spec cfg.state
+  match (M.whenTagged (M.eval M.fuel tm) pure).run ctx [] with
+  | .ok (te :: _) => .ok te
+  | .ok [] => .error s!"`{d}` produced no instance"
+  | .error e => .error e.message
+
+def serverInputSchemaJson (spec : Spec) : Json :=
+  let schemas := Plan.extractInputSchemas spec
+  Json.arr (schemas.map fun s =>
+    Json.mkObj [
+      ("name", Json.str s.name),
+      ("inputKind", Json.str s.inputKind),
+      ("confidential", Json.bool s.confidential),
+      ("audiences", Json.arr (s.audiences.map Json.str).toArray),
+      ("components", Json.arr (s.components.map fun c =>
+        Json.mkObj [
+          ("param", Json.str c.paramName),
+          ("domain", Json.str c.domName),
+          ("kind", Json.str c.domKind),
+          ("choices", Json.arr (c.choices.map Json.str).toArray)
+        ]).toArray)
+    ]).toArray
+
+def serverInspectInputsJson (cfg : Config) (action : DomId) (args : List Elem) : Except String Plan.MissingActInputs := do
+  checkExposedAct cfg.spec action
+  let te ← evalServerInstance cfg action args
+  .ok (Plan.inspectMissingInputs cfg te)
+
+def serverPlanJson (cfg : Config) (action : DomId) (args : List Elem) (maxDepth : Nat) : Except String Json := do
+  checkExposedAct cfg.spec action
+  let te ← evalServerInstance cfg action args
+  let res := Plan.findShortestPlan cfg te maxDepth 600 []
+  let stepToJson : Plan.PlanStep → Json
+    | .act actor sTe =>
+      Json.mkObj [("kind", Json.str "act"), ("actor", Json.str actor), ("instance", Json.str sTe.pp)]
+    | .wait t dlt =>
+      Json.mkObj [("kind", Json.str "wait"), ("targetTime", Json.num t), ("delta", Json.num dlt)]
+  match res with
+  | .alreadyEnabled =>
+    .ok (Json.mkObj [
+      ("target", Json.str te.pp),
+      ("status", Json.str "AlreadyEnabled"),
+      ("planFound", Json.bool true),
+      ("steps", Json.arr #[]),
+      ("visitedStates", Json.num 1)
+    ])
+  | .found steps vis =>
+    .ok (Json.mkObj [
+      ("target", Json.str te.pp),
+      ("status", Json.str "PlanFound"),
+      ("planFound", Json.bool true),
+      ("steps", Json.arr (steps.map stepToJson).toArray),
+      ("visitedStates", Json.num vis)
+    ])
+  | .unreachable vis bnd =>
+    .ok (Json.mkObj [
+      ("target", Json.str te.pp),
+      ("status", Json.str "Unreachable"),
+      ("planFound", Json.bool false),
+      ("steps", Json.arr #[]),
+      ("visitedStates", Json.num vis),
+      ("maxDepth", Json.num bnd)
+    ])
 
 end Charter.Server

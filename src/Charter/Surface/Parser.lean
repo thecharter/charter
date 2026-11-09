@@ -805,6 +805,14 @@ def isFrameHeadAt (idx : Nat) : P Bool := do
       return (match t1, t2 with
         | .ident _, .kw "{" | .atom _, .kw "{" | .str _, .kw "{" => true
         | _, _ => false)
+    else if s == "Expose" then
+      return (match ← peekAt (idx + 1) with
+        | .ident _ | .kw "Act" | .kw "Event" | .kw "Fact" | .atom "Input" => true
+        | _ => false)
+    else if s == "ActorKey" then
+      return (match ← peekAt (idx + 1), ← peekAt (idx + 2) with
+        | .atom _, .str _ | .str _, .str _ | .ident _, .str _ => true
+        | _, _ => false)
     else if s == "Evidenced" || s == "Input" then
       let t1 ← peekAt (idx + 1)
       let t2 ← peekAt (idx + 2)
@@ -1336,23 +1344,68 @@ def parseRegimeEntries : Nat → P (List (DomId × Int))
       let _ ← (do if (← isKw ",") || (← isKw ".") then advance else pure ())
       return (pname, val) :: (← parseRegimeEntries rem)
 
+def parseExposeDecl : P (List Decl) := do
+  advance
+  let cat ← (do
+    match ← peek with
+    | .kw "Act" => advance; return "act"
+    | .kw "Event" => advance; return "act"
+    | .atom "Input" => advance; return "input"
+    | .kw "Fact" => advance; return "input"
+    | _ => return "auto")
+  let targets ← sepBy1 ident "," 1000
+  return [.expose cat targets]
+
+def parseActorKeyDecl : P (List Decl) := do
+  advance
+  let who ← (do
+    match ← peek with
+    | .atom a => advance; return a
+    | .str s => advance; return s
+    | .ident i => advance; return i
+    | k => fail "CHR003" s!"expected actor atom or string after `ActorKey`, got {k.describe}")
+  let pk ← (do
+    match ← peek with
+    | .str s => advance; return s
+    | k => fail "CHR003" s!"expected public-key hex string after `ActorKey {who}`, got {k.describe}")
+  return [.actorKey who pk]
+
+def parseMigrateBody : Nat → P (List Effect)
+  | 0 => return []
+  | rem + 1 => do
+    if ← isKw "}" then advance; return []
+    if ← isKw "." then advance; return (← parseMigrateBody rem)
+    match ← peek with
+    | .kw "Creates" | .kw "+" =>
+      advance; let es ← createsClause; return es ++ (← parseMigrateBody rem)
+    | .kw "Terminates" | .kw "-" =>
+      advance; let es ← effectClause .tAll; return es ++ (← parseMigrateBody rem)
+    | .kw "Obfuscates" | .kw "~" =>
+      advance; let es ← effectClause .oAll; return es ++ (← parseMigrateBody rem)
+    | other => fail "CHR003" s!"expected `Creates`, `Terminates`, `+`, or `-` inside `Migrates` block, got {other.describe}"
+
 mutual
 
-def parseActExtras (bodyFuel : Nat) : Nat → P (List ModClause × List Decl)
-  | 0 => return ([], [])
+def parseActExtras (bodyFuel : Nat) : Nat → P (List ModClause × List Decl × List Effect)
+  | 0 => return ([], [], [])
   | rem + 1 => do
     if (← isCtxAtom "Installs") && (← peekAt 1) == .kw "{" then
       advance; expectKw "{"
       let body ← moduleBody bodyFuel
-      let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
-      return (moreCls, body ++ moreInsts)
+      let (moreCls, moreInsts, moreMigs) ← parseActExtras bodyFuel rem
+      return (moreCls, body ++ moreInsts, moreMigs)
+    else if (← isCtxAtom "Migrates") && (← peekAt 1) == .kw "{" then
+      advance; expectKw "{"
+      let migs ← parseMigrateBody 1000
+      let (moreCls, moreInsts, moreMigs) ← parseActExtras bodyFuel rem
+      return (moreCls, moreInsts, migs ++ moreMigs)
     else
       let cp ← pos
       match ← clause .act with
       | some c =>
-        let (moreCls, moreInsts) ← parseActExtras bodyFuel rem
-        return (.atPos cp c :: moreCls, moreInsts)
-      | none => return ([], [])
+        let (moreCls, moreInsts, moreMigs) ← parseActExtras bodyFuel rem
+        return (.atPos cp c :: moreCls, moreInsts, moreMigs)
+      | none => return ([], [], [])
 
 /-- The declarations of a `Module` body, up to `}`, each block ended by `.` or by the
 next declaration keyword. -/
@@ -1369,6 +1422,8 @@ def moduleBody : Nat → P (List Decl)
 def frame : Nat → P (List Decl)
   | 0 => fail "CHR003" "declarations nest too deeply"
   | fuel + 1 => do
+  if ← isCtxAtom "Expose" then return (← parseExposeDecl)
+  if ← isCtxAtom "ActorKey" then return (← parseActorKeyDecl)
   let (isClosed, isEv, isInp) ← openness
   match ← peek with
   | .kw "Fact" | .kw "Var" | .kw "Function" =>
@@ -1445,14 +1500,15 @@ def frame : Nat → P (List Decl)
     let recip ← (do if ← isKw "Recipient" then advance; return some (← var) else return none)
     let (objs, relCarriers) ← relatedToWithCarriers
     let filter ← domainConstraint
-    let (cls, instBody) ← parseActExtras fuel 1000
+    let (cls, instBody, migEffs) ← parseActExtras fuel 1000
     let actorV := actor.getD ⟨"actor", ""⟩
     let mkOne (d : DomId) : List Decl :=
       let instDecls := if instBody.isEmpty then [] else [Decl.amendInstall d instBody]
+      let migDecls := if migEffs.isEmpty then [] else [Decl.amendMigrate d migEffs]
       [ .typeDecl d { kind := .act { hasRecipient := recip.isSome, isPower := isPow, isFinding := isFind, isAmend := isAm },
                       domain := .products (actorV :: (recip.toList ++ objs)),
                       domainConstraint := filter, closed := if isClosed then none else some false },
-        .typeExt d cls ] ++ instDecls
+        .typeExt d cls ] ++ instDecls ++ migDecls
     return relCarriers ++ ds.flatMap mkOne
   | .atom "Role" =>
     advance

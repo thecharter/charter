@@ -56,9 +56,84 @@ inductive ServerEvent where
   | submitEvidence (factName : DomId) (args : List Elem) (polarity : Bool) (issuer : String)
       (aclAudiences : List String := []) (supersedes : Option String := none)
   | retractEvidence (factName : DomId) (args : List Elem) (issuer : String)
+  | supplyInput (factName : DomId) (args : List Elem) (holds : Bool := true)
   | advanceClock (newTime : Int)
   | amendLaw (amendActName : DomId) (amendArgs : List Elem) (newArtifactSha256 : String)
   deriving Repr, ToJson, FromJson
+
+/-- Enforce `#67` `Expose` service interface boundary for triggerable acts/events. -/
+def checkExposedAct (spec : Spec) (actName : DomId) : Except String Unit :=
+  let canon := spec.chaseAlias actName
+  if spec.serviceInterfaceDeclared && !spec.exposedActs.contains canon then
+    .error s!"CHR050: service interface refuses unexposed act or event `{actName}`"
+  else .ok ()
+
+/-- Enforce `#67` `Expose` service interface boundary for client-supplied open/evidenced facts. -/
+def checkExposedInput (spec : Spec) (factName : DomId) : Except String Unit :=
+  let canon := spec.chaseAlias factName
+  if spec.serviceInterfaceDeclared && !spec.exposedInputs.contains canon then
+    .error s!"CHR050: service interface refuses unexposed input fact `{factName}`"
+  else .ok ()
+
+/-- Canonical scalar serialization for per-actor signature payloads (`#76`). -/
+def canonicalElemSig : Elem → String
+  | .str s => "s:" ++ s
+  | .int n => "i:" ++ toString n
+  | .prod _ => "p"
+
+/-- Canonical actor-signed message for a `ServerEvent` (`#76`). -/
+def actorSigPayload (institutionId lawHash : String) : ServerEvent → String
+  | .triggerAct act args intentId =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|act|{act}|{",".intercalate (args.map canonicalElemSig)}|{intentId}"
+  | .amendLaw act args sha =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|amend|{act}|{",".intercalate (args.map canonicalElemSig)}|{sha}"
+  | .submitEvidence fact args pol issuer _ _ =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|subEv|{fact}|{",".intercalate (args.map canonicalElemSig)}|{pol}|{issuer}"
+  | .retractEvidence fact args issuer =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|retEv|{fact}|{",".intercalate (args.map canonicalElemSig)}|{issuer}"
+  | .supplyInput fact args holds =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|input|{fact}|{",".intercalate (args.map canonicalElemSig)}|{holds}"
+  | .observeExternal act args evT obsT =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|obs|{act}|{",".intercalate (args.map canonicalElemSig)}|{evT}|{obsT}"
+  | .advanceClock t =>
+    s!"charter-act-v1|{institutionId}|{lawHash}|clock|{t}"
+
+/-- Look up `actor`'s bound Schnorr public key in `State` (`actor-key(actor, pk)`) or `Spec.actorKeys` (`#76`). -/
+def lookupActorPubKey (cfg : Config) (actor : String) : Option String :=
+  let fromState := cfg.state.holdsList.findSome? fun te =>
+    if te.2 == "actor-key" then
+      match te.1 with
+      | .prod [(.str a, _), (.str pk, _)] => if a == actor then some pk else none
+      | _ => none
+    else none
+  fromState.orElse fun _ => (cfg.spec.actorKeys.find? (·.1 == actor)).map (·.2)
+
+/-- Identify the principal actor named by `ev`, if any (`#76`). -/
+def eventActorId (spec : Spec) : ServerEvent → Option String
+  | .triggerAct actName (arg0 :: _) _ | .amendLaw actName (arg0 :: _) _ =>
+    match spec.findDecl (spec.chaseAlias actName) with
+    | some { kind := .act _, .. } =>
+      match arg0 with
+      | .str s => some s
+      | .int n => some (toString n)
+      | _ => none
+    | _ => none
+  | .submitEvidence _ _ _ issuer _ _ | .retractEvidence _ _ issuer => some issuer
+  | _ => none
+
+/-- Verify per-actor Schnorr public-key signature when the named actor has a bound key (`#76`). -/
+def verifyEventActorSig (institutionId lawHash : String) (cfg : Config)
+    (ev : ServerEvent) (actorSig? : Option String) : Except String (Option String) := do
+  let actor? := eventActorId cfg.spec ev
+  match actor? >>= lookupActorPubKey cfg with
+  | none => .ok actor?
+  | some pkHex =>
+    match actorSig? with
+    | none => .error s!"CHR052: missing actorSignature for key-bound actor `{actor?.getD ""}`"
+    | some sig =>
+      let msg := actorSigPayload institutionId lawHash ev
+      if Artifact.verifyActorSig pkHex msg sig then .ok actor?
+      else .error s!"CHR052: invalid actorSignature for actor `{actor?.getD ""}`"
 
 /-- Convert a primitive `Elem` into a checked `Term` tagged with component domain `compDom`. -/
 def elemToTaggedTerm (spec : Spec) (compDom : DomId) (e : Elem) : Except String Term :=
@@ -130,6 +205,7 @@ def evaluateServerEvent (cfg : Config) (ev : ServerEvent) (commit : Bool := true
       reasonSummary := s!"clock advanced to {newTime}"
     }
   | .submitEvidence factName args pol issuer _ _ =>
+    checkExposedInput cfg.spec factName
     let tm ← buildInstanceTerm cfg.spec factName args
     let (cfg', outs) := evalCompiledStep cfg (.submitEvidence pol [] tm issuer) true
     for o in outs do
@@ -145,6 +221,7 @@ def evaluateServerEvent (cfg : Config) (ev : ServerEvent) (commit : Bool := true
       reasonSummary := s!"evidence ({if pol then "support" else "rebut"}) tendered by `{issuer}` on `{factName}`"
     }
   | .retractEvidence factName args issuer =>
+    checkExposedInput cfg.spec factName
     let tm ← buildInstanceTerm cfg.spec factName args
     let (cfg', outs) := evalCompiledStep cfg (.retractEvidence [] tm issuer) true
     for o in outs do
@@ -159,7 +236,31 @@ def evaluateServerEvent (cfg : Config) (ev : ServerEvent) (commit : Bool := true
       valid := .yes
       reasonSummary := s!"evidence retracted by `{issuer}` on `{factName}`"
     }
+  | .supplyInput factName args holds =>
+    checkExposedInput cfg.spec factName
+    let canon := cfg.spec.chaseAlias factName
+    match cfg.spec.findDecl canon with
+    | some ts@{ kind := .fact fs, .. } =>
+      if (ts.isClosed && !fs.isInput) || fs.evidenced then
+        .error s!"CHR050: `{factName}` is not an open or `Input` fact (use SubmitEvidence for Evidenced facts)"
+    | _ => .error s!"CHR050: `{factName}` is not a declared open or `Input` fact"
+    let tm ← buildInstanceTerm cfg.spec factName args
+    let cph : CPhrase := if holds then .create [] tm else .terminate [] tm
+    let (cfg', outs) := evalCompiledStep cfg cph true
+    for o in outs do
+      match o with
+      | .diag d => if d.isError then .error s!"{d.code}: {d.message}"
+      | _ => pure ()
+    .ok {
+      nextConfig := if commit then cfg' else cfg
+      outcome := "Allow"
+      occurred := if commit then "observed" else "hypothetical"
+      lawful := .yes
+      valid := .yes
+      reasonSummary := s!"input `{factName}` set to {holds}"
+    }
   | .triggerAct actName args _ | .amendLaw actName args _ =>
+    checkExposedAct cfg.spec actName
     let tm ← buildInstanceTerm cfg.spec actName args
     let (cfg', outs) := evalCompiledStep cfg (.trigger [] tm) false
     for o in outs do
@@ -183,6 +284,7 @@ def evaluateServerEvent (cfg : Config) (ev : ServerEvent) (commit : Bool := true
         reasonSummary := s!"rule `{actName}` judged lawful={info.lawfulTri.asString}, valid={info.validTri.asString}"
       }
   | .observeExternal actName args evTime obsTime =>
+    checkExposedAct cfg.spec actName
     -- External physical/contractor observation (`Law 1`, `Law 2`, `docs/rfc.md` §8.5):
     -- always recorded in state even when unlawful or void!
     let tm ← buildInstanceTerm cfg.spec actName args
@@ -220,27 +322,35 @@ structure LogEntry where
   stateRootAfter : String
   entryHash      : String
   signatureHex   : String
+  actorId        : Option String := none
+  actorSignature : Option String := none
   deriving Repr, ToJson, FromJson
 
 def computeLogEntryHash (institutionId : String) (seqNo : Nat) (prevEntryHash lawHash : String)
-    (lawVersion : Nat) (ev : ServerEvent) (outcome lawful valid stateRootAfter : String) : String :=
-  let payload := s!"{institutionId}|{seqNo}|{prevEntryHash}|{lawHash}|{lawVersion}|{(toJson ev).compress}|{outcome}|{lawful}|{valid}|{stateRootAfter}"
+    (lawVersion : Nat) (ev : ServerEvent) (outcome lawful valid stateRootAfter : String)
+    (actorId : Option String := none) (actorSignature : Option String := none) : String :=
+  let actorTail := match actorSignature with
+    | some asig => s!"|actor:{actorId.getD ""}|asig:{asig}"
+    | none => ""
+  let payload := s!"{institutionId}|{seqNo}|{prevEntryHash}|{lawHash}|{lawVersion}|{(toJson ev).compress}|{outcome}|{lawful}|{valid}|{stateRootAfter}{actorTail}"
   Artifact.sha256String payload
 
 def mkSignedLogEntry (secretKey : String) (institutionId : String) (seqNo : Nat)
     (prevEntryHash lawHash : String) (lawVersion : Nat) (ev : ServerEvent)
-    (outcome lawful valid stateRootAfter : String) : LogEntry :=
-  let eh := computeLogEntryHash institutionId seqNo prevEntryHash lawHash lawVersion ev outcome lawful valid stateRootAfter
+    (outcome lawful valid stateRootAfter : String)
+    (actorId : Option String := none) (actorSignature : Option String := none) : LogEntry :=
+  let eh := computeLogEntryHash institutionId seqNo prevEntryHash lawHash lawVersion ev outcome lawful valid stateRootAfter actorId actorSignature
   let sig := Artifact.hmacSha256 secretKey s!"charter-log-v1:{eh}"
   { institutionId, seqNo, prevEntryHash, lawHash, lawVersion, event := ev,
-    outcome, lawful, valid, stateRootAfter, entryHash := eh, signatureHex := sig }
+    outcome, lawful, valid, stateRootAfter, entryHash := eh, signatureHex := sig,
+    actorId, actorSignature }
 
 def verifyLogEntryIntegrity (secretKey : String) (expectedPrevHash : String) (expectedSeq : Nat) (e : LogEntry) : Except String Unit := do
   if e.seqNo != expectedSeq then
     .error s!"log sequence gap/out-of-order: expected seqNo={expectedSeq}, found seqNo={e.seqNo}"
   if e.prevEntryHash != expectedPrevHash then
     .error s!"log hash-chain broken at seqNo={e.seqNo}: expected prev={expectedPrevHash}, found prev={e.prevEntryHash}"
-  let wantHash := computeLogEntryHash e.institutionId e.seqNo e.prevEntryHash e.lawHash e.lawVersion e.event e.outcome e.lawful e.valid e.stateRootAfter
+  let wantHash := computeLogEntryHash e.institutionId e.seqNo e.prevEntryHash e.lawHash e.lawVersion e.event e.outcome e.lawful e.valid e.stateRootAfter e.actorId e.actorSignature
   if e.entryHash != wantHash then
     .error s!"log entry payload tampered at seqNo={e.seqNo}: expected entryHash={wantHash}, found={e.entryHash}"
   let wantSig := Artifact.hmacSha256 secretKey s!"charter-log-v1:{wantHash}"
@@ -295,6 +405,7 @@ def replayEntries (secretKey : String) (lawHash : String) (startCfg : Config)
       pure () -- already covered by verified snapshot prefix
     else
       verifyLogEntryIntegrity secretKey prevHash expectedSeq e
+      let _ ← verifyEventActorSig e.institutionId e.lawHash cfg e.event e.actorSignature
       let commitEvent := e.outcome == "Allow" || e.outcome == "Observed"
       let dec ← evaluateServerEvent cfg e.event commitEvent
       if dec.outcome != e.outcome || dec.lawful.asString != e.lawful || dec.valid.asString != e.valid then

@@ -7,6 +7,7 @@ import Charter.Cli.Build
 import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
+import Charter.Cli.Plan
 import Charter.Cli.Diff
 import Charter.Cli.Generate
 import Charter.Cli.Doc
@@ -43,6 +44,8 @@ def helpText : String :=
   "  explore  [flags] <file.charter> ...     explore lawful, adversarial, or mixed state spaces\n" ++
   "  verify   [flags] <file.charter> ...     verify invariants & temporal properties (finite, smt, inductive)\n" ++
   "  explain  <expr> <file.charter> [flags]  emit audience-scoped ReasonGraph with counterfactuals\n" ++
+  "  plan     <act> <file.charter> [flags]   find shortest lawful and valid sequence enabling <act>\n" ++
+  "  inputs   [<act>] <file.charter> [flags] list open/evidenced input schema or missing act inputs\n" ++
   "  diff     <old.charter> <new.charter>    3-view English, CIR rule, and scenario semantic diff\n" ++
   "  generate --target <tgt> <file.charter>  project CIR to solidity, abi, quint, or advisory prompt\n" ++
   "  trace    <clause-id> <file.charter>     print the verbatim span table for a clause\n" ++
@@ -76,6 +79,8 @@ def main (args : List String) : IO UInt32 := do
   | "explore" :: rest => exploreCommand rest
   | "verify" :: rest => verifyCommand rest
   | "explain" :: rest => explainCommand rest
+  | "plan" :: rest => planCommand rest
+  | "inputs" :: rest => inputsCommand rest
   | "diff" :: rest => diffCommand rest
   | "generate" :: rest => generateCommand rest
   | "trace" :: cid :: rest => traceCommand cid rest

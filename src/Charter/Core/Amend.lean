@@ -199,7 +199,8 @@ theorem applyInstallDecl_lookupDecl_ne (r : DomId) :
   | .placeholder _ _, _, _ | .clause _, _, _ | .document _ _ _ _, _, _ | .param _ _ _, _, _
   | .module _ _ _, _, _ | .use _ _ _ _, _, _ | .spanInit _, _, _ | .property _, _, _
   | .amendInstall _ _, _, _ | .regime _, _, _ | .amendProcedure _, _, _
-  | .amountDef _ _ _, _, _ | .ensureCarrier _ _, _, _ | .varInit _ _, _, _ => rfl
+  | .amountDef _ _ _, _, _ | .ensureCarrier _ _, _, _ | .varInit _ _, _, _
+  | .expose _ _, _, _ | .amendMigrate _ _, _, _ | .actorKey _ _, _, _ => rfl
 
 theorem applyInstallDecls_lookupDecl_not_mem (r : DomId) :
     ∀ (ds : List Decl) (s : Spec), r ∉ touchedByDecls ds → (applyInstallDecls s ds).lookupDecl r = s.lookupDecl r

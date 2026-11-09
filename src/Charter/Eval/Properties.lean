@@ -1785,6 +1785,19 @@ theorem newContextAfterAmend_time {cfg cfg' : Config} {effSpec : Spec} {effSpecI
         rw [← h.1]
         exact Saturate.rebaseAndSatWithIdx_time effSpec effSpecIdx effStrata s1 state' hrs
 
+theorem runAmendMigrations_time (sUpd : Spec) (sUpdIdx : Spec.SpecIndex) (migEffs : List Effect)
+    (st st' : State) (h : Interp.runAmendMigrations sUpd sUpdIdx migEffs st = .ok st') :
+    st'.time = st.time := by
+  unfold Interp.runAmendMigrations at h
+  by_cases hemp : migEffs.isEmpty = true
+  · rw [if_pos hemp] at h; cases h; rfl
+  · rw [if_neg hemp] at h
+    dsimp only at h
+    split at h
+    · cases h
+    · simp only [Except.ok.injEq] at h
+      rw [← h, State.makeAssignments_time]
+
 theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIndex}
     {strata : List (List DomId)} {state1 : State} {outs : List Output}
     (h : Interp.newContext cfg spec specIdx strata state1 = (some cfg', outs)) :
@@ -1798,7 +1811,18 @@ theorem newContext_time {cfg cfg' : Config} {spec : Spec} {specIdx : Spec.SpecIn
   · rw [if_pos hemp] at h
     rw [newContextAfterAmend_time h, hClean]
   · rw [if_neg hemp] at h
-    rw [newContextAfterAmend_time h, hClean]
+    split at h
+    · cases h
+    · next state1Mig hMig =>
+      have hMigT := runAmendMigrations_time _ _ _ state1Clean state1Mig hMig
+      by_cases hmEmpty : (amCommits.flatMap fun actId => (spec.amendMigrations.find? (·.1 == actId)).map (·.2) |>.getD []).isEmpty = true
+      · rw [if_pos hmEmpty, Prod.eta] at h
+        rw [newContextAfterAmend_time h, hMigT, hClean]
+      · rw [if_neg hmEmpty] at h
+        split at h
+        · cases h
+        · rw [Prod.eta] at h
+          rw [newContextAfterAmend_time h, hMigT, hClean]
 
 /-- Clock monotonicity (`009.1`): no transition ever moves `state.time` backwards. -/
 theorem clock_never_decreases {cfg cfg' : Config} {p : Phrase} {outs : List Output}

@@ -723,6 +723,18 @@ def newContextAfterAmend (cfg : Config) (effSpec : Spec) (effSpecIdx : Spec.Spec
         let outs := newDuty.map (fun te => Output.violation (.duty te)) ++ invViol.map (fun d => Output.violation (.invariant d))
         (some { spec := effSpec, strata := effStrata, state := state', violatedDuties := violated, lawVersion := nextVer }, outs)
 
+/-- Evaluate deterministic `Amend ... Migrates { ... }` state transformations (`#71`). -/
+def runAmendMigrations (sUpd : Spec) (sUpdIdx : Spec.SpecIndex) (migEffs : List Effect) (st : State) :
+    Except RuntimeError State :=
+  if migEffs.isEmpty then .ok st
+  else
+    let ctx := Ctx.ofIdx sUpd sUpdIdx st
+    match (migEffs.mapM (evalEffect M.fuel)).run ctx [] with
+    | .error e => .error e
+    | .ok pairLists =>
+      let stores := pairLists.flatten.map (·.1)
+      .ok (State.makeAssignments sUpd (Store.unions stores) st)
+
 /-- Apply a store, saturate, and find the violations (eFLINT `new_context`). -/
 def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state1 : State) :
     Option Config × List Output :=
@@ -731,8 +743,26 @@ def newContext (cfg : Config) (spec : Spec) (specIdx : Spec.SpecIndex) (strata :
     newContextAfterAmend cfg spec specIdx strata cfg.lawVersion state1Clean
   else
     let sUpd := amCommits.foldl Amend.applyTriggeredAmend spec
+    let sUpdIdx := sUpd.buildIndex
     let stUpd := match Stratify.strata sUpd with | .ok st => st | .error _ => strata
-    newContextAfterAmend cfg sUpd sUpd.buildIndex stUpd (cfg.lawVersion + amCommits.length) state1Clean
+    let migEffs := amCommits.flatMap fun actId =>
+      (spec.amendMigrations.find? (·.1 == actId)).map (·.2) |>.getD []
+    match runAmendMigrations sUpd sUpdIdx migEffs state1Clean with
+    | .error e => (none, [diagOf e])
+    | .ok state1Mig =>
+      match newContextAfterAmend cfg sUpd sUpdIdx stUpd (cfg.lawVersion + amCommits.length) state1Mig with
+      | (cfg'?, outs2) =>
+        if migEffs.isEmpty then
+          (cfg'?, outs2)
+        else
+          let entrenchedBreach? := outs2.findSome? fun
+            | .violation (.invariant inv) => if sUpd.entrenchedInvariants.contains inv then some inv else none
+            | _ => none
+          match entrenchedBreach? with
+          | some inv =>
+            (none, [Output.diag (Diagnostic.error "CHR051"
+              ("Amend migration violated entrenched invariant `" ++ inv ++ "`; amendment did not take effect"))])
+          | none => (cfg'?, outs2)
 
 end Interp
 

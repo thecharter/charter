@@ -1531,6 +1531,9 @@ def executeDecls (ds : List Decl) : Stc Store := do
       if (spec.lookupDecl n).isNone then
         setSpec (spec.insertDecl n { kind := .fact {}, domain := dom })
     | .varInit .. => pure ()
+    | .expose .. => pure ()
+    | .amendMigrate .. => pure ()
+    | .actorKey .. => pure ()
     | .atPos .. => pure ()
   -- a placeholder may name a type declared later in the same block (eFLINT inserts
   -- all of them first); check the targets once every declaration is in
@@ -1641,6 +1644,43 @@ def executeDecls (ds : List Decl) : Stc Store := do
         | some _ => err "CHR012" s!"Regime {r.name}: `{pname}` is not a `Param` (`Var` fact)"
         | none => err "CHR010" s!"Regime {r.name}: undeclared parameter `{pname}`"
       modifySpec (·.insertRegime r)
+    | .expose cat targets =>
+      targets.forM fun rawT => do
+        let curSpec ← getSpec
+        let canon := curSpec.chaseAlias rawT
+        match curSpec.findDecl canon with
+        | none =>
+          err "CHR050" ("Expose: undeclared identifier `" ++ rawT ++ "`")
+        | some ts =>
+          match ts.kind with
+          | .act _ | .event _ =>
+            if cat == "input" then
+              err "CHR050" ("Expose Input: `" ++ rawT ++ "` is an act or event, not an open or evidenced input fact")
+            else
+              modifySpec (·.insertExposedAct canon)
+          | .fact fs =>
+            let isSuppInput := !ts.isClosed || fs.evidenced || fs.isInput
+            if cat == "act" || !isSuppInput then
+              err "CHR050" ("Expose: `" ++ rawT ++ "` is an internal or closed fact; only triggerable acts/events and `Open`/`Input`/`Evidenced` facts may be exposed")
+            else
+              modifySpec (·.insertExposedInput canon)
+          | _ =>
+            err "CHR050" ("Expose: `" ++ rawT ++ "` is an internal duty or immunity and cannot be exposed on the service interface")
+    | .amendMigrate actId rawEffs =>
+      let curSpec ← getSpec
+      let postInstSpec := Amend.applyTriggeredAmend curSpec actId
+      let compiledEffs ← withSpec postInstSpec do
+        rawEffs.mapM (compileEffect [])
+      modifySpec fun s =>
+        let s1 := s.insertAmendMigration actId compiledEffs
+        s1.adjustDecl actId fun ts => match ts.kind with
+          | .act a =>
+            let hasOp := a.effects.any fun | .amendOp _ => true | _ => false
+            let effs := if hasOp then a.effects else .amendOp actId :: a.effects
+            { ts with kind := .act { a with isAmend := true, isPower := true, effects := effs } }
+          | _ => ts
+    | .actorKey actor pk =>
+      modifySpec (·.insertActorKey actor pk)
     | _ => pure ()
   -- 4. enforce `Power`/`Finding`/`Amend` competence (`CHR032`, 005.10–005.11), `Amend Procedure`
   --    inheritance (`#54`), `Power` `Holds when` default (`#37`), `Protection` `Holds when True`

@@ -1,0 +1,22 @@
+// 015.7 (#67): `Expose` declares which acts/events an external application may trigger
+// and which open/evidenced facts it supplies; internal duties and derived facts stay hidden.
+Fact bidder Identified by Alice, Bob.
+Open Fact reserve-met Identified by bidder.
+Fact internal-ledger Identified by bidder.
+
+Power place-bid Actor bidder
+  Holds when True
+  Valid when reserve-met(bidder)
+  Creates internal-ledger(bidder).
+
+Event end-auction Related to bidder
+  Terminates internal-ledger(bidder).
+
+Expose place-bid, end-auction.
+Expose Input reserve-met.
+
+Scenario exposed-ok {
+  +reserve-met(Alice).
+  place-bid(Alice).
+  ?internal-ledger(Alice).
+}

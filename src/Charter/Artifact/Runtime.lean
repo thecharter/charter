@@ -228,6 +228,9 @@ partial def declToJson : Decl → Json
   | .amountDef n dom? e => Json.mkObj [("k", "am"), ("n", Json.str n), ("dom", toJson dom?), ("e", toJson e)]
   | .ensureCarrier n dom => Json.mkObj [("k", "ec"), ("n", Json.str n), ("dom", toJson dom)]
   | .varInit n e => Json.mkObj [("k", "vi"), ("n", Json.str n), ("e", toJson e)]
+  | .expose cat ts => Json.mkObj [("k", "ex"), ("cat", Json.str cat), ("ts", toJson ts)]
+  | .amendMigrate a effs => Json.mkObj [("k", "amig"), ("a", Json.str a), ("effs", toJson effs)]
+  | .actorKey actor pk => Json.mkObj [("k", "ak"), ("actor", Json.str actor), ("pk", Json.str pk)]
 
 partial def declFromJson (j : Json) : Except String Decl := do
   let k ← j.getObjValAs? String "k"
@@ -266,6 +269,9 @@ partial def declFromJson (j : Json) : Except String Decl := do
   | "am" => .amountDef <$> j.getObjValAs? String "n" <*> j.getObjValAs? (Option Domain) "dom" <*> j.getObjValAs? Term "e"
   | "ec" => .ensureCarrier <$> j.getObjValAs? String "n" <*> j.getObjValAs? Domain "dom"
   | "vi" => .varInit <$> j.getObjValAs? String "n" <*> j.getObjValAs? Term "e"
+  | "ex" => .expose <$> j.getObjValAs? String "cat" <*> j.getObjValAs? (List DomId) "ts"
+  | "amig" => .amendMigrate <$> j.getObjValAs? String "a" <*> j.getObjValAs? (List Effect) "effs"
+  | "ak" => .actorKey <$> j.getObjValAs? String "actor" <*> j.getObjValAs? String "pk"
   | other => .error s!"unknown Decl kind `{other}`"
 
 instance : ToJson Decl := ⟨declToJson⟩

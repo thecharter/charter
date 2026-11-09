@@ -426,6 +426,12 @@ inductive Decl where
   | ensureCarrier (name : DomId) (dom : Domain)
   /-- Charter (D37, `#42`): initial value assignment `Var <name> : <dom> = <expr>` at Genesis. -/
   | varInit (name : DomId) (expr : Term)
+  /-- Charter (`#67`): `Expose [Act|Event|Input|Fact] <id>, ...` service boundary declaration. -/
+  | expose (category : String) (targets : List DomId)
+  /-- Charter (`#71`): `Migrates { ... }` deterministic state migration on an `Amend` act. -/
+  | amendMigrate (actId : DomId) (effects : List Effect)
+  /-- Charter (`#76`): `ActorKey <actor> "<pubKeyHex>"` binding an actor to a public key in `Spec`. -/
+  | actorKey (actor : String) (pubKeyHex : String)
   /-- Source-span wrapper (`#27`): stripped when inserted into `Spec` so `CIR` stays position-free. -/
   | atPos (pos : Pos) (d : Decl)
   deriving Repr, Inhabited
@@ -471,6 +477,9 @@ def Decl.isInitial : Decl → Bool
   | .amountDef .. => true
   | .ensureCarrier .. => true
   | .varInit .. => false
+  | .expose .. => false
+  | .amendMigrate .. => false
+  | .actorKey .. => false
 
 def Decl.name : Decl → DomId
   | .atPos _ d => d.name
@@ -490,6 +499,9 @@ def Decl.name : Decl → DomId
   | .amountDef n _ _ => n
   | .ensureCarrier n _ => n
   | .varInit n _ => n
+  | .expose _ ts => ts.headD ""
+  | .amendMigrate a _ => a
+  | .actorKey a _ => a
 
 /-- The declared types and placeholder aliases of a program. Insertion replaces
 an existing entry (eFLINT's `M.insert`; see brief B9 for the pending ruling). -/
@@ -517,6 +529,11 @@ structure Spec where
   /-- Charter (D38, `#49`, `#43`): `true` when `Done`/`Since`/`Before`/`Within`/`?occurred` is used, enabling `$occ` transition stamping. -/
   tracksHistory : Bool := false
   rankEdges     : List (DomId × RankPriorityEdge) := []
+  amendMigrations : List (DomId × List Effect) := []
+  serviceInterfaceDeclared : Bool := false
+  exposedActs   : List DomId := []
+  exposedInputs : List DomId := []
+  actorKeys     : List (String × String) := []
   deriving Repr, Inhabited
 
 namespace Spec
@@ -701,6 +718,21 @@ def insertRegime (s : Spec) (r : RegimeSpec) : Spec :=
 def insertAmendBody (s : Spec) (actId : DomId) (ds : List Decl) : Spec :=
   let prev := (s.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
   { s with amendBodies := s.amendBodies.filter (·.1 != actId) ++ [(actId, prev ++ ds)] }
+
+def insertAmendMigration (s : Spec) (actId : DomId) (effs : List Effect) : Spec :=
+  let prev := (s.amendMigrations.find? (·.1 == actId)).map (·.2) |>.getD []
+  { s with amendMigrations := s.amendMigrations.filter (·.1 != actId) ++ [(actId, prev ++ effs)] }
+
+def insertExposedAct (s : Spec) (d : DomId) : Spec :=
+  let acts := if s.exposedActs.contains d then s.exposedActs else s.exposedActs ++ [d]
+  { s with serviceInterfaceDeclared := true, exposedActs := acts }
+
+def insertExposedInput (s : Spec) (d : DomId) : Spec :=
+  let inps := if s.exposedInputs.contains d then s.exposedInputs else s.exposedInputs ++ [d]
+  { s with serviceInterfaceDeclared := true, exposedInputs := inps }
+
+def insertActorKey (s : Spec) (actor pubKeyHex : String) : Spec :=
+  { s with actorKeys := s.actorKeys.filter (·.1 != actor) ++ [(actor, pubKeyHex)] }
 
 /-- All declared `Immunity` and `Protection` entries, pre-extracted once per `Spec` (`#78`). -/
 def allImmunities (s : Spec) : List (DomId × TypeSpec × ImmunitySpec) :=
@@ -1051,6 +1083,9 @@ def Decl.mapDom (f : DomId → DomId) : Decl → Decl
   | .amountDef n dom? e => .amountDef (f n) (dom?.map (·.mapDom f)) (e.mapDom f)
   | .ensureCarrier n dom => .ensureCarrier (f n) (dom.mapDom f)
   | .varInit n e => .varInit (f n) (e.mapDom f)
+  | .expose cat ts => .expose cat (ts.map f)
+  | .amendMigrate a effs => .amendMigrate (f a) (effs.map (Effect.mapDom f))
+  | .actorKey actor pk => .actorKey actor pk
   | d => d
 
 def Decl.mapDomList (f : DomId → DomId) : List Decl → List Decl

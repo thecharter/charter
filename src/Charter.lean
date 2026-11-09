@@ -49,6 +49,7 @@ import Charter.Resolve.AssuranceGates
 import Charter.Artifact.Format
 import Charter.Eval.Eval
 import Charter.Eval.Step
+import Charter.Eval.Plan
 import Charter.Eval.Interpreter
 import Charter.Core.Transition
 import Charter.Eval.Properties
@@ -70,6 +71,7 @@ import Charter.Cli.Build
 import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
+import Charter.Cli.Plan
 import Charter.Project.Diff
 import Charter.Project.SolidityIR
 import Charter.Project.GuardTarget

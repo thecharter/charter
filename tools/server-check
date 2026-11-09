@@ -185,5 +185,72 @@ assert proc.returncode == 0
 rep_check = subprocess.run([sb, "replay", art, str(tmp / "live.log")], capture_output=True, text=True)
 assert rep_check.returncode == 0, f"replay failed: {rep_check.stderr}"
 
-print("8 passed, 0 failed, 8 total (T09, T34, T35, T36, T43, MCP, tenant-isolation, Trace-F)")
+# #67 (Expose boundary), #68 (Input schema, missing-input pause/resume), #70 (Plan), & #76 (Schnorr ActorKey signatures + replay tamper check)
+charter_bin = str(pathlib.Path(sb).parent / "charter")
+alice_pk = subprocess.check_output([sb, "pubkey", "alice-secret-seed-99"], text=True).strip()
+svc_src = f"""Fact member Identified by Alice, Bob.
+Open Fact kyc-verified Identified by member.
+Fact proposed Identified by member.
+Fact ratified Identified by member.
+Param timelock : Duration = 10.
+ActorKey Alice "{alice_pk}".
+Power propose-change Actor member
+  Holds when True
+  Valid when kyc-verified(member)
+  Creates proposed(member).
+Power ratify-change Actor member
+  Holds when Held(proposed(member)) For timelock
+  Valid when Held(proposed(member)) For timelock
+  Creates ratified(member).
+Act hidden-internal Actor member
+  Holds when True
+  Creates ratified(member).
+Expose propose-change, ratify-change.
+Expose Input kyc-verified.
+"""
+svc_file = tmp / "svc.charter"
+svc_art = tmp / "svc.artifact"
+svc_log = tmp / "svc.log"
+svc_file.write_text(svc_src, encoding="utf-8")
+subprocess.run([charter_bin, "build", str(svc_file), "-o", str(svc_art)], check=True, capture_output=True)
+svc_hash = json.loads(svc_art.read_text(encoding="utf-8"))["artifactSha256"]
+alice_sig = subprocess.check_output([sb, "sign", "alice-secret-seed-99", "inst-svc", svc_hash, "propose-change", "Alice"], text=True).strip()
+
+svc_reqs = "\n".join([
+    json.dumps({"op": "Evaluate", "action": "hidden-internal", "args": ["Alice"]}),
+    json.dumps({"op": "GetInputSchema"}),
+    json.dumps({"op": "InspectInputs", "action": "propose-change", "args": ["Alice"]}),
+    json.dumps({"op": "ExercisePower", "action": "propose-change", "args": ["Alice"], "pauseOnMissing": True}),
+    json.dumps({"op": "ExercisePower", "action": "propose-change", "args": ["Alice"], "pauseOnMissing": True, "actorSignature": alice_sig}),
+    json.dumps({"op": "SupplyInput", "fact": "kyc-verified", "args": ["Alice"], "holds": True}),
+    json.dumps({"op": "ResumeRequest", "requestId": "pause-1"}),
+    json.dumps({"op": "Plan", "action": "ratify-change", "args": ["Alice"], "maxDepth": 4}),
+]) + "\n"
+svc_p = subprocess.run([sb, "serve", str(svc_art), "--institution", "inst-svc", "--log", str(svc_log)],
+                       input=svc_reqs, text=True, capture_output=True, check=True)
+rs = [json.loads(l) for l in svc_p.stdout.strip().splitlines()]
+assert not rs[0]["ok"] and "CHR050" in rs[0]["error"]
+assert rs[1]["ok"] and rs[1]["inputSchema"][0]["name"] == "kyc-verified"
+assert rs[2]["ok"] and "kyc-verified" in str(rs[2]["openFacts"])
+assert not rs[3]["ok"] and "CHR052" in rs[3]["error"]
+assert rs[4]["ok"] and rs[4]["outcome"] == "PausedMissingInput"
+assert rs[5]["ok"] and rs[6]["ok"] and rs[6]["outcome"] == "Allow"
+assert rs[7]["ok"] and rs[7]["plan"]["status"] == "PlanFound"
+assert subprocess.run([sb, "replay", str(svc_art), str(svc_log)], capture_output=True).returncode == 0
+
+import hashlib, hmac
+log_lines = svc_log.read_text(encoding="utf-8").strip().splitlines()
+e1 = json.loads(log_lines[1])
+e1["actorSignature"] = "02:01"
+ev_s = json.dumps(e1["event"], separators=(",", ":"))
+pl = f"{e1['institutionId']}|{e1['seqNo']}|{e1['prevEntryHash']}|{e1['lawHash']}|{e1['lawVersion']}|{ev_s}|{e1['outcome']}|{e1['lawful']}|{e1['valid']}|{e1['stateRootAfter']}|actor:{e1['actorId']}|asig:{e1['actorSignature']}"
+eh = hashlib.sha256(pl.encode()).hexdigest()
+e1["entryHash"] = eh
+e1["signatureHex"] = hmac.new(b"charter-dev-local-hmac-key-do-not-use-in-prod", f"charter-log-v1:{eh}".encode(), hashlib.sha256).hexdigest()
+log_lines[1] = json.dumps(e1, separators=(",", ":"))
+forged_log = tmp / "forged.log"
+forged_log.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+assert subprocess.run([sb, "replay", str(svc_art), str(forged_log)], capture_output=True).returncode != 0
+
+print("12 passed, 0 failed, 12 total (T09, T34, T35, T36, T43, MCP, tenant-isolation, Trace-F, Expose, PauseResume, Plan, ActorSig)")
 PY

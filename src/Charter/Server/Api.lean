@@ -12,19 +12,32 @@ namespace Charter.Server
 
 open Lean (Json ToJson FromJson toJson fromJson?)
 
+/-- Pending request paused while awaiting open inputs or unresolved evidence (`#68`). -/
+structure PausedRequest where
+  requestId      : String
+  action         : DomId
+  args           : List Elem
+  intentId       : String := ""
+  actorId        : Option String := none
+  actorSignature : Option String := none
+  createdAt      : Int
+  deriving Repr, ToJson, FromJson
+
 structure InstitutionRuntime where
-  institutionId : String
-  lawHash       : String
-  certificate   : Artifact.ArtifactCertificate
-  config        : Config
-  seqNo         : Nat := 0
-  lastEntryHash : String := "GENESIS"
-  reservations  : ReservationTable := {}
-  vault         : List VaultRecord := []
-  clockPolicy   : ClockPolicy := {}
-  logPath       : Option System.FilePath := none
-  snapshotPath  : Option System.FilePath := none
-  secretKey     : String := Artifact.defaultDevSigningKey
+  institutionId  : String
+  lawHash        : String
+  certificate    : Artifact.ArtifactCertificate
+  config         : Config
+  seqNo          : Nat := 0
+  lastEntryHash  : String := "GENESIS"
+  reservations   : ReservationTable := {}
+  vault          : List VaultRecord := []
+  pausedRequests : List PausedRequest := []
+  nextPauseSeq   : Nat := 1
+  clockPolicy    : ClockPolicy := {}
+  logPath        : Option System.FilePath := none
+  snapshotPath   : Option System.FilePath := none
+  secretKey      : String := Artifact.defaultDevSigningKey
 
 def parseElemArg (j : Json) : Except String Elem :=
   match j with
@@ -52,11 +65,13 @@ def reasonGraphJson (rg : ReasonGraph) : Json :=
 
 /-- Append one committed `LogEntry` to disk (when `rt.logPath` is configured) and update `rt`. -/
 def commitTransition (rt : InstitutionRuntime) (ev : ServerEvent)
-    (nextCfg : Config) (outcome : String) (lawful valid : TriBool) : IO (InstitutionRuntime × LogEntry) := do
+    (nextCfg : Config) (outcome : String) (lawful valid : TriBool)
+    (actorId : Option String := none) (actorSignature : Option String := none) :
+    IO (InstitutionRuntime × LogEntry) := do
   let rootAfter := computeStateRoot rt.lawHash nextCfg
   let entry := mkSignedLogEntry rt.secretKey rt.institutionId rt.seqNo
     rt.lastEntryHash rt.lawHash nextCfg.lawVersion ev
-    outcome lawful.asString valid.asString rootAfter
+    outcome lawful.asString valid.asString rootAfter actorId actorSignature
   if let some lp := rt.logPath then
     if let some parent := lp.parent then IO.FS.createDirAll parent
     let line := (toJson entry).compress ++ "\n"
@@ -106,9 +121,10 @@ def handleRequest (rt : InstitutionRuntime) (req : Json) : IO (InstitutionRuntim
   if let .ok mcpMethod := req.getObjValAs? String "method" then
     let reqId := (req.getObjVal? "id").toOption.getD Json.null
     if mcpMethod == "tools/list" then
-      let tools := #["GetLaw", "GetState", "GetCoverageManifest", "Evaluate", "Reserve",
-                     "Authorize", "ConfirmExecution", "ReconcileExecution", "ExercisePower",
-                     "ObserveExternal", "SubmitEvidence", "AdvanceClock", "Explain", "AmendLaw"]
+      let tools := #["GetLaw", "GetState", "GetCoverageManifest", "GetInputSchema", "InspectInputs",
+                     "Evaluate", "Plan", "Reserve", "Authorize", "ConfirmExecution", "ReconcileExecution",
+                     "ExercisePower", "SupplyInput", "ResumeRequest", "ObserveExternal",
+                     "SubmitEvidence", "AdvanceClock", "Explain", "AmendLaw"]
       let resp := Json.mkObj [
         ("jsonrpc", Json.str "2.0"), ("id", reqId),
         ("result", Json.mkObj [("tools", Json.arr (tools.map fun t => Json.mkObj [("name", Json.str t)]))])
@@ -137,11 +153,45 @@ where
         return (rt, envelopeErr rt op s!"cross-tenant request rejected: server hosts `{rt.institutionId}`, request named `{reqInst}`")
     match op with
     | "GetLaw" =>
+      let iface := Json.mkObj [
+        ("declared", Json.bool rt.config.spec.serviceInterfaceDeclared),
+        ("exposedActs", Json.arr (rt.config.spec.exposedActs.map Json.str).toArray),
+        ("exposedInputs", Json.arr (rt.config.spec.exposedInputs.map Json.str).toArray)
+      ]
       return (rt, envelopeOk rt op [
         ("certificate", toJson rt.certificate),
         ("declaredRules", Json.arr (rt.config.spec.ruleIds.map Json.str).toArray),
-        ("invariants", Json.arr (rt.config.spec.invariants.map Json.str).toArray)
+        ("invariants", Json.arr (rt.config.spec.invariants.map Json.str).toArray),
+        ("serviceInterface", iface),
+        ("boundActors", Json.arr (rt.config.spec.actorKeys.map (Json.str ∘ Prod.fst)).toArray)
       ])
+    | "GetInputSchema" =>
+      return (rt, envelopeOk rt op [
+        ("inputSchema", serverInputSchemaJson rt.config.spec)
+      ])
+    | "InspectInputs" =>
+      match (do
+        let act ← req.getObjValAs? String "action"
+        let args ← parseElemArgs req
+        serverInspectInputsJson rt.config act args) with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok miss =>
+        return (rt, envelopeOk rt op [
+          ("subject", Json.str miss.subject),
+          ("openFacts", Json.arr (miss.openFacts.map Json.str).toArray),
+          ("openDomains", Json.arr (miss.openDomains.map Json.str).toArray),
+          ("unmetEvidence", Json.arr (miss.unmetEvidence.map fun (f, st) =>
+            Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
+        ])
+    | "Plan" =>
+      let maxDepth := (req.getObjValAs? Nat "maxDepth").toOption.getD 5
+      match (do
+        let act ← req.getObjValAs? String "action"
+        let args ← parseElemArgs req
+        serverPlanJson rt.config act args maxDepth) with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok planObj =>
+        return (rt, envelopeOk rt op [("plan", planObj)])
     | "GetState" =>
       let held := rt.config.state.holdsList.filter (fun te => !isInternalEvDom te.2 && te.2 != defConflictDom)
       return (rt, envelopeOk rt op [
@@ -178,6 +228,11 @@ where
       match parseElemArgs req with
       | .error e => return (rt, envelopeErr rt op e)
       | .ok args =>
+        let actorSig? := (req.getObjValAs? String "actorSignature").toOption
+        let evProbe := ServerEvent.triggerAct action args intentId
+        match verifyEventActorSig rt.institutionId rt.lawHash rt.config evProbe actorSig? with
+        | .error e => return (rt, envelopeErr rt op e)
+        | .ok _ =>
         -- Check legal prerequisites via hypothetical Evaluate first (§8.3 step 2)
         match evaluateServerEvent rt.config (.triggerAct action args) false with
         | .error e => return (rt, envelopeErr rt op e)
@@ -259,11 +314,74 @@ where
         else
           return (rtPre, envelopeOk rtPre op [("sagaStatus", Json.str recResolved.status.asString)])
     | "ExercisePower" =>
+      let pauseOnMissing := (req.getObjValAs? Bool "pauseOnMissing").toOption.getD false
+      let actorSig? := (req.getObjValAs? String "actorSignature").toOption
       match (do
         let act ← req.getObjValAs? String "action"
         let args ← parseElemArgs req
         let intentId := (req.getObjValAs? String "intentId").toOption.getD ""
         let ev := ServerEvent.triggerAct act args intentId
+        let verifiedActor ← verifyEventActorSig rt.institutionId rt.lawHash rt.config ev actorSig?
+        .ok (act, args, intentId, ev, verifiedActor)) with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok (act, args, intentId, ev, verifiedActor) =>
+        match evaluateServerEvent rt.config ev true with
+        | .error evalErr =>
+          if pauseOnMissing && (evalErr.startsWith "CHR100" || (evalErr.splitOn "missing input").length > 1) then
+            let miss := match serverInspectInputsJson rt.config act args with
+              | .ok m => m
+              | .error _ => { subject := act }
+            let reqId := s!"pause-{rt.nextPauseSeq}"
+            let prec : PausedRequest := {
+              requestId := reqId, action := act, args, intentId,
+              actorId := verifiedActor, actorSignature := actorSig?,
+              createdAt := rt.config.state.time
+            }
+            let rt' := { rt with pausedRequests := rt.pausedRequests ++ [prec], nextPauseSeq := rt.nextPauseSeq + 1 }
+            return (rt', envelopeOk rt' op [
+              ("outcome", Json.str "PausedMissingInput"),
+              ("requestId", Json.str reqId),
+              ("openFacts", Json.arr (miss.openFacts.map Json.str).toArray),
+              ("openDomains", Json.arr (miss.openDomains.map Json.str).toArray),
+              ("unmetEvidence", Json.arr (miss.unmetEvidence.map fun (f, st) =>
+                Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
+            ])
+          else
+            return (rt, envelopeErr rt op evalErr)
+        | .ok dec =>
+          if pauseOnMissing && dec.outcome == "NeedEvidence" then
+            let miss := match serverInspectInputsJson rt.config act args with
+              | .ok m => m
+              | .error _ => { subject := act, unmetEvidence := dec.unmetEvidence }
+            let reqId := s!"pause-{rt.nextPauseSeq}"
+            let prec : PausedRequest := {
+              requestId := reqId, action := act, args, intentId,
+              actorId := verifiedActor, actorSignature := actorSig?,
+              createdAt := rt.config.state.time
+            }
+            let rt' := { rt with pausedRequests := rt.pausedRequests ++ [prec], nextPauseSeq := rt.nextPauseSeq + 1 }
+            return (rt', envelopeOk rt' op [
+              ("outcome", Json.str "PausedMissingInput"),
+              ("requestId", Json.str reqId),
+              ("openFacts", Json.arr (miss.openFacts.map Json.str).toArray),
+              ("openDomains", Json.arr (miss.openDomains.map Json.str).toArray),
+              ("unmetEvidence", Json.arr (miss.unmetEvidence.map fun (f, st) =>
+                Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
+            ])
+          else
+            let (rt', logEntry) ← commitTransition rt ev dec.nextConfig dec.outcome dec.lawful dec.valid verifiedActor actorSig?
+            return (rt', envelopeOk rt' op [
+              ("outcome", Json.str dec.outcome),
+              ("lawful", Json.str dec.lawful.asString),
+              ("valid", Json.str dec.valid.asString),
+              ("logEntryHash", Json.str logEntry.entryHash)
+            ])
+    | "SupplyInput" =>
+      match (do
+        let fact ← req.getObjValAs? String "fact"
+        let args ← parseElemArgs req
+        let holds := (req.getObjValAs? Bool "holds").toOption.getD true
+        let ev := ServerEvent.supplyInput fact args holds
         let dec ← evaluateServerEvent rt.config ev true
         .ok (ev, dec)) with
       | .error e => return (rt, envelopeErr rt op e)
@@ -271,10 +389,48 @@ where
         let (rt', logEntry) ← commitTransition rt ev dec.nextConfig dec.outcome dec.lawful dec.valid
         return (rt', envelopeOk rt' op [
           ("outcome", Json.str dec.outcome),
-          ("lawful", Json.str dec.lawful.asString),
-          ("valid", Json.str dec.valid.asString),
           ("logEntryHash", Json.str logEntry.entryHash)
         ])
+    | "ResumeRequest" =>
+      let reqId := (req.getObjValAs? String "requestId").toOption.getD ""
+      match rt.pausedRequests.find? (·.requestId == reqId) with
+      | none => return (rt, envelopeErr rt op s!"unknown paused request `{reqId}`")
+      | some prec =>
+        let ev := ServerEvent.triggerAct prec.action prec.args prec.intentId
+        match evaluateServerEvent rt.config ev true with
+        | .error evalErr =>
+          if evalErr.startsWith "CHR100" || (evalErr.splitOn "missing input").length > 1 then
+            let miss := match serverInspectInputsJson rt.config prec.action prec.args with
+              | .ok m => m
+              | .error _ => { subject := prec.action }
+            return (rt, envelopeOk rt op [
+              ("outcome", Json.str "PausedMissingInput"),
+              ("requestId", Json.str reqId),
+              ("openFacts", Json.arr (miss.openFacts.map Json.str).toArray),
+              ("openDomains", Json.arr (miss.openDomains.map Json.str).toArray),
+              ("unmetEvidence", Json.arr (miss.unmetEvidence.map fun (f, st) =>
+                Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
+            ])
+          else
+            return (rt, envelopeErr rt op evalErr)
+        | .ok dec =>
+          if dec.outcome == "NeedEvidence" then
+            return (rt, envelopeOk rt op [
+              ("outcome", Json.str "PausedMissingInput"),
+              ("requestId", Json.str reqId),
+              ("unmetEvidence", Json.arr (dec.unmetEvidence.map fun (f, st) =>
+                Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
+            ])
+          else
+            let rtClean := { rt with pausedRequests := rt.pausedRequests.filter (·.requestId != reqId) }
+            let (rt', logEntry) ← commitTransition rtClean ev dec.nextConfig dec.outcome dec.lawful dec.valid prec.actorId prec.actorSignature
+            return (rt', envelopeOk rt' op [
+              ("outcome", Json.str dec.outcome),
+              ("requestId", Json.str reqId),
+              ("lawful", Json.str dec.lawful.asString),
+              ("valid", Json.str dec.valid.asString),
+              ("logEntryHash", Json.str logEntry.entryHash)
+            ])
     | "ObserveExternal" =>
       match (do
         let act ← req.getObjValAs? String "action"
@@ -294,6 +450,7 @@ where
           ("logEntryHash", Json.str logEntry.entryHash)
         ])
     | "SubmitEvidence" =>
+      let actorSig? := (req.getObjValAs? String "actorSignature").toOption
       match (do
         let fact ← req.getObjValAs? String "fact"
         let args ← parseElemArgs req
@@ -302,13 +459,14 @@ where
         let acl := (req.getObjValAs? (List String) "aclAudiences").toOption.getD []
         let sup? := (req.getObjValAs? String "supersedes").toOption
         let ev := ServerEvent.submitEvidence fact args pol issuer acl sup?
+        let verifiedActor ← verifyEventActorSig rt.institutionId rt.lawHash rt.config ev actorSig?
         let dec ← evaluateServerEvent rt.config ev true
-        .ok (fact, args, pol, issuer, acl, sup?, ev, dec)) with
+        .ok (fact, args, pol, issuer, acl, sup?, ev, dec, verifiedActor)) with
       | .error e => return (rt, envelopeErr rt op e)
-      | .ok (fact, args, pol, issuer, acl, sup?, ev, dec) =>
+      | .ok (fact, args, pol, issuer, acl, sup?, ev, dec, verifiedActor) =>
         let vrec := mkVaultRecord fact args pol issuer rt.config.state.time acl sup?
         let rtVault := { rt with vault := rt.vault ++ [vrec] }
-        let (rt', logEntry) ← commitTransition rtVault ev dec.nextConfig dec.outcome dec.lawful dec.valid
+        let (rt', logEntry) ← commitTransition rtVault ev dec.nextConfig dec.outcome dec.lawful dec.valid verifiedActor actorSig?
         return (rt', envelopeOk rt' op [
           ("evidenceId", Json.str vrec.evidenceId),
           ("logEntryHash", Json.str logEntry.entryHash)
@@ -340,6 +498,7 @@ where
     | "AmendLaw" =>
       let amendAct := (req.getObjValAs? String "amendAct").toOption.getD ""
       let artifactPath := (req.getObjValAs? String "successorArtifact").toOption.getD ""
+      let actorSig? := (req.getObjValAs? String "actorSignature").toOption
       match parseElemArgs req with
       | .error e => return (rt, envelopeErr rt op e)
       | .ok args =>
@@ -353,14 +512,17 @@ where
           match installCertifiedAmendment rt.secretKey rt.config amendAct args rawTxt with
           | .error e => return (rt, envelopeErr rt op e)
           | .ok (verNew, nextCfg) =>
-            let rtLaw := { rt with lawHash := verNew.artifactSha256, certificate := verNew.certificate }
             let ev := ServerEvent.amendLaw amendAct args verNew.artifactSha256
-            let (rt', logEntry) ← commitTransition rtLaw ev nextCfg "Allow" .yes .yes
-            return (rt', envelopeOk rt' op [
-              ("outcome", Json.str "Allow"),
-              ("newLawHash", Json.str verNew.artifactSha256),
-              ("logEntryHash", Json.str logEntry.entryHash)
-            ])
+            match verifyEventActorSig rt.institutionId rt.lawHash rt.config ev actorSig? with
+            | .error e => return (rt, envelopeErr rt op e)
+            | .ok verifiedActor =>
+              let rtLaw := { rt with lawHash := verNew.artifactSha256, certificate := verNew.certificate }
+              let (rt', logEntry) ← commitTransition rtLaw ev nextCfg "Allow" .yes .yes verifiedActor actorSig?
+              return (rt', envelopeOk rt' op [
+                ("outcome", Json.str "Allow"),
+                ("newLawHash", Json.str verNew.artifactSha256),
+                ("logEntryHash", Json.str logEntry.entryHash)
+              ])
     | other =>
       return (rt, envelopeErr rt other s!"unknown operation `{other}`")
 

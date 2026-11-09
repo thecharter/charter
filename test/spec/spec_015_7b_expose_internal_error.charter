@@ -1,0 +1,6 @@
+// 015.7b (#67): `Expose` rejects internal duties or closed non-evidenced facts with CHR050.
+//! expect-error: CHR050
+Fact party Identified by Alice, Bob.
+Duty pay-fee Holder party Claimant party'.
+
+Expose pay-fee.

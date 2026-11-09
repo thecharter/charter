@@ -15,9 +15,11 @@ open Lean (Json fromJson?)
 def serverHelp : String :=
   "usage: charter-server <command> [args]\n" ++
   "  verify <file.artifact> [--key <secret>]                       verify SHA-256, certificate, and CIR well-formedness\n" ++
-  "  replay <file.artifact> <file.log> [--snapshot <snap>] [--key] recompute every transition & state root offline\n" ++
+  "  replay <file.artifact> <file.log> [--snapshot <snap>] [--key] recompute every transition, actor sig, & state root offline\n" ++
   "  serve  <file.artifact> [--log <log>] [--snapshot <snap>]      run JSON/stdio & MCP institutional service\n" ++
   "         [--institution <id>] [--max-skew <N>] [--key <secret>]\n" ++
+  "  pubkey <private-seed>                                         derive actor Schnorr public key hex (#76)\n" ++
+  "  sign   <private-seed> <inst> <lawHash> <act> [args...]        sign an actor request payload (#76)\n" ++
   "  version                                                       print version\n" ++
   "  help                                                          print this summary"
 
@@ -81,6 +83,20 @@ def serverMain (args : List String) : IO UInt32 := do
     return 0
   | ["version"] | ["--version"] | ["-v"] =>
     IO.println "charter-server 1.0.0"
+    return 0
+  | ["pubkey", seed] =>
+    IO.println (Artifact.deriveActorPubKey seed)
+    return 0
+  | "sign" :: seed :: inst :: lawHash :: actName :: rawArgs =>
+    let rec takeSignArgs : List String → List Elem → String → List Elem × String
+      | [], acc, intent => (acc.reverse, intent)
+      | "--intent" :: id :: rest, acc, _ => takeSignArgs rest acc id
+      | a :: rest, acc, intent =>
+        let el := match a.toInt? with | some n => Elem.int n | none => Elem.str a
+        takeSignArgs rest (el :: acc) intent
+    let (elArgs, intentId) := takeSignArgs rawArgs [] ""
+    let msg := actorSigPayload inst lawHash (.triggerAct actName elArgs intentId)
+    IO.println (Artifact.signActorMsg seed msg)
     return 0
   | "verify" :: rest =>
     match parseServerOpts rest {} with

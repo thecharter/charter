@@ -198,6 +198,95 @@ theorem hmacSha256_rfc4231_vector :
       "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843" := by
   decide +kernel
 
+/-! ## Per-Actor Schnorr Public-Key Signatures (`#76`)
+Subgroup order `q = 2^255 - 19`, modulus `p = (2^257 + 22) * q + 1`, generator `g = 2^(2^257 + 22) mod p`.
+Public keys `pk = g^sk mod p` bind actors in `.artifact` or `State` without revealing `sk`. -/
+
+def schnorrP : Nat :=
+  0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe5f
+
+def schnorrQ : Nat :=
+  0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed
+
+def schnorrG : Nat :=
+  0x92682eb410d1295964cd1e6fb8eeb538be540e23ac7af7281785f2d372a9ba5a0c43e5161cc1a8c29cc353133797abf5e9613199ed9a744b63b42679f65a9934
+
+def powModLoop : Nat → Nat → Nat → Nat → Nat → Nat
+  | 0, _, _, _, acc => acc
+  | fuel + 1, base, exp, m, acc =>
+    if exp == 0 then acc
+    else
+      let acc' := if exp % 2 == 1 then (acc * base) % m else acc
+      powModLoop fuel ((base * base) % m) (exp / 2) m acc'
+
+def powMod (base exp m : Nat) : Nat :=
+  if m <= 1 then 0 else powModLoop 520 (base % m) exp m 1
+
+def hexDigitVal (c : Char) : Option Nat :=
+  if '0' <= c && c <= '9' then some (c.toNat - '0'.toNat)
+  else if 'a' <= c && c <= 'f' then some (10 + c.toNat - 'a'.toNat)
+  else if 'A' <= c && c <= 'F' then some (10 + c.toNat - 'A'.toNat)
+  else none
+
+def parseHexNatChars : List Char → Nat → Option Nat
+  | [], acc => some acc
+  | c :: cs, acc =>
+    match hexDigitVal c with
+    | some d => parseHexNatChars cs (acc * 16 + d)
+    | none => none
+
+def parseHexNat (s : String) : Option Nat :=
+  let cs := s.toList
+  if cs.isEmpty then none else parseHexNatChars cs 0
+
+def natToHexChars : Nat → Nat → List Char → List Char
+  | 0, _, acc => if acc.isEmpty then ['0'] else acc
+  | fuel + 1, n, acc =>
+    if n == 0 then (if acc.isEmpty then ['0'] else acc)
+    else
+      let nib := n % 16
+      let ch := if nib < 10 then Char.ofNat ('0'.toNat + nib) else Char.ofNat ('a'.toNat + nib - 10)
+      natToHexChars fuel (n / 16) (ch :: acc)
+
+def natToHex (n : Nat) : String :=
+  String.mk (natToHexChars 140 n [])
+
+def sha256ScalarModQ (s : String) : Nat :=
+  let raw := (parseHexNat (sha256String s)).getD 1
+  (raw % (schnorrQ - 1)) + 1
+
+/-- Derive an actor's hex public key `pk = g^sk mod p` from their private seed (`#76`). -/
+def deriveActorPubKey (privSeed : String) : String :=
+  let sk := sha256ScalarModQ ("charter-actor-sk-v1:" ++ privSeed)
+  natToHex (powMod schnorrG sk schnorrP)
+
+/-- Produce a deterministic Schnorr signature `<R_hex>:<s_hex>` over `msg` (`#76`). -/
+def signActorMsg (privSeed msg : String) : String :=
+  let sk := sha256ScalarModQ ("charter-actor-sk-v1:" ++ privSeed)
+  let pkHex := natToHex (powMod schnorrG sk schnorrP)
+  let k := sha256ScalarModQ ("charter-actor-nonce-v1:" ++ privSeed ++ ":" ++ msg)
+  let rVal := powMod schnorrG k schnorrP
+  let rHex := natToHex rVal
+  let e := sha256ScalarModQ ("charter-actor-sig-v1:" ++ rHex ++ ":" ++ pkHex ++ ":" ++ msg)
+  let sVal := (k + e * sk) % schnorrQ
+  rHex ++ ":" ++ natToHex sVal
+
+/-- Verify a Schnorr actor signature using ONLY `pubKeyHex` (never needing `privSeed`, `#76`). -/
+def verifyActorSig (pubKeyHex msg sig : String) : Bool :=
+  match pubKeyHex.toLower, sig.splitOn ":" with
+  | pkNorm, [rStr, sStr] =>
+    let rNorm := rStr.toLower
+    match parseHexNat pkNorm, parseHexNat rNorm, parseHexNat sStr with
+    | some pk, some rVal, some sVal =>
+      if pk <= 1 || pk >= schnorrP || rVal <= 1 || rVal >= schnorrP || sVal >= schnorrQ then false
+      else
+        let e := sha256ScalarModQ ("charter-actor-sig-v1:" ++ rNorm ++ ":" ++ pkNorm ++ ":" ++ msg)
+        let lhs := powMod schnorrG sVal schnorrP
+        let rhs := (rVal * powMod pk e schnorrP) % schnorrP
+        lhs == rhs && powMod pk schnorrQ schnorrP == 1
+    | _, _, _ => false
+  | _, _ => false
+
 #print axioms sha256_nist_vectors
 
 end Charter.Artifact
