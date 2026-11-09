@@ -64,6 +64,57 @@ def runPhrase (cfg : Config) (p : Phrase) : Config × List Output :=
           | none => (cfg, warnOuts ++ outs ++ outs2)
           | some cfg' => (cfg', warnOuts ++ outs ++ outs2)
 
+/-- Fast-path phrase driver for CLI `run`/`test` (`#78`): reuses `cachedIdx` across non-declaration,
+non-`Amend` phrases (avoiding repeated 773-type `Spec.buildIndex` rebuilds) and skips redundant
+mid-query `checkInvariants` when `skipReadInv = true` (`testMode`, where end-state invariants are
+checked once per scenario by `exploreFrom`, `D30`). -/
+def runPhraseCached (cfg : Config) (cachedIdx : Spec.SpecIndex) (skipReadInv : Bool) (p : Phrase) :
+    Config × Spec.SpecIndex × List Output :=
+  let declChanged := p.hasDecls
+  match resolvePhrase cfg.spec p with
+  | .error ds => (cfg, cachedIdx, ds.map .diag)
+  | .ok (spec', cp, warnings) =>
+    let warnOuts := warnings.map Output.diag
+    let strataRes : Except (List DomId) (List (List DomId)) :=
+      if declChanged then Stratify.strata spec' else .ok cfg.strata
+    match strataRes with
+    | .error cycle =>
+      (cfg, cachedIdx, warnOuts ++ [.diag (Diagnostic.error "CHR020"
+        s!"derivation is not stratifiable: {", ".intercalate cycle} depend on their own absence (through Not, Forall, or an aggregate)")])
+    | .ok strata =>
+      let specIdx := if declChanged then spec'.buildIndex else cachedIdx
+      match Interp.evalClockStep spec' specIdx cfg.state cp with
+      | .error e => (cfg, specIdx, warnOuts ++ [Interp.diagOf e])
+      | .ok newTime =>
+      let state0 := match newTime with
+        | some t => { cfg.state with time := t, step := cfg.state.step + 1 }
+        | none => { cfg.state with step := cfg.state.step + 1 }
+      let (store?, outs) := Interp.semPhrase spec' specIdx state0 1000 cp
+      let outs := match newTime with
+        | some t => Output.timeSet t :: outs
+        | none => outs
+      match store? with
+      | none => (cfg, specIdx, warnOuts ++ outs)
+      | some store =>
+        if !declChanged && newTime.isNone && store.isEmpty then
+          if skipReadInv then
+            ({ cfg with spec := spec', state := state0 }, specIdx, warnOuts ++ outs)
+          else
+            match Interp.checkInvariants spec' specIdx state0 with
+            | .error e => (cfg, specIdx, warnOuts ++ outs ++ [Interp.diagOf e])
+            | .ok invViol =>
+              let outs2 := invViol.map (fun d => Output.violation (.invariant d))
+              ({ cfg with spec := spec', state := state0 }, specIdx, warnOuts ++ outs ++ outs2)
+        else
+          let prevVer := cfg.lawVersion
+          let state1 := State.makeAssignments spec' store state0
+          let (cfg'?, outs2) := Interp.newContext cfg spec' specIdx strata state1
+          match cfg'? with
+          | none => (cfg, specIdx, warnOuts ++ outs ++ outs2)
+          | some cfg' =>
+            let nextIdx := if cfg'.lawVersion != prevVer then cfg'.spec.buildIndex else specIdx
+            (cfg', nextIdx, warnOuts ++ outs ++ outs2)
+
 /-! ## Exploration (plan §2.2.7): bounded search over acts from a state -/
 
 namespace Explore

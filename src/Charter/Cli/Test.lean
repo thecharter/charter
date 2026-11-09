@@ -55,14 +55,16 @@ def walkEflint (p : System.FilePath) : Nat → IO (List System.FilePath)
     else return []
 
 structure TestOpts where
-  paths       : List String := []
-  expect      : Option String := none
-  tolerate    : Option String := none
-  metamorphic : Bool := false
+  paths        : List String := []
+  expect       : Option String := none
+  tolerate     : Option String := none
+  metamorphic  : Bool := false
+  mutateClaims : Bool := false
 
 def parseTestArgs : List String → TestOpts → Except String TestOpts
   | [], o => .ok { o with paths := o.paths.reverse }
   | "--metamorphic" :: rest, o => parseTestArgs rest { o with metamorphic := true }
+  | "--mutate-claims" :: rest, o => parseTestArgs rest { o with mutateClaims := true }
   | "--expect" :: f :: rest, o => parseTestArgs rest { o with expect := some f }
   | ["--expect"], _ => .error "--expect needs a file"
   | "--tolerate" :: f :: rest, o => parseTestArgs rest { o with tolerate := some f }
@@ -383,6 +385,65 @@ def checkMetamorphicImpartiality (path : System.FilePath) : IO (Option String) :
       return some "metamorphic T05 failure: permuting interchangeable actor/entity atoms changed verdicts"
   return none
 
+/-- Flip a claim phrase (`?t` <-> `?!t`, `?w t` <-> `?!w t`) for `#69` claim-mutation testing. -/
+def flipClaimPhrase : Phrase → Option (Phrase × String)
+  | .query (.not inner) => some (.query inner, s!"?!{inner}")
+  | .query t => some (.query (.not t), s!"?{t}")
+  | .expect w neg t => some (.expect w (!neg) t, s!"?{if neg then "" else "!"}{w.name} {t}")
+  | _ => none
+
+/-- Flip each claim in `path` one at a time (`#69` `--mutate-claims`) and report any mutant that still passes. -/
+def checkClaimMutations (path : System.FilePath) (scenFilter : List String) : IO (Nat × List String) := do
+  let (items, loadDiags) ← loadProgram path
+  if loadDiags.any Diagnostic.isError then return (0, [])
+  let claimOutsPass (outs : List Output) : Bool :=
+    outs.all fun
+      | .queryRes ok => ok
+      | .expectRes _ _ ok => ok
+      | .diag d => !d.isError
+      | _ => true
+  let mut cfg : Config := {}
+  let mut specIdx : Spec.SpecIndex := cfg.spec.buildIndex
+  let mut totalMutants := 0
+  let mut survivors : List String := []
+  for l in items do
+    match l.item.val with
+    | .inl _ => pure ()
+    | .inr (.scenario name ps spans) =>
+      cfg := { cfg with spec := cfg.spec.insertScenario name spans }
+      if scenFilter.isEmpty || scenFilter.contains name then
+        let mut scCfg := cfg
+        let mut scIdx := specIdx
+        let mut idx := 0
+        for p in ps do
+          let pPos := match l.item.subPos[idx]? with
+            | some qp => if qp.line == 0 then l.item.pos else qp
+            | none => l.item.pos
+          idx := idx + 1
+          if let some (flipped, label) := flipClaimPhrase p then
+            totalMutants := totalMutants + 1
+            let (_, _, flipOuts) := runPhraseCached scCfg scIdx true flipped
+            if claimOutsPass flipOuts then
+              survivors := survivors ++ [
+                s!"{l.file}:{pPos.line}:{pPos.col} [scenario {name}]: survived claim mutation `{label}` (flipping claim still passed — vacuous or unexercised)"
+              ]
+          let (scCfg', scIdx', _) := runPhraseCached scCfg scIdx true p
+          scCfg := scCfg'
+          scIdx := scIdx'
+    | .inr p =>
+      if scenFilter.isEmpty then
+        if let some (flipped, label) := flipClaimPhrase p then
+          totalMutants := totalMutants + 1
+          let (_, _, flipOuts) := runPhraseCached cfg specIdx true flipped
+          if claimOutsPass flipOuts then
+            survivors := survivors ++ [
+              s!"{l.file}:{l.item.pos.line}:{l.item.pos.col}: survived claim mutation `{label}` (flipping claim still passed — vacuous or unexercised)"
+            ]
+      let (cfg', nextIdx, _) := runPhraseCached cfg specIdx true p
+      cfg := cfg'
+      specIdx := nextIdx
+  return (totalMutants, survivors)
+
 /-- The verdict on a file: passed, and why in one phrase. -/
 def verdict (d : Directives) (denyWarnings : Bool) (stats : RunStats) : Bool × String :=
   if !d.expectErrors.isEmpty || !d.expectWarnings.isEmpty then
@@ -448,7 +509,16 @@ def testCommand (args : List String) : IO UInt32 := do
     let metaErr? ← if opts.metamorphic || d.metamorphic then checkMetamorphicImpartiality f else pure none
     if let some me := metaErr? then IO.eprintln s!"{f}: error: {me}"
     let stats := if metaErr?.isSome then { stats with errors := stats.errors + 1 } else stats
-    let (outcome, why) := verdict d assurance.denyWarnings stats
+    let (mutTotal, mutSurv) ← if opts.mutateClaims && stats.ok assurance.denyWarnings then
+        checkClaimMutations f fl.scenarios
+      else pure (0, [])
+    for surv in mutSurv do
+      IO.eprintln surv
+    let stats := if mutSurv.isEmpty then stats else { stats with failedQueries := stats.failedQueries + mutSurv.length }
+    let (outcome, why0) := verdict d assurance.denyWarnings stats
+    let why := if opts.mutateClaims && outcome then s!"{why0}, {mutTotal}/{mutTotal} mutated claim(s) killed"
+               else if opts.mutateClaims && !mutSurv.isEmpty then s!"{mutSurv.length}/{mutTotal} mutated claim(s) survived"
+               else why0
     let fS := f.toString
     let isTolerated := tolerated.any (endsWithPath fS)
     match expected.find? (fun (p, _) => endsWithPath fS p) with

@@ -1,0 +1,6 @@
+// Helper case file for spec_011_7d dependency direction test (#63).
+Fact dummy-actor Identified by A.
+Scenario sample-case {
+  +dummy-actor(A).
+  ?dummy-actor(A).
+}

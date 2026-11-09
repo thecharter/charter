@@ -105,25 +105,140 @@ def analyzeDocument (uri content : String) : IO (Spec × Array Json) := do
           lspDiags := lspDiags.push (mkLspDiag 1 1 1 "LAW8" c.text)
     return (spec, lspDiags)
 
-/-- Extract the identifier/clause token under `(line0, char0)` in `content`. -/
-def wordAtPosition (content : String) (line0 char0 : Nat) : String := Id.run do
+/-- Extract `(identifier, optionalCallArgs)` under `(line0, char0)` in `content` (`#72`). -/
+def callAtPosition (content : String) (line0 char0 : Nat) : String × Option String := Id.run do
   let lines := content.splitOn "\n"
   match lines[line0]? with
-  | none => return ""
+  | none => return ("", none)
   | some ln =>
     let cs := ln.toList.toArray
-    if char0 ≥ cs.size then return ""
+    if char0 ≥ cs.size then return ("", none)
     else
-      let isTokChar (c : Char) : Bool := c.isAlphanum || c == '-' || c == '_' || c == '.'
+      let isTokChar (c : Char) : Bool := c.isAlphanum || c == '-' || c == '_' || c == '.' || c == '\''
       let mut start := char0
       while start > 0 && isTokChar cs[start - 1]! do
         start := start - 1
       let mut stop := char0
       while stop < cs.size && isTokChar cs[stop]! do
         stop := stop + 1
-      return String.mk ((cs.extract start stop).toList)
+      let tok := String.mk ((cs.extract start stop).toList)
+      if tok.isEmpty then return ("", none)
+      else if stop < cs.size && cs[stop]! == '(' then
+        let mut idx := stop + 1
+        let mut depth : Nat := 1
+        let mut argChars : List Char := []
+        while idx < cs.size && depth > 0 do
+          let ch := cs[idx]!
+          if ch == '(' then
+            depth := depth + 1
+            argChars := argChars ++ [ch]
+          else if ch == ')' then
+            depth := depth - 1
+            if depth > 0 then argChars := argChars ++ [ch]
+          else
+            argChars := argChars ++ [ch]
+          idx := idx + 1
+        if depth == 0 then return (tok, some (String.mk argChars))
+        else return (tok, none)
+      else return (tok, none)
 
-def hoverMarkdownFor (spec : Spec) (tok : String) : Option String :=
+/-- Extract the identifier/clause token under `(line0, char0)` in `content`. -/
+def wordAtPosition (content : String) (line0 char0 : Nat) : String :=
+  (callAtPosition content line0 char0).1
+
+/-- Split top-level comma-separated call arguments without splitting nested parentheses. -/
+def splitTopLevelArgs (raw : String) : List String := Id.run do
+  if raw.trim.isEmpty then return []
+  let mut parts : List String := []
+  let mut cur : List Char := []
+  let mut depth : Nat := 0
+  for ch in raw.toList do
+    if ch == '(' then
+      depth := depth + 1
+      cur := cur ++ [ch]
+    else if ch == ')' then
+      if depth > 0 then depth := depth - 1
+      cur := cur ++ [ch]
+    else if ch == ',' && depth == 0 then
+      parts := parts ++ [(String.mk cur).trim]
+      cur := []
+    else
+      cur := cur ++ [ch]
+  let last := (String.mk cur).trim
+  if !last.isEmpty then parts := parts ++ [last]
+  return parts
+
+/-- Expand implicit constructor arguments (`#72`): e.g. `signed()` ->
+`signed(grantor = grantor, grantee = grantee, parcel = parcel)`. -/
+def expandConstructorCall (tok : String) (t : TypeSpec) (rawArgs? : Option String) : Option String :=
+  match t.domain with
+  | .products xs =>
+    if xs.isEmpty then none
+    else
+      let fullTemplate := s!"{tok}(" ++ ", ".intercalate (xs.map fun x => s!"{x} = {x}") ++ ")"
+      match rawArgs? with
+      | none => some fullTemplate
+      | some raw =>
+        let given := splitTopLevelArgs raw
+        if given.isEmpty then some fullTemplate
+        else
+          let hasNamed := given.any fun g => (g.splitOn "=").length == 2
+          if hasNamed then
+            let namedPairs : List (String × String) := given.filterMap fun g =>
+              match g.splitOn "=" with
+              | [k, v] => some (k.trim, v.trim)
+              | _ => none
+            let expanded := xs.map fun x =>
+              let xsName := toString x
+              match namedPairs.find? (·.1 == xsName) with
+              | some (_, rhs) => s!"{xsName} = {rhs}"
+              | none => s!"{xsName} = {xsName}"
+            some (s!"{tok}(" ++ ", ".intercalate expanded ++ ")")
+          else
+            let expanded := (List.range xs.length).map fun idx =>
+              let xName := toString xs[idx]!
+              match given[idx]? with
+              | some rhs => s!"{xName} = {rhs}"
+              | none => s!"{xName} = {xName}"
+            some (s!"{tok}(" ++ ", ".intercalate expanded ++ ")")
+  | _ => none
+
+/-- Render `Default` / `Exception` rules in topological priority order (`#72`: highest priority first). -/
+def formatDefeasibleRuleOrder (spec : Spec) (tok : String) (t : TypeSpec) : String := Id.run do
+  if t.defeasibleRules.isEmpty then return ""
+  let normId (rid : String) : String :=
+    if rid.startsWith (tok ++ ".") then rid.drop (tok.length + 1) else rid
+  let rankPairs : List (String × String) :=
+    (spec.rankEdges.filter (·.1 == tok)).map fun (_, e) => (normId e.higherRule, normId e.lowerRule)
+  let overridesDirect (hi lo : DefeasibleRule) : Bool :=
+    let nhi := normId hi.id
+    let nlo := normId lo.id
+    hi.overrides.any (fun ov => normId ov == nlo) ||
+    rankPairs.any (fun (a, b) => a == nhi && b == nlo)
+  -- Topological sort: emit rules that no remaining rule overrides first (highest priority first)
+  let mut remaining := t.defeasibleRules
+  let mut ordered : List DefeasibleRule := []
+  for _ in [0 : t.defeasibleRules.length] do
+    if !remaining.isEmpty then
+      let pick? := remaining.find? fun cand =>
+        !remaining.any (fun other => other.id != cand.id && overridesDirect other cand)
+      let chosen := pick?.getD remaining.head!
+      ordered := ordered ++ [chosen]
+      remaining := remaining.filter (·.id != chosen.id)
+  let mut lines : List String := []
+  let mut rankIdx := 1
+  for r in ordered do
+    let tier := if r.isDefault then "Default" else "Exception"
+    let ovStr := if r.overrides.isEmpty then "" else s!" *(overrides {", ".intercalate r.overrides})*"
+    let csq := match r.conseq with
+      | .holdsBool true => "Holds"
+      | .holdsBool false => "Rejects"
+      | .yieldsVal v => s!"Yields `{Pretty.fmtTerm v}`"
+    lines := lines ++ [s!"{rankIdx}. **{tier} `{r.id}`**{ovStr}: {csq} `When {Pretty.fmtTerm r.cond}`"]
+    rankIdx := rankIdx + 1
+  return "\n\n**Defeasible Rule Order (highest priority first):**\n" ++ "\n".intercalate lines
+
+def hoverMarkdownFor (spec : Spec) (tok : String) (rawArgs? : Option String := none) : Option String :=
   if tok.isEmpty then none
   else if let some c := spec.clauses.find? (·.id == tok) then
     let st := if c.stale then "STALE (re-approval required)" else "Approved & current"
@@ -134,17 +249,54 @@ def hoverMarkdownFor (spec : Spec) (tok : String) : Option String :=
       | .fact fs => if fs.invariant then (if fs.entrenched then "Entrenched Invariant" else "Invariant")
                     else if fs.evidenced then "Evidenced Fact (4-valued)" else "Fact"
       | .duty _ => "Duty"
-      | .immunity _ => "Immunity"
+      | .immunity im => if im.isProtection then "Protection" else "Immunity"
       | .event _ => "Event"
     let domStr := Pretty.fmtDomain t.domain
+    let ctorBlock := match expandConstructorCall tok t rawArgs? with
+      | some exp =>
+        let hdr := if rawArgs?.isSome then "Expanded Application" else "Constructor"
+        s!"\n\n{hdr}: `{exp}`"
+      | none => ""
+    let defBlock := formatDefeasibleRuleOrder spec tok t
     let spanLines := t.spans.map fun (cid, q) =>
       let st := match spec.clauses.find? (·.id == cid) with
         | some cl => if cl.stale then " *(STALE)*" else " *(approved)*"
         | none => ""
       s!"- **`{cid}`**{st}: \"{q}\""
     let provBlock := if spanLines.isEmpty then "" else "\n\n**English Provenance:**\n" ++ "\n".intercalate spanLines
-    some s!"**`{tok}`** — `{kindLabel}`\n\nDomain: `{domStr}`{provBlock}"
+    some s!"**`{tok}`** — `{kindLabel}`\n\nDomain: `{domStr}`{ctorBlock}{defBlock}{provBlock}"
   else none
+
+/-- Compute LSP 3.17 `textDocument/inlayHint` hints expanding elided `tok()` constructor arguments (`#72`). -/
+def inlayHintsForRange (entry : DocEntry) (startLine endLine : Nat) : Array Json := Id.run do
+  let lines := entry.content.splitOn "\n"
+  let isTokChar (c : Char) : Bool := c.isAlphanum || c == '-' || c == '_' || c == '\''
+  let mut hints : Array Json := #[]
+  let hi := min lines.length (endLine + 1)
+  for l0 in [startLine : hi] do
+    let cs := (lines[l0]!).toList.toArray
+    let mut i := 0
+    while i + 1 < cs.size do
+      if cs[i]! == '(' && cs[i + 1]! == ')' && i > 0 && isTokChar cs[i - 1]! then
+        let mut s := i
+        while s > 0 && isTokChar cs[s - 1]! do
+          s := s - 1
+        let tok := String.mk ((cs.extract s i).toList)
+        if let some t := entry.spec.findDecl tok then
+          match t.domain with
+          | .products xs =>
+            if !xs.isEmpty then
+              let lbl := ", ".intercalate (xs.map fun x => s!"{x} = {x}")
+              hints := hints.push (Json.mkObj [
+                ("position", Json.mkObj [("line", Json.num l0), ("character", Json.num ((i + 1 : Nat)))]),
+                ("label", Json.str lbl),
+                ("kind", Json.num 2)
+              ])
+          | _ => pure ()
+        i := i + 2
+      else
+        i := i + 1
+  return hints
 
 def definitionLocationFor (entry : DocEntry) (tok : String) : IO Json := do
   if tok.isEmpty then return Json.null
@@ -197,6 +349,7 @@ partial def lspLoop (stdin stdout : IO.FS.Stream) (docs : List DocEntry) : IO UI
     let caps := Json.mkObj [
       ("textDocumentSync", Json.num 1),
       ("hoverProvider", Json.bool true),
+      ("inlayHintProvider", Json.bool true),
       ("definitionProvider", Json.bool true),
       ("documentFormattingProvider", Json.bool true)
     ]
@@ -253,12 +406,25 @@ partial def lspLoop (stdin stdout : IO.FS.Stream) (docs : List DocEntry) : IO UI
     let resJson := match docs.find? (·.uri == uri) with
       | none => Json.null
       | some entry =>
-        let tok := wordAtPosition entry.content l0 c0
-        match hoverMarkdownFor entry.spec tok with
+        let (tok, rawArgs?) := callAtPosition entry.content l0 c0
+        match hoverMarkdownFor entry.spec tok rawArgs? with
         | none => Json.null
         | some md =>
           Json.mkObj [("contents", Json.mkObj [("kind", Json.str "markdown"), ("value", Json.str md)])]
     sendLspMessage stdout (Json.mkObj [("jsonrpc", Json.str "2.0"), ("id", idOpt.getD Json.null), ("result", resJson)])
+    lspLoop stdin stdout docs
+  | "textDocument/inlayHint" =>
+    let td := (params.getObjVal? "textDocument").toOption.getD (Json.mkObj [])
+    let uri := (td.getObjValAs? String "uri").toOption.getD ""
+    let rng := (params.getObjVal? "range").toOption.getD (Json.mkObj [])
+    let sPos := (rng.getObjVal? "start").toOption.getD (Json.mkObj [])
+    let ePos := (rng.getObjVal? "end").toOption.getD (Json.mkObj [])
+    let sLine := (sPos.getObjValAs? Nat "line").toOption.getD 0
+    let eLine := (ePos.getObjValAs? Nat "line").toOption.getD 10000
+    let hintsJson := match docs.find? (·.uri == uri) with
+      | none => Json.arr #[]
+      | some entry => Json.arr (inlayHintsForRange entry sLine eLine)
+    sendLspMessage stdout (Json.mkObj [("jsonrpc", Json.str "2.0"), ("id", idOpt.getD Json.null), ("result", hintsJson)])
     lspLoop stdin stdout docs
   | "textDocument/definition" =>
     let td := (params.getObjVal? "textDocument").toOption.getD (Json.mkObj [])

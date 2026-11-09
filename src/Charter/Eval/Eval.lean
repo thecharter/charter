@@ -22,16 +22,23 @@ namespace Charter
 abbrev Subs := List (Var × Tagged)
 
 structure Ctx where
-  spec     : Spec
-  state    : State
-  specIdx  : Spec.SpecIndex := .empty
-  stateIdx : State.StateIndex := .empty
-  indexed  : Bool := false
+  spec         : Spec
+  state        : State
+  specIdx      : Spec.SpecIndex := .empty
+  stateIdx     : State.StateIndex := .empty
+  indexed      : Bool := false
+  hasEpistemic : Bool := false
+  immDecls     : Option (List (DomId × TypeSpec × ImmunitySpec)) := none
 
 namespace Ctx
 
+def ofBothIdx (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (stateIdx : State.StateIndex)
+    (hasEp : Bool) (immDecls : Option (List (DomId × TypeSpec × ImmunitySpec)) := none) : Ctx :=
+  { spec, state, specIdx, stateIdx, indexed := true, hasEpistemic := hasEp, immDecls }
+
 def ofIdx (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) : Ctx :=
-  { spec, state, specIdx, stateIdx := state.buildIndex, indexed := true }
+  { spec, state, specIdx, stateIdx := state.buildIndex, indexed := true,
+    hasEpistemic := spec.hasEpistemicOrDefeasible }
 
 def of (spec : Spec) (state : State) : Ctx :=
   ofIdx spec spec.buildIndex state
@@ -411,7 +418,7 @@ def isEnabled : Nat → Tagged → M Bool
               if ← isEnabled fuel inst then isValid fuel inst else pure false
             pure (oks.any id)
           pure (rs.any id)
-      else if spec.hasEpistemicOrDefeasible then
+      else if (← getCtx).indexed && (← getCtx).hasEpistemic || (!(← getCtx).indexed && spec.hasEpistemicOrDefeasible) then
         let (lTri, _, _) ← evalActTri fuel te
         pure (lTri == .yes)
       else if !(← isHolds fuel te) then pure false
@@ -438,7 +445,7 @@ def isValid : Nat → Tagged → M Bool
       -- 003.8: an element outside the act's domain is not an instance of it, so performing it
       -- has no institutional effect (it still occurs, and is not lawful)
       if !(← isValidInstance fuel te) then pure false
-      else if spec.hasEpistemicOrDefeasible then
+      else if (← getCtx).indexed && (← getCtx).hasEpistemic || (!(← getCtx).indexed && spec.hasEpistemicOrDefeasible) then
         let (_, vTri, _) ← evalActTri fuel te
         pure (vTri == .yes)
       else
@@ -469,10 +476,16 @@ conditions hold. -/
 def immunityBlocks : Nat → Bool → DomId → Tagged → List (Var × Tagged) → M Bool
   | 0, _, _, _, _ => err (.fuelExhausted "checking immunities")
   | fuel + 1, wantProt, act, party, actRel => do
-    let spec ← getSpec
-    let state ← getState
+    let ctx ← getCtx
+    let spec := ctx.spec
+    let state := ctx.state
     let same (a b : Tagged) : Bool := spec.chaseAlias a.2 == spec.chaseAlias b.2 && Elem.beq a.1 b.1
-    let candidates := if wantProt then spec.protectionsFor act else spec.immunitiesAgainst act
+    let candidates : List (DomId × TypeSpec × ImmunitySpec) := match ctx.immDecls with
+      | some allIms =>
+        allIms.filter fun (e : DomId × TypeSpec × ImmunitySpec) =>
+          let i := e.2.2
+          (if wantProt then i.isProtection else !i.isProtection) && i.against.contains act
+      | none => if wantProt then spec.protectionsFor act else spec.immunitiesAgainst act
     let rs ← candidates.mapM fun entry => do
       let d := entry.1
       let tspec := entry.2.1
@@ -522,14 +535,21 @@ def amendImmunityBlocks : Nat → DomId → ActSpec → M Bool
   | fuel + 1, actId, a => do
     if !a.isAmend then pure false
     else
-      let spec ← getSpec
-      let state ← getState
+      let ctx ← getCtx
+      let spec := ctx.spec
+      let state := ctx.state
       let installs := (spec.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
       let effTargets := a.effects.filterMap fun
         | .cAll _ tm _ _ | .tAll _ tm _ | .oAll _ tm _ => Stratify.typeOf spec tm
         | _ => none
       let touched := actId :: (Amend.touchedIds a.repeals installs ++ effTargets)
-      let rs ← (spec.immunitiesAgainstAmend actId).mapM fun entry => do
+      let candIms : List (DomId × TypeSpec × ImmunitySpec) := match ctx.immDecls with
+        | some allIms =>
+          allIms.filter fun (e : DomId × TypeSpec × ImmunitySpec) =>
+            let i := e.2.2
+            !i.isProtection && (i.against.contains actId || i.against.contains "Amend")
+        | none => spec.immunitiesAgainstAmend actId
+      let rs ← candIms.mapM fun entry => do
         let imId := entry.1
         let imTs := entry.2.1
         let imSpec := entry.2.2

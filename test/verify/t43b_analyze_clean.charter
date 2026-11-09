@@ -1,0 +1,18 @@
+// #69 clean whole-specification analysis fixture: ranked exception, live power,
+// live derived fact, and preserved invariant across generated traces.
+Fact party Identified by Alice, Bob.
+Fact paid Identified by party.
+Fact receipt-issued Identified by party
+  Holds when paid(party).
+
+Power issue-payment Actor party
+  Holds when Not(paid(party))
+  Valid when Not(paid(party))
+  Creates paid(party).
+
+Fact eligible Identified by party
+  Default d_yes Holds When True
+  Exception e_unpaid Overrides d_yes Rejects When Not(paid(party)).
+
+Invariant receipt-implies-paid When
+  (Forall party: Not(receipt-issued(party)) || paid(party)).

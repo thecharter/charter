@@ -281,9 +281,11 @@ def ackedInvariants (ps : List Phrase) : List DomId :=
 /-- Run a scenario's phrases from `cfg`, reporting under each phrase's own position
 and the scenario's name (`#29`); the configuration is not changed. -/
 def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg : Config)
+    (initSpecIdx : Spec.SpecIndex)
     (ps : List Phrase) (subPos : List Pos) (discarded : List String)
     (stats : RunStats) : IO RunStats := do
   let mut cfg := cfg
+  let mut specIdx := initSpecIdx
   let mut stats := stats
   let mut locDiscard := discarded
   let mut k := 0
@@ -292,7 +294,7 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
       | some qp => if qp == {} then ⟨line, 0⟩ else qp
       | none => ⟨line, 0⟩
     k := k + 1
-    let (cfg', outs) := runPhrase cfg p
+    let (cfg', specIdx', outs) := runPhraseCached cfg specIdx o.testMode p
     stats := { stats with phrases := stats.phrases + 1 }
     let label := match p with
       | .query t => s!"?{t}"
@@ -304,14 +306,17 @@ def runScenario (o : RunOpts) (file : String) (line : Nat) (name : String) (cfg 
       let newly := recSpec.citeableIds.filter (!cfg.spec.citeableIds.contains ·)
       locDiscard := (locDiscard ++ newly).eraseDups
     cfg := cfg'
+    specIdx := specIdx'
   exploreFrom o s!"{file}:{line} [scenario {name}]" cfg stats (ackedInvariants ps)
 
 /-- Run one located item. -/
 def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located)
-    (discarded : List String := []) : IO (Config × RunStats × List String) := do
+    (discarded : List String := []) (cachedIdx? : Option Spec.SpecIndex := none) :
+    IO (Config × RunStats × List String × Spec.SpecIndex) := do
+  let curIdx := cachedIdx?.getD cfg.spec.buildIndex
   let it := l.item
   match it.val with
-  | .inl _ => return (cfg, stats, discarded)
+  | .inl _ => return (cfg, stats, discarded, curIdx)
   | .inr (.scenario name ps spans) =>
     let cfg := { cfg with spec := cfg.spec.insertScenario name spans }
     let shouldRun := o.scenarios && (o.scenarioFilter.isEmpty || o.scenarioFilter.contains name)
@@ -321,9 +326,9 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located)
     else if !o.testMode then
       IO.println s!"{l.file}:{it.pos.line}: Scenario {name} ({ps.length} phrases{if shouldRun then "" else "; skipped"})"
     if shouldRun then
-      let stats ← runScenario o l.file it.pos.line name cfg ps it.subPos discarded stats
-      return (cfg, stats, discarded)
-    else return (cfg, stats, discarded)
+      let stats ← runScenario o l.file it.pos.line name cfg curIdx ps it.subPos discarded stats
+      return (cfg, stats, discarded, curIdx)
+    else return (cfg, stats, discarded, curIdx)
   | .inr p =>
     let label := match p with
       | .query t => s!"?{t}"
@@ -333,7 +338,7 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located)
       IO.println s!"{l.file}:{it.pos.line}: {it.text}"
     if o.json then
       IO.println (Json.mkObj [("kind", "phrase"), ("file", Json.str l.file), ("line", Json.num it.pos.line), ("text", Json.str label)]).compress
-    let (cfg', outs) := runPhrase cfg p
+    let (cfg', nextIdx, outs) := runPhraseCached cfg curIdx o.testMode p
     let stats := { stats with phrases := stats.phrases + 1 }
     let stats ← report o l.file it.pos label cfg.state cfg'.state outs stats none discarded
     let discarded' := if p.hasDecls && outs.any (fun | .diag d => d.isError | _ => false) then
@@ -341,7 +346,7 @@ def stepItem (o : RunOpts) (cfg : Config) (stats : RunStats) (l : Located)
       let newly := recSpec.citeableIds.filter (!cfg.spec.citeableIds.contains ·)
       (discarded ++ newly).eraseDups
     else discarded
-    return (cfg', stats, discarded')
+    return (cfg', stats, discarded', nextIdx)
 
 /-- Print the provenance report of a resolved spec (Law 8); returns `(failedChecks, loadedDocs, coverage)`. -/
 def reportProvenance (o : RunOpts) (spec : Spec) (programDir : System.FilePath) : IO (Nat × LoadedDocs × ProvenanceCoverage) := do
@@ -375,12 +380,14 @@ def runProgram (o : RunOpts) (path : System.FilePath) : IO RunStats := do
       emit o (diagJson d) d.render (toErr := true)
       stats := { stats with errors := stats.errors + 1, codes := stats.codes ++ [d.code] }
   let mut cfg : Config := {}
+  let mut specIdx : Spec.SpecIndex := cfg.spec.buildIndex
   let mut discarded : List String := []
   for l in items do
-    let (cfg', stats', disc') ← stepItem o cfg stats l discarded
+    let (cfg', stats', disc', nextIdx) ← stepItem o cfg stats l discarded (some specIdx)
     cfg := cfg'
     stats := stats'
     discarded := disc'
+    specIdx := nextIdx
   let declaredScens := cfg.spec.scenarios.map (·.1)
   for wanted in o.scenarioFilter do
     if !declaredScens.contains wanted then
@@ -542,10 +549,23 @@ def checkCommand (args : List String) : IO UInt32 := do
       for d in AssuranceGates.checkProvenanceGate f spec loadedDocs cov do
         emit o (diagJson d) d.render (toErr := true)
         errors := errors + 1
+    let comps := computationalCompletions spec
+    let byFile := completionsByFile (items.map fun l => (l.file, l.item)) spec
+    let unquoted := unquotedDocumentClauses spec loadedDocs
+    if fl.verbose && !fl.json then
+      for (af, acs) in byFile do
+        let detail := if acs.isEmpty then "none" else ", ".intercalate acs
+        IO.println s!"  completions ({af}): {acs.length} ({detail})"
+      for (docPath, missingCids) in unquoted do
+        IO.println s!"  unquoted clauses ({docPath}): {", ".intercalate missingCids}"
     let failedTotal := errors != 0 || (fl.assurance.denyWarnings && warnings != 0)
-    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses, coverage {cov.asString}, {warnings} warning(s))"
+    let compNote := if spec.clauses.isEmpty then "" else s!", {comps.length} completion(s)"
+    let okLine := s!"ok   {f}: {items.length} phrase(s) resolve ({spec.decls.length - 3} declared types, {spec.clauses.length} clauses{compNote}, coverage {cov.asString}, {warnings} warning(s))"
     let failLine := s!"FAIL {f}: {errors} error(s) or failed checks, {warnings} warning(s)"
+    let byFileJson := Json.arr (byFile.map fun (af, acs) =>
+      Json.mkObj [("file", Json.str af), ("count", Json.num acs.length), ("declarations", Json.arr (acs.map Json.str).toArray)]).toArray
     emit o (Json.mkObj [("kind", "summary"), ("file", Json.str f), ("phrases", Json.num items.length),
+      ("completions", Json.num comps.length), ("completionsByFile", byFileJson),
       ("coverage", Json.str cov.asString),
       ("errors", Json.num errors), ("warnings", Json.num warnings), ("ok", Json.bool (!failedTotal))])
       (if !failedTotal then okLine else failLine)

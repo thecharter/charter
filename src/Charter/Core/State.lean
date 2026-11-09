@@ -131,8 +131,31 @@ def derivedFacts (s : State) : List (Tagged × Info) := s.contents.filter (·.2.
 /-- Precomputed per-`DomId` buckets preserving the exact left-to-right order of `s.contents`. -/
 abbrev StateIndex := DomMap (List (Tagged × Info))
 
+def indexList (xs : List (Tagged × Info)) : StateIndex :=
+  xs.foldr (fun p m => m.prepend p.1.2 p) .empty
+
 def buildIndex (s : State) : StateIndex :=
-  s.contents.foldr (fun p m => m.prepend p.1.2 p) .empty
+  indexList s.contents
+
+def stampFromIdx (prevIdx : StateIndex) (now : Int) (te : Tagged) : Int :=
+  match ((prevIdx.lookup te.2).getD []).find? (·.1 == te) with
+  | some (_, i) => i.since
+  | none => now
+
+def deriveWithIdx (s : State) (sIdx : StateIndex) (since : Int) (te : Tagged) : State × StateIndex × Bool :=
+  match ((sIdx.lookup te.2).getD []).find? (·.1 == te) with
+  | some _ => (s, sIdx, false)
+  | none =>
+    let info : Info := ⟨true, true, since, none, .derived te.2 s.step⟩
+    ({ s with contents := (te, info) :: s.contents }, sIdx.prepend te.2 (te, info), true)
+
+def deriveAllWithIdx (prevIdx : StateIndex) : State → StateIndex → List Tagged → State × StateIndex × Bool
+  | s, sIdx, [] => (s, sIdx, false)
+  | s, sIdx, te :: tes =>
+    match s.deriveWithIdx sIdx (stampFromIdx prevIdx s.time te) te with
+    | (s', sIdx', ch) =>
+      match deriveAllWithIdx prevIdx s' sIdx' tes with
+      | (s'', sIdx'', ch') => (s'', sIdx'', ch || ch')
 
 /-- Maximum phrase step among live evidence/finding records in `bucket` targeting `te`. -/
 def maxMatchingEvStep (now : Int) (te : Tagged) : List (Tagged × Info) → Option Nat

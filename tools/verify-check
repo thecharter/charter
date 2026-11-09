@@ -109,5 +109,15 @@ check_case "t38-diff-detects-unreviewed-formal-change" 1 'REVIEW-REQUIRED.*T38' 
   "$B" diff --require-approved "$tmp_diff/old.charter" "$tmp_diff/new.charter"
 rm -rf "$tmp_diff"
 
+# 10. #69: Whole-specification analysis (dead rules & unranked overlaps) and claim mutation
+check_case "t43-analyze-dead-and-overlap-caught" 1 "CHR047.*unranked-overlap" \
+  "$B" analyze test/verify/t43_analyze_dead_and_overlap.charter
+
+check_case "t43b-analyze-clean-passes" 0 "^ok " \
+  "$B" analyze test/verify/t43b_analyze_clean.charter
+
+check_case "t44-mutate-claims-catches-vacuous" 1 "survived claim mutation" \
+  "$B" test --mutate-claims test/verify/t44_mutate_claims_vacuous.charter
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

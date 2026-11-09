@@ -1,0 +1,5 @@
+// 011.7d (#63): dependency direction `case -> root -> articles -> modules` — a root file
+// declaring `Document` may not `#require` a case file containing `Scenario`s (CHR046).
+//! expect-error: CHR046
+Document "include/tenancy.md"
+#require "include/case-with-scenario.charter".

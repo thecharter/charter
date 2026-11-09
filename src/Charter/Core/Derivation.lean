@@ -155,42 +155,64 @@ def typeDeps (spec : Spec) (d : DomId) (tspec : TypeSpec) : List Dep :=
   let fromFilter := deps spec fuel xs .pos tspec.domainConstraint
   fromDerivations ++ fromConds ++ fromFilter
 
-/-- Strata of the derived types, lowest first, or the types on a negative cycle. -/
+def dfsReach (adj : DomMap (List DomId)) : Nat → List DomId → DomMap Bool → DomMap Bool
+  | 0, _, vis => vis
+  | _, [], vis => vis
+  | fuel + 1, u :: work, vis =>
+    if (vis.lookup u).isSome then dfsReach adj fuel work vis
+    else
+      let vis' := vis.insert u true
+      let nbrs := (adj.lookup u).getD []
+      dfsReach adj fuel (nbrs ++ work) vis'
+
+/-- Strata of the derived types, lowest first, or the types on a negative cycle (`#78`:
+indexed `DomMap` reachability avoids cubic `List.contains` closure on 700+ type specs). -/
 def strata (spec : Spec) : Except (List DomId) (List (List DomId)) :=
-  let derived := spec.derivedTypes
+  let specIdx := spec.buildIndex
+  let derived := spec.decls.filterMap fun (p : DomId × TypeSpec) =>
+    if p.2.derivation.isEmpty then none
+    else
+      let hasJudged := match specIdx.lookup p.1 with
+        | some (_, _, some _) => true
+        | _ => false
+      if hasJudged && p.2.derivation.all (fun | .holdsWhen _ => true | _ => false) then none
+      else some p.1
+  let derivedSet : DomMap Bool := derived.foldl (fun m d => m.insert d true) .empty
   let edges : List (DomId × Dep) := derived.flatMap fun d =>
-    match spec.findDecl d with
-    | some t => (typeDeps spec d t).filter (fun e => derived.contains e.1) |>.map (d, ·)
+    match specIdx.lookup d with
+    | some (t, _, _) => (typeDeps spec d t).filter (fun e => (derivedSet.lookup e.1).isSome) |>.map (d, ·)
     | none => []
-  let direct (a b : DomId) : Bool := edges.any fun (x, (y, _)) => x == a && y == b
-  let rec closure (fuel : Nat) (reach : List (DomId × DomId)) : List (DomId × DomId) :=
-    match fuel with
-    | 0 => reach
-    | fuel + 1 =>
-      let more := reach.flatMap fun (a, b) => reach.filterMap fun (b', c) =>
-        if b == b' && !reach.contains (a, c) then some (a, c) else none
-      let more := more.eraseDups
-      if more.isEmpty then reach else closure fuel (reach ++ more)
-  let reach := closure (derived.length * derived.length + 1) (edges.map fun (a, (b, _)) => (a, b))
-  let reaches (a b : DomId) : Bool := a == b || reach.contains (a, b)
+  let adj : DomMap (List DomId) := edges.foldl (fun m (a, (b, _)) =>
+    let cur := (m.lookup a).getD []
+    if cur.contains b then m else m.insert a (b :: cur)) .empty
+  let dfsFuel := 2 * edges.length + derived.length + 2
+  let reachMap : DomMap (DomMap Bool) := derived.foldl (fun m d =>
+    let nbrs := (adj.lookup d).getD []
+    m.insert d (dfsReach adj dfsFuel nbrs .empty)) .empty
+  let nonTrivReaches (a b : DomId) : Bool :=
+    match reachMap.lookup a with
+    | some vis => (vis.lookup b).isSome
+    | none => false
+  let reaches (a b : DomId) : Bool := a == b || nonTrivReaches a b
   let bad := edges.filter fun (a, (b, p)) => p == .neg && reaches b a
   if !bad.isEmpty then .error (bad.map (·.1) |>.eraseDups)
   else
-    let rec layers (fuel : Nat) (pending done : List DomId) (acc : List (List DomId)) : List (List DomId) :=
+    let rec layers (fuel : Nat) (pending : List DomId) (acc : List (List DomId)) : List (List DomId) :=
       match fuel with
       | 0 => acc ++ [pending]
       | fuel + 1 =>
         if pending.isEmpty then acc else
         let ready := pending.filter fun d => pending.all fun e =>
-          e == d || !(direct d e || reach.contains (d, e)) || reaches e d
+          e == d || !nonTrivReaches d e || reaches e d
         if ready.isEmpty then acc ++ [pending]
         else
+          let readySet : DomMap Bool := ready.foldl (fun m d => m.insert d true) .empty
           let groups := ready.foldl (fun (gs : List (List DomId)) d =>
             match gs.findIdx? (fun g => g.any fun e => reaches d e && reaches e d) with
             | some i => gs.set i (gs[i]! ++ [d])
             | none => gs ++ [[d]]) []
-          layers fuel (pending.filter (fun d => !ready.contains d)) (done ++ ready) (acc ++ groups)
-    .ok (layers (derived.length + 1) derived [] [])
+          layers fuel (pending.filter (fun d => (readySet.lookup d).isNone)) (acc ++ groups)
+    .ok (layers (derived.length + 1) derived [])
 
 end Stratify
 

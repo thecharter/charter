@@ -1,0 +1,13 @@
+// 011.7e (#63): a specialising root (declaring its own `Document`) MAY `#require` a base root
+// and declare additional rules and clauses without triggering CHR043 or CHR046.
+#require "include/document-owner.charter".
+Document BYLAW "include/bylaw.md" Rank 2.
+
+Act authorize-issuance Actor landlord.
+Clause B.1 In BYLAW Approved "6ac4054cc9ee87ed421c9de60e053a45d961a994c92f0eeaf41eda8550cdc754" Text "The board may authorize a share issuance only when quorum holds."
+  Norm "The board may authorize a share issuance only when quorum holds." => authorize-issuance.
+
+Scenario specialised-ok {
+  +pay-rent(T, L).
+  ?pay-rent(T, L).
+}

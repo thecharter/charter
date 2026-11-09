@@ -57,6 +57,12 @@ more errors); `warning` does not.
 | CHR040 | warning | a binder over an unrestricted, non-derived, closed `Money`, `Quantity`, `Duration`, or built-in `int`/`string` carrier type ranges over held instances of that type itself, of which none are asserted (004.7) | `Charter.Resolve` |
 | CHR041 | warning | an `Immunity` has no `Holds when` / `Default` rule and nothing creates an instance of it, so it protects no one (007.4) | `Charter.Resolve.AssuranceGates` |
 | CHR042 | warning | an `Act` declares both `Except under` and `Holds when` (`Holds when` is ignored when `Except under` is present, 007.2) | `Charter.Resolve` |
+| CHR043 | error | a case file (requiring a root `Document` without declaring its own `Document`) declares new types, rules, or clauses beyond `Extend ... Identified by ...` (`#63`) | `Charter.Cli.Load` |
+| CHR044 | error | duplicate `Clause` ID across files or declarations (each clause must have a single owner, `#63`) | `Charter.Cli.Load` |
+| CHR046 | error | `#require` / `#include` violates the `case -> root -> articles -> modules` dependency direction (`#63`) | `Charter.Cli.Load` |
+| CHR047 | error | `charter analyze`: two `Default` / `Exception` rules on a type prescribe distinct outcomes with no `Overrides` or `Document Rank` priority and non-disjoint conditions (`#69`) | `Charter.Cli.Analyze` |
+| CHR048 | error | `charter analyze`: dead rule — a `Power` that can never be valid, an undischargeable or dead `Duty`, an `Immunity` that never holds, or a derived `Fact` that can never be derived (`#69`) | `Charter.Cli.Analyze` |
+| CHR049 | error | `charter analyze`: an invariant is violated on a generated lawful scenario trace (`#69`) | `Charter.Cli.Analyze` |
 
 ## Evaluation (CHR100–CHR149)
 

@@ -1,0 +1,24 @@
+// #69 whole-specification analysis fixture:
+// 1. Unranked Default/Exception overlap on `eligible` (`e_no` Overrides `d_base` Rejects vs
+//    `e_vip` Overrides `d_base` Holds, forgetting `e_no` in `Overrides`!);
+// 2. Dead power `dead-grant` (`Valid when False` on a `Power`);
+// 3. Dead derived fact `never-derived` (`Holds when False`);
+// 4. Dead immunity `never-immune` (`Holds when False`).
+Fact party Identified by Alice, Bob.
+Fact vip Identified by party.
+
+Fact eligible Identified by party
+  Default d_base Holds When True
+  Exception e_no Overrides d_base Rejects When party == Bob
+  Exception e_vip Overrides d_base Holds When vip(party).
+
+Power dead-grant Actor party Recipient party'
+  Holds when True
+  Valid when False
+  Creates eligible(party').
+
+Fact never-derived Identified by party
+  Holds when False.
+
+Immunity never-immune Holder party Against dead-grant
+  Holds when False.

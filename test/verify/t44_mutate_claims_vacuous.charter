@@ -1,0 +1,11 @@
+// #69 claim-mutation fixture: `?(Foreach party: paid(party) When False)` is vacuously true
+// because 0 instances match `When False`, so flipping `?` to `?!` ALSO passes unless caught
+// by `charter test --mutate-claims`.
+Fact party Identified by Alice.
+Fact paid Identified by party.
+
+Scenario vacuous-claim-survives {
+  +paid(Alice).
+  ?paid(Alice).
+  ?occurred (paid(party) When False).
+}

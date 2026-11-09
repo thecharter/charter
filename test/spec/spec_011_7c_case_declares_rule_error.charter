@@ -1,0 +1,9 @@
+// 011.7c (#63): a case file that `#require`s a root Document and declares no rules or new types
+// (only `Extend ... Identified by ...` domain atoms, initial state, and `Scenario`s) is valid,
+// whereas declaring a new type, rule, or derivation in a case file is rejected with CHR043.
+//! expect-error: CHR043
+#require "include/document-owner.charter".
+
+Extend Fact tenant Identified by Bob.
+Fact extra-case-rule Identified by tenant
+  Holds when True.

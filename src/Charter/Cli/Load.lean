@@ -85,31 +85,171 @@ def rebaseDocuments (rel : System.FilePath) : Phrase → Phrase
     .decls (ds.map rebOne)
   | ph => ph
 
+/-- Recorded `#include`/`#require` edge for `#63` layout verification. -/
+structure IncludeEdge where
+  parentCanon   : String
+  parentDisplay : String
+  childCanon    : String
+  childDisplay  : String
+  pos           : Pos
+
+/-- Metadata of one loaded source file's own items (excluding included children) for `#63`. -/
+structure FileMeta where
+  canonPath   : String
+  displayPath : String
+  ownItems    : List Item
+
+def isCaseAllowedMod : ModClause → Bool
+  | .atPos _ m => isCaseAllowedMod m
+  | .strings _ | .ints _ => true
+  | _ => false
+
+def isCaseAllowedDecl (d : Decl) : Bool :=
+  match d.stripPos with
+  | .typeExt _ mcs _ => mcs.all isCaseAllowedMod
+  | _ => false
+
+def declPosOr (fallback : Pos) : Decl → Pos
+  | .atPos p _ => if p == {} then fallback else p
+  | _ => fallback
+
+/-- Verify `#63` layout rules across loaded files and include/require edges:
+- `CHR043`: case files (non-root files requiring a root `Document`) declare no new types, rules, or clauses;
+- `CHR044`: one owner per `(docId?, clauseId)` across all loaded files;
+- `CHR046`: dependency direction `case -> root -> articles -> modules`. -/
+def checkLayoutRules (items : List Located) (metas : List FileMeta) (edges : List IncludeEdge) :
+    List Diagnostic := Id.run do
+  let mut diags : List Diagnostic := []
+  -- 1. Single owner per clause ID (`CHR044`)
+  let mut seenClauses : List ((Option String × ClauseId) × String × Pos) := []
+  for l in items do
+    match l.item.val with
+    | .inr (.decls ds) =>
+      for rawD in ds do
+        let p := declPosOr l.item.pos rawD
+        match rawD.stripPos with
+        | .clause c =>
+          let key := (c.docId, c.id)
+          match seenClauses.find? (·.1 == key) with
+          | some (_, prevFile, prevPos) =>
+            diags := diags ++ [(Diagnostic.error "CHR044"
+              s!"duplicate Clause `{c.id}` (already owned at {prevFile}:{prevPos.line}); each clause must have a single owner"
+              p).withFile l.file]
+          | none =>
+            seenClauses := seenClauses ++ [(key, l.file, p)]
+        | _ => pure ()
+    | _ => pure ()
+
+  -- 2. Classify each file from its own items
+  let hasOwnDoc (cPath : String) : Bool :=
+    match metas.find? (·.canonPath == cPath) with
+    | none => false
+    | some fm => fm.ownItems.any fun it => match it.val with
+      | .inr (.decls ds) => ds.any fun d => match d.stripPos with | .document .. => true | _ => false
+      | _ => false
+  let hasOwnClause (cPath : String) : Bool :=
+    match metas.find? (·.canonPath == cPath) with
+    | none => false
+    | some fm => fm.ownItems.any fun it => match it.val with
+      | .inr (.decls ds) => ds.any fun d => match d.stripPos with | .clause .. => true | _ => false
+      | _ => false
+  let hasOwnModule (cPath : String) : Bool :=
+    match metas.find? (·.canonPath == cPath) with
+    | none => false
+    | some fm => fm.ownItems.any fun it => match it.val with
+      | .inr (.decls ds) => ds.any fun d => match d.stripPos with | .module .. => true | _ => false
+      | _ => false
+  let hasOwnScenario (cPath : String) : Bool :=
+    match metas.find? (·.canonPath == cPath) with
+    | none => false
+    | some fm => fm.ownItems.any fun it => match it.val with
+      | .inr (.scenario ..) => true
+      | _ => false
+
+  let rec reachesOtherDoc (fuel : Nat) (work visited : List String) (origin : String) : Bool :=
+    match fuel, work with
+    | 0, _ | _, [] => false
+    | fuel' + 1, u :: rest =>
+      if visited.contains u then reachesOtherDoc fuel' rest visited origin
+      else if u != origin && hasOwnDoc u then true
+      else
+        let nbrs := edges.filterMap fun e => if e.parentCanon == u then some e.childCanon else none
+        reachesOtherDoc fuel' (nbrs ++ rest) (u :: visited) origin
+
+  let reachFuel := 2 * edges.length + metas.length + 2
+  let requiresRoot (cPath : String) : Bool :=
+    reachesOtherDoc reachFuel [cPath] [] cPath
+
+  let fileRole (cPath : String) : String :=
+    match hasOwnDoc cPath, hasOwnClause cPath, hasOwnScenario cPath, hasOwnModule cPath, requiresRoot cPath with
+    | true, _, _, _, _ => "root"
+    | false, true, _, _, _ => "article"
+    | false, false, false, true, _ => "module"
+    | false, false, true, _, _ => "case"
+    | false, false, false, false, true => "case"
+    | _, _, _, _, _ => "plain"
+
+  -- `CHR043`: case files declare nothing beyond `Extend ... Identified by ...`
+  for fm in metas do
+    if !hasOwnDoc fm.canonPath && requiresRoot fm.canonPath then
+      let mut reported : Bool := false
+      for it in fm.ownItems do
+        if !reported then
+          match it.val with
+          | .inr (.decls ds) =>
+            for rawD in ds do
+              if !reported && !isCaseAllowedDecl rawD then
+                let p := declPosOr it.pos rawD
+                diags := diags ++ [(Diagnostic.error "CHR043"
+                  "case file declares types, rules, or clauses after requiring a root Document; keep only `Extend ... Identified by ...`, initial state, and `Scenario`s in case files (or declare a specialising `Document`)"
+                  p).withFile fm.displayPath]
+                reported := true
+          | _ => pure ()
+
+  -- 3. Dependency direction: `case -> root -> articles -> modules` (`CHR046`)
+  for e in edges do
+    let pRole := fileRole e.parentCanon
+    let cRole := fileRole e.childCanon
+    let bad :=
+      (pRole == "root" && cRole == "case") ||
+      (pRole == "article" && (cRole == "root" || cRole == "case")) ||
+      (pRole == "module" && (cRole == "root" || cRole == "article" || cRole == "case"))
+    if bad then
+      diags := diags ++ [(Diagnostic.error "CHR046"
+        s!"{pRole} file may not require or include {cRole} file `{e.childDisplay}` (expected dependency direction: case -> root -> articles -> modules)"
+        e.pos).withFile e.parentDisplay]
+  return diags
+
 /-- Load a file and expand its directives. `seen` holds every file loaded so far
 (for `#require`); `dirs` the include directories accumulated so far (eFLINT adds the
 directory of every file it loads, so a file under `usage-control/` that requires
 `../access.eflint` can then require `simple-scenario.eflint` from the parent); `top` is
 the directory of the program's own file; `depth` bounds include chains. -/
-def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (dirs : List System.FilePath) : Nat →
-    IO (List Located × List Diagnostic × List String × List System.FilePath)
-  | 0 => return ([], [Diagnostic.error "CHR005" s!"include chain too deep at {path}"], seen, dirs)
+def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (dirs : List System.FilePath)
+    (metas : List FileMeta) (edges : List IncludeEdge) : Nat →
+    IO (List Located × List Diagnostic × List String × List System.FilePath × List FileMeta × List IncludeEdge)
+  | 0 => return ([], [Diagnostic.error "CHR005" s!"include chain too deep at {path}"], seen, dirs, metas, edges)
   | depth + 1 => do
     let pathS := path.toString
     let src ← try IO.FS.readFile path catch _ => pure ""
     if !(← path.pathExists) then
-      return ([], [Diagnostic.error "CHR005" s!"cannot read {pathS}"], seen, dirs)
+      return ([], [Diagnostic.error "CHR005" s!"cannot read {pathS}"], seen, dirs, metas, edges)
     let canonPath ← (try (·.toString) <$> IO.FS.realPath path catch _ => pure pathS)
     let seen := if seen.contains canonPath then seen else seen ++ [canonPath]
     let dir := dirOf path
     let dirs := if dirs.contains dir then dirs else dirs ++ [dir]
     let rel? ← relativeDir top dir
     match parseSource src eflint with
-    | .error e => return ([], [e.withFile pathS], seen, dirs)
+    | .error e => return ([], [e.withFile pathS], seen, dirs, metas, edges)
     | .ok items =>
+      let metas := if metas.any (·.canonPath == canonPath) then metas
+                   else metas ++ [{ canonPath, displayPath := pathS, ownItems := items }]
       let mut acc : List Located := []
       let mut diags : List Diagnostic := []
       let mut seen := seen
       let mut dirs := dirs
+      let mut metas := metas
+      let mut edges := edges
       for it in items do
         match it.val with
         | .inr ph =>
@@ -125,14 +265,18 @@ def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (
           | none => diags := diags ++ [(Diagnostic.error "CHR005" s!"cannot find {name} (looked in {dirs})" it.pos).withFile pathS]
           | some f =>
             let fCanon ← (try (·.toString) <$> IO.FS.realPath f catch _ => pure f.toString)
+            edges := edges ++ [{ parentCanon := canonPath, parentDisplay := pathS,
+                                 childCanon := fCanon, childDisplay := f.toString, pos := it.pos }]
             if once && seen.contains fCanon then pure ()
             else
-              let (its, ds, seen', dirs') ← loadFile eflint top f seen dirs depth
+              let (its, ds, seen', dirs', metas', edges') ← loadFile eflint top f seen dirs metas edges depth
               acc := acc ++ its
               diags := diags ++ ds
               seen := seen'
               dirs := dirs'
-      return (acc, diags, seen, dirs)
+              metas := metas'
+              edges := edges'
+      return (acc, diags, seen, dirs, metas, edges)
 
 /-- Load a program: its items in order, and the diagnostics of loading. `eflint`
 restricts the keywords to eFLINT's (`--eflint`). -/
@@ -140,7 +284,8 @@ def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Loc
   let stdDirs ← match ← locateCharterRoot with
     | some r => pure [r, r / "lib"]
     | none => pure []
-  let (its, ds, _, _) ← loadFile eflint (dirOf path) path [] ("." :: stdDirs) 64
-  return (its, ds)
+  let (its, ds, _, _, metas, edges) ← loadFile eflint (dirOf path) path [] ("." :: stdDirs) [] [] 64
+  let layoutDiags := if ds.any (·.isError) then [] else checkLayoutRules its metas edges
+  return (its, ds ++ layoutDiags)
 
 end Charter.Cli

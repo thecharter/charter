@@ -1,0 +1,10 @@
+// 012.10b (#63): one owner per clause — quoting the same Clause ID more than once is CHR044.
+//! expect-error: CHR044
+Document "include/tenancy.md".
+
+Fact tenant Identified by T
+Fact landlord Identified by L
+Duty pay-rent Holder tenant Claimant landlord
+
+Clause T.1 => pay-rent
+Clause T.1 => tenant.

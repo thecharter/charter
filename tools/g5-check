@@ -29,12 +29,16 @@ else
   bad "g5-doctor-claims-verified" "claims check failed"
 fi
 
-# 3. `charter doc` generates Markdown rulebook + statutory decision table
+# 3. `charter doc` generates Markdown rulebook + statutory decision table + `#64` legal views (Markdown & HTML)
 if "$B" doc Examples/TreasuryMandate/treasury-mandate.charter -o "$tmp/rulebook.md" >/dev/null 2>&1 \
-   && grep -q "Decision Table: \`apparent-authority-protects\`" "$tmp/rulebook.md"; then
-  ok "g5-doc-rulebook-and-decision-table"
+   && grep -q "Decision Table: \`apparent-authority-protects\`" "$tmp/rulebook.md" \
+   && "$B" doc --view legal Examples/LastWill/will.charter -o "$tmp/legal.md" >/dev/null 2>&1 \
+   && grep -q "Computational Completions" "$tmp/legal.md" \
+   && "$B" doc --view legal --format html Examples/LastWill/cases/estate.charter -o "$tmp/legal.html" >/dev/null 2>&1 \
+   && grep -q "clause-pair" "$tmp/legal.html" && grep -q "Scenario Execution Trace" "$tmp/legal.html"; then
+  ok "g5-doc-rulebook-and-legal-views"
 else
-  bad "g5-doc-rulebook-and-decision-table" "missing expected rulebook table"
+  bad "g5-doc-rulebook-and-legal-views" "missing expected rulebook or legal view output"
 fi
 
 # 4. `charter lsp` stdio JSON-RPC (`initialize`, `didOpen` publishDiagnostics, `hover`, `definition`, `formatting`)
@@ -61,9 +65,33 @@ reqs = b"".join([
 p = subprocess.run([charter_bin, "lsp"], input=reqs, capture_output=True)
 assert p.returncode == 0, f"lsp exit {p.returncode}: {p.stderr.decode()}"
 out = p.stdout.decode("utf-8")
-assert '"hoverProvider":true' in out, f"missing hoverProvider: {out}"
+assert '"hoverProvider":true' in out and '"inlayHintProvider":true' in out, f"missing providers: {out}"
 assert '"method":"textDocument/publishDiagnostics"' in out, f"missing diagnostics notification: {out}"
 assert 'tenancy.md' in out or '"diagnostics":[]' in out, f"unexpected lsp payload: {out}"
+
+# #72: verify implicit constructor argument expansion on hover + defeasible rule priority order + inlayHint
+src72 = """Fact grantor Identified by Ada.
+Fact grantee Identified by Ben.
+Fact parcel Identified by Lot7.
+Fact signed Identified by grantor * grantee * parcel.
+Fact clear-title Identified by parcel
+  Default d_ok Holds When signed()
+  Exception e_lien Overrides d_ok Rejects When False.
+"""
+reqs72 = b"".join([
+    frame({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+    frame({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": "file:///tmp/t72.charter", "text": src72}}}),
+    frame({"jsonrpc": "2.0", "id": 2, "method": "textDocument/hover", "params": {"textDocument": {"uri": "file:///tmp/t72.charter"}, "position": {"line": 5, "character": 28}}}),
+    frame({"jsonrpc": "2.0", "id": 3, "method": "textDocument/hover", "params": {"textDocument": {"uri": "file:///tmp/t72.charter"}, "position": {"line": 4, "character": 8}}}),
+    frame({"jsonrpc": "2.0", "id": 4, "method": "textDocument/inlayHint", "params": {"textDocument": {"uri": "file:///tmp/t72.charter"}, "range": {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}}}}),
+    frame({"jsonrpc": "2.0", "id": 5, "method": "shutdown", "params": {}}),
+    frame({"jsonrpc": "2.0", "method": "exit", "params": {}}),
+])
+p72 = subprocess.run([charter_bin, "lsp"], input=reqs72, capture_output=True)
+assert p72.returncode == 0
+out72 = p72.stdout.decode("utf-8")
+assert "signed(grantor = grantor, grantee = grantee, parcel = parcel)" in out72, out72
+assert "Exception `e_lien`" in out72 and "Default `d_ok`" in out72, out72
 PY
 then
   ok "g5-lsp-initialize-diagnostics-hover-definition"

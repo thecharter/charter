@@ -41,7 +41,7 @@ def replLoop (o : RunOpts) (h : IO.FS.Stream) : Nat → Config → RunStats → 
         let mut cfg := cfg
         let mut stats := stats
         for it in items do
-          let (cfg', stats', _) ← stepItem o cfg stats ⟨"<repl>", it⟩
+          let (cfg', stats', _, _) ← stepItem o cfg stats ⟨"<repl>", it⟩
           cfg := cfg'
           stats := stats'
         replLoop o h fuel cfg stats
@@ -57,7 +57,7 @@ def replCommand (args : List String) : IO UInt32 := do
     let (items, loadDiags) ← loadProgram f
     for d in loadDiags do IO.eprintln d.render
     for l in items do
-      let (cfg', stats', _) ← stepItem o cfg stats l
+      let (cfg', stats', _, _) ← stepItem o cfg stats l
       cfg := cfg'
       stats := stats'
   | _ => IO.eprintln "usage: charter repl [file.eflint]"; return 2

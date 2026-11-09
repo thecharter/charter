@@ -1,4 +1,5 @@
 import Charter.Cli.Test
+import Charter.Cli.Analyze
 import Charter.Cli.Prove
 import Charter.Cli.Repl
 import Charter.Cli.Fmt
@@ -38,6 +39,7 @@ def helpText : String :=
   "  doctor   [--claims ...] [--lock]        verify claims registry, lockfile digests, and environment\n" ++
   "  run      <file.charter>                 run top-level phrases and report transitions\n" ++
   "  test     <file.charter | dir> ...       run scenarios, provenance checks, and invariant exploration\n" ++
+  "  analyze  <file.charter> ...             check dead rules, unranked overlaps, and generated scenarios\n" ++
   "  explore  [flags] <file.charter> ...     explore lawful, adversarial, or mixed state spaces\n" ++
   "  verify   [flags] <file.charter> ...     verify invariants & temporal properties (finite, smt, inductive)\n" ++
   "  explain  <expr> <file.charter> [flags]  emit audience-scoped ReasonGraph with counterfactuals\n" ++
@@ -70,6 +72,7 @@ def main (args : List String) : IO UInt32 := do
   | "doctor" :: rest => doctorCommand rest
   | "run" :: rest => runCommand rest
   | "test" :: rest => testCommand rest
+  | "analyze" :: rest => analyzeCommand rest
   | "explore" :: rest => exploreCommand rest
   | "verify" :: rest => verifyCommand rest
   | "explain" :: rest => explainCommand rest

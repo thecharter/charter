@@ -355,14 +355,6 @@ theorem foldl_saturate_lookup (spec : Spec) (specIdx : Spec.SpecIndex)
       exact foldl_saturate_lookup spec specIdx prevFn rest s1 s' te i
         (saturateStratum_lookup spec specIdx (prevFn s layer) layer 100000 s s1 te i h h1) hf
 
-/-- 004.3, in full: an assigned fact is exactly what the state holds after saturation,
-with its stamp, expiry and origin. -/
-theorem rebaseAndSat_assigned (spec : Spec) (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info)
-    (h : s.lookup te = some i) (hi : i.fromSat = false) (hs : rebaseAndSat spec strata s = .ok s') :
-    s'.lookup te = some i :=
-  foldl_saturate_lookup spec spec.buildIndex (fun acc layer => s.derivedFacts ++ clockThresholdSeeds spec spec.buildIndex acc layer)
-    strata s.rebase s' te i (State.rebase_lookup s te i h hi) hs
-
 end Saturate
 
 /-! ## 006.2 and 006.5: the report and the query agree
@@ -547,7 +539,7 @@ theorem foldr_prepend_wf :
 returns the order-preserving list of entries in `s.contents` belonging to `d`. -/
 theorem buildIndex_bucket_eq (s : State) (d : DomId) :
     ((s.buildIndex.lookup d).getD []) = s.contents.filter (fun p => p.1.2 == d) := by
-  unfold buildIndex
+  unfold buildIndex indexList
   induction s.contents with
   | nil => rfl
   | cons p rest ih =>
@@ -583,6 +575,161 @@ theorem buildIndex_lookup_eq (s : State) (te : Tagged) :
     (((s.buildIndex.lookup te.2).getD []).find? (·.1 == te)).map (·.2) = s.lookup te := by
   rw [buildIndex_bucket_eq, find?_filter_dom_eq]
   rfl
+
+theorem deriveWithIdx_preserves (s : State) (since : Int) (te' te : Tagged) (i : Info)
+    (h : s.lookup te = some i) :
+    (s.deriveWithIdx s.buildIndex since te').1.lookup te = some i ∧
+    (s.deriveWithIdx s.buildIndex since te').2.1 = (s.deriveWithIdx s.buildIndex since te').1.buildIndex := by
+  unfold deriveWithIdx
+  have hlk := buildIndex_lookup_eq s te'
+  rcases hfind : ((s.buildIndex.lookup te'.2).getD []).find? (·.1 == te') with _ | ⟨q, iq⟩
+  · rw [hfind] at hlk; simp only [Option.map_none] at hlk
+    have hne : te' ≠ te := by rintro rfl; rw [← hlk] at h; cases h
+    rw [hfind]
+    refine ⟨?_, rfl⟩
+    simp only [lookup, List.find?_cons, Tagged.beq_eq_false_of_ne hne]
+    exact h
+  · rw [hfind]
+    exact ⟨h, rfl⟩
+
+theorem deriveAllWithIdx_preserves (prevIdx : StateIndex) :
+    ∀ (tes : List Tagged) (s : State) (te : Tagged) (i : Info),
+      s.lookup te = some i →
+      (deriveAllWithIdx prevIdx s s.buildIndex tes).1.lookup te = some i ∧
+      (deriveAllWithIdx prevIdx s s.buildIndex tes).2.1 = (deriveAllWithIdx prevIdx s s.buildIndex tes).1.buildIndex
+  | [], s, _, _, h => ⟨h, rfl⟩
+  | te' :: tes, s, te, i, h => by
+    simp only [deriveAllWithIdx]
+    have ⟨h1, hidx1⟩ := deriveWithIdx_preserves s (stampFromIdx prevIdx s.time te') te' te i h
+    rcases hd1 : s.deriveWithIdx s.buildIndex (stampFromIdx prevIdx s.time te') te' with ⟨s1, sIdx1, ch1⟩
+    rw [hd1] at h1 hidx1; dsimp only at h1 hidx1
+    subst hidx1
+    have ⟨h2, hidx2⟩ := deriveAllWithIdx_preserves prevIdx tes s1 te i h1
+    rcases hd2 : deriveAllWithIdx prevIdx s1 s1.buildIndex tes with ⟨s2, sIdx2, ch2⟩
+    rw [hd2] at h2 hidx2; exact ⟨h2, hidx2⟩
+
+end State
+
+namespace Saturate
+
+theorem passTypeIdx_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (d : DomId) (tspec : TypeSpec) :
+    ∀ (cs : List Derivation) (s s2 : State) (sIdx2 : State.StateIndex) (b : Bool) (te : Tagged) (i : Info),
+      s.lookup te = some i →
+      passTypeIdx spec specIdx hasEp immDecls prevIdx d tspec cs s s.buildIndex = .ok (s2, sIdx2, b) →
+      s2.lookup te = some i ∧ sIdx2 = s2.buildIndex
+  | [], s, s2, sIdx2, b, te, i, h, hp => by
+    simp only [passTypeIdx, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1, ← hp.2.1]; exact ⟨h, rfl⟩
+  | c :: cs, s, s2, sIdx2, b, te, i, h, hp => by
+    simp only [passTypeIdx] at hp
+    split at hp
+    · cases hp
+    · next ress _ =>
+      have ⟨hs1, hidx1⟩ := State.deriveAllWithIdx_preserves prevIdx ress.flatten s te i h
+      rcases hd1 : State.deriveAllWithIdx prevIdx s s.buildIndex ress.flatten with ⟨s1, sIdx1, ch⟩
+      rw [hd1] at hp hs1 hidx1; dsimp only at hs1 hidx1
+      subst hidx1
+      split at hp
+      · cases hp
+      · next s2' sIdx2' ch2 h2 =>
+        simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+        rw [← hp.1, ← hp.2.1]
+        exact passTypeIdx_lookup spec specIdx hasEp immDecls prevIdx d tspec cs s1 s2' sIdx2' ch2 te i hs1 h2
+
+theorem passIdx_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex) :
+    ∀ (types : List DomId) (s s2 : State) (sIdx2 : State.StateIndex) (b : Bool) (te : Tagged) (i : Info),
+      s.lookup te = some i →
+      passIdx spec specIdx hasEp immDecls prevIdx types s s.buildIndex = .ok (s2, sIdx2, b) →
+      s2.lookup te = some i ∧ sIdx2 = s2.buildIndex
+  | [], s, s2, sIdx2, b, te, i, h, hp => by
+    simp only [passIdx, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1, ← hp.2.1]; exact ⟨h, rfl⟩
+  | d :: ds, s, s2, sIdx2, b, te, i, h, hp => by
+    simp only [passIdx] at hp
+    split at hp
+    · exact passIdx_lookup spec specIdx hasEp immDecls prevIdx ds s s2 sIdx2 b te i h hp
+    · next tspec _ =>
+      split at hp
+      · cases hp
+      · next s1 sIdx1 ch h1 =>
+        have ⟨hs1, hidx1⟩ := passTypeIdx_lookup spec specIdx hasEp immDecls prevIdx d tspec tspec.derivation s s1 sIdx1 ch te i h h1
+        subst hidx1
+        split at hp
+        · cases hp
+        · next s2' sIdx2' ch2 h2 =>
+          simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+          rw [← hp.1, ← hp.2.1]
+          exact passIdx_lookup spec specIdx hasEp immDecls prevIdx ds s1 s2' sIdx2' ch2 te i hs1 h2
+
+theorem saturateStratumIdx_lookup (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp isRec : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (types : List DomId) :
+    ∀ (fuel : Nat) (s s' : State) (sIdx' : State.StateIndex) (te : Tagged) (i : Info),
+      s.lookup te = some i →
+      saturateStratumIdx spec specIdx hasEp isRec immDecls prevIdx types fuel s s.buildIndex = .ok (s', sIdx') →
+      s'.lookup te = some i ∧ sIdx' = s'.buildIndex
+  | 0, _, _, _, _, _, _, hs => by simp [saturateStratumIdx] at hs
+  | fuel + 1, s, s', sIdx', te, i, h, hs => by
+    simp only [saturateStratumIdx] at hs
+    split at hs
+    · cases hs
+    · next s1 sIdx1 changed heq =>
+      have ⟨hs1, hidx1⟩ := passIdx_lookup spec specIdx hasEp immDecls prevIdx types s s1 sIdx1 changed te i h heq
+      subst hidx1
+      split at hs
+      · exact saturateStratumIdx_lookup spec specIdx hasEp isRec immDecls prevIdx types fuel s1 s' sIdx' te i hs1 hs
+      · simp only [Except.ok.injEq, Prod.mk.injEq] at hs
+        rw [← hs.1, ← hs.2]; exact ⟨hs1, rfl⟩
+
+/-- 004.3, in full: an assigned fact is exactly what the state holds after saturation,
+with its stamp, expiry and origin. -/
+theorem rebaseAndSat_assigned (spec : Spec) (strata : List (List DomId)) (s s' : State) (te : Tagged) (i : Info)
+    (h : s.lookup te = some i) (hi : i.fromSat = false) (hs : rebaseAndSat spec strata s = .ok s') :
+    s'.lookup te = some i := by
+  unfold rebaseAndSat rebaseAndSatWithIdx at hs
+  let basePrevIdx := State.indexList s.derivedFacts
+  let hasEp := spec.hasEpistemicOrDefeasible
+  let immDecls := spec.allImmunities
+  have hfold : ∀ (layers : List (List DomId)) (st st' : State) (stIdx' : State.StateIndex),
+      st.lookup te = some i →
+      layers.foldlM (fun (acc, accIdx) layer =>
+        let seeds := clockThresholdSeedsIdx spec spec.buildIndex hasEp immDecls acc accIdx layer
+        let prevIdx := if seeds.isEmpty then basePrevIdx else State.indexList (s.derivedFacts ++ seeds)
+        let isRec := layerNeedsLoop spec spec.buildIndex layer
+        saturateStratumIdx spec spec.buildIndex hasEp isRec immDecls prevIdx layer 100000 acc accIdx)
+        (st, st.buildIndex) = .ok (st', stIdx') →
+      st'.lookup te = some i := by
+    intro layers
+    induction layers with
+    | nil =>
+      intro st st' stIdx' hst hf
+      simp only [List.foldlM, pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at hf
+      rw [← hf.1]; exact hst
+    | cons layer rest ih =>
+      intro st st' stIdx' hst hf
+      simp only [List.foldlM, bind, Except.bind] at hf
+      split at hf
+      · cases hf
+      · next pair1 h1 =>
+        rcases pair1 with ⟨st1, stIdx1⟩
+        have ⟨hst1, hidx1⟩ := saturateStratumIdx_lookup spec spec.buildIndex hasEp _ immDecls _ layer 100000 st st1 stIdx1 te i hst h1
+        subst hidx1
+        exact ih st1 st' stIdx' hst1 hf
+  simp only [bind, Except.bind, pure, Except.pure] at hs
+  split at hs
+  · cases hs
+  · next pairFin hFin =>
+    rcases pairFin with ⟨sFin, sFinIdx⟩
+    simp only [Except.ok.injEq] at hs
+    rw [← hs]
+    exact hfold strata s.rebase sFin sFinIdx (State.rebase_lookup s te i h hi) hFin
+
+end Saturate
+
+namespace State
 
 end State
 
@@ -1486,28 +1633,131 @@ theorem saturateStratum_time (spec : Spec) (specIdx : Spec.SpecIndex) (prev : Li
       · rw [saturateStratum_time spec specIdx prev types fuel s1 s' hs, ht1]
       · simp only [Except.ok.injEq] at hs; rw [← hs, ht1]
 
+theorem deriveWithIdx_time (s : State) (sIdx : State.StateIndex) (since : Int) (te : Tagged) :
+    (s.deriveWithIdx sIdx since te).1.time = s.time := by
+  unfold State.deriveWithIdx
+  cases ((sIdx.lookup te.2).getD []).find? (·.1 == te) <;> rfl
+
+theorem deriveAllWithIdx_time (prevIdx : State.StateIndex) :
+    ∀ (tes : List Tagged) (s : State) (sIdx : State.StateIndex),
+      (State.deriveAllWithIdx prevIdx s sIdx tes).1.time = s.time
+  | [], _, _ => rfl
+  | te :: tes, s, sIdx => by
+    simp only [State.deriveAllWithIdx]
+    rcases hd1 : s.deriveWithIdx sIdx (State.stampFromIdx prevIdx s.time te) te with ⟨s1, sIdx1, ch1⟩
+    have ht1 : s1.time = s.time := by
+      have := deriveWithIdx_time s sIdx (State.stampFromIdx prevIdx s.time te) te
+      rw [hd1] at this; exact this
+    rcases hd2 : State.deriveAllWithIdx prevIdx s1 sIdx1 tes with ⟨s2, sIdx2, ch2⟩
+    have ht2 : s2.time = s1.time := by
+      have := deriveAllWithIdx_time prevIdx tes s1 sIdx1
+      rw [hd2] at this; exact this
+    rw [ht2, ht1]
+
+theorem passTypeIdx_time (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (d : DomId) (tspec : TypeSpec) :
+    ∀ (cs : List Derivation) (s s2 : State) (sIdx sIdx2 : State.StateIndex) (ch : Bool),
+      passTypeIdx spec specIdx hasEp immDecls prevIdx d tspec cs s sIdx = .ok (s2, sIdx2, ch) →
+      s2.time = s.time
+  | [], s, s2, _, _, _, hp => by
+    simp only [passTypeIdx, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1]
+  | c :: cs, s, s2, sIdx, sIdx2, ch, hp => by
+    simp only [passTypeIdx] at hp
+    split at hp
+    · cases hp
+    · next ress _ =>
+      rcases hd1 : State.deriveAllWithIdx prevIdx s sIdx ress.flatten with ⟨s1, sIdx1, ch1⟩
+      have ht1 : s1.time = s.time := by
+        have := deriveAllWithIdx_time prevIdx ress.flatten s sIdx
+        rw [hd1] at this; exact this
+      rw [hd1] at hp
+      split at hp
+      · cases hp
+      · next s2' sIdx2' ch2 h2 =>
+        simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+        rw [← hp.1, passTypeIdx_time spec specIdx hasEp immDecls prevIdx d tspec cs s1 s2' sIdx1 sIdx2' ch2 h2, ht1]
+
+theorem passIdx_time (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex) :
+    ∀ (types : List DomId) (s s2 : State) (sIdx sIdx2 : State.StateIndex) (ch : Bool),
+      passIdx spec specIdx hasEp immDecls prevIdx types s sIdx = .ok (s2, sIdx2, ch) →
+      s2.time = s.time
+  | [], s, s2, _, _, _, hp => by
+    simp only [passIdx, Except.ok.injEq, Prod.mk.injEq] at hp
+    rw [← hp.1]
+  | d :: ds, s, s2, sIdx, sIdx2, ch, hp => by
+    simp only [passIdx] at hp
+    split at hp
+    · exact passIdx_time spec specIdx hasEp immDecls prevIdx ds s s2 sIdx sIdx2 ch hp
+    · next tspec _ =>
+      split at hp
+      · cases hp
+      · next s1 sIdx1 ch1 h1 =>
+        split at hp
+        · cases hp
+        · next s2' sIdx2' ch2 h2 =>
+          simp only [Except.ok.injEq, Prod.mk.injEq] at hp
+          rw [← hp.1, passIdx_time spec specIdx hasEp immDecls prevIdx ds s1 s2' sIdx1 sIdx2' ch2 h2,
+              passTypeIdx_time spec specIdx hasEp immDecls prevIdx d tspec tspec.derivation s s1 sIdx sIdx1 ch1 h1]
+
+theorem saturateStratumIdx_time (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp isRec : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (types : List DomId) :
+    ∀ (fuel : Nat) (s s' : State) (sIdx sIdx' : State.StateIndex),
+      saturateStratumIdx spec specIdx hasEp isRec immDecls prevIdx types fuel s sIdx = .ok (s', sIdx') →
+      s'.time = s.time
+  | 0, _, _, _, _, hs => by simp [saturateStratumIdx] at hs
+  | fuel + 1, s, s', sIdx, sIdx', hs => by
+    simp only [saturateStratumIdx] at hs
+    split at hs
+    · cases hs
+    · next s1 sIdx1 changed heq =>
+      have ht1 := passIdx_time spec specIdx hasEp immDecls prevIdx types s s1 sIdx sIdx1 changed heq
+      split at hs
+      · rw [saturateStratumIdx_time spec specIdx hasEp isRec immDecls prevIdx types fuel s1 s' sIdx1 sIdx' hs, ht1]
+      · simp only [Except.ok.injEq, Prod.mk.injEq] at hs; rw [← hs.1, ht1]
+
 theorem rebaseAndSatWithIdx_time (spec : Spec) (specIdx : Spec.SpecIndex)
     (strata : List (List DomId)) (s s' : State)
     (h : rebaseAndSatWithIdx spec specIdx strata s = .ok s') :
     s'.time = s.time := by
   unfold rebaseAndSatWithIdx at h
-  have hfold : ∀ (layers : List (List DomId)) (st st' : State),
-      layers.foldlM (fun acc layer => saturateStratum spec specIdx (s.derivedFacts ++ clockThresholdSeeds spec specIdx acc layer) layer 100000 acc) st = .ok st' →
+  let basePrevIdx := State.indexList s.derivedFacts
+  let hasEp := spec.hasEpistemicOrDefeasible
+  let immDecls := spec.allImmunities
+  have hfold : ∀ (layers : List (List DomId)) (st st' : State) (stIdx stIdx' : State.StateIndex),
+      layers.foldlM (fun (acc, accIdx) layer =>
+        let seeds := clockThresholdSeedsIdx spec specIdx hasEp immDecls acc accIdx layer
+        let prevIdx := if seeds.isEmpty then basePrevIdx else State.indexList (s.derivedFacts ++ seeds)
+        let isRec := layerNeedsLoop spec specIdx layer
+        saturateStratumIdx spec specIdx hasEp isRec immDecls prevIdx layer 100000 acc accIdx)
+        (st, stIdx) = .ok (st', stIdx') →
       st'.time = st.time := by
     intro layers
     induction layers with
     | nil =>
-      intro st st' hf
-      simp only [List.foldlM, pure, Except.pure, Except.ok.injEq] at hf
-      rw [← hf]
+      intro st st' _ _ hf
+      simp only [List.foldlM, pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at hf
+      rw [← hf.1]
     | cons layer rest ih =>
-      intro st st' hf
+      intro st st' stIdx stIdx' hf
       simp only [List.foldlM, bind, Except.bind] at hf
       split at hf
       · cases hf
-      · next st1 h1 =>
-        rw [ih st1 st' hf, saturateStratum_time spec specIdx _ layer 100000 st st1 h1]
-  exact hfold strata s.rebase s' h
+      · next pair1 h1 =>
+        rcases pair1 with ⟨st1, stIdx1⟩
+        rw [ih st1 st' stIdx1 stIdx' hf,
+            saturateStratumIdx_time spec specIdx hasEp _ immDecls _ layer 100000 st st1 stIdx stIdx1 h1]
+  simp only [bind, Except.bind, pure, Except.pure] at h
+  split at h
+  · cases h
+  · next pairFin hFin =>
+    rcases pairFin with ⟨sFin, sFinIdx⟩
+    simp only [Except.ok.injEq] at h
+    rw [← h]
+    exact hfold strata s.rebase sFin s.rebase.buildIndex sFinIdx hFin
 
 end Saturate
 

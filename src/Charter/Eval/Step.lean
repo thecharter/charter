@@ -25,6 +25,130 @@ def checkFilter {α} (p : α → M Bool) (m : M α) : M α := do
   let a ← m
   if ← p a then pure a else empty
 
+def splitConjuncts : Term → List Term
+  | .and a b => splitConjuncts a ++ splitConjuncts b
+  | .boolLit true => []
+  | t => [t]
+termination_by structural x => x
+
+mutual
+/-- Whether every variable read by `tm` is already in `bound` (`#78` conjunct pushdown). -/
+def termReadyAt (spec : Spec) (specIdx : Spec.SpecIndex) (bound : List Var) : Term → Bool
+  | .boolLit _ | .intLit _ | .stringLit _ | .currentTime | .dimLit _ _ => true
+  | .ref x => bound.contains x
+  | .not a | .present a | .violated a | .enabled a | .evStatus _ a | .hasConflict a
+  | .project a _ | .tag a _ | .untag a | .doneAt a | .stampOf a | .overdueOf a
+  | .calOp1 _ a | .fnApp _ a => termReadyAt spec specIdx bound a
+  | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b
+  | .sub a b | .add a b | .mult a b | .mod a b | .div a b
+  | .eq a b | .neq a b | .when a b | .heldFor a b | .calOp2 _ a b =>
+    termReadyAt spec specIdx bound a && termReadyAt spec specIdx bound b
+  | .ite c t e | .mulDivRound c t e _ =>
+    termReadyAt spec specIdx bound c && termReadyAt spec specIdx bound t && termReadyAt spec specIdx bound e
+  | .exists_ ys u | .forall_ ys u | .count ys u | .sum ys u | .max ys u | .min ys u =>
+    termReadyAt spec specIdx (bound ++ ys) u
+  | .app _ (.pos ts) => termReadyList spec specIdx bound ts
+  | .app f (.named ms) =>
+    let realF := spec.chaseAlias f
+    match specIdx.lookup realF with
+    | some ({ domain := .products fxs, .. }, _, _) =>
+      termReadyMods spec specIdx bound ms &&
+      fxs.all (fun fx => bound.contains fx || ms.any (·.1 == fx))
+    | _ => false
+termination_by structural x => x
+
+def termReadyList (spec : Spec) (specIdx : Spec.SpecIndex) (bound : List Var) : List Term → Bool
+  | [] => true
+  | t :: ts => termReadyAt spec specIdx bound t && termReadyList spec specIdx bound ts
+termination_by structural x => x
+
+def termReadyMods (spec : Spec) (specIdx : Spec.SpecIndex) (bound : List Var) : List (Var × Term) → Bool
+  | [] => true
+  | (_, t) :: ms => termReadyAt spec specIdx bound t && termReadyMods spec specIdx bound ms
+termination_by structural x => x
+end
+
+/-- Bind `xs` left-to-right while pushing each conjunct of `conjs` to the earliest binder prefix
+where all of its free variables are bound (`#78`: avoids materializing Cartesian act domains). -/
+def scopeFiltered (spec : Spec) (specIdx : Spec.SpecIndex) :
+    List Var → List Var → List Term → M Tagged → M Tagged
+  | _, [], remConjs, leaf => do
+    remConjs.forM fun cj => checkTrue (eval M.fuel cj)
+    leaf
+  | bound, x :: xs, remConjs, leaf =>
+    let (readyNow, later) := remConjs.partition (termReadyAt spec specIdx bound)
+    do
+      readyNow.forM fun cj => checkTrue (eval M.fuel cj)
+      let te ← everyValidSubs M.fuel x
+      bindVar x te (scopeFiltered spec specIdx (x :: bound) xs later leaf)
+
+/-- Peel outer `.exists_ ys body` layers whose binders are all closed in `specIdx` (`#78`:
+`compileDerivation` wraps `Holds when` rules mentioning `Param`s or unbound closed facts in
+`.exists_ unbound body`, which otherwise hides top-level `&&` conjuncts from `scopeFiltered`). -/
+def peelClosedExists (spec : Spec) (specIdx : Spec.SpecIndex) : Term → List Var × Term
+  | .exists_ ys body =>
+    let ysClosed := ys.all fun y =>
+      match specIdx.lookup (spec.removeDecoration y) with
+      | some (yt, _, _) => yt.isClosed
+      | none => false
+    if ysClosed then
+      let (more, inner) := peelClosedExists spec specIdx body
+      (ys ++ more, inner)
+    else ([], .exists_ ys body)
+  | other => ([], other)
+termination_by structural t => t
+
+mutual
+/-- Conservative syntactic check whether `t` mentions `target` or an indirect modal query
+(`.enabled`/`.violated`) (`#78`: non-self-recursive singleton strata reach fixpoint in 1 pass). -/
+def termMentionsDomOrModal (spec : Spec) (target : DomId) : Term → Bool
+  | .boolLit _ | .intLit _ | .stringLit _ | .currentTime | .dimLit _ _ => false
+  | .enabled _ | .violated _ => true
+  | .ref x => spec.removeDecoration x == target
+  | .project u x => spec.removeDecoration x == target || termMentionsDomOrModal spec target u
+  | .tag u f => spec.chaseAlias f == target || termMentionsDomOrModal spec target u
+  | .fnApp f k => spec.chaseAlias f == target || termMentionsDomOrModal spec target k
+  | .app f (.pos ts) => spec.chaseAlias f == target || termMentionsList spec target ts
+  | .app f (.named ms) => spec.chaseAlias f == target || termMentionsMods spec target ms
+  | .exists_ ys u | .forall_ ys u | .count ys u | .sum ys u | .max ys u | .min ys u =>
+    ys.any (fun y => spec.removeDecoration y == target) || termMentionsDomOrModal spec target u
+  | .not u | .present u | .evStatus _ u | .hasConflict u | .doneAt u | .stampOf u
+  | .overdueOf u | .calOp1 _ u | .untag u =>
+    termMentionsDomOrModal spec target u
+  | .and a b | .or a b | .leq a b | .geq a b | .ge a b | .le a b | .mult a b | .mod a b
+  | .div a b | .sub a b | .add a b | .eq a b | .neq a b | .when a b | .heldFor a b | .calOp2 _ a b =>
+    termMentionsDomOrModal spec target a || termMentionsDomOrModal spec target b
+  | .ite c t e | .mulDivRound c t e _ =>
+    termMentionsDomOrModal spec target c || termMentionsDomOrModal spec target t || termMentionsDomOrModal spec target e
+termination_by structural x => x
+
+def termMentionsList (spec : Spec) (target : DomId) : List Term → Bool
+  | [] => false
+  | t :: ts => termMentionsDomOrModal spec target t || termMentionsList spec target ts
+termination_by structural x => x
+
+def termMentionsMods (spec : Spec) (target : DomId) : List (Var × Term) → Bool
+  | [] => false
+  | (_, t) :: ms => termMentionsDomOrModal spec target t || termMentionsMods spec target ms
+termination_by structural x => x
+end
+
+/-- Whether `layer` may require more than a single saturation pass to reach fixpoint. -/
+def layerNeedsLoop (spec : Spec) (specIdx : Spec.SpecIndex) : List DomId → Bool
+  | [d] =>
+    match (specIdx.lookup d).map (·.1) with
+    | none => false
+    | some tspec =>
+      let canon := spec.chaseAlias d
+      termMentionsDomOrModal spec canon tspec.domainConstraint ||
+      termMentionsList spec canon tspec.conditions ||
+      tspec.derivation.any fun
+        | .holdsWhen t => termMentionsDomOrModal spec canon t
+        | .dv ys t => ys.any (fun y => spec.removeDecoration y == canon) || termMentionsDomOrModal spec canon t
+        | .defeasibleDAG _ _ => true
+  | [] => false
+  | _ => true
+
 /-- Instances one derivation clause of `d` yields in the current state. -/
 def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagged) :=
   let dyn (xs : List Var) (t : Term) : M (List Tagged) :=
@@ -36,10 +160,23 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
   | .holdsWhen t =>
     match tspec.domain with
     | .products xs =>
-      if tspec.domainConstraint.isTrueLit then
-        foreach M.fuel xs do
-          checkTrue (eval M.fuel t)
-          checkSat (whenTagged (eval M.fuel (.app d (.named []))) pure)
+      if tspec.domainConstraint.isTrueLit then do
+        let ctx ← getCtx
+        let allClosed := ctx.indexed && xs.all fun x =>
+          match ctx.specIdx.lookup (ctx.spec.removeDecoration x) with
+          | some (xt, _, _) => xt.isClosed
+          | none => false
+        if allClosed then
+          let (extraYs, inner) := peelClosedExists ctx.spec ctx.specIdx t
+          let conjs := splitConjuncts inner
+          if conjs.any (fun | .boolLit false => true | _ => false) then pure []
+          else
+            results (scopeFiltered ctx.spec ctx.specIdx [] (xs ++ extraYs) conjs
+              (checkSat (whenTagged (eval M.fuel (.app d (.named []))) pure)))
+        else
+          foreach M.fuel xs do
+            checkTrue (eval M.fuel t)
+            checkSat (whenTagged (eval M.fuel (.app d (.named []))) pure)
       else dyn xs (.when (.app d (.named [])) t)
     | _ =>
       results do
@@ -54,6 +191,22 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
         withSubs [(⟨d, ""⟩, te)] do
           checkTrue (eval M.fuel t)
           checkSat (pure te)
+  | .dv xs (.when head cond) => do
+    let ctx ← getCtx
+    let allClosed := ctx.indexed && xs.all fun x =>
+      match ctx.specIdx.lookup (ctx.spec.removeDecoration x) with
+      | some (xt, _, _) => xt.isClosed
+      | none => false
+    if allClosed then
+      let (extraYs, inner) := peelClosedExists ctx.spec ctx.specIdx cond
+      if extraYs.all (!xs.contains ·) then
+        let conjs := splitConjuncts inner
+        if conjs.any (fun | .boolLit false => true | _ => false) then pure []
+        else
+          results (scopeFiltered ctx.spec ctx.specIdx [] (xs ++ extraYs) conjs
+            (checkFilter (satConditions M.fuel) (whenTagged (eval M.fuel head) pure)))
+      else dyn xs (.when head cond)
+    else dyn xs (.when head cond)
   | .dv xs t => dyn xs t
   | .defeasibleDAG dag rules =>
     let evalActiveRules : M (List (String × DefeasibleVal)) := do
@@ -123,6 +276,53 @@ def deriveClause (d : DomId) (tspec : TypeSpec) (c : Derivation) : M (List Tagge
 
 def runM {α} (spec : Spec) (specIdx : Spec.SpecIndex) (state : State) (m : M α) : Except RuntimeError (List α) :=
   m.run (Ctx.ofIdx spec specIdx state) []
+
+def runMWithIdx {α} (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec))
+    (state : State) (stateIdx : State.StateIndex) (m : M α) : Except RuntimeError (List α) :=
+  m.run (Ctx.ofBothIdx spec specIdx state stateIdx hasEp (some immDecls)) []
+
+/-- Indexed single-type pass keeping `sIdx = s.buildIndex` incrementally (`#78`: zero `buildIndex` rebuilds). -/
+def passTypeIdx (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (d : DomId) (tspec : TypeSpec) :
+    List Derivation → State → State.StateIndex → Except RuntimeError (State × State.StateIndex × Bool)
+  | [], s, sIdx => .ok (s, sIdx, false)
+  | c :: cs, s, sIdx =>
+    match runMWithIdx spec specIdx hasEp immDecls s sIdx (deriveClause d tspec c) with
+    | .error e => .error e
+    | .ok ress =>
+      match State.deriveAllWithIdx prevIdx s sIdx ress.flatten with
+      | (s1, sIdx1, ch) =>
+        match passTypeIdx spec specIdx hasEp immDecls prevIdx d tspec cs s1 sIdx1 with
+        | .error e => .error e
+        | .ok (s2, sIdx2, ch2) => .ok (s2, sIdx2, ch || ch2)
+
+def passIdx (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex) :
+    List DomId → State → State.StateIndex → Except RuntimeError (State × State.StateIndex × Bool)
+  | [], s, sIdx => .ok (s, sIdx, false)
+  | d :: ds, s, sIdx =>
+    match (specIdx.lookup d).map (·.1) with
+    | none => passIdx spec specIdx hasEp immDecls prevIdx ds s sIdx
+    | some tspec =>
+      match passTypeIdx spec specIdx hasEp immDecls prevIdx d tspec tspec.derivation s sIdx with
+      | .error e => .error e
+      | .ok (s1, sIdx1, ch) =>
+        match passIdx spec specIdx hasEp immDecls prevIdx ds s1 sIdx1 with
+        | .error e => .error e
+        | .ok (s2, sIdx2, ch2) => .ok (s2, sIdx2, ch || ch2)
+
+def saturateStratumIdx (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool) (isRec : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec)) (prevIdx : State.StateIndex)
+    (types : List DomId) : Nat → State → State.StateIndex → Except RuntimeError (State × State.StateIndex)
+  | 0, _, _ => .error (.fuelExhausted s!"saturating {", ".intercalate types}")
+  | fuel + 1, state, sIdx =>
+    match passIdx spec specIdx hasEp immDecls prevIdx types state sIdx with
+    | .error e => .error e
+    | .ok (s', sIdx', changed) =>
+      if changed && isRec then saturateStratumIdx spec specIdx hasEp isRec immDecls prevIdx types fuel s' sIdx'
+      else .ok (s', sIdx')
 
 /-- One pass over the derivation clauses of one type; the state and whether it grew. -/
 def passType (spec : Spec) (specIdx : Spec.SpecIndex) (prev : List (Tagged × Info)) (d : DomId) (tspec : TypeSpec) :
@@ -218,10 +418,80 @@ def clockThresholdSeeds (spec : Spec) (specIdx : Spec.SpecIndex) (acc : State) (
             [((.prod [], d), ⟨true, true, earliest, none, .derived d acc.step⟩)]
         | _ => []
 
-/-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6). -/
-def rebaseAndSatWithIdx (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
+/-- Indexed variant of `clockThresholdSeeds` reusing `accIdx` (`#78`). -/
+def clockThresholdSeedsIdx (spec : Spec) (specIdx : Spec.SpecIndex) (hasEp : Bool)
+    (immDecls : List (DomId × TypeSpec × ImmunitySpec))
+    (acc : State) (accIdx : State.StateIndex) (layer : List DomId) : List (Tagged × Info) :=
+  let lookupIdx (te : Tagged) : Option Info :=
+    (((accIdx.lookup te.2).getD []).find? (·.1 == te)).map (·.2)
+  let evalConstInt (tm : Term) : Option Int :=
+    match runMWithIdx spec specIdx hasEp immDecls acc accIdx (whenInt (eval M.fuel tm) pure) with
+    | .ok (k :: _) => some k
+    | _ => none
+  let evalConstTag (tm : Term) : Option Tagged :=
+    match runMWithIdx spec specIdx hasEp immDecls acc accIdx (whenTagged (eval M.fuel tm) pure) with
+    | .ok (te :: _) => some te
+    | _ => none
+  let clauseThreshold : Derivation → Option Int
+    | .holdsWhen (.geq .currentTime kTm) => evalConstInt kTm
+    | .holdsWhen (.ge .currentTime kTm) => (evalConstInt kTm).map (· + 1)
+    | .holdsWhen (.geq (.sub .currentTime t0Tm) durTm) =>
+      Option.bind (evalConstInt t0Tm) fun t0 => (evalConstInt durTm).map (t0 + ·)
+    | .holdsWhen (.ge (.sub .currentTime t0Tm) durTm) =>
+      Option.bind (evalConstInt t0Tm) fun t0 => (evalConstInt durTm).map (t0 + · + 1)
+    | .holdsWhen (.heldFor innerTm durTm) =>
+      Option.bind (evalConstTag innerTm) fun teIn =>
+      Option.bind (lookupIdx teIn) fun iIn =>
+      (evalConstInt durTm).map (iIn.since + ·)
+    | .holdsWhen (.present innerTm) =>
+      Option.bind (evalConstTag innerTm) fun teIn =>
+      (lookupIdx teIn).map (·.since)
+    | _ => none
+  layer.flatMap fun d =>
+    match (specIdx.lookup d).map (·.1) with
+    | none => []
+    | some tspec =>
+      match tspec.kind with
+      | .duty { everyPeriod := some perLen, .. } =>
+        tspec.derivation.flatMap fun c =>
+          match runMWithIdx spec specIdx hasEp immDecls acc accIdx (deriveClause d tspec c) with
+          | .ok ress =>
+            ress.flatten.filterMap fun te =>
+              match te.1 with
+              | .prod args =>
+                match args.getLast? with
+                | some (.int k, _) =>
+                  let t0 := k * perLen
+                  if t0 <= acc.time then some (te, ⟨true, true, t0, none, .derived d acc.step⟩)
+                  else none
+                | _ => none
+              | _ => none
+          | .error _ => []
+      | _ =>
+        match tspec.domain with
+        | .products [] =>
+          let candTs := tspec.derivation.filterMap clauseThreshold |>.filter (· <= acc.time)
+          match candTs with
+          | [] => []
+          | t0 :: rest =>
+            let earliest := rest.foldl min t0
+            [((.prod [], d), ⟨true, true, earliest, none, .derived d acc.step⟩)]
+        | _ => []
+
+/-- Remove derived facts and recompute them stratum by stratum (eFLINT `rebase_and_sat`, D6),
+maintaining `State.StateIndex` incrementally (`#78`). -/
+def rebaseAndSatWithIdx (spec : Spec) (specIdx : Spec.SpecIndex) (strata : List (List DomId)) (state : State) : Except RuntimeError State := do
   let prev := state.derivedFacts
-  strata.foldlM (fun s layer => saturateStratum spec specIdx (prev ++ clockThresholdSeeds spec specIdx s layer) layer 100000 s) state.rebase
+  let basePrevIdx := State.indexList prev
+  let hasEp := spec.hasEpistemicOrDefeasible
+  let immDecls := spec.allImmunities
+  let s0 := state.rebase
+  let (sFin, _) ← strata.foldlM (fun (s, sIdx) layer =>
+    let seeds := clockThresholdSeedsIdx spec specIdx hasEp immDecls s sIdx layer
+    let prevIdx := if seeds.isEmpty then basePrevIdx else State.indexList (prev ++ seeds)
+    let isRec := layerNeedsLoop spec specIdx layer
+    saturateStratumIdx spec specIdx hasEp isRec immDecls prevIdx layer 100000 s sIdx) (s0, s0.buildIndex)
+  return sFin
 
 def rebaseAndSat (spec : Spec) (strata : List (List DomId)) (state : State) : Except RuntimeError State :=
   rebaseAndSatWithIdx spec spec.buildIndex strata state
@@ -434,11 +704,14 @@ def newContextAfterAmend (cfg : Config) (effSpec : Spec) (effSpecIdx : Spec.Spec
     let duties := state'.holdsList.filter fun te => match effSpecIdx.lookup te.2 with
       | some ({ kind := .duty _, .. }, _, _) => true
       | _ => false
-    let ctx' := Ctx.ofIdx effSpec effSpecIdx state'
+    let ctx' := Ctx.ofBothIdx effSpec effSpecIdx state' state'.buildIndex effSpec.hasEpistemicOrDefeasible (some effSpec.allImmunities)
     let run {α} (m : M α) : Except RuntimeError (List α) := m.run ctx' []
     let violatedNow : Except RuntimeError (List Tagged) :=
       duties.filterMapM fun te => do
-        let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te (effSpec.findViolationCond te.2)))
+        let vconds := match effSpecIdx.lookup te.2 with
+          | some ({ kind := .duty ds, .. }, _, _) => some ds.violatedWhen
+          | _ => none
+        let r ← run (ignoreMissingInput (evalViolationCondition M.fuel te vconds))
         pure (if r.any id then some te else none)
     match violatedNow with
     | .error e => (none, [diagOf e])

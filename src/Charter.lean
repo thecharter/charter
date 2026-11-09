@@ -62,6 +62,7 @@ import Charter.Prove.LeanGen
 import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Cli.Test
+import Charter.Cli.Analyze
 import Charter.Cli.Repl
 import Charter.Cli.Prove
 import Charter.Cli.Fmt

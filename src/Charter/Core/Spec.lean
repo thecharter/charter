@@ -34,11 +34,14 @@ inductive DomMap (α : Type) where
 
 namespace DomMap
 
-def hashChars : List Char → Nat → Nat
-  | [], h => h
-  | c :: cs, h => hashChars cs ((h * 33 + c.toNat) % 65536)
+def hashLoop (s : String) : Nat → String.Pos → UInt32 → UInt32
+  | 0, _, h => h
+  | fuel + 1, p, h =>
+    if s.atEnd p then h
+    else hashLoop s fuel (s.next p) (h * 33 + (s.get p).val)
 
-def hash (k : DomId) : Nat := hashChars k.toList 5381
+def hash (k : DomId) : Nat :=
+  (hashLoop k (k.utf8ByteSize + 1) ⟨0⟩ 5381).toNat
 
 def treeDepth : Nat := 8
 
@@ -698,6 +701,12 @@ def insertRegime (s : Spec) (r : RegimeSpec) : Spec :=
 def insertAmendBody (s : Spec) (actId : DomId) (ds : List Decl) : Spec :=
   let prev := (s.amendBodies.find? (·.1 == actId)).map (·.2) |>.getD []
   { s with amendBodies := s.amendBodies.filter (·.1 != actId) ++ [(actId, prev ++ ds)] }
+
+/-- All declared `Immunity` and `Protection` entries, pre-extracted once per `Spec` (`#78`). -/
+def allImmunities (s : Spec) : List (DomId × TypeSpec × ImmunitySpec) :=
+  s.decls.filterMap fun (p : DomId × TypeSpec) => match p.2.kind with
+    | .immunity i => some (p.1, p.2, i)
+    | _ => none
 
 /-- The immunity types naming `a` in `Against`, with their specs (excluding `Protection`s). -/
 def immunitiesAgainst (s : Spec) (a : DomId) : List (DomId × TypeSpec × ImmunitySpec) :=

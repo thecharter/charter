@@ -1,4 +1,5 @@
 import Charter.Core.Spec
+import Charter.Surface.Ast
 import Lean.Data.Json
 
 /-!
@@ -264,6 +265,82 @@ def clauseRulesDigest (spec : Spec) (c : Clause) : String :=
             s!"def:{ty}.{r.id}={reprStr r}"
         "|".intercalate defMatches
   Artifact.sha256String ("\n".intercalate (spanPart ++ targetDefs))
+
+/-- Declarations that cite no authoritative passage (`#63` item 4 & `#64`: "computational completions"). -/
+def computationalCompletions (spec : Spec) : List DomId :=
+  let installedDecls : List (DomId × TypeSpec) := spec.amendBodies.flatMap fun (_, ds) =>
+    ds.filterMap fun d => match d.stripPos with | .typeDecl bty bts => some (bty, bts) | _ => none
+  let allDecls := spec.decls ++ installedDecls
+  let fromSpans : List Span := allDecls.flatMap fun (p : DomId × TypeSpec) =>
+    p.2.spans.map fun sp => ⟨sp.1, sp.2, .norm, [p.1]⟩
+  spec.decls.reverse.filterMap fun (d, _) =>
+    if d == "int" || d == "string" || d == "actor" || d.startsWith "_" then none
+    else if reverseProvenanceWith spec.clauses fromSpans [d] then none
+    else some d
+
+/-- Group computational completions by the source file that introduced each declaration (`#63`). -/
+def completionsByFile (located : List (String × Item)) (spec : Spec) : List (String × List DomId) := Id.run do
+  let comps := computationalCompletions spec
+  let mut byFile : List (String × List DomId) := []
+  for (file, it) in located do
+    match it.val with
+    | .inr (.decls ds) =>
+      let mut fileDecls : List DomId := []
+      for rawD in ds do
+        match rawD.stripPos with
+        | .typeDecl d _ =>
+          if comps.contains d && !fileDecls.contains d then
+            fileDecls := fileDecls ++ [d]
+        | _ => pure ()
+      let prev := (byFile.find? (·.1 == file)).map (·.2) |>.getD []
+      let merged := (prev ++ fileDecls).eraseDups
+      if byFile.any (·.1 == file) then
+        byFile := byFile.map fun (f, xs) => if f == file then (f, merged) else (f, xs)
+      else
+        byFile := byFile ++ [(file, merged)]
+    | _ => pure ()
+  return byFile
+
+/-- Extract dotted clause identifiers (`1.1`, `T.2`, `LAW1.0`) from a Markdown `Document`
+and return those no `Clause` quotes (`#63` item 2). -/
+def unquotedDocumentClauses (spec : Spec) (loaded : LoadedDocs) : List (String × List ClauseId) :=
+  let extractIds (docText : String) : List ClauseId :=
+    let looksLikeCid (tok : String) : Bool :=
+      let clean := ((tok.dropWhile (· == '*')).dropRightWhile (fun c => c == '*' || c == '.' || c == ':' || c == ')'))
+      let parts := clean.splitOn "."
+      parts.length >= 2 && parts.all (fun p => !p.isEmpty && p.toList.all (fun c => c.isAlphanum || c == '_' || c == '-')) &&
+      (parts[1]!).toList.any (fun c => c.isAlphanum)
+    let cleanTok (tok : String) : String :=
+      (tok.dropWhile (· == '*')).dropRightWhile (fun c => c == '*' || c == '.' || c == ':' || c == ')')
+    (docText.splitOn "\n").filterMap fun l =>
+      match stripHeadingHashes l with
+      | some h =>
+        let ws := h.splitOn " " |>.filter (!·.isEmpty)
+        match ws with
+        | "Clause" :: tok :: _ | "Section" :: tok :: _ =>
+          if looksLikeCid tok then some (cleanTok tok) else none
+        | tok :: _ => if looksLikeCid tok then some (cleanTok tok) else none
+        | [] => none
+      | none =>
+        let ws := l.trimLeft.splitOn " " |>.filter (!·.isEmpty)
+        match ws with
+        | tok :: _ =>
+          let bare := tok.dropWhile (· == '*')
+          if bare.toList.head?.any Char.isDigit && looksLikeCid tok then some (cleanTok tok) else none
+        | [] => none
+  loaded.filterMap fun (sd, res) =>
+    match res with
+    | .error _ => none
+    | .ok txt =>
+      let relevantClauses := spec.clauses.filter fun c =>
+        match c.docId, sd.id with
+        | some cidDoc, some sid => cidDoc == sid
+        | none, _ => true
+        | _, _ => false
+      let cids := (extractIds txt).eraseDups
+      let missing := cids.filter fun cid =>
+        !relevantClauses.any (fun c => c.id == cid || c.id.startsWith (cid ++ "/"))
+      if missing.isEmpty then none else some (sd.path, missing)
 
 /-- Multi-document, template-aware, & lockfile-backed SHA-256 provenance report (`012`, `D34`). -/
 def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List ClauseLockEntry := []) : List ProvClaim :=
