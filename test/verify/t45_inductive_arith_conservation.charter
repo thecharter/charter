@@ -1,0 +1,160 @@
+// #75 all-trace inductive linear-arithmetic conservation fixture:
+// Open `Int` domains, conditional ledger conservation, `MulDivRound` Floor/Ceil
+// atomic zero-crossing base split, and inductively preserved combined rate headroom.
+Fact account Identified by Acc1, Acc2.
+Fact earner Identified by E1, E2.
+Fact cycle Identified by C1, C2.
+Fact instant Identified by Time.
+
+Fact earner-account Identified by earner * account.
+Fact earner-cycle Identified by earner * cycle.
+
+Fact active-member Identified by earner * account.
+Fact alive Identified by earner.
+Fact cleared-extinct Identified by account.
+
+Param min-headroom-bps = 500.
+Param max-levy-cap-bps = 200.
+
+Function principal-owed Identified by account * int.
+Function retired-sum Identified by account * int.
+Function forfeited-sum Identified by account * int.
+Function account-sunset Identified by account * instant.
+Function retire-rate-bps Identified by account * int.
+Function earner-levy-cap-bps Identified by earner * int.
+Function share-weight-bps Identified by earner-account * int.
+Function period-net-va Identified by earner-cycle * int.
+
+Fact has-alive-member Identified by account
+  Holds when (Exists earner: active-member(earner, account) && alive(earner)).
+
+Fact raw-remaining Identified by account * int
+  Derived from (Foreach principal-owed, retired-sum, forfeited-sum:
+                  raw-remaining(principal-owed.account,
+                    principal-owed.int - retired-sum.int - forfeited-sum.int)
+                  When retired-sum.account == principal-owed.account
+                    && forfeited-sum.account == principal-owed.account).
+
+Fact ledger-open Identified by account * int
+  Derived from (Foreach raw-remaining, account-sunset:
+                  ledger-open(raw-remaining.account, raw-remaining.int)
+                  When account-sunset.account == raw-remaining.account
+                    && Current Time < account-sunset.instant
+                    && has-alive-member(raw-remaining.account)
+                    && Not(cleared-extinct(raw-remaining.account))
+                    && raw-remaining.int > 0)
+  Derived from (Foreach raw-remaining, account-sunset:
+                  ledger-open(raw-remaining.account, 0)
+                  When account-sunset.account == raw-remaining.account
+                    && (Current Time >= account-sunset.instant
+                        || Not(has-alive-member(raw-remaining.account))
+                        || cleared-extinct(raw-remaining.account)
+                        || raw-remaining.int <= 0)).
+
+Fact on-ledger Identified by earner * account
+  Holds when active-member(earner, account) && alive(earner)
+    && (Exists ledger-open: ledger-open.account == account && ledger-open.int > 0).
+
+Fact attributed-inflow Identified by earner * account * cycle * int
+  Derived from (Foreach period-net-va, share-weight-bps:
+                  attributed-inflow(period-net-va.earner-cycle.earner, share-weight-bps.earner-account.account,
+                    period-net-va.earner-cycle.cycle, MulDivRound(period-net-va.int, share-weight-bps.int, 10000, Floor))
+                  When share-weight-bps.earner-account.earner == period-net-va.earner-cycle.earner
+                    && active-member(period-net-va.earner-cycle.earner, share-weight-bps.earner-account.account)).
+
+Fact retire-attempt Identified by earner * account * cycle * int
+  Derived from (Foreach attributed-inflow, retire-rate-bps:
+                  retire-attempt(attributed-inflow.earner, attributed-inflow.account, attributed-inflow.cycle,
+                    MulDivRound(attributed-inflow.int, retire-rate-bps.int, 10000, Floor))
+                  When retire-rate-bps.account == attributed-inflow.account).
+
+Fact retire-collected Identified by earner * account * cycle * int
+  Derived from (Foreach retire-attempt, ledger-open:
+                  retire-collected(retire-attempt.earner, retire-attempt.account, retire-attempt.cycle, ledger-open.int)
+                  When ledger-open.account == retire-attempt.account
+                    && ledger-open.int <= retire-attempt.int)
+  Derived from (Foreach retire-attempt, ledger-open:
+                  retire-collected(retire-attempt.earner, retire-attempt.account, retire-attempt.cycle, retire-attempt.int)
+                  When ledger-open.account == retire-attempt.account
+                    && retire-attempt.int < ledger-open.int).
+
+Fact residual-va-base Identified by earner * account * cycle * int
+  Derived from (Foreach attributed-inflow, ledger-open:
+                  residual-va-base(attributed-inflow.earner, attributed-inflow.account, attributed-inflow.cycle, attributed-inflow.int)
+                  When ledger-open.account == attributed-inflow.account && ledger-open.int == 0)
+  Derived from (Foreach attributed-inflow, ledger-open, retire-attempt:
+                  residual-va-base(attributed-inflow.earner, attributed-inflow.account, attributed-inflow.cycle, 0)
+                  When ledger-open.account == attributed-inflow.account && ledger-open.int > 0
+                    && retire-attempt.earner == attributed-inflow.earner
+                    && retire-attempt.account == attributed-inflow.account
+                    && retire-attempt.cycle == attributed-inflow.cycle
+                    && retire-attempt.int <= ledger-open.int)
+  Derived from (Foreach attributed-inflow, ledger-open, retire-attempt, retire-rate-bps:
+                  residual-va-base(attributed-inflow.earner, attributed-inflow.account, attributed-inflow.cycle,
+                    attributed-inflow.int - MulDivRound(ledger-open.int, 10000, retire-rate-bps.int, Ceil))
+                  When ledger-open.account == attributed-inflow.account && ledger-open.int > 0
+                    && retire-rate-bps.account == attributed-inflow.account && retire-rate-bps.int > 0
+                    && retire-attempt.earner == attributed-inflow.earner
+                    && retire-attempt.account == attributed-inflow.account
+                    && retire-attempt.cycle == attributed-inflow.cycle
+                    && retire-attempt.int > ledger-open.int).
+
+Power record-period-va Actor earner Related to cycle, int
+  Holds when alive(earner) && int >= 0
+  Valid when alive(earner) && int >= 0
+  Creates period-net-va(earner-cycle(earner, cycle), int).
+
+Power onboard-earner Actor earner Recipient earner' Related to account
+  Holds when earner != earner' && alive(earner) && active-member(earner, account) && Not(alive(earner'))
+  Valid when earner != earner' && alive(earner) && active-member(earner, account) && Not(alive(earner'))
+  Creates alive(earner'),
+          active-member(earner', account),
+          share-weight-bps(earner-account(earner', account), 10000),
+          earner-levy-cap-bps(earner', max-levy-cap-bps).
+
+Entrenched Invariant inv-ledger-conservation When
+  (Forall ledger-open, principal-owed, retired-sum, forfeited-sum, account-sunset:
+     ledger-open.int == principal-owed.int - retired-sum.int - forfeited-sum.int
+     When principal-owed.account == ledger-open.account
+       && retired-sum.account == ledger-open.account
+       && forfeited-sum.account == ledger-open.account
+       && account-sunset.account == ledger-open.account
+       && has-alive-member(ledger-open.account)
+       && Current Time < account-sunset.instant
+       && Not(cleared-extinct(ledger-open.account))
+       && principal-owed.int - retired-sum.int - forfeited-sum.int >= 0).
+
+Entrenched Invariant inv-income-collection When
+  (Forall earner, account:
+     Not(active-member(earner, account) && alive(earner)
+         && (Exists ledger-open: ledger-open.account == account && ledger-open.int > 0))
+     || on-ledger(earner, account))
+  && (Forall retire-attempt, attributed-inflow, retire-rate-bps:
+        retire-attempt.int == MulDivRound(attributed-inflow.int, retire-rate-bps.int, 10000, Floor)
+        When retire-attempt.earner == attributed-inflow.earner
+          && retire-attempt.account == attributed-inflow.account
+          && retire-attempt.cycle == attributed-inflow.cycle
+          && retire-rate-bps.account == attributed-inflow.account).
+
+Entrenched Invariant inv-atomic-bounds When
+  (Forall ledger-open: ledger-open.int >= 0)
+  && (Forall retire-collected, ledger-open:
+        retire-collected.int <= ledger-open.int
+        When ledger-open.account == retire-collected.account)
+  && (Forall residual-va-base, attributed-inflow:
+        residual-va-base.int >= 0 && residual-va-base.int <= attributed-inflow.int
+        When attributed-inflow.earner == residual-va-base.earner
+          && attributed-inflow.account == residual-va-base.account
+          && attributed-inflow.cycle == residual-va-base.cycle)
+  && (Forall retire-rate-bps, earner-levy-cap-bps:
+        retire-rate-bps.int + earner-levy-cap-bps.int + min-headroom-bps <= 10000
+        When active-member(earner-levy-cap-bps.earner, retire-rate-bps.account)).
+
+{
+  +alive(E1).
+  +active-member(E1, Acc1).
+  +share-weight-bps(earner-account(E1, Acc1), 10000).
+  +principal-owed(Acc1, 1000). +retired-sum(Acc1, 0). +forfeited-sum(Acc1, 0).
+  +account-sunset(Acc1, 500). +retire-rate-bps(Acc1, 2000).
+  +earner-levy-cap-bps(E1, 200). +earner-levy-cap-bps(E2, 200).
+}

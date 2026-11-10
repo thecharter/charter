@@ -34,14 +34,12 @@ inductive DomMap (α : Type) where
 
 namespace DomMap
 
-def hashLoop (s : String) : Nat → String.Pos → UInt32 → UInt32
-  | 0, _, h => h
-  | fuel + 1, p, h =>
-    if s.atEnd p then h
-    else hashLoop s fuel (s.next p) (h * 33 + (s.get p).val)
+def hashChars : List Char → Nat → Nat
+  | [], h => h
+  | c :: cs, h => hashChars cs ((h * 5 + c.toNat) % 1024)
 
 def hash (k : DomId) : Nat :=
-  (hashLoop k (k.utf8ByteSize + 1) ⟨0⟩ 5381).toNat
+  hashChars k.toList 7
 
 def treeDepth : Nat := 8
 

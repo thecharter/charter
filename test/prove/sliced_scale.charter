@@ -1,0 +1,45 @@
+// #74 slice-framed `charter prove` fixture: multi-domain specification with unreferenced
+// sibling subsystems, functions, derived relations, scenarios, and invariants, decided
+// over per-step read/write slices with zero axioms (`Charter.Prove.Slice`).
+Fact member Identified by Ava, Bea.
+Fact group Identified by G1, G2.
+Fact unrelated-region Identified by R1, R2, R3, R4.
+
+Param reserve-floor = 50.
+Function reserve-held Identified by member * int.
+Fact member-of Identified by member * group.
+Fact active Identified by member.
+
+// Unrelated derived subsystem (outside the scenario's active slice)
+Fact region-pair Identified by unrelated-region * unrelated-region'
+  Holds when unrelated-region != unrelated-region'.
+
+Power fund-reserve Actor member Recipient member' Related to int
+  Holds when active(member) && int >= reserve-floor
+  Valid when active(member) && int >= reserve-floor
+  Creates reserve-held(member', int).
+
+Power admit-successor Actor member Recipient member' Related to group
+  Holds when member != member' && active(member) && member-of(member, group)
+    && Not(active(member'))
+    && (Exists reserve-held: reserve-held.member == member' && reserve-held.int >= reserve-floor)
+  Valid when member != member' && active(member) && member-of(member, group)
+    && Not(active(member'))
+    && (Exists reserve-held: reserve-held.member == member' && reserve-held.int >= reserve-floor)
+  Creates active(member'), member-of(member', group).
+
+Invariant nonnegative-reserves When
+  (Forall reserve-held: reserve-held.int >= 0).
+
++active(Ava).
++member-of(Ava, G1).
++reserve-held(Ava, 100).
+?active(Ava).
+
+Scenario admit-with-reserve {
+  fund-reserve(Ava, Bea, 60).
+  admit-successor(Ava, Bea, G1).
+  ?active(Bea).
+  ?member-of(Bea, G1).
+  ?reserve-held(Bea, 60).
+}

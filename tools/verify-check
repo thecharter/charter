@@ -119,5 +119,9 @@ check_case "t43b-analyze-clean-passes" 0 "^ok " \
 check_case "t44-mutate-claims-catches-vacuous" 1 "survived claim mutation" \
   "$B" test --mutate-claims test/verify/t44_mutate_claims_vacuous.charter
 
+# 11. #75: All-trace inductive linear-arithmetic conservation proofs in the proof kernel (`proved`)
+check_case "t45-inductive-arith-conservation-proved" 0 "^proved .*inv-atomic-bounds proved for all traces and parameters" \
+  "$B" verify --backend inductive --time 30 test/verify/t45_inductive_arith_conservation.charter
+
 echo "$pass passed, $fail failed, $((pass+fail)) total"
 [ $fail -eq 0 ]

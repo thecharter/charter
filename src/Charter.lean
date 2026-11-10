@@ -58,7 +58,10 @@ import Charter.Verify.Explorer
 import Charter.Verify.Temporal
 import Charter.Verify.TVIR
 import Charter.Verify.Smt
+import Charter.Verify.ArithLemmas
+import Charter.Verify.InductiveArith
 import Charter.Prove.Run
+import Charter.Prove.Slice
 import Charter.Prove.LeanGen
 import Charter.Cli.Load
 import Charter.Cli.Run

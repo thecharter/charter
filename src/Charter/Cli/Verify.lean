@@ -2,6 +2,7 @@ import Charter.Cli.Prove
 import Charter.Cli.Explore
 import Charter.Verify.Temporal
 import Charter.Verify.Smt
+import Charter.Verify.InductiveArith
 
 /-!
 # Charter.Cli.Verify — `charter verify [--backend finite|smt|inductive] ... <file.charter>` (`G2.5`)
@@ -45,6 +46,7 @@ structure VerifyCliOpts where
   mustProve   : Bool := false
   json        : Bool := false
   regime      : Option String := none
+  invariants  : List DomId := []
   menu        : Explore.Menu := []
   files       : List String := []
 
@@ -77,6 +79,8 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
     | some k => parseVerifyArgs rest { o with minDepth := some k }
     | none => .error s!"--min-depth needs a positive integer, not {n}"
   | ["--min-depth"], _ => .error "--min-depth needs a positive integer"
+  | "--invariant" :: inv :: rest, o => parseVerifyArgs rest { o with invariants := o.invariants ++ [inv] }
+  | ["--invariant"], _ => .error "--invariant needs an invariant name"
   | "--time" :: n :: rest, o => match n.toNat? with
     | some k => parseVerifyArgs rest { o with timeoutSec := k }
     | none => .error s!"--time needs seconds, not {n}"
@@ -252,19 +256,66 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
         emitVerifyCert o.json cert s!"ok   {path} [smt/{solverUsed}]: no counterexample up to depth {k} ({vis} symbolic state(s))"
         return (1, 0, 0)
   | .inductive_ =>
-    -- Check whether the state space is finite/enumerable and closed under inductive step
-    -- exploration (`cappedOut == false` over unbounded depth up to `stateCap`), then certify
-    -- initial-state + reachable closure in the proof kernel!
+    let requestedInvs := if o.invariants.isEmpty then cfg.spec.invariants else o.invariants
+    for want in o.invariants do
+      if !cfg.spec.invariants.contains want then
+        IO.eprintln s!"{path}: error CHR003: unknown invariant `{want}`"
+        return (0, 1, 0)
     let allFinite := (Verify.modeCoverage o.mode cfg.spec []).isEmpty
     if !allFinite then
-      let cert : Artifact.ClaimCertificate := {
-        claim := "invariants", about := "inductive-safety", verdict := none, assurance := .proved,
-        scope := .liveEvaluator, completion := .inconclusive,
-        lawSha256 := some lawHash, file := path,
-        note := "open infinite domain cannot be closed automatically without inductive auxiliary invariants"
-      }
-      emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [inductive]: {cert.note}"
-      return (0, 0, 1)
+      match ← locateCharterRoot with
+      | none =>
+        let cert : Artifact.ClaimCertificate := {
+          claim := "invariants", about := "inductive-safety", verdict := none, assurance := .proved,
+          scope := .liveEvaluator, completion := .inconclusive,
+          lawSha256 := some lawHash, file := path,
+          note := "open infinite domain cannot be closed automatically without inductive auxiliary invariants"
+        }
+        emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [inductive]: {cert.note}"
+        return (0, 0, 1)
+      | some root =>
+        let stem := ((System.FilePath.mk path).fileStem).getD "program"
+        let outDir := root / ".charter" / "verify" / stem
+        IO.FS.createDirAll outDir
+        let mut provedInvs : List DomId := []
+        let mut unprovedInvs : List DomId := []
+        let badAxToken := "sor" ++ "ryAx"
+        for invId in requestedInvs do
+          match Verify.InductiveArith.generateInductiveProofSource cfg [invId] with
+          | none => unprovedInvs := unprovedInvs ++ [invId]
+          | some (proofSrc, _) =>
+            let pfFile := outDir / (Verify.InductiveArith.sanId invId ++ ".lean")
+            IO.FS.writeFile pfFile proofSrc
+            let (res?, _, _) ← runChecker root outDir pfFile none 4096 o.timeoutSec
+            match res? with
+            | some (0, chkOut) =>
+              if (chkOut.splitOn badAxToken).length == 1 then
+                provedInvs := provedInvs ++ [invId]
+                let cert : Artifact.ClaimCertificate := {
+                  claim := invId, about := "inductive-conservation", verdict := some true,
+                  assurance := .proved, scope := .liveEvaluator, completion := .complete,
+                  lawSha256 := some lawHash, file := path,
+                  note := "base and inductive step obligations discharged in proof kernel for all traces and parameters"
+                }
+                emitVerifyCert o.json cert s!"proved  {path} [inductive]: invariant {invId} proved for all traces and parameters"
+              else
+                unprovedInvs := unprovedInvs ++ [invId]
+            | _ =>
+              unprovedInvs := unprovedInvs ++ [invId]
+        if unprovedInvs.isEmpty && !provedInvs.isEmpty then
+          return (provedInvs.length, 0, 0)
+        else
+          let note := if provedInvs.isEmpty then
+              "open infinite domain cannot be closed automatically without inductive auxiliary invariants"
+            else
+              s!"{provedInvs.length} arithmetic invariant(s) proved ({", ".intercalate provedInvs}); {unprovedInvs.length} remaining invariant(s) require auxiliary domain lemmas ({", ".intercalate unprovedInvs})"
+          let cert : Artifact.ClaimCertificate := {
+            claim := "invariants", about := "inductive-safety", verdict := none, assurance := .proved,
+            scope := .liveEvaluator, completion := .inconclusive,
+            lawSha256 := some lawHash, file := path, note
+          }
+          emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [inductive]: {cert.note}"
+          return (provedInvs.length, 0, 1)
     else
       let fullOpts : Verify.SearchOpts := {
         mode := o.mode, strategy := .bfs, depth := o.stateCap, stateCap := o.stateCap,

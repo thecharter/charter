@@ -32,7 +32,8 @@ structure ProveOpts where
   memory      : Nat := 6144
   time        : Nat := 300
   /-- Phrases per checkpoint module (013.4); each module is one checker process. -/
-  chunk       : Nat := 5
+  chunk       : Nat := 10
+  scenarios   : List String := []
   files       : List String := []
 
 def parseProveArgs : List String → ProveOpts → Except String ProveOpts
@@ -58,6 +59,8 @@ def parseProveArgs : List String → ProveOpts → Except String ProveOpts
     | some k => if k == 0 then .error "--chunk needs a positive number of phrases" else parseProveArgs rest { o with chunk := k }
     | none => .error s!"--chunk needs a number of phrases, not {n}"
   | ["--chunk"], _ => .error "--chunk needs a number of phrases"
+  | "--scenario" :: s :: rest, o => parseProveArgs rest { o with scenarios := o.scenarios ++ [s] }
+  | ["--scenario"], _ => .error "--scenario needs a scenario name"
   | a :: rest, o => parseProveArgs rest { o with files := a :: o.files }
 
 /-- One environment variable as `lake env` sets it, so the checker can be run directly
@@ -179,9 +182,31 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
       if dp.isAbsolute then dp else cwd / dp
     | none => root / ".charter" / "prove" / stem
   IO.FS.createDirAll dir
-  let proj := Prove.generate path stem (items.map (·.item)) o.chunk
-  for (m, src) in proj.files do
-    IO.FS.writeFile (dir / (m ++ ".lean")) src
+  let rawItems := items.map (·.item)
+  let filteredItems := if o.scenarios.isEmpty then rawItems
+    else rawItems.filter fun it => match it.val with
+      | .inr (.scenario name _ _) => o.scenarios.contains name
+      | _ => true
+  let proj := Prove.generate path stem filteredItems o.chunk
+  -- Track which prefix checkpoint modules are byte-identical to an already-checked `.olean` on disk (`013.4` cache)
+  let mut prefixUnchanged := true
+  let mut cachedModules : List String := []
+  let totalMods := proj.files.length
+  for ((m, src), idx) in proj.files.zipIdx do
+    let mFile := dir / (m ++ ".lean")
+    let mOlean := dir / (m ++ ".olean")
+    let isCheckpointMod := idx + 1 < totalMods
+    if prefixUnchanged && isCheckpointMod then
+      let oldSrc ← try IO.FS.readFile mFile catch _ => pure ""
+      let hasOlean ← mOlean.pathExists
+      if oldSrc == src && hasOlean then
+        cachedModules := cachedModules ++ [m]
+      else
+        prefixUnchanged := false
+        IO.FS.writeFile mFile src
+    else
+      prefixUnchanged := false
+      IO.FS.writeFile mFile src
   if proj.obligations.isEmpty then
     IO.println s!"{path}: prove: the program makes no claim and declares no invariant; nothing to decide"
     return (0, 0, 0)
@@ -196,19 +221,22 @@ def proveFile (o : ProveOpts) (root cwd : System.FilePath) (path : String) : IO 
   let mut left := o.time
   let n := proj.files.length
   for ((m, _), i) in proj.files.zipIdx do
-    let file := dir / (m ++ ".lean")
-    let olean := if i + 1 < n then some (dir / (m ++ ".olean")) else none
-    let t0 ← IO.monoMsNow
-    let (r, pk, st) ← runChecker root dir file olean o.memory left
-    let spent := ((← IO.monoMsNow) - t0) / 1000
-    left := if left == 0 then 0 else if spent + 1 < left then left - spent else 1
-    if pk > peak then peak := pk
-    match r, result with
-    | none, _ => result := none; stopped := st; break
-    | some (code, out), some (code0, out0) =>
-      result := some (if code != 0 then code else code0, out0 ++ out)
-      if code != 0 then break -- a failing module's import would fail every later one
-    | _, _ => pure ()
+    if cachedModules.contains m then
+      pure ()
+    else
+      let file := dir / (m ++ ".lean")
+      let olean := if i + 1 < n then some (dir / (m ++ ".olean")) else none
+      let t0 ← IO.monoMsNow
+      let (r, pk, st) ← runChecker root dir file olean o.memory left
+      let spent := ((← IO.monoMsNow) - t0) / 1000
+      left := if left == 0 then 0 else if spent + 1 < left then left - spent else 1
+      if pk > peak then peak := pk
+      match r, result with
+      | none, _ => result := none; stopped := st; break
+      | some (code, out), some (code0, out0) =>
+        result := some (if code != 0 then code else code0, out0 ++ out)
+        if code != 0 then break -- a failing module's import would fail every later one
+      | _, _ => pure ()
   let mut decided := 0
   let mut failed := 0
   let mut inconclusive := 0
