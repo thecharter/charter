@@ -1,4 +1,4 @@
-import Charter.Server.Protocol
+import Charter.Server.JustAct
 
 /-!
 # Charter.Server.Api — Operator-Blind JSON/stdio & MCP Service Dispatcher (`G4.5`, `D27`)
@@ -32,6 +32,7 @@ structure InstitutionRuntime where
   lastEntryHash  : String := "GENESIS"
   reservations   : ReservationTable := {}
   vault          : List VaultRecord := []
+  fedNet         : FedNetwork := {}
   pausedRequests : List PausedRequest := []
   nextPauseSeq   : Nat := 1
   clockPolicy    : ClockPolicy := {}
@@ -124,7 +125,8 @@ def handleRequest (rt : InstitutionRuntime) (req : Json) : IO (InstitutionRuntim
       let tools := #["GetLaw", "GetState", "GetCoverageManifest", "GetInputSchema", "InspectInputs",
                      "Evaluate", "Plan", "Reserve", "Authorize", "ConfirmExecution", "ReconcileExecution",
                      "ExercisePower", "SupplyInput", "ResumeRequest", "ObserveExternal",
-                     "SubmitEvidence", "AdvanceClock", "Explain", "AmendLaw"]
+                     "SubmitEvidence", "AdvanceClock", "Explain", "AmendLaw",
+                     "SignStatement", "RevokeStatement", "SynthesizeBundle", "VerifyBundle", "EnactBundle"]
       let resp := Json.mkObj [
         ("jsonrpc", Json.str "2.0"), ("id", reqId),
         ("result", Json.mkObj [("tools", Json.arr (tools.map fun t => Json.mkObj [("name", Json.str t)]))])
@@ -521,6 +523,173 @@ where
               return (rt', envelopeOk rt' op [
                 ("outcome", Json.str "Allow"),
                 ("newLawHash", Json.str verNew.artifactSha256),
+                ("logEntryHash", Json.str logEntry.entryHash)
+              ])
+    | "SignStatement" =>
+      let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
+        else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      -- Either accept a pre-signed `statement` object or sign from `seed` (`D43`)
+      let stmtRes : Except String SignedStatement :=
+        if let .ok preJ := req.getObjVal? "statement" then
+          do
+            let s ← fromJson? (α := SignedStatement) preJ
+            if !verifyStatementSig s then .error "invalid Schnorr signature on pre-signed statement"
+            else .ok s
+        else
+          do
+            let seed ← req.getObjValAs? String "seed"
+            let sid ← req.getObjValAs? String "statementId"
+            let author ← req.getObjValAs? String "author"
+            let exp? := (req.getObjValAs? Int "expiresAt").toOption
+            let aud : AudiencePolicy := match req.getObjValAs? (List String) "audience" with
+              | .ok xs => if xs.isEmpty then .unrestricted else .restricted xs
+              | .error _ => .unrestricted
+            let rawAss ← match req.getObjValAs? (Array Json) "assertions" with
+              | .ok arr => arr.toList.mapM fun aj => do
+                let kind := (aj.getObjValAs? String "kind").toOption.getD "inputFact"
+                if kind == "grantDisclosure" then
+                  let tSid ← aj.getObjValAs? String "targetStatementId"
+                  let recp ← aj.getObjValAs? String "recipient"
+                  .ok (StatementAssertion.grantDisclosure tSid recp)
+                else if kind == "tenderEvidence" then
+                  let fn ← aj.getObjValAs? String "fact"
+                  let fArgs ← parseElemArgs aj
+                  let pol := (aj.getObjValAs? Bool "polarity").toOption.getD true
+                  .ok (StatementAssertion.tenderEvidence fn fArgs pol)
+                else
+                  let fn ← aj.getObjValAs? String "fact"
+                  let fArgs ← parseElemArgs aj
+                  let holds := (aj.getObjValAs? Bool "holds").toOption.getD true
+                  .ok (StatementAssertion.inputFact fn fArgs holds)
+              | .error _ => .ok []
+            .ok (signStatement seed sid author rt.lawHash rt.config.state.time exp? aud rawAss)
+      match stmtRes with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok stmt =>
+        let stated' := if curNet.stated.any (· == stmt) then curNet.stated else curNet.stated ++ [stmt]
+        let rt' := { rt with fedNet := { curNet with stated := stated' } }
+        return (rt', envelopeOk rt' op [
+          ("statement", toJson stmt),
+          ("commitmentSha256", Json.str (computeStatementCommitment stmt))
+        ])
+    | "RevokeStatement" =>
+      let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
+        else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      let revRes : Except String RevocationNotice :=
+        if let .ok rj := req.getObjVal? "notice" then
+          fromJson? (α := RevocationNotice) rj
+        else do
+          let seed ← req.getObjValAs? String "seed"
+          let sid ← req.getObjValAs? String "statementId"
+          let author ← req.getObjValAs? String "author"
+          .ok (signRevocationNotice seed sid author rt.config.state.time)
+      match revRes with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok rev =>
+        match curNet.stated.find? (·.statementId == rev.statementId) with
+        | none => return (rt, envelopeErr rt op s!"unknown statementId `{rev.statementId}`")
+        | some orig =>
+          if !verifyRevocationNotice rev orig then
+            return (rt, envelopeErr rt op s!"invalid author revocation signature on `{rev.statementId}`")
+          else
+            let net' := applyRevocationId curNet rev.statementId
+            let rt' := { rt with fedNet := net' }
+            return (rt', envelopeOk rt' op [
+              ("revokedStatementId", Json.str rev.statementId),
+              ("revokedIds", Json.arr (net'.revokedIds.map Json.str).toArray)
+            ])
+    | "SynthesizeBundle" =>
+      let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
+        else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      match (do
+        let seed ← req.getObjValAs? String "actorSeed"
+        let bid := (req.getObjValAs? String "bundleId").toOption.getD s!"bundle-{rt.seqNo}"
+        let actor ← req.getObjValAs? String "actor"
+        let action ← req.getObjValAs? String "action"
+        let args ← parseElemArgs req
+        let cands ← match req.getObjVal? "candidates" with
+          | .ok cj => fromJson? (α := List SignedStatement) cj
+          | .error _ => .ok curNet.stated
+        .ok (seed, bid, actor, action, args, cands)) with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok (seed, bid, actor, action, args, cands) =>
+        match synthesizeBundle rt.config curNet seed bid actor action args rt.lawHash rt.config.state.time cands with
+        | none => return (rt, envelopeErr rt op s!"no valid justification bundle found for `{action}`")
+        | some b =>
+          return (rt, envelopeOk rt op [("bundle", toJson b)])
+    | "VerifyBundle" =>
+      let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
+        else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      match (do let bj ← req.getObjVal? "bundle"; fromJson? (α := JustificationBundle) bj) with
+      | .error e => return (rt, envelopeErr rt op s!"invalid bundle JSON: {e}")
+      | .ok b =>
+        match verifyBundle rt.config curNet b with
+        | .error e =>
+          return (rt, envelopeOk rt op [
+            ("permitted", Json.bool false),
+            ("reason", Json.str e)
+          ])
+        | .ok res =>
+          let perm := res.lawful == .yes && res.valid == .yes
+          return (rt, envelopeOk rt op [
+            ("permitted", Json.bool perm),
+            ("occurred", Json.str res.occurred),
+            ("lawful", Json.str res.lawful.asString),
+            ("valid", Json.str res.valid.asString),
+            ("outcome", Json.str res.outcome),
+            ("effectsOf", toJson res.effectsOf)
+          ])
+    | "EnactBundle" =>
+      let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
+        else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      match (do let bj ← req.getObjVal? "bundle"; fromJson? (α := JustificationBundle) bj) with
+      | .error e => return (rt, envelopeErr rt op s!"invalid bundle JSON: {e}")
+      | .ok b =>
+        match verifyBundle rt.config curNet b with
+        | .error e => return (rt, envelopeErr rt op e)
+        | .ok res =>
+          if res.lawful != .yes || res.valid != .yes then
+            return (rt, envelopeOk rt op [
+              ("permitted", Json.bool false),
+              ("outcome", Json.str res.outcome),
+              ("lawful", Json.str res.lawful.asString),
+              ("valid", Json.str res.valid.asString)
+            ])
+          else
+            -- Commit extracted clock/assertion events + action event sequentially so `T36` offline `replay`
+            -- reproduces every `stateRootAfter` deterministically!
+            let mut rtCur := rt
+            if b.enactedAt > rtCur.config.state.time then
+              let evClk := ServerEvent.advanceClock b.enactedAt
+              if let .ok decClk := evaluateServerEvent rtCur.config evClk true then
+                let (rtNext, _) ← commitTransition rtCur evClk decClk.nextConfig decClk.outcome decClk.lawful decClk.valid
+                rtCur := rtNext
+            let allAuthorAssertions : List (String × StatementAssertion) :=
+              (b.statements.flatMap fun s => s.assertions.map (fun a => (s.author, a))) ++
+              (b.attestations.flatMap fun a => a.exportedAssertions.map (fun x => (a.author, x)))
+            for (auth, ass) in allAuthorAssertions do
+              if (extractAssertionPhrase rtCur.config.spec auth ass).isSome then
+                let evAss? : Option ServerEvent := match ass with
+                  | .inputFact fn fArgs h => some (.supplyInput fn fArgs h)
+                  | .tenderEvidence fn fArgs pol => some (.submitEvidence fn fArgs pol auth [] none)
+                  | .grantDisclosure _ _ => none
+                if let some evAss := evAss? then
+                  if let .ok decAss := evaluateServerEvent rtCur.config evAss true then
+                    let (rtNext, _) ← commitTransition rtCur evAss decAss.nextConfig decAss.outcome decAss.lawful decAss.valid
+                    rtCur := rtNext
+            let evAct := ServerEvent.triggerAct b.action b.args b.bundleId
+            match evaluateServerEvent rtCur.config evAct true with
+            | .error e => return (rt, envelopeErr rt op e)
+            | .ok dec =>
+              let net' := { curNet with enacted := curNet.enacted ++ [b] }
+              let rtPre := { rtCur with fedNet := net' }
+              let (rt', logEntry) ← commitTransition rtPre evAct dec.nextConfig dec.outcome dec.lawful dec.valid
+              return (rt', envelopeOk rt' op [
+                ("permitted", Json.bool true),
+                ("outcome", Json.str dec.outcome),
+                ("lawful", Json.str dec.lawful.asString),
+                ("valid", Json.str dec.valid.asString),
+                ("effectsOf", toJson res.effectsOf),
                 ("logEntryHash", Json.str logEntry.entryHash)
               ])
     | other =>

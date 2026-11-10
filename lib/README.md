@@ -20,6 +20,7 @@ one with `#require "lib/<name>.charter"` (or `#require "<name>"`) and instantiat
 | `agency_mandate` | delegated mandates, express caps, apparent authority, revocation notice, reporting duties, non-imputation & anti-circumvention (`T15`–`T17`) | `mandate, principal, delegate, counterparty, trade` |
 | `monetary_estate` | reservation locks (`T09`), tiered fees (`T10`–`T11`), `no-double-recognition` (`T12`), `no-double-pledge` (`T13`), consolidated elimination (`T14`) | `account, party, item, entity` |
 | `jurisdiction` | superior/subordinate rank, nexus requirement, reserved subjects, entrenched-right preservation, contested jurisdiction (`T24`) | `polity, subject, norm` |
+| `federated_mandate` | actor-attributed statements, audience-restricted confidential disclosures, non-forwarding slash/nullity, and notice-gated deadlines (`D43`) | `party, statement, demand` |
 
 ## Conventions
 

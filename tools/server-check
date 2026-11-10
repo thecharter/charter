@@ -252,5 +252,63 @@ forged_log = tmp / "forged.log"
 forged_log.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 assert subprocess.run([sb, "replay", str(svc_art), str(forged_log)], capture_output=True).returncode != 0
 
-print("12 passed, 0 failed, 12 total (T09, T34, T35, T36, T43, MCP, tenant-isolation, Trace-F, Expose, PauseResume, Plan, ActorSig)")
+# D43: JustAct federated bundles (`charter bundle` CLI + `charter-server` SignStatement/SynthesizeBundle/VerifyBundle/EnactBundle/RevokeStatement + T36 replay)
+assert subprocess.run([charter_bin, "bundle", "self-test"], capture_output=True).returncode == 0
+ja_src = """Fact hospital Identified by StAntonius, SURF, Dan.
+Fact study Identified by Study1.
+Input Fact consent-cleared Identified by hospital * study.
+Fact study-completed Identified by hospital * study.
+Power run-study Actor hospital Related to study
+  Holds when consent-cleared(StAntonius, study)
+  Valid when consent-cleared(StAntonius, study)
+  Creates study-completed(hospital, study).
+"""
+ja_file = tmp / "ja.charter"
+ja_art = tmp / "ja.artifact"
+ja_log = tmp / "ja.log"
+ja_stmt = tmp / "ja_stmt.json"
+ja_bundle = tmp / "ja_bundle.json"
+ja_file.write_text(ja_src, encoding="utf-8")
+subprocess.run([charter_bin, "bundle", "sign", "--seed", "sa-seed", "--id", "sa-1", "--author", "StAntonius",
+                "--fact", "consent-cleared", "--args", "StAntonius,Study1", "--audience", "SURF",
+                "-o", str(ja_stmt), str(ja_file)], check=True, capture_output=True)
+subprocess.run([charter_bin, "bundle", "synthesize", "--seed", "surf-seed", "--id", "b-1", "--actor", "SURF",
+                "--act", "run-study", "--args", "SURF,Study1", "--statements", str(ja_stmt),
+                "-o", str(ja_bundle), str(ja_file)], check=True, capture_output=True)
+assert subprocess.run([charter_bin, "bundle", "verify", "--bundle", str(ja_bundle), str(ja_file)], capture_output=True).returncode == 0
+assert subprocess.run([charter_bin, "bundle", "verify", "--bundle", str(ja_bundle), "--revoked", "sa-1", str(ja_file)], capture_output=True).returncode != 0
+
+subprocess.run([charter_bin, "build", str(ja_file), "-o", str(ja_art)], check=True, capture_output=True)
+ja_reqs = "\n".join([
+    json.dumps({"op": "SignStatement", "seed": "dan-seed", "statementId": "dan-forge", "author": "Dan",
+                "assertions": [{"kind": "inputFact", "fact": "consent-cleared", "args": ["StAntonius", "Study1"], "holds": True}]}),
+    json.dumps({"op": "SignStatement", "seed": "sa-seed", "statementId": "sa-live", "author": "StAntonius",
+                "audience": ["SURF"],
+                "assertions": [{"kind": "inputFact", "fact": "consent-cleared", "args": ["StAntonius", "Study1"], "holds": True}]}),
+    json.dumps({"op": "SynthesizeBundle", "actorSeed": "dan-seed", "bundleId": "b-dan", "actor": "Dan", "action": "run-study", "args": ["Dan", "Study1"]}),
+    json.dumps({"op": "SynthesizeBundle", "actorSeed": "surf-seed", "bundleId": "b-surf", "actor": "SURF", "action": "run-study", "args": ["SURF", "Study1"]}),
+]) + "\n"
+ja_p1 = subprocess.run([sb, "serve", str(ja_art), "--institution", "inst-ja"], input=ja_reqs, text=True, capture_output=True, check=True)
+jrs = [json.loads(l) for l in ja_p1.stdout.strip().splitlines()]
+assert jrs[0]["ok"] and jrs[1]["ok"]
+assert not jrs[2]["ok"]  # Dan cannot forge StAntonius or use SURF-restricted statement!
+assert jrs[3]["ok"] and len(jrs[3]["bundle"]["statements"]) == 1 and jrs[3]["bundle"]["statements"][0]["statementId"] == "sa-live"
+surf_bundle = jrs[3]["bundle"]
+
+ja_reqs2 = "\n".join([
+    json.dumps({"op": "SignStatement", "statement": jrs[1]["statement"]}),
+    json.dumps({"op": "VerifyBundle", "bundle": surf_bundle}),
+    json.dumps({"op": "EnactBundle", "bundle": surf_bundle}),
+    json.dumps({"op": "RevokeStatement", "seed": "sa-seed", "statementId": "sa-live", "author": "StAntonius"}),
+    json.dumps({"op": "VerifyBundle", "bundle": surf_bundle}),
+]) + "\n"
+ja_p2 = subprocess.run([sb, "serve", str(ja_art), "--institution", "inst-ja", "--log", str(ja_log)], input=ja_reqs2, text=True, capture_output=True, check=True)
+jrs2 = [json.loads(l) for l in ja_p2.stdout.strip().splitlines()]
+assert jrs2[1]["permitted"] is True
+assert jrs2[2]["ok"] and jrs2[2]["permitted"] is True and jrs2[2]["outcome"] == "Allow"
+assert jrs2[3]["ok"] and "sa-live" in jrs2[3]["revokedIds"]
+assert jrs2[4]["permitted"] is False  # Revoked statement blocks replay of bundle!
+assert subprocess.run([sb, "replay", str(ja_art), str(ja_log)], capture_output=True).returncode == 0
+
+print("13 passed, 0 failed, 13 total (T09, T34, T35, T36, T43, MCP, tenant-isolation, Trace-F, Expose, PauseResume, Plan, ActorSig, JustActBundles)")
 PY

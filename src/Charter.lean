@@ -75,6 +75,7 @@ import Charter.Cli.Explore
 import Charter.Cli.Verify
 import Charter.Cli.Explain
 import Charter.Cli.Plan
+import Charter.Cli.Bundle
 import Charter.Project.Diff
 import Charter.Project.SolidityIR
 import Charter.Project.GuardTarget
@@ -91,6 +92,7 @@ import Charter.Cli.Main
 import Charter.Server.StateStore
 import Charter.Server.Reservations
 import Charter.Server.Protocol
+import Charter.Server.JustAct
 import Charter.Server.Api
 
 /-!

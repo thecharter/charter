@@ -1,0 +1,117 @@
+// lib/federated_mandate — Actor-attributed peer statements, audience-restricted
+// confidential disclosures, non-forwarding slash/nullity, granular revocation, and
+// notice-gated affirmative demands (`D43`, finishing JustAct §6.3.5 & §7.2.2–§7.2.4):
+// - Audience-restricted statements (`confidential-statement`) bind each authorized
+//   recipient under `guard-confidential-statement`. Forwarding always occurs physically
+//   (`Mission Law 1`), records `leaked-by` and breaches `guard-confidential-statement`
+//   when the recipient is unauthorized (`Mission Law 2`), enables `slash-leak-bond`
+//   (`Mission Law 3`), and confers zero institutional standing on the unauthorized
+//   recipient (`rely-on-statement` requires `authorized-holder`).
+// - Granular `revoke-statement` terminates `statement-active` for one statement without
+//   halting unrelated mandates.
+// - Affirmative `satisfy-demand` counts `Due within response-window After notice-delivered(...)`
+//   (`009.4`), so withholding or delaying notice never places an unnotified holder in breach.
+// Parameters: `party`, `statement`, `demand`.
+
+Module federated-mandate(party, statement, demand) {
+
+  Param response-window : Duration = 5
+
+  Fact statement-author Identified by statement * party
+  Fact statement-active Identified by statement
+  Fact statement-revoked Identified by statement
+  Fact confidential-statement Identified by statement
+  Fact authorized-holder Identified by statement * party
+  Fact possesses-statement Identified by statement * party
+  Fact leaked-by Identified by statement * party * party'
+  Fact bond-slashed Identified by party * statement
+  Fact relied-on Identified by party * statement
+
+  Fact pending-demand Identified by demand * party * party'
+  Fact notice-delivered Identified by party * demand
+
+  Duty guard-confidential-statement Holder party Claimant party' Related to statement
+    Violated when (Exists party'': leaked-by(statement, party, party''))
+
+  Duty satisfy-demand Holder party Claimant party' Related to demand
+    Due within response-window After notice-delivered(party, demand)
+
+  // ---- Issue, disclose, revoke, forward, slash, and rely on peer statements
+  Power issue-confidential-statement Actor party Recipient party' Related to statement
+    Holds when party != party' && !statement-active(statement) && !statement-revoked(statement)
+    Valid when party != party' && !statement-active(statement) && !statement-revoked(statement)
+    Creates statement-author(statement, party)
+          , statement-active(statement)
+          , confidential-statement(statement)
+          , authorized-holder(statement, party)
+          , authorized-holder(statement, party')
+          , possesses-statement(statement, party)
+          , possesses-statement(statement, party')
+          , guard-confidential-statement(party', party, statement)
+
+  Power authorize-disclosure Actor party Recipient party' Related to statement
+    Holds when statement-author(statement, party) && statement-active(statement)
+    Valid when statement-author(statement, party) && statement-active(statement)
+    Creates authorized-holder(statement, party')
+          , possesses-statement(statement, party')
+          , guard-confidential-statement(party', party, statement)
+
+  Power revoke-statement Actor party Related to statement
+    Holds when statement-author(statement, party) && statement-active(statement)
+    Valid when statement-author(statement, party) && statement-active(statement)
+    Creates statement-revoked(statement)
+    Terminates statement-active(statement)
+
+  Physical forward-statement Actor party Related to party', statement
+    Creates possesses-statement(statement, party')
+               When possesses-statement(statement, party)
+          , leaked-by(statement, party, party')
+               When possesses-statement(statement, party)
+                 && confidential-statement(statement)
+                 && !authorized-holder(statement, party')
+
+  Power slash-leak-bond Actor party Recipient party' Related to statement
+    Holds when statement-author(statement, party)
+      && (Exists party'': leaked-by(statement, party', party''))
+    Valid when statement-author(statement, party)
+      && (Exists party'': leaked-by(statement, party', party''))
+    Creates bond-slashed(party', statement)
+
+  Power rely-on-statement Actor party Related to statement
+    Holds when statement-active(statement) && possesses-statement(statement, party)
+    Valid when statement-active(statement)
+      && possesses-statement(statement, party)
+      && !statement-revoked(statement)
+      && (!confidential-statement(statement) || authorized-holder(statement, party))
+    Creates relied-on(party, statement)
+
+  // ---- Notice-gated affirmative demands (`009.4`, JustAct §7.2.2)
+  Power issue-demand Actor party Recipient party' Related to demand
+    Holds when party != party' && !pending-demand(demand, party, party')
+    Valid when party != party' && !pending-demand(demand, party, party')
+    Creates pending-demand(demand, party, party')
+          , satisfy-demand(party', party, demand)
+
+  Act deliver-demand-notice Actor party Recipient party' Related to demand
+    Holds when pending-demand(demand, party, party')
+    Creates notice-delivered(party', demand)
+
+  Act fulfill-demand Actor party Related to demand
+    Holds when (Exists party': pending-demand(demand, party', party))
+    Terminates (Foreach party': satisfy-demand(party, party', demand)
+                  When pending-demand(demand, party', party))
+             , (Foreach party': pending-demand(demand, party', party)
+                  When pending-demand(demand, party', party))
+
+  // ---- Module Invariants (`D8`)
+  Invariant reliance-requires-authorized-audience When (Forall relied-on:
+      authorized-holder(relied-on.statement, relied-on.party)
+      When relied-on && confidential-statement(relied-on.statement))
+
+  Invariant revoked-statement-never-active When (Forall statement:
+      !(statement-active(statement) && statement-revoked(statement)))
+
+  Invariant slash-requires-verified-leak When (Forall bond-slashed:
+      (Exists party': leaked-by(bond-slashed.statement, bond-slashed.party, party'))
+      When bond-slashed)
+}

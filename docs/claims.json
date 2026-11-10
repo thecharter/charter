@@ -371,6 +371,62 @@
       "summary": "Emitted Solidity (.sol + ABI) and Quint (.qnt) surface texts carry Law-10 checked tags and are validated via 3-way stateful differential traces, counterexample replay, and CI solc/Foundry + quint + z3 execution (D42, #66)."
     },
     {
+      "id": "justact.reflect_author_no_impersonation",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "reflectAuthor_no_impersonation",
+      "summary": "Mandatory authorship reflection ensures no statement signed by author can supply a base/input fact attributed to another actor or tender evidence under another issuer (D43, Law 6, Law 10)."
+    },
+    {
+      "id": "justact.persist_permitted_bundle",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "persist_permitted_bundle",
+      "summary": "Monotone auditability proved end-to-end over Charter's live evaluator: any bundle judged lawful and valid in network n1 remains identically permitted in every grown network n2 (growing n1 n2) while its basis law remains agreed and its statements remain unrevoked (D43, JustAct Theorem 3.20)."
+    },
+    {
+      "id": "justact.granular_revocation_isolation",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "unrelated_revocation_preserves_bundle",
+      "summary": "Author-signed statement revocations invalidate targeted bundles (revocation_invalidates_bundle) while preserving all unrelated bundles without freezing global agreements (D43, JustAct §6.3.5)."
+    },
+    {
+      "id": "justact.restricted_leak_detected_and_unusable",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "restricted_leak_detected_and_unusable",
+      "summary": "Unrestricted statements gossip with zero communication-breach overhead (public_gossip_always_lawful), while forwarding restricted statements outside their permitted audience records a CommViolation and bars unauthorized recipients from relying on the leaked statement (D43, JustAct §7.2.3)."
+    },
+    {
+      "id": "justact.redacted_bundle_agrees_with_unredacted",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "redacted_bundle_agrees_with_unredacted",
+      "summary": "Commitment-bound RedactedAttestations yield the exact same closed-bundle verdict on non-confidential actions as raw private statements while exporting zero Confidential facts (D43, JustAct §7.2.4)."
+    },
+    {
+      "id": "justact.synthesize_bundle_sound",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "synthesizeBundle_sound",
+      "summary": "Every justification bundle produced by dependency-sliced synthesizeBundle satisfies permittedBundle over Charter's live evaluator (D43, JustAct §7.2.1)."
+    },
+    {
+      "id": "justact.unnoticed_duty_never_violated",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/JustAct.lean",
+      "symbol": "unnoticed_duty_never_violated",
+      "summary": "Evaluated directly over Charter's live M.eval, a notice-gated Duty (Due within dur After notice) evaluates to false at every clock instant while notice has not occurred in the agent's view (D43, JustAct §7.2.2)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",
