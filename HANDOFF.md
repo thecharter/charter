@@ -5,22 +5,22 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
-# Handoff — 2026-11-10: `D43` (`B30`–`B31`) — JustAct federated justification bundles, audience-controlled communication, redacted attestations, and partial-view obligation safety
+# Handoff — 2026-11-10: `D43` (`B30`–`B31`) — Federated justification bundles, audience-bounded sharing, redacted attestations, and partial-view obligation safety
 
 ## Where
 
 - `main`, pushed straight to `main` after `tools/battery` PASS across all steps (59 backed claims in `docs/claims.json`, 14/14 stdlib suites including `federated_mandate`, 13/13 `server-check` suites, zero build warnings, zero `Surface`/`Resolve`/`Prove` symbols in `charter-server`).
-- Companion PSA update (`B31`) applied and verified under `/Users/eric/psa/tools/verify-psa` and `charter prove`.
+- Companion PSA update (`B31`) applied and verified under `/Users/eric/psa/tools/verify-psa`.
 
 ## What landed (`D43`)
 
-- **Operator-blind federated justification bundle layer (`src/Charter/Server/JustAct.lean`)**: Built directly over Charter's proved evaluator (`evalCompiledStep` / `M.eval`) with zero `Surface/`, `Resolve/`, or `Prove/` imports and zero new `.charter` surface syntax (`Law 13`), finishing *JustAct*'s six open problems with machine-checked Lean theorems:
+- **Operator-blind federated justification bundle layer (`src/Charter/Server/Bundles.lean`)**: Integrated directly over Charter's proved evaluator (`evalCompiledStep` / `M.eval`) with zero `Surface/`, `Resolve/`, or `Prove/` imports and zero new `.charter` surface syntax (`Law 13`), extending Charter with machine-checked Lean theorems inspired by Esterhuyse, Müller, and van Binsbergen (*LMCS* 22:3, 2026):
   1. `reflectAuthor_no_impersonation` — mandatory authorship reflection prevents any peer statement from asserting base/input facts in another actor's slot or tendering evidence as another issuer;
-  2. `persist_permitted_bundle` — *JustAct* Theorem 3.20 proved end-to-end over Charter's live evaluator with zero unproved evaluator parameters;
-  3. `revocation_invalidates_bundle` & `unrelated_revocation_preserves_bundle` — author-signed per-statement revocations without wiping global `agreedLaws`;
-  4. `public_gossip_always_lawful` & `restricted_leak_detected_and_unusable` — free gossip for unrestricted statements while unauthorized forwarding of restricted statements records `CommViolation` and confers zero standing on unauthorized recipients;
+  2. `persist_permitted_bundle` — monotone closed-bundle auditability proved end-to-end over Charter's live evaluator;
+  3. `revocation_invalidates_bundle` & `unrelated_revocation_preserves_bundle` — author-signed per-statement revocations without disturbing active agreements;
+  4. `public_gossip_always_lawful` & `restricted_leak_detected_and_unusable` — unrestricted statements propagate with zero communication overhead while unauthorized forwarding of restricted statements records `CommViolation` and confers zero standing;
   5. `redacted_bundle_agrees_with_unredacted` — commitment-bound `RedactedAttestation`s hide `Confidential` facts from counterparties and public verifiers while preserving identical closed-bundle verdicts;
-  6. `synthesizeBundle_sound` & `unnoticed_duty_never_violated` — dependency-sliced minimal bundle synthesis and proof over `M.eval` that a notice-gated `Duty` (`Due within d After notice`) is never violated before notice enters the holder's view.
+  6. `synthesizeBundle_sound` & `unnoticed_duty_never_violated` — dependency-sliced minimal bundle synthesis and proof over `M.eval` that a notice-gated `Duty` (`Due within d After notice`) is never violated before notice enters state.
 - **CLI, `charter-server`, and standard library**: Added `charter bundle <sign|synthesize|verify|inspect|self-test>` (`src/Charter/Cli/Bundle.lean`), `SignStatement`/`RevokeStatement`/`SynthesizeBundle`/`VerifyBundle`/`EnactBundle` RPCs (`src/Charter/Server/Api.lean`, deterministic under `charter-server replay`), and `lib/federated_mandate.charter` (`test/lib/federated_mandate_test.charter`).
 
 ---

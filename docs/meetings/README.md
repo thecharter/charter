@@ -6,7 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
-- [D43 — Federated action-carried justification bundles, authorship reflection, audience-controlled gossip, redacted attestations, and partial-view obligation safety (`B30`, `018.2`, `018.5`)](2026-11-10-D43-justact-bundles-and-federated-obligations.md)
+- [D43 — Federated action-carried justification bundles, audience-bounded sharing, redacted attestations, and partial-view obligation safety (`B30`, `018.2`, `018.5`)](2026-11-10-D43-federated-bundles-and-partial-view-obligations.md)
 - [D39–D42 — Duplicate-declaration refusal (`B9`, `CHR019`), `Document Rank` *lex superior* (`#73`), evaluator-independent `Core.Meaning` (`#65`), and mechanized `SolidityIR` + Law-10 target boundaries (`#66`)](2026-11-08-D39-D42-duplicate-decls-doc-rank-meaning-and-solidity-ir.md)
 - [D34–D38 — Language ergonomics (`#35`–`#61`), standard-library provenance (`#62`), and companion fixes (`#13`–`#18`, `#21`–`#23`, `#25`, `#26`, `#30`, `#32`)](2026-11-07-D34-D38-ergonomics-and-stdlib-provenance.md)
 - [D30–D33 — End-state invariant checks in `test`, status-explicit `Evidenced` derivations (`CHR038`), missing-input `Var`/`Function` effects (`CHR100`), source-keyed evidence + `Retracts !e` + `CHR109`, and binder/count warnings (`CHR039`, `CHR040`; issues #3, #6, #8, #9, #11, #12)](2026-11-07-D30-D33-end-states-evidence-and-missing-input.md)

@@ -1,45 +1,46 @@
 import Charter.Server.Protocol
 
 /-!
-# Charter.Server.JustAct — Federated Action-Carried Justification Bundles (`D43`)
+# Charter.Server.Bundles — Federated Action-Carried Justification Bundles (`D43`)
 
-Finishes the six open problems of Esterhuyse, Müller, and van Binsbergen's *JustAct*
-framework (*Logical Methods in Computer Science*, 22:3, Sept. 2026) directly over
-Charter's proved evaluator (`Charter.Eval` / `Charter.Core.Meaning`) with zero
-`Charter.Surface`, `Charter.Resolve`, or `Charter.Prove` dependencies (`operator-blind`):
+Extends Charter's operator-blind runtime (`Charter.Eval` / `Charter.Core.Meaning`) to
+inter-organizational settings where participants hold partial views of peer state and carry
+self-contained cryptographic proof bundles alongside actions, with zero `Charter.Surface`,
+`Charter.Resolve`, or `Charter.Prove` dependencies (`operator-blind`).
 
-1. **End-to-end verified bundle evaluation (replacing *JustAct* §4.5.2 `Parameter 4.10`):**
-   Evaluates closed `JustificationBundle` payloads over `evalCompiledStep` (`M.evalActTri` /
-   `Interp.semPhrase`), returning Charter's three answers (`occurred`, `lawful`, `valid`, `Law 2`)
-   plus enumerated `effectsOf` capability tokens (`§3.9`, `§5.2`), and proving
-   `persist_permitted_bundle` (*JustAct* Theorem 3.20) end-to-end without unproved parameters.
-2. **Mandatory authorship reflection (`reflectAuthor_no_impersonation`, §4.7 & §5.3):**
-   Schnorr-verified `SignedStatement`s authored by `α` can only supply base/input facts whose
+Inspired by the action-carried justification model of Esterhuyse, Müller, and van Binsbergen
+(*Logical Methods in Computer Science*, 22:3, 2026), integrated with Charter's verified
+evaluator, stateful duties, audience-scoped confidentiality, and per-statement revocation:
+
+1. **Verified closed-bundle evaluation (`persist_permitted_bundle`):**
+   Evaluates closed `JustificationBundle` payloads directly over `evalCompiledStep`
+   (`M.evalActTri` / `Interp.semPhrase`), returning Charter's three institutional answers
+   (`occurred`, `lawful`, `valid`, `Law 2`) plus enumerated `effectsOf` capability tokens, and
+   proving monotone auditability across growing network histories over the live evaluator.
+2. **Mandatory authorship reflection (`reflectAuthor_no_impersonation`):**
+   Schnorr-verified `SignedStatement`s authored by `α` may only supply base/input facts whose
    leading actor argument equals `α` or tender `Evidenced` support/rebuttal with `issuer = α`.
-3. **Granular per-statement revocation without global freeze (§6.3.5):**
-   Author-signed `RevocationNotice`s (`revokedIds`) and `expiresAt` bounds invalidate targeted
-   delegations (`revocation_invalidates_bundle`) while leaving unrelated bundles intact
-   (`unrelated_revocation_preserves_bundle`), eliminating `agreed := []` consortium freezes.
-4. **Audience-controlled statement communication without recursive gossip regress (§7.2.3):**
-   `.unrestricted` statements gossip with zero overhead (`public_gossip_always_lawful`), whereas
+3. **Per-statement revocation & expiry (`revocation_invalidates_bundle`, `unrelated_revocation_preserves_bundle`):**
+   Author-signed `RevocationNotice`s (`revokedIds`) and `expiresAt` stamps retire individual
+   delegations without disturbing active agreements or unrelated bundles.
+4. **Audience-bounded statement sharing (`public_gossip_always_lawful`, `restricted_leak_detected_and_unusable`):**
+   `.unrestricted` statements propagate freely with zero communication overhead, whereas
    forwarding `.restricted` statements outside their permitted audience records a
-   `CommViolation` (`Law 1`–`Law 3`) and prevents unauthorized recipients from relying on the
-   leaked statement (`restricted_leak_detected_and_unusable`).
-5. **Commitment-bound redacted attestations (§7.2.4):**
-   `RedactedAttestation`s carry the SHA-256 commitment of a hidden `SignedStatement` plus an
-   authorized auditor/enclave Schnorr signature exporting only non-confidential interface facts
-   (`redacted_bundle_agrees_with_unredacted`).
-6. **Automated minimal bundle synthesis (§7.2.1) & partial-view duty notice safety (§7.2.2):**
-   `synthesizeBundle` slices candidate pools to minimal valid bundles (`synthesizeBundle_sound`),
+   `CommViolation` (`Law 1`–`Law 3`) and confers no standing in `verifyBundle`.
+5. **Commitment-bound redacted attestations (`redacted_bundle_agrees_with_unredacted`):**
+   `RedactedAttestation`s bind the SHA-256 commitment of a private `SignedStatement` to an
+   auditor/enclave Schnorr attestation exporting only non-confidential interface facts.
+6. **Minimal bundle synthesis (`synthesizeBundle_sound`) & notice-gated obligation safety (`unnoticed_duty_never_violated`):**
+   Dependency-cone slicing synthesizes minimal valid bundles from candidate statement pools,
    and `unnoticed_duty_never_violated` proves over `M.eval` that a notice-gated `Duty`
-   (`Due within d After notice`) is never violated while notice is absent from an agent's view.
+   (`Due within d After notice`) is never violated before notice is established in state.
 -/
 
 namespace Charter.Server
 
 open Lean (Json ToJson FromJson toJson fromJson?)
 
-/-- Audience disclosure policy on a signed peer statement (`D43`, finishing *JustAct* §7.2.3). -/
+/-- Audience disclosure policy on a signed peer statement (`D43`). -/
 inductive AudiencePolicy where
   | unrestricted
   | restricted (allowed : List String)
@@ -73,7 +74,7 @@ def canonicalAudienceSig : AudiencePolicy → String
   | .unrestricted => "pub"
   | .restricted allowed => "res:" ++ ",".intercalate allowed
 
-/-- Cryptographically signed peer policy/delegation statement (`stated` in *JustAct* §3.6, §5.3). -/
+/-- Cryptographically signed peer policy or delegation statement (`D43`). -/
 structure SignedStatement where
   statementId  : String
   author       : String
@@ -90,7 +91,7 @@ def statementSigPayload (s : SignedStatement) : String :=
   let expStr := match s.expiresAt with | some t => toString t | none => "none"
   s!"charter-stmt-v1|{s.statementId}|{s.author}|{s.basisLawHash}|{s.issuedAt}|{expStr}|{canonicalAudienceSig s.audience}|{"/".intercalate (s.assertions.map canonicalAssertionSig)}"
 
-/-- SHA-256 commitment digest of a `SignedStatement` (used by `RedactedAttestation`s, §7.2.4). -/
+/-- SHA-256 commitment digest of a `SignedStatement` (bound by `RedactedAttestation`s). -/
 def computeStatementCommitment (s : SignedStatement) : String :=
   Artifact.sha256String (statementSigPayload s ++ "|" ++ s.signature)
 
@@ -111,7 +112,7 @@ def verifyStatementSig (s : SignedStatement) : Bool :=
   !s.statementId.isEmpty && !s.author.isEmpty &&
   Artifact.verifyActorSig s.authorPubKey (statementSigPayload s) s.signature
 
-/-- Author-signed revocation of an earlier `SignedStatement` (finishing *JustAct* §6.3.5). -/
+/-- Author-signed revocation of an earlier `SignedStatement` (`D43`). -/
 structure RevocationNotice where
   statementId  : String
   author       : String
@@ -135,7 +136,7 @@ def verifyRevocationNotice (r : RevocationNotice) (orig : SignedStatement) : Boo
   Artifact.verifyActorSig r.authorPubKey (revocationSigPayload r) r.signature
 
 /-- Commitment-bound redacted attestation hiding `Confidential` facts inside a private statement
-while exporting only non-confidential interface assertions (`D43`, finishing *JustAct* §7.2.4). -/
+while exporting only non-confidential interface assertions (`D43`, `T43`). -/
 structure RedactedAttestation where
   statementId        : String
   commitmentSha256   : String
@@ -185,7 +186,7 @@ def verifyRedactedAttestation (spec : Spec) (a : RedactedAttestation) : Bool :=
   a.exportedAssertions.all (assertionIsNonConfidential spec) &&
   Artifact.verifyActorSig a.auditorPubKey (redactedAttestationPayload a) a.auditorSignature
 
-/-- Authorized auditor opening check verifying `raw` against `a.commitmentSha256` (§7.2.4). -/
+/-- Authorized auditor opening check verifying `raw` against `a.commitmentSha256`. -/
 def verifyRedactedOpening (spec : Spec) (raw : SignedStatement) (a : RedactedAttestation) : Bool :=
   verifyStatementSig raw &&
   verifyRedactedAttestation spec a &&
@@ -194,7 +195,7 @@ def verifyRedactedOpening (spec : Spec) (raw : SignedStatement) (a : RedactedAtt
   a.basisLawHash == raw.basisLawHash &&
   a.commitmentSha256 == computeStatementCommitment raw
 
-/-! ## Mandatory Authorship Reflection (`reflectAuthor`, *JustAct* §4.7 & §5.3) -/
+/-! ## Mandatory Authorship Reflection -/
 
 /-- Check whether `args` starts with `.str expectedAuthor`. -/
 def hasLeadingAuthor (expectedAuthor : String) : List Elem → Bool
@@ -290,9 +291,9 @@ theorem reflectAuthor_no_impersonation
     | grantDisclosure _ _ =>
       simp [extractAssertionPhrase] at hExt
 
-/-! ## Self-Contained Action-Carried Justification Bundles (`payload(a)`, *JustAct* §3.7–3.9) -/
+/-! ## Self-Contained Action-Carried Justification Bundles -/
 
-/-- Enumerated ground capability/state-change effect projected from a valid transition (§3.9, §5.2). -/
+/-- Enumerated ground capability/state-change effect projected from a valid transition. -/
 structure EnumeratedEffect where
   factInstance : String
   polarity     : String -- "+" | "-"
@@ -316,7 +317,7 @@ def collectSyncEffects : List TransInfo → List EnumeratedEffect
   | t :: ts => collectTransEffects t ++ collectSyncEffects ts
 end
 
-/-- Self-contained action-carried justification bundle (`a = (actor, basis, payload)` in *JustAct* §5.3). -/
+/-- Self-contained action-carried justification bundle (`D43`). -/
 structure JustificationBundle where
   bundleId     : String
   actor        : String
@@ -399,7 +400,7 @@ structure BundleEvalResult where
   unmetEvidence : List (String × EvidenceStatus) := []
   deriving Repr, DecidableEq, BEq, Inhabited, ToJson, FromJson
 
-/-- Evaluate an action against an extracted closed `Config` using Charter's real `evalCompiledStep`. -/
+/-- Evaluate an action against an extracted closed `Config` using Charter's `evalCompiledStep`. -/
 def evalActionOnExtractedConfig (extractedCfg : Config) (action : DomId) (args : List Elem) :
     Except String BundleEvalResult := do
   checkExposedAct extractedCfg.spec action
@@ -425,8 +426,7 @@ def evalActionOnExtractedConfig (extractedCfg : Config) (action : DomId) (args :
         unmetEvidence := info.unmetEvidence.map fun (u, st) => (u.pp, st)
       }
 
-/-- Closed-box static validity evaluation (`valid-act` in *JustAct* §3.8, upgraded to Charter's
-three answers and real `evalCompiledStep` with zero unproved evaluator parameters). -/
+/-- Closed-box static evaluation over `(baseCfg, b)` returning Charter's three answers. -/
 def evalBundleStatic (baseCfg : Config) (b : JustificationBundle) : Except String BundleEvalResult :=
   if !verifyBundleActorSig b then
     .error "invalid actor Schnorr signature on JustificationBundle"
@@ -438,9 +438,10 @@ def evalBundleStatic (baseCfg : Config) (b : JustificationBundle) : Except Strin
     let extracted := extractBundleConfig baseCfg b.enactedAt b.statements b.attestations
     evalActionOnExtractedConfig extracted b.action b.args
 
-/-! ## Federated Network State, Monotone Auditability (`Theorem 3.20`), & Granular Revocation -/
+/-! ## Federated Network State, Monotone Auditability, & Per-Statement Revocation -/
 
-/-- Federated control-plane configuration (`config` in *JustAct* §5.4 + per-statement `revokedIds`). -/
+/-- Federated control-plane configuration tracking active `agreedLaws`, peer `stated` messages,
+per-statement `revokedIds`, and `enacted` bundles (`D43`). -/
 structure FedNetwork where
   agreedLaws : List String := []
   stated     : List SignedStatement := []
@@ -448,20 +449,20 @@ structure FedNetwork where
   enacted    : List JustificationBundle := []
   deriving Repr, Inhabited, ToJson, FromJson
 
-/-- Monotone network history growth (`growing(c, c')` in *JustAct* Definition 3.4). -/
+/-- Monotone network history growth (`stated` and `enacted` grow monotonically). -/
 def FedNetwork.growing (n₁ n₂ : FedNetwork) : Prop :=
   (∀ s, s ∈ n₁.stated → s ∈ n₂.stated) ∧
   (∀ b, b ∈ n₁.enacted → b ∈ n₂.enacted)
 
-/-- `based(c, a)`: bundle's `basisLawHash` is in the active synchronized `agreedLaws` set (§3.8). -/
+/-- `basedBundle`: bundle's `basisLawHash` is in the active synchronized `agreedLaws` set. -/
 def basedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
   net.agreedLaws.contains b.basisLawHash
 
-/-- `sourced(c, a)`: every `SignedStatement` carried in `b` has been `stated` (§3.8). -/
+/-- `sourcedBundle`: every `SignedStatement` carried in `b` has been `stated`. -/
 def sourcedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
   b.statements.all (fun s => net.stated.any (· == s))
 
-/-- `unrevoked(c, a)`: none of `b`'s statements or attestations has been revoked (§6.3.5 fix). -/
+/-- `unrevokedBundle`: none of `b`'s statements or attestations has been revoked. -/
 def unrevokedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
   b.statements.all (fun s => !net.revokedIds.contains s.statementId) &&
   b.attestations.all (fun a => !net.revokedIds.contains a.statementId)
@@ -504,12 +505,12 @@ theorem sourced_monotone_of_growing
   rcases hSrc s hs with ⟨w, hwMem, hwEq⟩
   exact ⟨w, hGrow.1 w hwMem, hwEq⟩
 
-/-- **Theorem 3 (`persist_permitted_bundle` — *JustAct* Theorem 3.20 proved end-to-end):**
+/-- **Theorem 3 (`persist_permitted_bundle`):**
 Because non-monotonic Charter rules (`Not`, `Default`/`Exception`, `Immunity`) evaluate inside
 the closed extracted bundle state (`evalBundleStatic`), any action bundle judged lawful and valid
 in `n₁` remains identically lawful and valid in every grown network state `n₂` (`growing n₁ n₂`)
-whose `agreedLaws` still contain `b.basisLawHash` and in which `b`'s statements remain unrevoked—
-even if adversarial peers inject arbitrary conflicting statements into `n₂.stated`! -/
+whose `agreedLaws` still contain `b.basisLawHash` and in which `b`'s statements remain unrevoked,
+regardless of additional statements published to `n₂.stated`. -/
 theorem persist_permitted_bundle
     (baseCfg : Config) (n₁ n₂ : FedNetwork) (b : JustificationBundle)
     (hGrow : FedNetwork.growing n₁ n₂)
@@ -524,14 +525,14 @@ theorem persist_permitted_bundle
   have hS₂ := sourced_monotone_of_growing n₁ n₂ b hGrow hS₁
   simp [hBased, hS₂, hUnrev, hPerm]
 
-/-- Record a verified `RevocationNotice` in `net` without altering `agreedLaws` (§6.3.5 fix). -/
+/-- Record a verified `RevocationNotice` in `net` without altering `agreedLaws`. -/
 def applyRevocationId (net : FedNetwork) (sid : String) : FedNetwork :=
   if net.revokedIds.contains sid then net
   else { net with revokedIds := sid :: net.revokedIds }
 
 /-- **Theorem 4 (`revocation_invalidates_bundle`):**
-Revoking `s.statementId` immediately invalidates any bundle carrying `s`, without wiping
-`agreedLaws` (`agreed := []`). -/
+Revoking `s.statementId` immediately invalidates any bundle carrying `s`, without altering
+`agreedLaws`. -/
 theorem revocation_invalidates_bundle
     (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle) (s : SignedStatement)
     (hs : s ∈ b.statements) :
@@ -565,7 +566,7 @@ theorem list_all_eq_of_mem {α : Type} (xs : List α) (f g : α → Bool)
 
 /-- **Theorem 5 (`unrelated_revocation_preserves_bundle`):**
 Revoking a statement `sid` that appears nowhere in `b` leaves `permittedBundle` for `b`
-completely unchanged—no innocent agent is frozen (§6.3.5). -/
+unchanged. -/
 theorem unrelated_revocation_preserves_bundle
     (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle) (sid : String)
     (hNoStmt : ∀ s ∈ b.statements, s.statementId ≠ sid)
@@ -591,7 +592,7 @@ theorem unrelated_revocation_preserves_bundle
   unfold permittedBundle verifyBundle
   rw [hBasedEq, hSrcEq, hUnrevEq]
 
-/-! ## Audience-Controlled Communication (`gossip` & `CommViolation`, Finishing *JustAct* §7.2.3) -/
+/-! ## Audience-Bounded Communication (`stepGossip` & `CommViolation`) -/
 
 /-- Recorded breach when an agent forwards a `.restricted` statement outside its allowed audience. -/
 structure CommViolation where
@@ -600,8 +601,7 @@ structure CommViolation where
   statementId : String
   deriving Repr, DecidableEq, BEq, Inhabited, ToJson, FromJson
 
-/-- Federated multi-agent system with per-agent partial views (`views`, *JustAct* Def. 5.14–5.16)
-plus explicit communication-breach tracking (`commViolations`). -/
+/-- Federated multi-agent system with per-agent partial views plus communication-breach tracking. -/
 structure FedSystem where
   net            : FedNetwork := {}
   views          : List (String × List SignedStatement) := []
@@ -617,7 +617,7 @@ def setView (views : List (String × List SignedStatement)) (agent : String)
     (ss : List SignedStatement) : List (String × List SignedStatement) :=
   (agent, ss) :: views.filter (·.1 != agent)
 
-/-- Whether `sender` is authorized to forward `s` to `recipient` given `senderView` (§7.2.3). -/
+/-- Whether `sender` is authorized to forward `s` to `recipient` given `senderView`. -/
 def gossipAuthorized (senderView : List SignedStatement) (recipient : String)
     (s : SignedStatement) : Bool :=
   audienceAllowedForActor senderView recipient s.audience s.author s.statementId
@@ -638,7 +638,7 @@ def stepGossip (sys : FedSystem) (sender recipient : String) (s : SignedStatemen
 
 /-- **Theorem 6 (`public_gossip_always_lawful`):**
 `.unrestricted` statements require zero communication-justification search and never incur a
-`CommViolation` when gossiped (*JustAct* §7.2.3). -/
+`CommViolation` when gossiped. -/
 theorem public_gossip_always_lawful
     (sys : FedSystem) (sender recipient : String) (s : SignedStatement)
     (hPub : s.audience = .unrestricted) :
@@ -653,12 +653,12 @@ theorem public_gossip_always_lawful
       simp
     simp only [hAuth, ↓reduceIte]
 
-/-- **Theorem 7 (`restricted_leak_detected_and_unusable` — Finishing *JustAct* §7.2.3):**
+/-- **Theorem 7 (`restricted_leak_detected_and_unusable`):**
 If `s.audience = .restricted allowed` and `recipient` is neither in `allowed` nor `s.author`
 and holds no valid disclosure grant from `s.author`:
 1. Any `stepGossip` of `s` from `sender` (holding `s`) to `recipient` records
-   `⟨sender, recipient, s.statementId⟩` in `commViolations` (catching SURF → Dan leaks); and
-2. `recipient` cannot use the leaked statement `s` to pass `permittedBundle`! -/
+   `⟨sender, recipient, s.statementId⟩` in `commViolations`; and
+2. `recipient` cannot use the leaked statement `s` to pass `permittedBundle`. -/
 theorem restricted_leak_detected_and_unusable
     (baseCfg : Config) (sys : FedSystem) (sender recipient : String)
     (s : SignedStatement) (allowed : List String)
@@ -714,13 +714,13 @@ theorem restricted_leak_detected_and_unusable
       cases verifyBundleActorSig b <;>
       simp [hAllFalse]
 
-/-! ## Commitment-Bound Redacted Attestation Equivalence (Finishing *JustAct* §7.2.4) -/
+/-! ## Commitment-Bound Redacted Attestation Equivalence -/
 
 /-- **Theorem 8 (`redacted_bundle_agrees_with_unredacted`):**
 Whenever a bundle carrying a `RedactedAttestation` (`bRedacted`, hiding `Confidential` raw facts)
 and the corresponding unredacted bundle (`bRaw`) pass envelope signature/audience checks and
 induce the same extracted `Config` on the public interface, `evalBundleStatic` returns the
-**exact same** `(occurred, lawful, valid, outcome, effectsOf)` verdict while `bRedacted` exposes
+exact same `(occurred, lawful, valid, outcome, effectsOf)` verdict while `bRedacted` exposes
 zero `Confidential` assertions (`assertionIsNonConfidential`). -/
 theorem redacted_bundle_agrees_with_unredacted
     (baseCfg : Config) (bRaw bRedacted : JustificationBundle)
@@ -748,7 +748,7 @@ theorem redacted_bundle_agrees_with_unredacted
       cases a.exportedAssertions.all (assertionIsNonConfidential baseCfg.spec) <;>
       simp
 
-/-! ## Dependency-Sliced Minimal Bundle Synthesis (Finishing *JustAct* §7.2.1) -/
+/-! ## Dependency-Sliced Minimal Bundle Synthesis -/
 
 /-- Collect asserted `DomId`s inside a `SignedStatement` for dependency-cone filtering. -/
 def statementAssertedDoms (spec : Spec) (s : SignedStatement) : List DomId :=
@@ -823,8 +823,8 @@ def synthesizeCandidateBundle (baseCfg : Config) (net : FedNetwork)
       let minStmts := minimizeBundleStatements baseCfg net actorSeed bundleId actor action args basisLawHash enactedAt [] accStmts
       signBundle actorSeed bundleId actor action args basisLawHash enactedAt minStmts []
 
-/-- Synthesize a minimal valid `JustificationBundle` from a noisy candidate pool (discarding
-irrelevant, expired, revoked, unauthorized, or conflicting adversarial statements, §7.2.1). -/
+/-- Synthesize a minimal valid `JustificationBundle` from a candidate pool (discarding
+irrelevant, expired, revoked, unauthorized, or conflicting statements). -/
 def synthesizeBundle (baseCfg : Config) (net : FedNetwork)
     (actorSeed bundleId actor : String) (action : DomId) (args : List Elem)
     (basisLawHash : String) (enactedAt : Int)
@@ -832,10 +832,9 @@ def synthesizeBundle (baseCfg : Config) (net : FedNetwork)
   let cand := synthesizeCandidateBundle baseCfg net actorSeed bundleId actor action args basisLawHash enactedAt candidates
   if permittedBundle baseCfg net cand then some cand else none
 
-/-- **Theorem 9 (`synthesizeBundle_sound` — Finishing *JustAct* §7.2.1):**
-Every `JustificationBundle` returned by `synthesizeBundle` is guaranteed to satisfy
-`permittedBundle baseCfg net b = true` (`based`, `sourced`, `unrevoked`, `lawful = .yes`, and
-`valid = .yes` over Charter's live evaluator). -/
+/-- **Theorem 9 (`synthesizeBundle_sound`):**
+Every `JustificationBundle` returned by `synthesizeBundle` satisfies `permittedBundle baseCfg net b = true`
+over Charter's live evaluator. -/
 theorem synthesizeBundle_sound
     (baseCfg : Config) (net : FedNetwork)
     (actorSeed bundleId actor : String) (action : DomId) (args : List Elem)
@@ -849,7 +848,7 @@ theorem synthesizeBundle_sound
   · injection hSynth with hEq; rw [← hEq]; assumption
   · contradiction
 
-/-! ## Partial-View Notice Safety for Obligations (Finishing *JustAct* §7.2.2) -/
+/-! ## Partial-View Notice Safety for Obligations -/
 
 /-- Notice-gated deadline violation term compiled by Charter for `Due within dur After noticeTerm`
 (`009.4`, `Resolve.Static` line 1349). -/
@@ -875,12 +874,11 @@ theorem eval_and_short_circuit_false
   rw [M_bind_run, hFalse]
   rfl
 
-/-- **Theorem 10 (`unnoticed_duty_never_violated` — Finishing *JustAct* §7.2.2):**
-Evaluated directly over Charter's live `M.eval`, whenever `noticeTerm` has not yet occurred /
-entered the agent's acknowledged view (`(M.eval (fuel + 1) (.doneAt noticeTerm)).run ctx subs = .ok [.bool false]`),
-the notice-gated obligation violation condition `noticeGatedViolationTerm noticeTerm durTerm`
-evaluates to `.ok [.bool false]` at **every** clock instant `ctx.state.time`—so no agent is ever
-judged in breach of an obligation beyond its acknowledged knowledge! -/
+/-- **Theorem 10 (`unnoticed_duty_never_violated`):**
+Evaluated directly over Charter's live `M.eval`, whenever `noticeTerm` has not yet occurred in
+state (`(M.eval (fuel + 1) (.doneAt noticeTerm)).run ctx subs = .ok [.bool false]`), the
+notice-gated obligation violation condition `noticeGatedViolationTerm noticeTerm durTerm`
+evaluates to `.ok [.bool false]` at every clock instant `ctx.state.time`. -/
 theorem unnoticed_duty_never_violated
     (fuel : Nat) (ctx : Ctx) (subs : Subs) (noticeTerm durTerm : Term)
     (hUnnoticed : (M.eval (fuel + 1) (.doneAt noticeTerm)).run ctx subs = .ok [.bool false]) :
@@ -888,12 +886,12 @@ theorem unnoticed_duty_never_violated
   eval_and_short_circuit_false (fuel + 1) ctx subs (.doneAt noticeTerm)
     (.geq (.sub .currentTime (.stampOf noticeTerm)) durTerm) hUnnoticed
 
-/-! ## End-to-End *JustAct* Runtime Self-Test Suite -/
+/-! ## End-to-End Federated Bundle Self-Test Suite -/
 
-def mkJustActDemoSpec : Spec :=
+def mkBundleDemoSpec : Spec :=
   let strDom   : TypeSpec := { kind := .fact {}, domain := .anyString, closed := some false }
-  let actorDom : TypeSpec := { kind := .fact {}, domain := .strings ["StAntonius", "SURF", "Dan"], derivation := [.holdsWhen (.boolLit true)], closed := some true }
-  let taskDom  : TypeSpec := { kind := .fact {}, domain := .strings ["Task1"], derivation := [.holdsWhen (.boolLit true)], closed := some true }
+  let actorDom : TypeSpec := { kind := .fact {}, domain := .strings ["ClinicA", "PartnerLab", "ThirdParty"], derivation := [.holdsWhen (.boolLit true)], closed := some true }
+  let taskDom  : TypeSpec := { kind := .fact {}, domain := .strings ["Study1"], derivation := [.holdsWhen (.boolLit true)], closed := some true }
   let patFact  : TypeSpec := {
     kind := .fact { isInput := true, confidential := true, audiences := ["auditor"] }
     domain := .products [⟨"actor", ""⟩, ⟨"string", ""⟩]
@@ -910,7 +908,7 @@ def mkJustActDemoSpec : Spec :=
     closed := some true
   }
   let condCleared : Term :=
-    .present (.app "consent-cleared" (.named [(⟨"actor", ""⟩, .tag (.stringLit "StAntonius") "actor"),
+    .present (.app "consent-cleared" (.named [(⟨"actor", ""⟩, .tag (.stringLit "ClinicA") "actor"),
                                               (⟨"task", ""⟩, .ref ⟨"task", ""⟩)]))
   let effDone : Effect :=
     .cAll [] (.app "study-completed" (.named [(⟨"actor", ""⟩, .ref ⟨"actor", ""⟩),
@@ -931,49 +929,49 @@ def mkJustActDemoSpec : Spec :=
       ("string", strDom)
     ] }
 
-def justActSelfTest : Bool :=
-  let spec := mkJustActDemoSpec
+def bundleSelfTest : Bool :=
+  let spec := mkBundleDemoSpec
   let strata := match Stratify.strata spec with | .ok st => st | .error _ => []
   let initState := match Saturate.rebaseAndSat spec strata {} with | .ok s => s | .error _ => {}
   let baseCfg : Config := { spec, strata, state := initState }
-  let lawHash := "law-consortium-v1"
-  let stStmt := signStatement "seed-st-antonius" "stmt-sa-1" "StAntonius" lawHash 0 (some 100)
-    (.restricted ["SURF"])
-    [.inputFact "consent-cleared" [.str "StAntonius", .str "Task1"] true]
-  let danForge := signStatement "seed-dan" "stmt-dan-forge" "Dan" lawHash 0 none .unrestricted
-    [.inputFact "consent-cleared" [.str "StAntonius", .str "Task1"] true]
-  let net0 : FedNetwork := { agreedLaws := [lawHash], stated := [stStmt, danForge] }
-  let danForgeBundle := signBundle "seed-dan" "b-dan-1" "Dan" "process-study" [.str "Dan", .str "Task1"]
-    lawHash 5 [danForge] []
-  let forgeBlocked := !permittedBundle baseCfg net0 danForgeBundle
-  let surfSynth? := synthesizeBundle baseCfg net0 "seed-surf" "b-surf-1" "SURF"
-    "process-study" [.str "SURF", .str "Task1"] lawHash 5 [danForge, stStmt]
-  let synthOk := match surfSynth? with
+  let lawHash := "law-federation-v1"
+  let clinicStmt := signStatement "seed-clinic-a" "stmt-ca-1" "ClinicA" lawHash 0 (some 100)
+    (.restricted ["PartnerLab"])
+    [.inputFact "consent-cleared" [.str "ClinicA", .str "Study1"] true]
+  let outsiderForge := signStatement "seed-outsider" "stmt-forge" "ThirdParty" lawHash 0 none .unrestricted
+    [.inputFact "consent-cleared" [.str "ClinicA", .str "Study1"] true]
+  let net0 : FedNetwork := { agreedLaws := [lawHash], stated := [clinicStmt, outsiderForge] }
+  let forgeBundle := signBundle "seed-outsider" "b-forge-1" "ThirdParty" "process-study" [.str "ThirdParty", .str "Study1"]
+    lawHash 5 [outsiderForge] []
+  let forgeBlocked := !permittedBundle baseCfg net0 forgeBundle
+  let labSynth? := synthesizeBundle baseCfg net0 "seed-lab" "b-lab-1" "PartnerLab"
+    "process-study" [.str "PartnerLab", .str "Study1"] lawHash 5 [outsiderForge, clinicStmt]
+  let synthOk := match labSynth? with
     | some b => permittedBundle baseCfg net0 b && b.statements.length == 1
     | none => false
-  let sys0 : FedSystem := { net := net0, views := [("SURF", [stStmt])] }
-  let sysLeak := stepGossip sys0 "SURF" "Dan" stStmt
-  let danLeakBundle := signBundle "seed-dan" "b-dan-leak" "Dan" "process-study" [.str "Dan", .str "Task1"]
-    lawHash 5 [stStmt] []
+  let sys0 : FedSystem := { net := net0, views := [("PartnerLab", [clinicStmt])] }
+  let sysLeak := stepGossip sys0 "PartnerLab" "ThirdParty" clinicStmt
+  let leakBundle := signBundle "seed-outsider" "b-leak-1" "ThirdParty" "process-study" [.str "ThirdParty", .str "Study1"]
+    lawHash 5 [clinicStmt] []
   let leakCaughtAndBlocked :=
-    sysLeak.commViolations.contains ⟨"SURF", "Dan", "stmt-sa-1"⟩ &&
-    !permittedBundle baseCfg net0 danLeakBundle
-  let rawSecret := signStatement "seed-st-antonius" "stmt-sa-secret" "StAntonius" lawHash 0 (some 100)
+    sysLeak.commViolations.contains ⟨"PartnerLab", "ThirdParty", "stmt-ca-1"⟩ &&
+    !permittedBundle baseCfg net0 leakBundle
+  let rawSecret := signStatement "seed-clinic-a" "stmt-ca-secret" "ClinicA" lawHash 0 (some 100)
     (.restricted ["auditor"])
-    [.inputFact "patient-record" [.str "StAntonius", .str "Billy"] true,
-     .inputFact "consent-cleared" [.str "StAntonius", .str "Task1"] true]
+    [.inputFact "patient-record" [.str "ClinicA", .str "Patient42"] true,
+     .inputFact "consent-cleared" [.str "ClinicA", .str "Study1"] true]
   let att := mintRedactedAttestation "seed-auditor" "AuditorPanel" rawSecret
-    [.inputFact "consent-cleared" [.str "StAntonius", .str "Task1"] true] (some (.restricted ["SURF"]))
+    [.inputFact "consent-cleared" [.str "ClinicA", .str "Study1"] true] (some (.restricted ["PartnerLab"]))
   let netSecret : FedNetwork := { agreedLaws := [lawHash], stated := [rawSecret] }
-  let surfRedactedBundle := signBundle "seed-surf" "b-surf-red" "SURF" "process-study"
-    [.str "SURF", .str "Task1"] lawHash 5 [] [att]
+  let redactedBundle := signBundle "seed-lab" "b-lab-red" "PartnerLab" "process-study"
+    [.str "PartnerLab", .str "Study1"] lawHash 5 [] [att]
   let redactedOk :=
     verifyRedactedOpening spec rawSecret att &&
-    permittedBundle baseCfg netSecret surfRedactedBundle
-  let netRev := applyRevocationId net0 "stmt-sa-1"
+    permittedBundle baseCfg netSecret redactedBundle
+  let netRev := applyRevocationId net0 "stmt-ca-1"
   let revokeIsolated :=
-    (match surfSynth? with | some b => !permittedBundle baseCfg netRev b | none => false) &&
-    permittedBundle baseCfg (applyRevocationId netSecret "stmt-sa-1") surfRedactedBundle
+    (match labSynth? with | some b => !permittedBundle baseCfg netRev b | none => false) &&
+    permittedBundle baseCfg (applyRevocationId netSecret "stmt-ca-1") redactedBundle
   forgeBlocked && synthOk && leakCaughtAndBlocked && redactedOk && revokeIsolated
 
 end Charter.Server

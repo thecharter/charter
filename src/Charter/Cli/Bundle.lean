@@ -1,6 +1,6 @@
 import Charter.Cli.Plan
 import Charter.Cli.Build
-import Charter.Server.JustAct
+import Charter.Server.Bundles
 
 /-!
 # Charter.Cli.Bundle — Federated Action-Carried Justification Bundles CLI (`charter bundle`, `D43`)
@@ -104,7 +104,7 @@ def bundleCommand (args : List String) : IO UInt32 := do
     IO.println bundleUsage
     return 0
   | ["self-test"] =>
-    if justActSelfTest then
+    if bundleSelfTest then
       IO.println "ok   bundle self-test (authorship reflection, synthesis, leak detection, redacted attestation, granular revocation)"
       return 0
     else

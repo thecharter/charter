@@ -4,7 +4,7 @@
 
 ## B30. Federated action-carried justification bundles, authorship reflection, audience-controlled gossip, redacted attestations, and partial-view obligation safety (`D43`, `018.2`, `018.5`, `Law 1`, `Law 2`, `Law 6`, `Law 7`, `Law 9`, `Law 10`, `Law 13`)
 
-- **Ruling (`A`, `D43`):** Add zero-axiom federated justification bundles (`src/Charter/Server/JustAct.lean`, `src/Charter/Cli/Bundle.lean`, `lib/federated_mandate.charter`) directly over Charter's proved evaluator with zero duplicate `.charter` surface syntax (`Law 13`) and zero `Surface/`/`Resolve/`/`Prove/` server dependencies (`operator-blind`):
+- **Ruling (`A`, `D43`):** Add federated justification bundles (`src/Charter/Server/Bundles.lean`, `src/Charter/Cli/Bundle.lean`, `lib/federated_mandate.charter`) directly over Charter's proved evaluator with zero duplicate `.charter` surface syntax (`Law 13`) and zero `Surface/`/`Resolve/`/`Prove/` server dependencies (`operator-blind`):
   1. Schnorr-signed actor-attributed statements (`reflectAuthor_no_impersonation`) and closed-bundle evaluation returning all three institutional answers (`occurred`, `lawful`, `valid`) plus enumerated `effectsOf` capability tokens, proving monotone auditability (`persist_permitted_bundle`) end-to-end without unproved evaluator parameters;
   2. Author-signed per-statement revocation and expiry (`revocation_invalidates_bundle`, `unrelated_revocation_preserves_bundle`) without wiping global agreements;
   3. Audience-controlled statement communication (`public_gossip_always_lawful`, `restricted_leak_detected_and_unusable`) preventing unauthorized recipients from relying on leaked confidential statements without introducing recursive gossip justification overhead;

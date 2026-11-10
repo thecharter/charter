@@ -4,54 +4,54 @@
 //! explore: 1
 #require "../../lib/federated_mandate.charter".
 
-Fact org Identified by StAntonius, SURF, Dan.
+Fact org Identified by ClinicA, PartnerLab, ThirdParty.
 Fact stmt-id Identified by StmtConsent, StmtAux.
 Fact req-id Identified by AuditReq1.
 
 Use federated-mandate(org, stmt-id, req-id) As fm.
 
 Scenario confidential-leak-caught-slashed-and-unusable {
-  fm-issue-confidential-statement(StAntonius, SURF, StmtConsent).
-  fm-issue-confidential-statement(StAntonius, SURF, StmtAux).
+  fm-issue-confidential-statement(ClinicA, PartnerLab, StmtConsent).
+  fm-issue-confidential-statement(ClinicA, PartnerLab, StmtAux).
 
-  // Authorized recipient SURF can validly rely on StmtConsent:
-  ?valid fm-rely-on-statement(SURF, StmtConsent).
-  fm-rely-on-statement(SURF, StmtConsent).
-  ?fm-relied-on(SURF, StmtConsent).
+  // Authorized recipient PartnerLab can validly rely on StmtConsent:
+  ?valid fm-rely-on-statement(PartnerLab, StmtConsent).
+  fm-rely-on-statement(PartnerLab, StmtConsent).
+  ?fm-relied-on(PartnerLab, StmtConsent).
 
-  // SURF forwards StmtConsent to unauthorized Dan (`Law 1`: physical forward occurs!):
-  fm-forward-statement(SURF, Dan, StmtConsent).
-  ?fm-possesses-statement(StmtConsent, Dan).
-  ?fm-leaked-by(StmtConsent, SURF, Dan).
-  ?violated fm-guard-confidential-statement(SURF, StAntonius, StmtConsent).
+  // PartnerLab forwards StmtConsent to unauthorized ThirdParty (`Law 1`: physical forward occurs):
+  fm-forward-statement(PartnerLab, ThirdParty, StmtConsent).
+  ?fm-possesses-statement(StmtConsent, ThirdParty).
+  ?fm-leaked-by(StmtConsent, PartnerLab, ThirdParty).
+  ?violated fm-guard-confidential-statement(PartnerLab, ClinicA, StmtConsent).
 
-  // Dan possesses the leaked statement, yet reliance by Dan is void (`?!valid`):
-  ?!valid fm-rely-on-statement(Dan, StmtConsent).
-  fm-rely-on-statement(Dan, StmtConsent).
-  ?!fm-relied-on(Dan, StmtConsent).
+  // ThirdParty possesses the leaked statement, yet reliance by ThirdParty is void (`?!valid`):
+  ?!valid fm-rely-on-statement(ThirdParty, StmtConsent).
+  fm-rely-on-statement(ThirdParty, StmtConsent).
+  ?!fm-relied-on(ThirdParty, StmtConsent).
 
-  // St. Antonius slashes SURF's bond and revokes StmtConsent while StmtAux stays active:
-  fm-slash-leak-bond(StAntonius, SURF, StmtConsent).
-  ?fm-bond-slashed(SURF, StmtConsent).
-  fm-revoke-statement(StAntonius, StmtConsent).
-  ?!valid fm-rely-on-statement(SURF, StmtConsent).
-  ?valid fm-rely-on-statement(SURF, StmtAux).
+  // ClinicA slashes PartnerLab's bond and revokes StmtConsent while StmtAux stays active:
+  fm-slash-leak-bond(ClinicA, PartnerLab, StmtConsent).
+  ?fm-bond-slashed(PartnerLab, StmtConsent).
+  fm-revoke-statement(ClinicA, StmtConsent).
+  ?!valid fm-rely-on-statement(PartnerLab, StmtConsent).
+  ?valid fm-rely-on-statement(PartnerLab, StmtAux).
 }
 
 Scenario unnotified-demand-never-breaches-before-notice {
-  fm-issue-demand(StAntonius, SURF, AuditReq1).
-  ?fm-satisfy-demand(SURF, StAntonius, AuditReq1).
+  fm-issue-demand(ClinicA, PartnerLab, AuditReq1).
+  ?fm-satisfy-demand(PartnerLab, ClinicA, AuditReq1).
 
   // Advance clock far past nominal 5-unit response-window WITHOUT delivering notice:
   @ 20.
-  ?!violated fm-satisfy-demand(SURF, StAntonius, AuditReq1).
+  ?!violated fm-satisfy-demand(PartnerLab, ClinicA, AuditReq1).
 
-  // Deliver notice at t=20: deadline runs 5 units from notice (t=25), not from t=0!
-  fm-deliver-demand-notice(StAntonius, SURF, AuditReq1).
+  // Deliver notice at t=20: deadline runs 5 units from notice (t=25), not from t=0:
+  fm-deliver-demand-notice(ClinicA, PartnerLab, AuditReq1).
   @ 24.
-  ?!violated fm-satisfy-demand(SURF, StAntonius, AuditReq1).
+  ?!violated fm-satisfy-demand(PartnerLab, ClinicA, AuditReq1).
   @ 25.
-  ?violated fm-satisfy-demand(SURF, StAntonius, AuditReq1).
-  fm-fulfill-demand(SURF, AuditReq1).
-  ?!fm-satisfy-demand(SURF, StAntonius, AuditReq1).
+  ?violated fm-satisfy-demand(PartnerLab, ClinicA, AuditReq1).
+  fm-fulfill-demand(PartnerLab, AuditReq1).
+  ?!fm-satisfy-demand(PartnerLab, ClinicA, AuditReq1).
 }

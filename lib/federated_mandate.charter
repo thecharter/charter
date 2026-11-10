@@ -1,6 +1,6 @@
 // lib/federated_mandate — Actor-attributed peer statements, audience-restricted
 // confidential disclosures, non-forwarding slash/nullity, granular revocation, and
-// notice-gated affirmative demands (`D43`, finishing JustAct §6.3.5 & §7.2.2–§7.2.4):
+// notice-gated affirmative demands (`D43`):
 // - Audience-restricted statements (`confidential-statement`) bind each authorized
 //   recipient under `guard-confidential-statement`. Forwarding always occurs physically
 //   (`Mission Law 1`), records `leaked-by` and breaches `guard-confidential-statement`
@@ -85,7 +85,7 @@ Module federated-mandate(party, statement, demand) {
       && (!confidential-statement(statement) || authorized-holder(statement, party))
     Creates relied-on(party, statement)
 
-  // ---- Notice-gated affirmative demands (`009.4`, JustAct §7.2.2)
+  // ---- Notice-gated affirmative demands (`009.4`, `D43`)
   Power issue-demand Actor party Recipient party' Related to demand
     Holds when party != party' && !pending-demand(demand, party, party')
     Valid when party != party' && !pending-demand(demand, party, party')
