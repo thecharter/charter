@@ -427,6 +427,46 @@
       "summary": "Evaluated directly over Charter's live M.eval, a notice-gated Duty (Due within dur After notice) evaluates to false at every clock instant while notice has not occurred in state (D43, 009.4)."
     },
     {
+      "id": "bundle.delegate_when_no_impersonation",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/Bundles.lean",
+      "symbol": "delegateWhen_no_impersonation",
+      "summary": "Scoped conditional delegation rules (delegateWhen) preserve mandatory leading-author namespace reflection so no peer can delegate a base fact in another actor's namespace (D44, Law 6, Law 10)."
+    },
+    {
+      "id": "bundle.replay_bundle_rejected",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/Bundles.lean",
+      "symbol": "replay_bundle_rejected",
+      "summary": "Any JustificationBundle whose bundleId already appears in net.enacted is rejected by enactableBundle, preventing replay/double-enactment (D44)."
+    },
+    {
+      "id": "bundle.superseded_law_cannot_enact_new",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/Bundles.lean",
+      "symbol": "superseded_law_cannot_enact_new",
+      "summary": "After supersedeLawEpoch retires oldLaw in favor of newLaw, no bundle based on oldLaw can pass permittedBundle or enactableBundle for new enactments (D44)."
+    },
+    {
+      "id": "bundle.historical_audit_preserves_enacted",
+      "assurance": "proved",
+      "scope": "live-evaluator",
+      "artifact": "src/Charter/Server/Bundles.lean",
+      "symbol": "historical_audit_preserves_enacted",
+      "summary": "Previously enacted bundles remain identically verifiable under verifyBundleAudit after their basis law is superseded by a constitutional amendment (D44)."
+    },
+    {
+      "id": "server.d44_runtime_and_tooling_extensions",
+      "assurance": "checked",
+      "scope": "concrete-trace",
+      "artifact": "src/Charter/Server/Api.lean",
+      "symbol": "test/gates/d44-extensions.sh",
+      "summary": "End-to-end verification of epoch-versioned replay-safe bundles, delegateWhen, charter diff --impact, stakeholder dutyDeltas & GetActorBrief, UCON Authorize re-verification, and branching charter repl (D44)."
+    },
+    {
       "id": "prove.concrete_fixtures",
       "assurance": "decided",
       "scope": "concrete-trace",

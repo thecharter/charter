@@ -14,6 +14,7 @@ structure DiffOpts where
   newFile         : Option String := none
   json            : Bool := false
   requireApproved : Bool := false
+  impact          : Bool := false
 
 def parseDiffArgs : List String → DiffOpts → Except String DiffOpts
   | [], o => .ok o
@@ -22,6 +23,7 @@ def parseDiffArgs : List String → DiffOpts → Except String DiffOpts
   | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
   | ["--out"], _ => .error "--out needs json or text"
   | "--require-approved" :: rest, o => parseDiffArgs rest { o with requireApproved := true }
+  | "--impact" :: rest, o => parseDiffArgs rest { o with impact := true }
   | a :: rest, o =>
     if a.startsWith "-" then .error s!"unknown flag {a}"
     else if o.oldFile.isNone then parseDiffArgs rest { o with oldFile := some a }
@@ -29,7 +31,7 @@ def parseDiffArgs : List String → DiffOpts → Except String DiffOpts
     else .error s!"unexpected extra argument {a}"
 
 def diffCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter diff <old.charter> <new.charter> [--out json] [--require-approved]"
+  let usage := "usage: charter diff <old.charter> <new.charter> [--impact] [--out json] [--require-approved]"
   let opts ← match parseDiffArgs args {} with
     | .ok o => pure o
     | .error e => IO.eprintln s!"charter diff: {e}\n{usage}"; return 2
@@ -44,7 +46,7 @@ def diffCommand (args : List String) : IO UInt32 := do
       return 1
   let oldPhrases := oldItems.filterMap fun l => match l.item.val with | .inr p => some p | .inl _ => none
   let newPhrases := newItems.filterMap fun l => match l.item.val with | .inr p => some p | .inl _ => none
-  let rep := Project.computeDiff oldF newF oldPhrases newPhrases
+  let rep := Project.computeDiff oldF newF oldPhrases newPhrases opts.impact
   if opts.json then IO.println (Project.DiffReport.toJson rep).compress
   else IO.println (Project.DiffReport.renderText rep)
   if !rep.entrenchedViolations.isEmpty then return 1

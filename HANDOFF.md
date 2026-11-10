@@ -5,6 +5,30 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-10 (2): `D44` (`B32`–`B33`) — Epoch-versioned & replay-safe bundles, scoped conditional delegations, `charter diff --impact`, stakeholder duty deltas / `GetActorBrief`, `UCON` mid-saga re-verification, and branching `charter repl`
+
+## Where
+
+- `main`, pushed straight to `main` after full `tools/battery` PASS across all 26 steps (64 backed claims in `docs/claims.json`, zero build warnings, zero `Surface`/`Resolve`/`Prove` symbols in `charter-server`).
+- Companion PSA 1:1 lockstep update (`B33`: `psa.md` + `psa.charter`) applied and verified under `/Users/eric/psa/tools/verify-psa`.
+
+## What landed (`D44`)
+
+1. **Epoch-versioned & replay-safe federated bundles + parallel commutativity (`src/Charter/Server/Bundles.lean`, `src/Charter/Core/Derivation.lean`)**:
+   - Separated active `agreedLaws` from retired `supersededLaws` across `AmendLaw` transitions (`superseded_law_cannot_enact_new`, `historical_audit_preserves_enacted`), added `freshBundle` replay rejection (`replay_bundle_rejected`), and exposed single-owner static read/write footprint commutativity (`Footprint.actsFootprintCommute`, `BundlesCommute`, `charter bundle commute`).
+2. **Scoped conditional delegations (`StatementAssertion.delegateWhen`)**:
+   - Peer statements can carry positive acyclic conditional delegations locked to `author`'s leading-argument namespace (`delegateWhen_no_impersonation`), usable while the delegating party is offline (`charter bundle delegate`, `SignStatement`, `SynthesizeBundle`, `EnactBundle` with deterministic offline `replay`).
+3. **Counterexample-synthesizing semantic impact diffing (`charter diff --impact`, `src/Charter/Project/Diff.lean`)**:
+   - Bounded BFS exploration emits minimal concrete witness traces where `(lawful, valid)` or duty violation flips between `old` and `new`.
+4. **Proactive stakeholder `dutyDeltas` & `GetActorBrief` (`src/Charter/Server/Protocol.lean`, `src/Charter/Server/Api.lean`)**:
+   - Every state-advancing `charter-server` transition emits structured holder/claimant `dutyDeltas` (`created`, `late`, `fulfilled`, `violated`, with `dueAt`), and `GetActorBrief` returns audience-redacted enabled powers, held duties, and owed claims.
+5. **Usage-Control (`UCON`) live re-verification on `Authorize` (`src/Charter/Server/Api.lean`)**:
+   - Re-evaluates live `Allow` whenever `rt.seqNo > r.stateVersion` before minting or re-issuing an `AuthorizationToken`, rejecting unconfirmed reservations if an intervening freeze, immunity, or revocation removed authority.
+6. **Branching interactive `charter repl` (`src/Charter/Cli/Repl.lean`)**:
+   - Added `:options` (`:o`), `:duties`, `:history` (`:hist`), `:revert` (`:r`), and `:jump <n>` (`:j <n>`).
+
+---
+
 # Handoff — 2026-11-10: `D43` (`B30`–`B31`) — Federated justification bundles, audience-bounded sharing, redacted attestations, and partial-view obligation safety
 
 ## Where

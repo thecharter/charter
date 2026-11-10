@@ -288,4 +288,136 @@ def serverPlanJson (cfg : Config) (action : DomId) (args : List Elem) (maxDepth 
       ("maxDepth", Json.num bnd)
     ])
 
+/-! ## Proactive Stakeholder Duty Deltas & Audience-Redacted `GetActorBrief` (`D44`) -/
+
+/-- Extract `(holder, claimant)` actor names from a `Duty` instance `te`. -/
+def dutyPartiesOf (te : Tagged) : Option String × Option String :=
+  match te.1 with
+  | .prod ((.str h, _) :: (.str c, _) :: _) => (some h, some c)
+  | .prod ((.str h, _) :: _) => (some h, none)
+  | .str h => (some h, none)
+  | _ => (none, none)
+
+/-- Compute optional static `dueAt = since + dueDuration` for a holding `Duty` instance. -/
+def dutyDueAt (cfg : Config) (te : Tagged) : Option Int :=
+  match cfg.spec.findDecl te.2, cfg.state.lookup te with
+  | some { kind := .duty ds, .. }, some info =>
+    match ds.dueDuration with
+    | some (.intLit d) => some (info.since + d)
+    | some (.dimLit _ d) => some (info.since + d)
+    | some tm =>
+      let ctx := Ctx.of cfg.spec cfg.state
+      let binds := match cfg.spec.findDecl te.2 with | some t => Tagged.bindings t.domain te | none => []
+      match (M.eval M.fuel tm).run ctx binds with
+      | .ok (.int d :: _) => some (info.since + d)
+      | _ => none
+    | none => none
+  | _, _ => none
+
+/-- All currently holding `Duty` instances in `cfg`. -/
+def holdingDutyInstances (cfg : Config) : List Tagged :=
+  cfg.state.holdsList.filter fun te =>
+    match cfg.spec.findDecl te.2 with
+    | some { kind := .duty _, .. } => true
+    | _ => false
+
+/-- All currently holding `Duty` instances in `cfg` whose `lateWhen` condition holds (and not yet `violated`). -/
+def lateDutyInstances (cfg : Config) : List Tagged :=
+  let ctx := Ctx.of cfg.spec cfg.state
+  (holdingDutyInstances cfg).filter fun te =>
+    if cfg.violatedDuties.contains te then false
+    else match cfg.spec.findDecl te.2 with
+      | some { kind := .duty ds, .. } =>
+        if ds.lateWhen.isEmpty then false
+        else
+          match (M.ignoreMissingInput (M.evalViolationCondition M.fuel te (some ds.lateWhen))).run ctx [] with
+          | .ok rs => rs.any id
+          | .error _ => false
+      | _ => false
+
+def mkDutyDeltaJson (cfg : Config) (te : Tagged) (status : String) : Json :=
+  let (h?, c?) := dutyPartiesOf te
+  Json.mkObj [
+    ("duty", Json.str te.pp),
+    ("dutyType", Json.str te.2),
+    ("status", Json.str status),
+    ("holder", match h? with | some h => Json.str h | none => Json.null),
+    ("claimant", match c? with | some c => Json.str c | none => Json.null),
+    ("dueAt", match dutyDueAt cfg te with | some t => Json.num t | none => Json.null)
+  ]
+
+/-- Compute structured stakeholder duty lifecycle notifications (`created`, `late`, `fulfilled`, `violated`)
+across a single `before → after` configuration transition (`D44`). -/
+def computeDutyDeltasJson (before after : Config) : List Json :=
+  let heldBefore := holdingDutyInstances before
+  let heldAfter := holdingDutyInstances after
+  let lateBefore := lateDutyInstances before
+  let lateAfter := lateDutyInstances after
+  let created := (heldAfter.filter fun te => !heldBefore.contains te).map
+    (fun te => mkDutyDeltaJson after te "created")
+  let fulfilled := (heldBefore.filter fun te => !heldAfter.contains te && !before.violatedDuties.contains te).map
+    (fun te => mkDutyDeltaJson before te "fulfilled")
+  let newlyLate := (lateAfter.filter fun te => !lateBefore.contains te).map
+    (fun te => mkDutyDeltaJson after te "late")
+  let newlyViol := (after.violatedDuties.filter fun te => !before.violatedDuties.contains te).map
+    (fun te => mkDutyDeltaJson after te "violated")
+  created ++ newlyLate ++ fulfilled ++ newlyViol
+
+/-- Check whether `te` is an act instance whose leading actor component equals `actor`. -/
+def isActorLeadingInstance (actor : String) (te : Tagged) : Bool :=
+  match te.1 with
+  | .prod ((.str a, _) :: _) => a == actor
+  | .str a => a == actor
+  | _ => false
+
+/-- Project an audience-redacted capability & obligation brief for `actor` (`GetActorBrief`, `D44`). -/
+def serverActorBriefJson (cfg : Config) (actor : String) (audience? : Option String) : Json :=
+  let heldDuties := holdingDutyInstances cfg
+  let lateDuties := lateDutyInstances cfg
+  let dutySummary (te : Tagged) : Json :=
+    let (h?, c?) := dutyPartiesOf te
+    Json.mkObj [
+      ("duty", Json.str te.pp),
+      ("dutyType", Json.str te.2),
+      ("holder", match h? with | some h => Json.str h | none => Json.null),
+      ("claimant", match c? with | some c => Json.str c | none => Json.null),
+      ("dueAt", match dutyDueAt cfg te with | some t => Json.num t | none => Json.null),
+      ("late", Json.bool (lateDuties.contains te)),
+      ("violated", Json.bool (cfg.violatedDuties.contains te))
+    ]
+  let myDuties := (heldDuties.filter fun te => (dutyPartiesOf te).1 == some actor).map dutySummary
+  let myClaims := (heldDuties.filter fun te => (dutyPartiesOf te).2 == some actor).map dutySummary
+  let ctx := Ctx.of cfg.spec cfg.state
+  let enabledActs : List Json := cfg.spec.decls.flatMap fun (d, tspec) =>
+    match tspec.kind with
+    | .act _ =>
+      if (checkExposedAct cfg.spec d).isOk && cfg.spec.enumerable tspec.domain then
+        let enumM := M.results (M.scope M.fuel (cfg.spec.components d)
+          (M.whenTagged (M.eval M.fuel (.app d (.named []))) pure))
+        let cands : List Tagged := match (M.ignoreMissingInput enumM).run ctx [] with
+          | .ok xs => xs.flatten.filter (isActorLeadingInstance actor)
+          | .error _ => []
+        cands.filterMap fun te =>
+          match (M.evalActTri M.fuel te).run ctx [] with
+          | .ok ((.yes, .yes, _) :: _) =>
+            let allGuardTerms := (tspec.derivation.filterMap fun | .holdsWhen c => some c | _ => none) ++ tspec.conditions
+            let touchesDisallowedConf := (allGuardTerms.flatMap collectApps).any fun (fd, _) =>
+              match cfg.spec.findDecl fd with
+              | some { kind := .fact fs, .. } =>
+                fs.confidential && !(match audience? with | some r => fs.audiences.contains r | none => false)
+              | _ => false
+            if touchesDisallowedConf then none
+            else some (Json.mkObj [("action", Json.str d), ("instance", Json.str te.pp),
+                                   ("lawful", Json.str "yes"), ("valid", Json.str "yes")])
+          | _ => none
+      else []
+    | _ => []
+  Json.mkObj [
+    ("actor", Json.str actor),
+    ("time", Json.num cfg.state.time),
+    ("enabledActions", Json.arr enabledActs.toArray),
+    ("heldDuties", Json.arr myDuties.toArray),
+    ("owedClaims", Json.arr myClaims.toArray)
+  ]
+
 end Charter.Server

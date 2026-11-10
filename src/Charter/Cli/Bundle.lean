@@ -17,10 +17,12 @@ open Charter.Server
 def bundleUsage : String :=
   "usage: charter bundle <subcommand> [flags] [<file.charter>]\n" ++
   "  sign        --seed <seed> --id <id> --author <actor> --fact <fact> [--args a,b] [--audience r1,r2] [--expires T] [-o out.json] <file.charter>\n" ++
+  "  delegate    --seed <seed> --id <id> --author <actor> --fact <fact> [--args a,b] --guard <fact:a,b> [--audience r1,r2] [-o out.json] <file.charter>\n" ++
   "  synthesize  --seed <seed> --id <id> --actor <actor> --act <act> [--args a,b] --statements <pool.json> [-o bundle.json] <file.charter>\n" ++
   "  verify      --bundle <bundle.json> [--statements <pool.json>] [--revoked id1,id2] [--out json] <file.charter>\n" ++
+  "  commute     --act-a <act1> --act-b <act2> [--out json] <file.charter>\n" ++
   "  inspect     --bundle <bundle.json>\n" ++
-  "  self-test   run federated justification, redaction, revocation, and leak-detection self-tests"
+  "  self-test   run federated justification, delegation, epoch, replay, redaction, revocation, and leak-detection self-tests"
 
 structure BundleCliOpts where
   seed       : Option String := none
@@ -29,6 +31,9 @@ structure BundleCliOpts where
   actor      : Option String := none
   fact       : Option String := none
   act        : Option String := none
+  actA       : Option String := none
+  actB       : Option String := none
+  guards     : List String := []
   csvArgs    : List String := []
   audience   : List String := []
   revoked    : List String := []
@@ -56,6 +61,9 @@ def parseBundleFlags : List String → BundleCliOpts → Except String BundleCli
   | "--actor" :: v :: r, o => parseBundleFlags r { o with actor := some v }
   | "--fact" :: v :: r, o => parseBundleFlags r { o with fact := some v }
   | "--act" :: v :: r, o => parseBundleFlags r { o with act := some v }
+  | "--act-a" :: v :: r, o => parseBundleFlags r { o with actA := some v }
+  | "--act-b" :: v :: r, o => parseBundleFlags r { o with actB := some v }
+  | "--guard" :: v :: r, o => parseBundleFlags r { o with guards := o.guards ++ [v] }
   | "--args" :: v :: r, o => parseBundleFlags r { o with csvArgs := splitCsvNonEmpty v }
   | "--audience" :: v :: r, o => parseBundleFlags r { o with audience := splitCsvNonEmpty v }
   | "--revoked" :: v :: r, o => parseBundleFlags r { o with revoked := splitCsvNonEmpty v }
@@ -148,6 +156,42 @@ def bundleCommand (args : List String) : IO UInt32 := do
         IO.FS.writeFile op outTxt
       else
         IO.print outTxt
+      return 0
+    | "delegate" =>
+      let (some seed, some author, some factName, some file) := (opts.seed, opts.author, opts.fact, opts.file)
+        | do IO.eprintln s!"charter bundle delegate: --seed, --author, --fact, --guard, and <file.charter> required\n{bundleUsage}"; return (2 : UInt32)
+      if opts.guards.isEmpty then
+        IO.eprintln s!"charter bundle delegate: at least one --guard <fact:a,b> required\n{bundleUsage}"
+        return 2
+      let (_, lawHash) ← match ← loadSpecAndLawHash file with
+        | .ok p => pure p
+        | .error e => IO.eprintln s!"charter bundle delegate: {e}"; return 1
+      let parsedGuards : List GuardAtom := opts.guards.map fun gs =>
+        match gs.splitOn ":" with
+        | [gf] => ⟨gf.trim, []⟩
+        | gf :: rest => ⟨gf.trim, (splitCsvNonEmpty (":".intercalate rest)).map parseCsvElem⟩
+        | [] => ⟨gs, []⟩
+      let aud : AudiencePolicy := if opts.audience.isEmpty then .unrestricted else .restricted opts.audience
+      let elArgs := opts.csvArgs.map parseCsvElem
+      let stmt := signStatement seed opts.id author lawHash opts.enactedAt opts.expiresAt aud
+        [.delegateWhen factName elArgs parsedGuards]
+      let outTxt := (toJson stmt).pretty ++ "\n"
+      if let some op := opts.outPath then
+        IO.FS.writeFile op outTxt
+      else
+        IO.print outTxt
+      return 0
+    | "commute" =>
+      let (some actA, some actB, some file) := (opts.actA, opts.actB, opts.file)
+        | do IO.eprintln s!"charter bundle commute: --act-a, --act-b, and <file.charter> required\n{bundleUsage}"; return (2 : UInt32)
+      let (cfg, _) ← match ← loadSpecAndLawHash file with
+        | .ok p => pure p
+        | .error e => IO.eprintln s!"charter bundle commute: {e}"; return 1
+      let comm := actionsCommute cfg.spec actA actB
+      if opts.jsonOut then
+        IO.println (Json.mkObj [("ok", Json.bool true), ("actionA", Json.str actA), ("actionB", Json.str actB), ("commutes", Json.bool comm), ("assurance", Json.str "checked")]).compress
+      else
+        IO.println s!"commute `{actA}` vs `{actB}`: {if comm then "yes (disjoint footprints)" else "no (overlapping read/write footprints)"}"
       return 0
     | "synthesize" =>
       let (some seed, some actor, some actName, some sp, some file) :=

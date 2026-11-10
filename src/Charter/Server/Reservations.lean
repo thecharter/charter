@@ -196,6 +196,13 @@ def authorizeReservation (secretKey : String) (tbl0 : ReservationTable)
         if q.intentId == intentId then { q with status := .authorized, token := some tok } else q
       .ok ({ tbl with records := recs' }, tok)
 
+/-- Reject an unconfirmed reservation mid-saga when an ongoing `UCON` precondition ceases to hold (`D44`). -/
+def rejectReservation (tbl : ReservationTable) (intentId : String) : ReservationTable :=
+  { tbl with records := tbl.records.map fun q =>
+      if q.intentId == intentId && (q.status == .reserved || q.status == .authorized) then
+        { q with status := .rejected, token := none }
+      else q }
+
 /-- Verify a presented `AuthorizationToken` before settling or confirming execution (`T34`). -/
 def verifyPresentedToken (secretKey : String) (tbl : ReservationTable)
     (institutionId lawHash : String) (now : Int) (tok : AuthorizationToken) : Except String ReservationRecord := do

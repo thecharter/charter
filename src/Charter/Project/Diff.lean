@@ -1,6 +1,7 @@
 import Charter.Cli.Load
 import Charter.Cli.Run
 import Charter.Artifact.Format
+import Charter.Verify.Explorer
 
 /-!
 # Charter.Project.Diff — Three-View Semantic & Provenance Diff (`D11`, `D25`, `G3.5`, `T38`)
@@ -39,12 +40,22 @@ structure ScenarioDiffEntry where
   newVerdict : String
   deriving Repr
 
+/-- Concrete state/trace witness where `(lawful, valid)` or duty violation diverges (`charter diff --impact`, `D44`). -/
+structure ImpactWitness where
+  subject     : String
+  kind        : String -- "act" | "duty"
+  trace       : List String
+  oldJudgment : String
+  newJudgment : String
+  deriving Repr
+
 structure DiffReport where
   oldFile              : String
   newFile              : String
   clauseChanges        : List ClauseDiffEntry
   ruleChanges          : List RuleDiffEntry
   scenarioChanges      : List ScenarioDiffEntry
+  impactWitnesses      : List ImpactWitness := []
   entrenchedViolations : List DomId
   reviewRequiredCount  : Nat
   deriving Repr
@@ -54,7 +65,7 @@ provenance re-quoting is distinguished from `CIR` rule logic changes). -/
 def semanticRepr (t : TypeSpec) : String :=
   reprStr { t with spans := [] }
 
-def evalScenarioVerdicts (phrases : List Phrase) : Spec × List (String × String) := Id.run do
+def evalScenarioVerdicts (phrases : List Phrase) : Config × List (String × String) := Id.run do
   let mut cfg : Config := {}
   let mut scenResults : List (String × String) := []
   for p in phrases do
@@ -79,11 +90,76 @@ def evalScenarioVerdicts (phrases : List Phrase) : Spec × List (String × Strin
     | _ =>
       let (c', _) := runPhrase cfg p
       cfg := c'
-  return (cfg.spec, scenResults)
+  return (cfg, scenResults)
 
-def computeDiff (oldFile newFile : String) (oldPhrases newPhrases : List Phrase) : DiffReport :=
-  let (oldSpec, oldScens) := evalScenarioVerdicts oldPhrases
-  let (newSpec, newScens) := evalScenarioVerdicts newPhrases
+/-- Compare act `(lawful, valid)` and duty `(holds, violated)` judgments at one synchronized `(oldCfg, newCfg)` pair. -/
+def collectStateImpactWitnesses (trace : List String) (oldCfg newCfg : Config) : List ImpactWitness :=
+  let oldCtx := Ctx.of oldCfg.spec oldCfg.state
+  let newCtx := Ctx.of newCfg.spec newCfg.state
+  let oldSteps := (Verify.candidateSteps .adversarial [( "duration", [.int 1] )] oldCfg).toOption.getD []
+  let newSteps := (Verify.candidateSteps .adversarial [( "duration", [.int 1] )] newCfg).toOption.getD []
+  let allActs : List Tagged := ((oldSteps ++ newSteps).filterMap fun
+    | .trigger te => some te
+    | _ => none).eraseDups
+  let actWits : List ImpactWitness := allActs.filterMap fun te =>
+    match oldCfg.spec.findDecl te.2, newCfg.spec.findDecl te.2 with
+    | some { kind := .act _, .. }, some { kind := .act _, .. } =>
+      let evalPair (ctx : Ctx) : String :=
+        match (M.ignoreMissingInput (M.evalActTri M.fuel te)).run ctx [] with
+        | .ok ((l, v, _) :: _) => s!"lawful={l.asString}, valid={v.asString}"
+        | _ => "unavailable"
+      let oj := evalPair oldCtx
+      let nj := evalPair newCtx
+      if oj == nj then none
+      else some { subject := te.pp, kind := "act", trace, oldJudgment := oj, newJudgment := nj }
+    | _, _ => none
+  let allDuties : List Tagged :=
+    ((oldCfg.state.holdsList ++ newCfg.state.holdsList).filter fun te =>
+      match oldCfg.spec.findDecl te.2, newCfg.spec.findDecl te.2 with
+      | some { kind := .duty _, .. }, _ | _, some { kind := .duty _, .. } => true
+      | _, _ => false).eraseDups
+  let dutyWits : List ImpactWitness := allDuties.filterMap fun te =>
+    let dutyStatus (cfg : Config) : String :=
+      let h := cfg.state.holds te
+      let v := cfg.violatedDuties.contains te
+      s!"holds={h}, violated={v}"
+    let oj := dutyStatus oldCfg
+    let nj := dutyStatus newCfg
+    if oj == nj then none
+    else some { subject := te.pp, kind := "duty", trace, oldJudgment := oj, newJudgment := nj }
+  actWits ++ dutyWits
+
+/-- Bounded breadth-first exploration synthesizing minimal concrete impact witnesses (`D44`). -/
+def synthesizeImpactWitnesses (oldInit newInit : Config) (maxDepth : Nat := 2) (maxStates : Nat := 32) :
+    List ImpactWitness := Id.run do
+  let mut queue : List (List String × Config × Config) := [([], oldInit, newInit)]
+  let mut visited : Nat := 0
+  let mut found : List ImpactWitness := []
+  while !queue.isEmpty && visited < maxStates && found.length < 16 do
+    match queue with
+    | [] => break
+    | (tr, oc, nc) :: rest =>
+      queue := rest
+      visited := visited + 1
+      let wits := collectStateImpactWitnesses tr oc nc
+      for w in wits do
+        if !found.any (·.subject == w.subject) && found.length < 16 then
+          found := found ++ [w]
+      if tr.length < maxDepth && visited < maxStates then
+        let steps := ((Verify.candidateSteps .adversarial [( "duration", [.int 1] )] oc).toOption.getD []).take 8
+        for st in steps do
+          match Verify.stepConfig oc st, Verify.stepConfig nc st with
+          | .ok oc', .ok nc' =>
+            queue := queue ++ [(tr ++ [st.pp], oc', nc')]
+          | _, _ => pure ()
+  return found
+
+def computeDiff (oldFile newFile : String) (oldPhrases newPhrases : List Phrase)
+    (withImpact : Bool := false) : DiffReport :=
+  let (oldCfg, oldScens) := evalScenarioVerdicts oldPhrases
+  let (newCfg, newScens) := evalScenarioVerdicts newPhrases
+  let oldSpec := oldCfg.spec
+  let newSpec := newCfg.spec
   -- 1. English clause diff
   let oldClauses := oldSpec.clauses
   let newClauses := newSpec.clauses
@@ -153,8 +229,9 @@ def computeDiff (oldFile newFile : String) (oldPhrases newPhrases : List Phrase)
     | some _, none => true
     | _, _ => false
   let reviewReqCnt := (ruleChanges.filter (·.reviewRequired)).length
+  let impactWits := if withImpact then synthesizeImpactWitnesses oldCfg newCfg else []
   { oldFile, newFile, clauseChanges, ruleChanges, scenarioChanges := scenChanges,
-    entrenchedViolations, reviewRequiredCount := reviewReqCnt }
+    impactWitnesses := impactWits, entrenchedViolations, reviewRequiredCount := reviewReqCnt }
 
 def DiffReport.toJson (r : DiffReport) : Json :=
   Json.mkObj [
@@ -170,7 +247,11 @@ def DiffReport.toJson (r : DiffReport) : Json :=
                   ("reviewRequired", Json.bool rc.reviewRequired),
                   ("clauses", Json.arr (rc.clauses.map Json.str).toArray)]).toArray),
     ("scenarioChanges", Json.arr (r.scenarioChanges.map fun sc =>
-      Json.mkObj [("scenario", Json.str sc.name), ("old", Json.str sc.oldVerdict), ("new", Json.str sc.newVerdict)]).toArray)
+      Json.mkObj [("scenario", Json.str sc.name), ("old", Json.str sc.oldVerdict), ("new", Json.str sc.newVerdict)]).toArray),
+    ("impactWitnesses", Json.arr (r.impactWitnesses.map fun w =>
+      Json.mkObj [("subject", Json.str w.subject), ("kind", Json.str w.kind),
+                  ("trace", Json.arr (w.trace.map Json.str).toArray),
+                  ("old", Json.str w.oldJudgment), ("new", Json.str w.newJudgment)]).toArray)
   ]
 
 def DiffReport.renderText (r : DiffReport) : String :=
@@ -182,8 +263,11 @@ def DiffReport.renderText (r : DiffReport) : String :=
     s!"  [cir:{rc.change}] {rc.kind} {rc.id}{cls}{rev}"
   let sLines := r.scenarioChanges.map fun sc =>
     s!"  [verdict-changed] Scenario {sc.name}: {sc.oldVerdict} -> {sc.newVerdict}"
+  let iLines := r.impactWitnesses.map fun w =>
+    let trStr := if w.trace.isEmpty then "initial state" else " -> ".intercalate w.trace
+    s!"  [impact:{w.kind}] {w.subject} @ ({trStr}): ({w.oldJudgment}) -> ({w.newJudgment})"
   let eLines := r.entrenchedViolations.map fun eid =>
     s!"  [ENTRENCHED-VIOLATION] entrenched protection `{eid}` modified or removed"
-  "\n".intercalate (hdr :: (cLines ++ rLines ++ sLines ++ eLines))
+  "\n".intercalate (hdr :: (cLines ++ rLines ++ sLines ++ iLines ++ eLines))
 
 end Charter.Project

@@ -133,6 +133,9 @@ inductive Effect where
   | amendOp (actId : DomId)
   deriving Repr, Inhabited
 
+/-- Transient internal store domain signaling a valid `Amend` transition inside `newContext`. -/
+def amendCommitDom : String := "$amend_commit"
+
 /-- `Syncs with`: the transitions triggered together with this one. -/
 structure Sync where
   xs : List Var

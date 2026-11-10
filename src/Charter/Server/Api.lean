@@ -33,7 +33,9 @@ structure InstitutionRuntime where
   reservations   : ReservationTable := {}
   vault          : List VaultRecord := []
   fedNet         : FedNetwork := {}
-  pausedRequests : List PausedRequest := []
+  historicalLaws   : List (String × Config) := []
+  enactedSnapshots : List (String × Config) := []
+  pausedRequests   : List PausedRequest := []
   nextPauseSeq   : Nat := 1
   clockPolicy    : ClockPolicy := {}
   logPath        : Option System.FilePath := none
@@ -122,11 +124,11 @@ def handleRequest (rt : InstitutionRuntime) (req : Json) : IO (InstitutionRuntim
   if let .ok mcpMethod := req.getObjValAs? String "method" then
     let reqId := (req.getObjVal? "id").toOption.getD Json.null
     if mcpMethod == "tools/list" then
-      let tools := #["GetLaw", "GetState", "GetCoverageManifest", "GetInputSchema", "InspectInputs",
+      let tools := #["GetLaw", "GetState", "GetActorBrief", "GetCoverageManifest", "GetInputSchema", "InspectInputs",
                      "Evaluate", "Plan", "Reserve", "Authorize", "ConfirmExecution", "ReconcileExecution",
                      "ExercisePower", "SupplyInput", "ResumeRequest", "ObserveExternal",
                      "SubmitEvidence", "AdvanceClock", "Explain", "AmendLaw",
-                     "SignStatement", "RevokeStatement", "SynthesizeBundle", "VerifyBundle", "EnactBundle"]
+                     "SignStatement", "RevokeStatement", "SynthesizeBundle", "VerifyBundle", "EnactBundle", "BundlesCommute"]
       let resp := Json.mkObj [
         ("jsonrpc", Json.str "2.0"), ("id", reqId),
         ("result", Json.mkObj [("tools", Json.arr (tools.map fun t => Json.mkObj [("name", Json.str t)]))])
@@ -200,6 +202,15 @@ where
         ("holdingFacts", Json.arr (held.map (Json.str ∘ Tagged.pp)).toArray),
         ("activeReservations", Json.num (rt.reservations.records.filter (·.status.locksCapacity)).length)
       ])
+    | "GetActorBrief" =>
+      match req.getObjValAs? String "actor" with
+      | .error e => return (rt, envelopeErr rt op e)
+      | .ok actor =>
+        let aud? := (req.getObjValAs? String "audience").toOption
+        let brief := serverActorBriefJson rt.config actor aud?
+        match brief with
+        | .obj kvs => return (rt, envelopeOk rt op kvs.toList)
+        | _ => return (rt, envelopeOk rt op [("brief", brief)])
     | "GetCoverageManifest" =>
       return (rt, envelopeOk rt op [("coverageManifest", coverageManifestJson rt.institutionId rt.lawHash rt.config.spec)])
     | "Evaluate" =>
@@ -258,15 +269,32 @@ where
               ])
     | "Authorize" =>
       let intentId := (req.getObjValAs? String "intentId").toOption.getD ""
-      match authorizeReservation rt.secretKey rt.reservations rt.institutionId rt.lawHash
-              rt.config.state.time rt.seqNo intentId with
-      | .error e => return (rt, envelopeErr rt op e)
-      | .ok (tbl', tok) =>
-        let rt' := { rt with reservations := tbl' }
-        return (rt', envelopeOk rt' op [
-          ("outcome", Json.str "Allow"),
-          ("token", toJson tok)
-        ])
+      -- Usage-Control (`UCON`, `D44`): if institutional state advanced since reservation, re-verify live `Allow`!
+      let uconViolation? : Option String :=
+        match rt.reservations.records.find? (·.intentId == intentId) with
+        | some r =>
+          if (r.status == .reserved || r.status == .authorized) && rt.seqNo > r.stateVersion then
+            match evaluateServerEvent rt.config (.triggerAct r.action r.args) false with
+            | .ok dec =>
+              if dec.outcome != "Allow" then
+                some s!"UCON ongoing-condition interruption: `{r.action}` is no longer Allow (outcome={dec.outcome}, lawful={dec.lawful.asString}, valid={dec.valid.asString})"
+              else none
+            | .error e => some s!"UCON ongoing-condition interruption: {e}"
+          else none
+        | none => none
+      if let some uconMsg := uconViolation? then
+        let rtRej := { rt with reservations := rejectReservation rt.reservations intentId }
+        return (rtRej, envelopeErr rtRej op uconMsg)
+      else
+        match authorizeReservation rt.secretKey rt.reservations rt.institutionId rt.lawHash
+                rt.config.state.time rt.seqNo intentId with
+        | .error e => return (rt, envelopeErr rt op e)
+        | .ok (tbl', tok) =>
+          let rt' := { rt with reservations := tbl' }
+          return (rt', envelopeOk rt' op [
+            ("outcome", Json.str "Allow"),
+            ("token", toJson tok)
+          ])
     | "ConfirmExecution" =>
       let statusStr := (req.getObjValAs? String "status").toOption.getD "confirmed"
       let receipt? := (req.getObjValAs? String "receiptRef").toOption
@@ -282,10 +310,12 @@ where
             match evaluateServerEvent rt.config ev true with
             | .error e => return (rt, envelopeErr rt op e)
             | .ok dec =>
+              let deltas := computeDutyDeltasJson rt.config dec.nextConfig
               let rtPre := { rt with reservations := tbl' }
               let (rt', logEntry) ← commitTransition rtPre ev dec.nextConfig dec.outcome dec.lawful dec.valid
               return (rt', envelopeOk rt' op [
                 ("sagaStatus", Json.str sagaSt.asString),
+                ("dutyDeltas", Json.arr deltas.toArray),
                 ("logEntryHash", Json.str logEntry.entryHash)
               ])
           else
@@ -308,9 +338,11 @@ where
           match evaluateServerEvent rtPre.config ev true with
           | .error e => return (rt, envelopeErr rt op e)
           | .ok dec =>
+            let deltas := computeDutyDeltasJson rtPre.config dec.nextConfig
             let (rt', logEntry) ← commitTransition rtPre ev dec.nextConfig dec.outcome dec.lawful dec.valid
             return (rt', envelopeOk rt' op [
               ("sagaStatus", Json.str recResolved.status.asString),
+              ("dutyDeltas", Json.arr deltas.toArray),
               ("logEntryHash", Json.str logEntry.entryHash)
             ])
         else
@@ -371,11 +403,13 @@ where
                 Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
             ])
           else
+            let deltas := computeDutyDeltasJson rt.config dec.nextConfig
             let (rt', logEntry) ← commitTransition rt ev dec.nextConfig dec.outcome dec.lawful dec.valid verifiedActor actorSig?
             return (rt', envelopeOk rt' op [
               ("outcome", Json.str dec.outcome),
               ("lawful", Json.str dec.lawful.asString),
               ("valid", Json.str dec.valid.asString),
+              ("dutyDeltas", Json.arr deltas.toArray),
               ("logEntryHash", Json.str logEntry.entryHash)
             ])
     | "SupplyInput" =>
@@ -388,9 +422,11 @@ where
         .ok (ev, dec)) with
       | .error e => return (rt, envelopeErr rt op e)
       | .ok (ev, dec) =>
+        let deltas := computeDutyDeltasJson rt.config dec.nextConfig
         let (rt', logEntry) ← commitTransition rt ev dec.nextConfig dec.outcome dec.lawful dec.valid
         return (rt', envelopeOk rt' op [
           ("outcome", Json.str dec.outcome),
+          ("dutyDeltas", Json.arr deltas.toArray),
           ("logEntryHash", Json.str logEntry.entryHash)
         ])
     | "ResumeRequest" =>
@@ -424,6 +460,7 @@ where
                 Json.mkObj [("fact", Json.str f), ("status", Json.str st.asString)]).toArray)
             ])
           else
+            let deltas := computeDutyDeltasJson rt.config dec.nextConfig
             let rtClean := { rt with pausedRequests := rt.pausedRequests.filter (·.requestId != reqId) }
             let (rt', logEntry) ← commitTransition rtClean ev dec.nextConfig dec.outcome dec.lawful dec.valid prec.actorId prec.actorSignature
             return (rt', envelopeOk rt' op [
@@ -431,6 +468,7 @@ where
               ("requestId", Json.str reqId),
               ("lawful", Json.str dec.lawful.asString),
               ("valid", Json.str dec.valid.asString),
+              ("dutyDeltas", Json.arr deltas.toArray),
               ("logEntryHash", Json.str logEntry.entryHash)
             ])
     | "ObserveExternal" =>
@@ -444,11 +482,13 @@ where
         .ok (ev, dec)) with
       | .error e => return (rt, envelopeErr rt op e)
       | .ok (ev, dec) =>
+        let deltas := computeDutyDeltasJson rt.config dec.nextConfig
         let (rt', logEntry) ← commitTransition rt ev dec.nextConfig dec.outcome dec.lawful dec.valid
         return (rt', envelopeOk rt' op [
           ("outcome", Json.str dec.outcome),
           ("lawful", Json.str dec.lawful.asString),
           ("valid", Json.str dec.valid.asString),
+          ("dutyDeltas", Json.arr deltas.toArray),
           ("logEntryHash", Json.str logEntry.entryHash)
         ])
     | "SubmitEvidence" =>
@@ -484,9 +524,13 @@ where
           match evaluateServerEvent rt.config ev true with
           | .error e => return (rt, envelopeErr rt op e)
           | .ok dec =>
+            let deltas := computeDutyDeltasJson rt.config dec.nextConfig
             let rtExp := { rt with reservations := expireStaleReservations newTime rt.reservations }
             let (rt', logEntry) ← commitTransition rtExp ev dec.nextConfig dec.outcome dec.lawful dec.valid
-            return (rt', envelopeOk rt' op [("logEntryHash", Json.str logEntry.entryHash)])
+            return (rt', envelopeOk rt' op [
+              ("dutyDeltas", Json.arr deltas.toArray),
+              ("logEntryHash", Json.str logEntry.entryHash)
+            ])
     | "Explain" =>
       let target := (req.getObjValAs? String "target").toOption.getD ""
       let aud? := (req.getObjValAs? String "audience").toOption
@@ -518,17 +562,28 @@ where
             match verifyEventActorSig rt.institutionId rt.lawHash rt.config ev actorSig? with
             | .error e => return (rt, envelopeErr rt op e)
             | .ok verifiedActor =>
-              let rtLaw := { rt with lawHash := verNew.artifactSha256, certificate := verNew.certificate }
+              let curNet0 := if rt.fedNet.agreedLaws.contains rt.lawHash || rt.fedNet.supersededLaws.contains rt.lawHash then rt.fedNet
+                             else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+              let netEpoch := supersedeLawEpoch curNet0 rt.lawHash verNew.artifactSha256
+              let hist' := if rt.historicalLaws.any (·.1 == rt.lawHash) then rt.historicalLaws
+                           else (rt.lawHash, rt.config) :: rt.historicalLaws
+              let rtLaw := { rt with
+                lawHash := verNew.artifactSha256
+                certificate := verNew.certificate
+                fedNet := netEpoch
+                historicalLaws := hist'
+              }
               let (rt', logEntry) ← commitTransition rtLaw ev nextCfg "Allow" .yes .yes verifiedActor actorSig?
               return (rt', envelopeOk rt' op [
                 ("outcome", Json.str "Allow"),
                 ("newLawHash", Json.str verNew.artifactSha256),
+                ("supersededLaws", Json.arr (netEpoch.supersededLaws.map Json.str).toArray),
                 ("logEntryHash", Json.str logEntry.entryHash)
               ])
     | "SignStatement" =>
       let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
         else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
-      -- Either accept a pre-signed `statement` object or sign from `seed` (`D43`)
+      -- Either accept a pre-signed `statement` object or sign from `seed` (`D43`, `D44`)
       let stmtRes : Except String SignedStatement :=
         if let .ok preJ := req.getObjVal? "statement" then
           do
@@ -556,6 +611,15 @@ where
                   let fArgs ← parseElemArgs aj
                   let pol := (aj.getObjValAs? Bool "polarity").toOption.getD true
                   .ok (StatementAssertion.tenderEvidence fn fArgs pol)
+                else if kind == "delegateWhen" then
+                  let fn ← aj.getObjValAs? String "fact"
+                  let fArgs ← parseElemArgs aj
+                  let gsArr ← aj.getObjValAs? (Array Json) "guards"
+                  let gs ← gsArr.toList.mapM fun gj => do
+                    let gfn ← gj.getObjValAs? String "fact"
+                    let gArgs ← parseElemArgs gj
+                    .ok (GuardAtom.mk gfn gArgs)
+                  .ok (StatementAssertion.delegateWhen fn fArgs gs)
                 else
                   let fn ← aj.getObjValAs? String "fact"
                   let fArgs ← parseElemArgs aj
@@ -620,24 +684,65 @@ where
     | "VerifyBundle" =>
       let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
         else { rt.fedNet with agreedLaws := rt.lawHash :: rt.fedNet.agreedLaws }
+      let auditHist := (req.getObjValAs? Bool "auditHistorical").toOption.getD false
       match (do let bj ← req.getObjVal? "bundle"; fromJson? (α := JustificationBundle) bj) with
       | .error e => return (rt, envelopeErr rt op s!"invalid bundle JSON: {e}")
       | .ok b =>
-        match verifyBundle rt.config curNet b with
+        let evalCfg :=
+          if auditHist then
+            match rt.enactedSnapshots.find? (·.1 == b.bundleId) with
+            | some (_, snapCfg) => snapCfg
+            | none =>
+              match rt.historicalLaws.find? (·.1 == b.basisLawHash) with
+              | some (_, hCfg) => hCfg
+              | none => rt.config
+          else rt.config
+        let vRes := if auditHist then verifyBundleAudit evalCfg curNet b else verifyBundle evalCfg curNet b
+        match vRes with
         | .error e =>
           return (rt, envelopeOk rt op [
             ("permitted", Json.bool false),
+            ("auditHistorical", Json.bool auditHist),
             ("reason", Json.str e)
           ])
         | .ok res =>
           let perm := res.lawful == .yes && res.valid == .yes
           return (rt, envelopeOk rt op [
             ("permitted", Json.bool perm),
+            ("auditHistorical", Json.bool auditHist),
             ("occurred", Json.str res.occurred),
             ("lawful", Json.str res.lawful.asString),
             ("valid", Json.str res.valid.asString),
             ("outcome", Json.str res.outcome),
             ("effectsOf", toJson res.effectsOf)
+          ])
+    | "BundlesCommute" =>
+      if let .ok b1J := req.getObjVal? "bundleA" then
+        match (do
+          let b1 ← fromJson? (α := JustificationBundle) b1J
+          let b2J ← req.getObjVal? "bundleB"
+          let b2 ← fromJson? (α := JustificationBundle) b2J
+          .ok (b1, b2)) with
+        | .error e => return (rt, envelopeErr rt op s!"invalid bundle payload: {e}")
+        | .ok (b1, b2) =>
+          let comm := bundlesCommute rt.config.spec b1 b2
+          return (rt, envelopeOk rt op [
+            ("commutes", Json.bool comm),
+            ("actionA", Json.str b1.action),
+            ("actionB", Json.str b2.action)
+          ])
+      else
+        match (do
+          let a1 ← req.getObjValAs? String "actionA"
+          let a2 ← req.getObjValAs? String "actionB"
+          .ok (a1, a2)) with
+        | .error e => return (rt, envelopeErr rt op e)
+        | .ok (a1, a2) =>
+          let comm := actionsCommute rt.config.spec a1 a2
+          return (rt, envelopeOk rt op [
+            ("commutes", Json.bool comm),
+            ("actionA", Json.str a1),
+            ("actionB", Json.str a2)
           ])
     | "EnactBundle" =>
       let curNet := if rt.fedNet.agreedLaws.contains rt.lawHash then rt.fedNet
@@ -645,7 +750,7 @@ where
       match (do let bj ← req.getObjVal? "bundle"; fromJson? (α := JustificationBundle) bj) with
       | .error e => return (rt, envelopeErr rt op s!"invalid bundle JSON: {e}")
       | .ok b =>
-        match verifyBundle rt.config curNet b with
+        match enactableBundle rt.config curNet b with
         | .error e => return (rt, envelopeErr rt op e)
         | .ok res =>
           if res.lawful != .yes || res.valid != .yes then
@@ -658,6 +763,7 @@ where
           else
             -- Commit extracted clock/assertion events + action event sequentially so `T36` offline `replay`
             -- reproduces every `stateRootAfter` deterministically!
+            let cfgBeforeBundle := rt.config
             let mut rtCur := rt
             if b.enactedAt > rtCur.config.state.time then
               let evClk := ServerEvent.advanceClock b.enactedAt
@@ -672,17 +778,29 @@ where
                 let evAss? : Option ServerEvent := match ass with
                   | .inputFact fn fArgs h => some (.supplyInput fn fArgs h)
                   | .tenderEvidence fn fArgs pol => some (.submitEvidence fn fArgs pol auth [] none)
-                  | .grantDisclosure _ _ => none
+                  | .grantDisclosure _ _ | .delegateWhen _ _ _ => none
                 if let some evAss := evAss? then
                   if let .ok decAss := evaluateServerEvent rtCur.config evAss true then
                     let (rtNext, _) ← commitTransition rtCur evAss decAss.nextConfig decAss.outcome decAss.lawful decAss.valid
                     rtCur := rtNext
+            let condAssertions : List (String × StatementAssertion) :=
+              allAuthorAssertions.filter fun | (_, .delegateWhen _ _ _) => true | _ => false
+            for _ in List.range condAssertions.length do
+              for (auth, ass) in condAssertions do
+                if let .delegateWhen fn fArgs _ := ass then
+                  if (extractConditionalPhrase rtCur.config auth ass).isSome then
+                    let evDel := ServerEvent.supplyInput fn fArgs true
+                    if let .ok decDel := evaluateServerEvent rtCur.config evDel true then
+                      let (rtNext, _) ← commitTransition rtCur evDel decDel.nextConfig decDel.outcome decDel.lawful decDel.valid
+                      rtCur := rtNext
             let evAct := ServerEvent.triggerAct b.action b.args b.bundleId
             match evaluateServerEvent rtCur.config evAct true with
             | .error e => return (rt, envelopeErr rt op e)
             | .ok dec =>
+              let deltas := computeDutyDeltasJson cfgBeforeBundle dec.nextConfig
               let net' := { curNet with enacted := curNet.enacted ++ [b] }
-              let rtPre := { rtCur with fedNet := net' }
+              let snaps' := (b.bundleId, cfgBeforeBundle) :: rtCur.enactedSnapshots
+              let rtPre := { rtCur with fedNet := net', enactedSnapshots := snaps' }
               let (rt', logEntry) ← commitTransition rtPre evAct dec.nextConfig dec.outcome dec.lawful dec.valid
               return (rt', envelopeOk rt' op [
                 ("permitted", Json.bool true),
@@ -690,6 +808,7 @@ where
                 ("lawful", Json.str dec.lawful.asString),
                 ("valid", Json.str dec.valid.asString),
                 ("effectsOf", toJson res.effectsOf),
+                ("dutyDeltas", Json.arr deltas.toArray),
                 ("logEntryHash", Json.str logEntry.entryHash)
               ])
     | other =>

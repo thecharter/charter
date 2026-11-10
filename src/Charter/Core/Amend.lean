@@ -20,9 +20,6 @@ entrenchment (`014.5`, `T23`, `T24`):
 
 namespace Charter
 
-/-- Transient internal store domain signaling a valid `Amend` transition inside `newContext`. -/
-def amendCommitDom : String := "$amend_commit"
-
 namespace Amend
 
 /-- Neutralize a repealed rule's normative effect while keeping acts performable (`Mission Law 1`). -/

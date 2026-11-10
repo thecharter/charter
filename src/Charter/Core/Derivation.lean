@@ -291,4 +291,111 @@ theorem wellFormed_power_has_validWhen {s : Spec} (hwf : s.WellFormed)
 
 end Spec
 
+namespace Footprint
+
+/-- Types written directly by an effect list (`G2.2`, `D44`). -/
+def effectWriteTypes (spec : Spec) (effs : List Effect) : List DomId :=
+  (effs.flatMap fun
+    | .cAll _ t _ _ | .tAll _ t _ | .oAll _ t _ => (Stratify.typeOf spec t).toList
+    | .evOp _ _ t _ | .findingOp _ _ t _ =>
+      (Stratify.typeOf spec t).toList ++ [evSupportDom, evRebutDom, evFindingPosDom, evFindingNegDom]
+    | .amendOp actId => [amendCommitDom, actId] ++ spec.decls.map (·.1)).eraseDups
+
+/-- Types written by triggering `d` (including bounded `Syncs with` targets). -/
+def actWriteTypes (spec : Spec) : Nat → List DomId → DomId → List DomId
+  | 0, _, _ => []
+  | fuel + 1, seen, d =>
+    if seen.contains d then [] else
+    match spec.findDecl d with
+    | none => []
+    | some tspec =>
+      match tspec.kind with
+      | .act actSpec =>
+        let own := effectWriteTypes spec actSpec.effects
+        let synced := actSpec.syncs.flatMap fun s =>
+          match Stratify.typeOf spec s.t with
+          | some d' => actWriteTypes spec fuel (d :: seen) d'
+          | none => []
+        (own ++ synced).eraseDups
+      | .event evSpec =>
+        let own := effectWriteTypes spec evSpec.effects
+        let synced := evSpec.syncs.flatMap fun s =>
+          match Stratify.typeOf spec s.t with
+          | some d' => actWriteTypes spec fuel (d :: seen) d'
+          | none => []
+        (own ++ synced).eraseDups
+      | _ => []
+
+/-- Direct types read by one declaration `d`'s guards, derivations, or effects. -/
+def declDirectReadTypes (spec : Spec) (d : DomId) : List DomId :=
+  match spec.findDecl d with
+  | none => []
+  | some tspec =>
+    let xs := spec.components d
+    let cDeps := Stratify.depsList spec 500 xs .pos tspec.conditions
+    let dDeps := (tspec.derivation.flatMap fun
+      | .dv ys t => Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 ys .pos t
+      | .holdsWhen t => Stratify.binderDeps spec xs .pos ++ Stratify.deps spec 500 xs .pos t
+      | .defeasibleDAG _ rs =>
+        Stratify.binderDeps spec xs .neg ++
+        rs.flatMap fun r =>
+          Stratify.deps spec 500 xs .neg r.cond ++
+          (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => Stratify.deps spec 500 xs .neg vt))
+    let kDeps := match tspec.kind with
+      | .act actSpec =>
+        Stratify.depsList spec 500 xs .pos actSpec.validWhen ++
+        (actSpec.effects.flatMap fun
+          | .cAll ys t md _ =>
+            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
+            (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
+          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
+            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
+          | .amendOp _ => [])
+      | .event evSpec =>
+        evSpec.effects.flatMap fun
+          | .cAll ys t md _ =>
+            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
+            (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
+          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
+            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
+          | .amendOp _ => []
+      | _ => []
+    let immDeps := (spec.immunitiesAgainst d).map (fun (imId, _, _) => imId)
+    ((cDeps ++ dDeps ++ kDeps).map (·.1) ++ immDeps).eraseDups
+
+/-- Types read when evaluating `d`'s guards and effects (including transitive derived types). -/
+def actReadTypesTransitive (spec : Spec) (d : DomId) : List DomId :=
+  let stepOnce (acc : List DomId) : List DomId :=
+    let next := acc.flatMap (declDirectReadTypes spec)
+    (acc ++ next).eraseDups
+  Nat.repeat stepOnce 6 (declDirectReadTypes spec d)
+
+/-- Conservative static independence test (`G2.2` partial-order reduction). -/
+def staticallyIndependent (spec : Spec) (d1 d2 : DomId) : Bool :=
+  if d1 == d2 || !spec.derivedTypes.isEmpty then false
+  else
+    let w1 := actWriteTypes spec 16 [] d1
+    let w2 := actWriteTypes spec 16 [] d2
+    let r1 := declDirectReadTypes spec d1
+    let r2 := declDirectReadTypes spec d2
+    let disj (xs ys : List DomId) : Bool := xs.all (fun x => !ys.contains x)
+    disj w1 w2 && disj w1 r2 && disj w2 r1
+
+/-- Transitive read/write footprint commutativity test across derived strata (`D44`).
+Two distinct acts commute statically when their write footprints are disjoint and neither
+writes any type transitively read by the other's guards, derivations, immunities, or effects. -/
+def actsFootprintCommute (spec : Spec) (d1 d2 : DomId) : Bool :=
+  let c1 := spec.chaseAlias d1
+  let c2 := spec.chaseAlias d2
+  if c1 == c2 then false
+  else
+    let w1 := actWriteTypes spec 16 [] c1
+    let w2 := actWriteTypes spec 16 [] c2
+    let r1 := actReadTypesTransitive spec c1
+    let r2 := actReadTypesTransitive spec c2
+    let disj (xs ys : List DomId) : Bool := xs.all (fun x => !ys.contains x)
+    !w1.isEmpty && !w2.isEmpty && disj w1 w2 && disj w1 r2 && disj w2 r1
+
+end Footprint
+
 end Charter

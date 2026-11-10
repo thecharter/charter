@@ -10,86 +10,11 @@ store applications (`makeAssignments_comm_lookup_disjoint`).
 
 namespace Charter.Verify
 
-/-- Types written directly by an effect list. -/
-def effectWriteTypes (spec : Spec) (effs : List Effect) : List DomId :=
-  (effs.flatMap fun
-    | .cAll _ t _ _ | .tAll _ t _ | .oAll _ t _ => (Stratify.typeOf spec t).toList
-    | .evOp _ _ t _ | .findingOp _ _ t _ =>
-      (Stratify.typeOf spec t).toList ++ [evSupportDom, evRebutDom, evFindingPosDom, evFindingNegDom]
-    | .amendOp actId => [amendCommitDom, actId] ++ spec.decls.map (·.1)).eraseDups
-
-/-- Types written by triggering `d` (including bounded `Syncs with` targets). -/
-def actWriteTypes (spec : Spec) : Nat → List DomId → DomId → List DomId
-  | 0, _, _ => []
-  | fuel + 1, seen, d =>
-    if seen.contains d then [] else
-    match spec.findDecl d with
-    | none => []
-    | some tspec =>
-      match tspec.kind with
-      | .act actSpec =>
-        let own := effectWriteTypes spec actSpec.effects
-        let synced := actSpec.syncs.flatMap fun s =>
-          match Stratify.typeOf spec s.t with
-          | some d' => actWriteTypes spec fuel (d :: seen) d'
-          | none => []
-        (own ++ synced).eraseDups
-      | .event evSpec =>
-        let own := effectWriteTypes spec evSpec.effects
-        let synced := evSpec.syncs.flatMap fun s =>
-          match Stratify.typeOf spec s.t with
-          | some d' => actWriteTypes spec fuel (d :: seen) d'
-          | none => []
-        (own ++ synced).eraseDups
-      | _ => []
-
-/-- Types read when evaluating `d`'s guards and effects. -/
-def actReadTypes (spec : Spec) (d : DomId) : List DomId :=
-  match spec.findDecl d with
-  | none => []
-  | some tspec =>
-    let xs := spec.components d
-    let cDeps := Stratify.depsList spec 500 xs .pos tspec.conditions
-    let dDeps := (tspec.derivation.flatMap fun
-      | .dv ys t => Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 ys .pos t
-      | .holdsWhen t => Stratify.binderDeps spec xs .pos ++ Stratify.deps spec 500 xs .pos t
-      | .defeasibleDAG _ rs =>
-        Stratify.binderDeps spec xs .neg ++
-        rs.flatMap fun r =>
-          Stratify.deps spec 500 xs .neg r.cond ++
-          (match r.conseq with | .holdsBool _ => [] | .yieldsVal vt => Stratify.deps spec 500 xs .neg vt))
-    let kDeps := match tspec.kind with
-      | .act actSpec =>
-        Stratify.depsList spec 500 xs .pos actSpec.validWhen ++
-        (actSpec.effects.flatMap fun
-          | .cAll ys t md _ =>
-            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
-            (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
-          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
-            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
-          | .amendOp _ => [])
-      | .event evSpec =>
-        evSpec.effects.flatMap fun
-          | .cAll ys t md _ =>
-            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t ++
-            (md.map (Stratify.deps spec 500 (xs ++ ys) .pos)).getD []
-          | .tAll ys t _ | .oAll ys t _ | .evOp _ ys t _ | .findingOp _ ys t _ =>
-            Stratify.binderDeps spec ys .pos ++ Stratify.deps spec 500 (xs ++ ys) .pos t
-          | .amendOp _ => []
-      | _ => []
-    ((cDeps ++ dDeps ++ kDeps).map (·.1)).eraseDups
-
-/-- Conservative static independence test: two acts in a spec with no derived strata and
-strictly disjoint read/write footprints commute and can be ordered canonically during search. -/
-def staticallyIndependent (spec : Spec) (d1 d2 : DomId) : Bool :=
-  if d1 == d2 || !spec.derivedTypes.isEmpty then false
-  else
-    let w1 := actWriteTypes spec 16 [] d1
-    let w2 := actWriteTypes spec 16 [] d2
-    let r1 := actReadTypes spec d1
-    let r2 := actReadTypes spec d2
-    let disj (xs ys : List DomId) : Bool := xs.all (fun x => !ys.contains x)
-    disj w1 w2 && disj w1 r2 && disj w2 r1
+/-- Single-owner footprint aliases from `Charter.Footprint` (`Charter.Core.Derivation`). -/
+abbrev effectWriteTypes := Footprint.effectWriteTypes
+abbrev actWriteTypes := Footprint.actWriteTypes
+abbrev actReadTypes := Footprint.declDirectReadTypes
+abbrev staticallyIndependent := Footprint.staticallyIndependent
 
 /-! ### Disjoint-Store Commutativity Proof (`G2.2`) -/
 

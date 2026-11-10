@@ -51,7 +51,13 @@ def AudiencePolicy.permits (pol : AudiencePolicy) (agent : String) : Bool :=
   | .unrestricted => true
   | .restricted allowed => allowed.contains agent
 
-/-- One atomic assertion carried inside a peer's `SignedStatement` (`D43`). -/
+/-- Positive ground guard fact required by a scoped conditional delegation (`D44`). -/
+structure GuardAtom where
+  factName : DomId
+  args     : List Elem
+  deriving Repr, BEq, Inhabited, ToJson, FromJson
+
+/-- One assertion carried inside a peer's `SignedStatement` (`D43`, `D44`). -/
 inductive StatementAssertion where
   /-- Supply a base/input fact whose leading actor argument must match `stmt.author`. -/
   | inputFact (factName : DomId) (args : List Elem) (holds : Bool := true)
@@ -59,6 +65,9 @@ inductive StatementAssertion where
   | tenderEvidence (factName : DomId) (args : List Elem) (polarity : Bool)
   /-- Authorize `recipient` to receive and rely upon a `.restricted` statement authored by `stmt.author`. -/
   | grantDisclosure (targetStatementId : String) (recipient : String)
+  /-- Scoped conditional delegation (`D44`): assert `factName(args)` (whose leading argument must
+  equal `stmt.author`) whenever all positive `guards` hold in the extracted bundle state. -/
+  | delegateWhen (factName : DomId) (args : List Elem) (guards : List GuardAtom)
   deriving Repr, BEq, Inhabited, ToJson, FromJson
 
 /-- Canonical serialization of a `StatementAssertion` for cryptographic signing. -/
@@ -69,6 +78,9 @@ def canonicalAssertionSig : StatementAssertion → String
     s!"ev:{fn}:{",".intercalate (args.map canonicalElemSig)}:{pol}"
   | .grantDisclosure sid recp =>
     s!"disc:{sid}:{recp}"
+  | .delegateWhen fn args gs =>
+    let gStr := "&".intercalate (gs.map fun g => s!"{g.factName}({",".intercalate (g.args.map canonicalElemSig)})")
+    s!"del:{fn}:{",".intercalate (args.map canonicalElemSig)}:when:{gStr}"
 
 def canonicalAudienceSig : AudiencePolicy → String
   | .unrestricted => "pub"
@@ -154,13 +166,19 @@ def redactedAttestationPayload (a : RedactedAttestation) : String :=
   let expStr := match a.expiresAt with | some t => toString t | none => "none"
   s!"charter-redact-v1|{a.statementId}|{a.commitmentSha256}|{a.author}|{a.basisLawHash}|{expStr}|{canonicalAudienceSig a.audience}|{a.auditorId}|{"/".intercalate (a.exportedAssertions.map canonicalAssertionSig)}"
 
-/-- Check that an exported assertion touches no `Confidential` fact in `spec` (`T43`, `D43`). -/
+/-- Check that an exported assertion touches no `Confidential` fact in `spec` (`T43`, `D43`, `D44`). -/
 def assertionIsNonConfidential (spec : Spec) : StatementAssertion → Bool
   | .inputFact fn _ _ | .tenderEvidence fn _ _ =>
     let canon := spec.chaseAlias fn
     match spec.findDecl canon with
     | some { kind := .fact fs, .. } => !fs.confidential
     | _ => false
+  | .delegateWhen fn _ gs =>
+    let okFact (d : DomId) : Bool :=
+      match spec.findDecl (spec.chaseAlias d) with
+      | some { kind := .fact fs, .. } => !fs.confidential
+      | _ => false
+    okFact fn && gs.all (fun g => okFact g.factName)
   | .grantDisclosure _ _ => true
 
 def mintRedactedAttestation (auditorSeed auditorId : String) (raw : SignedStatement)
@@ -242,6 +260,26 @@ def extractAssertionPhrase (spec : Spec) (author : String) : StatementAssertion 
         | .error _ => none
     | _ => none
   | .grantDisclosure _ _ => none
+  | .delegateWhen _ _ _ => none
+
+/-- Check whether a positive `GuardAtom` currently holds in `cfg` (`D44`). -/
+def guardAtomHolds (cfg : Config) (g : GuardAtom) : Bool :=
+  match buildInstanceTerm cfg.spec g.factName g.args with
+  | .error _ => false
+  | .ok tm =>
+    let ctx := Ctx.of cfg.spec cfg.state
+    match (M.whenTagged (M.eval M.fuel tm) pure).run ctx [] with
+    | .ok (te :: _) => cfg.state.holds te
+    | _ => false
+
+/-- Compile a `delegateWhen` assertion into a `CPhrase` once all positive `guards` hold in `cfg`,
+enforcing the exact same mandatory authorship reflection (`hasLeadingAuthor author args`) as `inputFact`. -/
+def extractConditionalPhrase (cfg : Config) (author : String) : StatementAssertion → Option CPhrase
+  | .delegateWhen fn args gs =>
+    if gs.all (guardAtomHolds cfg) then
+      extractAssertionPhrase cfg.spec author (.inputFact fn args true)
+    else none
+  | _ => none
 
 /-- **Theorem 1 (`reflectAuthor_no_impersonation`):**
 Mandatory authorship reflection guarantees that a statement authored by `author` can never
@@ -290,6 +328,23 @@ theorem reflectAuthor_no_impersonation
       · contradiction
     | grantDisclosure _ _ =>
       simp [extractAssertionPhrase] at hExt
+    | delegateWhen _ _ _ =>
+      simp [extractAssertionPhrase] at hExt
+
+/-- **Theorem 1b (`delegateWhen_no_impersonation`, `D44`):**
+A scoped conditional delegation `delegateWhen fn args gs` signed by `author` can never fire to
+assert a fact whose leading actor argument belongs to any `other ≠ author`. -/
+theorem delegateWhen_no_impersonation
+    (cfg : Config) (author other : String) (hNe : other ≠ author)
+    (fn : DomId) (args : List Elem) (gs : List GuardAtom) (cph : CPhrase)
+    (hCond : extractConditionalPhrase cfg author (.delegateWhen fn args gs) = some cph) :
+    hasLeadingAuthor other args = false := by
+  unfold extractConditionalPhrase at hCond
+  cases hG : gs.all (guardAtomHolds cfg)
+  · simp [hG] at hCond
+  · simp [hG] at hCond
+    exact (reflectAuthor_no_impersonation cfg.spec author other hNe (.inputFact fn args true) cph hCond).1
+      fn args true rfl
 
 /-! ## Self-Contained Action-Carried Justification Bundles -/
 
@@ -373,12 +428,26 @@ def attestationUsableInBundle (spec : Spec) (allStmts : List SignedStatement)
   (match a.expiresAt with | some exp => b.enactedAt < exp | none => true) &&
   audienceAllowedForActor allStmts b.actor a.audience a.author a.statementId
 
-/-- Apply extracted `CPhrase`s from author-reflected assertions onto `cfg`. -/
+/-- Apply extracted ground `CPhrase`s from author-reflected assertions onto `cfg`. -/
 def applyAuthorAssertions (cfg : Config) (author : String) (assertions : List StatementAssertion) : Config :=
   assertions.foldl (fun acc a =>
     match extractAssertionPhrase acc.spec author a with
     | some cph => (evalCompiledStep acc cph true).1
     | none => acc) cfg
+
+/-- Apply one pass of scoped conditional delegations (`delegateWhen`, `D44`) whose positive guards hold. -/
+def applyConditionalPass (cfg : Config) (items : List (String × StatementAssertion)) : Config :=
+  items.foldl (fun acc (author, a) =>
+    match extractConditionalPhrase acc author a with
+    | some cph => (evalCompiledStep acc cph true).1
+    | none => acc) cfg
+
+/-- Evaluate bounded positive conditional delegations up to a structural fixpoint (`D44`). -/
+def saturateConditionalAssertions : Nat → Config → List (String × StatementAssertion) → Config
+  | 0, cfg, _ => cfg
+  | fuel + 1, cfg, items =>
+    let cfg' := applyConditionalPass cfg items
+    saturateConditionalAssertions fuel cfg' items
 
 /-- Build the closed bundle evaluation `Config` from `(baseCfg, enactedAt, statements, attestations)`. -/
 def extractBundleConfig (baseCfg : Config) (enactedAt : Int)
@@ -388,7 +457,14 @@ def extractBundleConfig (baseCfg : Config) (enactedAt : Int)
       (evalCompiledStep baseCfg (.setTime (.intLit enactedAt)) true).1
     else baseCfg
   let cfgStmts := stmts.foldl (fun acc s => applyAuthorAssertions acc s.author s.assertions) cfgAtTime
-  atts.foldl (fun acc a => applyAuthorAssertions acc a.author a.exportedAssertions) cfgStmts
+  let cfgGround := atts.foldl (fun acc a => applyAuthorAssertions acc a.author a.exportedAssertions) cfgStmts
+  let condItems : List (String × StatementAssertion) :=
+    (stmts.flatMap fun s => s.assertions.filterMap fun
+      | d@(.delegateWhen _ _ _) => some (s.author, d) | _ => none) ++
+    (atts.flatMap fun a => a.exportedAssertions.filterMap fun
+      | d@(.delegateWhen _ _ _) => some (a.author, d) | _ => none)
+  if condItems.isEmpty then cfgGround
+  else saturateConditionalAssertions condItems.length cfgGround condItems
 
 /-- Three-answer Charter evaluation verdict + enumerated capability effects for a bundle (`Law 2`). -/
 structure BundleEvalResult where
@@ -440,13 +516,14 @@ def evalBundleStatic (baseCfg : Config) (b : JustificationBundle) : Except Strin
 
 /-! ## Federated Network State, Monotone Auditability, & Per-Statement Revocation -/
 
-/-- Federated control-plane configuration tracking active `agreedLaws`, peer `stated` messages,
-per-statement `revokedIds`, and `enacted` bundles (`D43`). -/
+/-- Federated control-plane configuration tracking active `agreedLaws`, retired historical
+`supersededLaws` (`D44`), peer `stated` messages, per-statement `revokedIds`, and `enacted` bundles (`D43`). -/
 structure FedNetwork where
-  agreedLaws : List String := []
-  stated     : List SignedStatement := []
-  revokedIds : List String := []
-  enacted    : List JustificationBundle := []
+  agreedLaws     : List String := []
+  supersededLaws : List String := []
+  stated         : List SignedStatement := []
+  revokedIds     : List String := []
+  enacted        : List JustificationBundle := []
   deriving Repr, Inhabited, ToJson, FromJson
 
 /-- Monotone network history growth (`stated` and `enacted` grow monotonically). -/
@@ -457,6 +534,32 @@ def FedNetwork.growing (n₁ n₂ : FedNetwork) : Prop :=
 /-- `basedBundle`: bundle's `basisLawHash` is in the active synchronized `agreedLaws` set. -/
 def basedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
   net.agreedLaws.contains b.basisLawHash
+
+/-- `historicallyBasedBundle` (`D44`): bundle's `basisLawHash` is either currently active in
+`agreedLaws`, or was active in `supersededLaws` when `b` was already `enacted`. -/
+def historicallyBasedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
+  net.agreedLaws.contains b.basisLawHash ||
+  (net.supersededLaws.contains b.basisLawHash && net.enacted.any (·.bundleId == b.bundleId))
+
+/-- `freshBundle` (`D44`): `b.bundleId` has not already been enacted (blocks bundle replay). -/
+def freshBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
+  !net.enacted.any (·.bundleId == b.bundleId)
+
+/-- Retire `oldLaw` into `supersededLaws` and activate `newLaw` in `agreedLaws` (`D44`). -/
+def supersedeLawEpoch (net : FedNetwork) (oldLaw newLaw : String) : FedNetwork :=
+  let keptActive := net.agreedLaws.filter (· != oldLaw)
+  let active' := if keptActive.contains newLaw then keptActive else newLaw :: keptActive
+  let sup' := if oldLaw == newLaw || net.supersededLaws.contains oldLaw then net.supersededLaws
+              else oldLaw :: net.supersededLaws
+  { net with agreedLaws := active', supersededLaws := sup' }
+
+/-- Static parallel commutativity check between two federated actions (`D44`, `Footprint.actsFootprintCommute`). -/
+def actionsCommute (spec : Spec) (actA actB : DomId) : Bool :=
+  Footprint.actsFootprintCommute spec actA actB
+
+/-- Static parallel commutativity check between two `JustificationBundle`s (`D44`). -/
+def bundlesCommute (spec : Spec) (b₁ b₂ : JustificationBundle) : Bool :=
+  b₁.bundleId != b₂.bundleId && actionsCommute spec b₁.action b₂.action
 
 /-- `sourcedBundle`: every `SignedStatement` carried in `b` has been `stated`. -/
 def sourcedBundle (net : FedNetwork) (b : JustificationBundle) : Bool :=
@@ -479,11 +582,114 @@ def verifyBundle (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle)
   else
     evalBundleStatic baseCfg b
 
+/-- Replay-safe live enactment verification (`freshBundle ∧ verifyBundle`, `D44`). -/
+def enactableBundle (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle) :
+    Except String BundleEvalResult :=
+  if !freshBundle net b then
+    .error s!"bundle replay rejected: bundleId `{b.bundleId}` was already enacted"
+  else
+    verifyBundle baseCfg net b
+
+/-- Cross-epoch audit verification (`historicallyBasedBundle ∧ sourced ∧ unrevoked ∧ evalBundleStatic`, `D44`). -/
+def verifyBundleAudit (epochCfg : Config) (net : FedNetwork) (b : JustificationBundle) :
+    Except String BundleEvalResult :=
+  if !historicallyBasedBundle net b then
+    .error s!"bundle basis `{b.basisLawHash}` is neither in agreedLaws nor an enacted historical epoch"
+  else if !sourcedBundle net b then
+    .error "bundle carries an unsourced statement absent from network history"
+  else if !unrevokedBundle net b then
+    .error "bundle relies on a revoked statement"
+  else
+    evalBundleStatic epochCfg b
+
 /-- Boolean permission predicate (`lawful == .yes && valid == .yes` under `verifyBundle`). -/
 def permittedBundle (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle) : Bool :=
   match verifyBundle baseCfg net b with
   | .ok res => res.lawful == .yes && res.valid == .yes
   | .error _ => false
+
+/-- **Theorem 2b (`replay_bundle_rejected`, `D44`):**
+Any bundle `b` whose `bundleId` already appears in `net.enacted` is rejected by `enactableBundle`. -/
+theorem replay_bundle_rejected
+    (baseCfg : Config) (net : FedNetwork) (b : JustificationBundle)
+    (hEnacted : net.enacted.any (·.bundleId == b.bundleId) = true) :
+    (enactableBundle baseCfg net b).isOk = false := by
+  unfold enactableBundle freshBundle
+  rw [hEnacted]
+  rfl
+
+theorem list_contains_filter_self_false (xs : List String) (x : String) :
+    (xs.filter (· != x)).contains x = false := by
+  simp
+
+/-- **Theorem 2c (`superseded_law_cannot_enact_new`, `D44`):**
+Once `oldLaw` is superseded by `newLaw` (`oldLaw ≠ newLaw`), no bundle `b` carrying
+`b.basisLawHash = oldLaw` can pass `permittedBundle` or `enactableBundle` in the new epoch. -/
+theorem superseded_law_cannot_enact_new
+    (baseCfg : Config) (net : FedNetwork) (oldLaw newLaw : String) (b : JustificationBundle)
+    (hNe : oldLaw ≠ newLaw)
+    (hOld : b.basisLawHash = oldLaw) :
+    permittedBundle baseCfg (supersedeLawEpoch net oldLaw newLaw) b = false ∧
+    (enactableBundle baseCfg (supersedeLawEpoch net oldLaw newLaw) b).isOk = false := by
+  have hNotBased : basedBundle (supersedeLawEpoch net oldLaw newLaw) b = false := by
+    unfold basedBundle supersedeLawEpoch
+    rw [hOld]
+    dsimp only
+    by_cases hHasNew : (net.agreedLaws.filter (· != oldLaw)).contains newLaw = true
+    · rw [if_pos hHasNew]
+      exact list_contains_filter_self_false net.agreedLaws oldLaw
+    · rw [if_neg hHasNew, List.contains_cons]
+      have hBeqFalse : (oldLaw == newLaw) = false := beq_false_of_ne hNe
+      rw [hBeqFalse, Bool.false_or]
+      exact list_contains_filter_self_false net.agreedLaws oldLaw
+  constructor
+  · unfold permittedBundle verifyBundle
+    rw [hNotBased]
+    rfl
+  · unfold enactableBundle verifyBundle
+    cases freshBundle (supersedeLawEpoch net oldLaw newLaw) b
+    · rfl
+    · rw [hNotBased]; rfl
+
+/-- **Theorem 2d (`historical_audit_preserves_enacted`, `D44`):**
+Any bundle `b` already enacted (`net.enacted.any (·.bundleId == b.bundleId) = true`) that was
+valid under `verifyBundle epochCfg net b = .ok res` continues to validate identically under
+`verifyBundleAudit` after `b.basisLawHash` is superseded by `newLaw`. -/
+theorem historical_audit_preserves_enacted
+    (epochCfg : Config) (net : FedNetwork) (newLaw : String)
+    (b : JustificationBundle) (res : BundleEvalResult)
+    (hEnacted : net.enacted.any (·.bundleId == b.bundleId) = true)
+    (hVer : verifyBundle epochCfg net b = .ok res) :
+    verifyBundleAudit epochCfg (supersedeLawEpoch net b.basisLawHash newLaw) b = .ok res := by
+  unfold verifyBundle at hVer
+  cases hB : basedBundle net b <;> simp [hB] at hVer
+  cases hS : sourcedBundle net b <;> simp [hS] at hVer
+  cases hU : unrevokedBundle net b <;> simp [hU] at hVer
+  have hHist : historicallyBasedBundle (supersedeLawEpoch net b.basisLawHash newLaw) b = true := by
+    unfold historicallyBasedBundle supersedeLawEpoch
+    dsimp only
+    by_cases hSame : b.basisLawHash = newLaw
+    · rw [hSame]
+      have hInActive : (if (net.agreedLaws.filter (· != newLaw)).contains newLaw then
+          net.agreedLaws.filter (· != newLaw) else newLaw :: net.agreedLaws.filter (· != newLaw)).contains newLaw = true := by
+        by_cases hC : (net.agreedLaws.filter (· != newLaw)).contains newLaw = true
+        · rw [if_pos hC]; exact hC
+        · rw [if_neg hC, List.contains_cons]; simp
+      rw [hInActive]; rfl
+    · have hBeqFalse : (b.basisLawHash == newLaw) = false := beq_false_of_ne hSame
+      have hInSup : (if b.basisLawHash == newLaw || net.supersededLaws.contains b.basisLawHash then
+          net.supersededLaws else b.basisLawHash :: net.supersededLaws).contains b.basisLawHash = true := by
+        rw [hBeqFalse, Bool.false_or]
+        by_cases hSup : net.supersededLaws.contains b.basisLawHash = true
+        · rw [if_pos hSup]; exact hSup
+        · rw [if_neg hSup, List.contains_cons]; simp
+      rw [hInSup, hEnacted]; simp
+  have hS' : sourcedBundle (supersedeLawEpoch net b.basisLawHash newLaw) b = true := by
+    unfold sourcedBundle supersedeLawEpoch; exact hS
+  have hU' : unrevokedBundle (supersedeLawEpoch net b.basisLawHash newLaw) b = true := by
+    unfold unrevokedBundle supersedeLawEpoch; exact hU
+  unfold verifyBundleAudit
+  simp [hHist, hS', hU', hVer]
 
 /-- **Theorem 2 (`verifyBundle_deterministic`):**
 `verifyBundle` is a total, deterministic function of `(baseCfg, net, b)`. -/
@@ -750,31 +956,39 @@ theorem redacted_bundle_agrees_with_unredacted
 
 /-! ## Dependency-Sliced Minimal Bundle Synthesis -/
 
-/-- Collect asserted `DomId`s inside a `SignedStatement` for dependency-cone filtering. -/
+/-- Collect asserted or guard-referenced `DomId`s inside a `SignedStatement` for dependency-cone filtering. -/
 def statementAssertedDoms (spec : Spec) (s : SignedStatement) : List DomId :=
-  s.assertions.filterMap fun
-    | .inputFact fn _ _ | .tenderEvidence fn _ _ => some (spec.chaseAlias fn)
-    | .grantDisclosure _ _ => none
+  s.assertions.flatMap fun
+    | .inputFact fn _ _ | .tenderEvidence fn _ _ => [spec.chaseAlias fn]
+    | .delegateWhen fn _ gs => spec.chaseAlias fn :: gs.map (fun g => spec.chaseAlias g.factName)
+    | .grantDisclosure _ _ => []
 
-/-- Dependency cone of `DomId`s transitively referenced by `actName`'s conditions/derivations. -/
-def actionRelevantDoms (spec : Spec) (actName : DomId) : List DomId :=
+/-- Dependency cone of `DomId`s transitively referenced by `actName`'s conditions/derivations
+and any candidate `delegateWhen` guard atoms (`D43`, `D44`). -/
+def actionRelevantDoms (spec : Spec) (actName : DomId) (candidates : List SignedStatement := []) : List DomId :=
   let root := spec.chaseAlias actName
+  let delEdges : List (DomId × List DomId) := candidates.flatMap fun s =>
+    s.assertions.filterMap fun
+      | .delegateWhen fn _ gs => some (spec.chaseAlias fn, gs.map (fun g => spec.chaseAlias g.factName))
+      | _ => none
   let stepOnce (acc : List DomId) : List DomId :=
     let next := acc.flatMap fun d =>
-      match spec.findDecl d with
-      | none => []
-      | some ts =>
-        let hw := ts.derivation.flatMap fun
-          | .holdsWhen c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
-          | .dv xs t => (Plan.collectTermApps t).map (fun p => spec.chaseAlias p.1) ++
-                        xs.map (fun v => spec.removeDecoration v)
-          | .defeasibleDAG _ _ => []
-        let conds := ts.conditions.flatMap fun c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
-        let vw := match ts.kind with
-          | .act a => a.validWhen.flatMap fun c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
-          | _ => []
-        let df := ts.defeasibleRules.flatMap fun r => (Plan.collectTermApps r.cond).map (fun p => spec.chaseAlias p.1)
-        hw ++ conds ++ vw ++ df
+      let fromDel := (delEdges.filter (·.1 == d)).flatMap (·.2)
+      let fromSpec := match spec.findDecl d with
+        | none => []
+        | some ts =>
+          let hw := ts.derivation.flatMap fun
+            | .holdsWhen c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
+            | .dv xs t => (Plan.collectTermApps t).map (fun p => spec.chaseAlias p.1) ++
+                          xs.map (fun v => spec.removeDecoration v)
+            | .defeasibleDAG _ _ => []
+          let conds := ts.conditions.flatMap fun c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
+          let vw := match ts.kind with
+            | .act a => a.validWhen.flatMap fun c => (Plan.collectTermApps c).map (fun p => spec.chaseAlias p.1)
+            | _ => []
+          let df := ts.defeasibleRules.flatMap fun r => (Plan.collectTermApps r.cond).map (fun p => spec.chaseAlias p.1)
+          hw ++ conds ++ vw ++ df
+      fromSpec ++ fromDel
     (acc ++ next).foldl (fun u x => if u.contains x then u else u ++ [x]) []
   Nat.repeat stepOnce 6 [root]
 
@@ -797,7 +1011,7 @@ def synthesizeCandidateBundle (baseCfg : Config) (net : FedNetwork)
     (actorSeed bundleId actor : String) (action : DomId) (args : List Elem)
     (basisLawHash : String) (enactedAt : Int)
     (candidates : List SignedStatement) : JustificationBundle :=
-  let cone := actionRelevantDoms baseCfg.spec action
+  let cone := actionRelevantDoms baseCfg.spec action candidates
   let usable := candidates.filter fun s =>
     net.stated.any (· == s) &&
     !net.revokedIds.contains s.statementId &&
@@ -902,6 +1116,16 @@ def mkBundleDemoSpec : Spec :=
     domain := .products [⟨"actor", ""⟩, ⟨"task", ""⟩]
     closed := some true
   }
+  let trFact   : TypeSpec := {
+    kind := .fact { isInput := true }
+    domain := .products [⟨"actor", ""⟩]
+    closed := some true
+  }
+  let noteFact : TypeSpec := {
+    kind := .fact {}
+    domain := .products [⟨"actor", ""⟩]
+    closed := some true
+  }
   let doneFact : TypeSpec := {
     kind := .fact {}
     domain := .products [⟨"actor", ""⟩, ⟨"task", ""⟩]
@@ -913,13 +1137,24 @@ def mkBundleDemoSpec : Spec :=
   let effDone : Effect :=
     .cAll [] (.app "study-completed" (.named [(⟨"actor", ""⟩, .ref ⟨"actor", ""⟩),
                                               (⟨"task", ""⟩, .ref ⟨"task", ""⟩)]))
+  let effNote : Effect :=
+    .cAll [] (.app "audit-note" (.named [(⟨"actor", ""⟩, .ref ⟨"actor", ""⟩)]))
   let procAct : TypeSpec := {
     kind := .act { effects := [effDone], validWhen := [condCleared], isPower := true }
     domain := .products [⟨"actor", ""⟩, ⟨"task", ""⟩]
     derivation := [.holdsWhen condCleared]
     closed := some true
   }
+  let noteAct : TypeSpec := {
+    kind := .act { effects := [effNote], validWhen := [.boolLit true], isPower := true }
+    domain := .products [⟨"actor", ""⟩]
+    derivation := [.holdsWhen (.boolLit true)]
+    closed := some true
+  }
   { decls := [
+      ("audit-note", noteFact),
+      ("log-note", noteAct),
+      ("lab-trusted", trFact),
       ("study-completed", doneFact),
       ("process-study", procAct),
       ("consent-cleared", clrFact),
@@ -972,6 +1207,26 @@ def bundleSelfTest : Bool :=
   let revokeIsolated :=
     (match labSynth? with | some b => !permittedBundle baseCfg netRev b | none => false) &&
     permittedBundle baseCfg (applyRevocationId netSecret "stmt-ca-1") redactedBundle
-  forgeBlocked && synthOk && leakCaughtAndBlocked && redactedOk && revokeIsolated
+  -- D44 checks: delegateWhen standing mandate, replay rejection, epoch supersession, & commutativity
+  let standingDel := signStatement "seed-clinic-a" "stmt-del-standing" "ClinicA" lawHash 0 none .unrestricted
+    [.delegateWhen "consent-cleared" [.str "ClinicA", .str "Study1"] [⟨"lab-trusted", [.str "PartnerLab"]⟩]]
+  let labTrustStmt := signStatement "seed-lab" "stmt-lab-trust" "PartnerLab" lawHash 0 none .unrestricted
+    [.inputFact "lab-trusted" [.str "PartnerLab"] true]
+  let netDel : FedNetwork := { agreedLaws := [lawHash], stated := [standingDel, labTrustStmt] }
+  let delSynth? := synthesizeBundle baseCfg netDel "seed-lab" "b-del-1" "PartnerLab"
+    "process-study" [.str "PartnerLab", .str "Study1"] lawHash 5 [standingDel, labTrustStmt]
+  let delOk := match delSynth? with
+    | some bd =>
+      let netEnacted := { netDel with enacted := [bd] }
+      let replayBlocked := !(enactableBundle baseCfg netEnacted bd).isOk
+      let netEpoch2 := supersedeLawEpoch netEnacted lawHash "law-federation-v2"
+      let newUnderOldBlocked := !permittedBundle baseCfg netEpoch2 bd
+      let histAuditPreserved := (verifyBundleAudit baseCfg netEpoch2 bd).isOk
+      permittedBundle baseCfg netDel bd && replayBlocked && newUnderOldBlocked && histAuditPreserved
+    | none => false
+  let commuteOk :=
+    actionsCommute spec "process-study" "log-note" &&
+    !actionsCommute spec "process-study" "process-study"
+  forgeBlocked && synthOk && leakCaughtAndBlocked && redactedOk && revokeIsolated && delOk && commuteOk
 
 end Charter.Server

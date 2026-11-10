@@ -2,7 +2,7 @@
 
 **Laws:** 1, 2, 3, 6, 7, 9, 10, 11, 13, 14 (`docs/mission.md`). Brief `B30` (`2026-11-10-briefs-for-ruling.md`).
 **Date:** 2026-11-10
-**Status:** ruled as predicted (Eric, 2026-11-10)
+**Status:** ruled as predicted (Eric, 2026-11-10); sharpened by `D44` (adding scoped conditional delegations, law-epoch separation across `AmendLaw`, replay prevention, and footprint commutativity).
 
 ## Context
 
