@@ -5,6 +5,34 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-18: red CI lane fixed at its cause (`D45`: the Quint target), battery reporting, MIT licence, and three briefs awaiting ruling (`B34`–`B36`)
+
+## Where
+
+- `main`. `tools/battery` PASS twice on this tree: once with `solc` 0.8.24, `forge`, `quint` 0.33.1, and `z3` on `PATH` and `CHARTER_REQUIRE_EXTERNAL_TOOLS=1` (what CI runs; `projections` 13 passed, "external tools: all four ran"), once without them (PASS, naming the four it skipped). Zero build warnings.
+- The external tools are **not installed on the maintainer's machine**; for this session they were unpacked into a scratch directory. Until they are installed, the local battery cannot see what CI sees, and now says so on its last line.
+
+## What was wrong, and what landed
+
+1. **CI had failed on every run** (eight of eight, through `de90413`), and the log named no case. The case was `d42-differential-targets`: `quint parse` rejected the emitted model (`QNT000`, a comma written inside a `//` comment). Local runs were green because `tools/differential-targets-check` skipped a missing tool silently.
+2. **`D45`: the Quint target was hollow, not just unparseable.** Every action's effect was `clock_now' = clock_now`, unhandled terms became `true`, and `--verify-output` reported an "imported" counterexample that Charter's own explorer had found. `src/Charter/Project/QuintTarget.lean` is rewritten over the Solidity target's guard IR: real guards and effects, `CHR035` for what the model cannot carry, and a lockstep differential against the evaluator. See the decision for the evidence. `docs/targets.md` row updated; spec `017` unchanged.
+3. **Battery reporting (`tools/battery`, `tools/projections-check`, `tools/differential-targets-check`).** A failing step prints its failing cases and their output under the `FAIL` line. A missing external tool prints `SKIP`, is named in the projections summary and on the battery's last line, and is a failure under `CHARTER_REQUIRE_EXTERNAL_TOOLS=1` / `--require-external-tools`.
+4. **CI (`.github/workflows/differential-targets.yml`).** The battery runs with the tools required. The differential step runs whenever the build succeeded, so another gate's failure cannot hide it.
+5. **`LICENSE`: MIT** (Eric, 2026-11-18), noted in `README.md`.
+
+## Open, awaiting Eric (`docs/meetings/2026-11-18-briefs-for-ruling.md`)
+
+- **`B34`** A declared `Document` that cannot be read is a warning and `check` says `ok … 0 warning(s)`; `build` signs a `partial` bundle; `generate` checks no provenance. Needs a ruling and the words of `012.7`.
+- **`B35`** `017.4` names `importQuintTrace`; it does not exist. Implement (one new flag) or reword.
+- **`B36`** `charter verify --backend smt` runs `z3` and discards its answer; the emitted encoding asserts `(or (not (not true)))` for any program. The old CI step for it ran a nonexistent fixture under `|| true`; the step now runs the real T30 fixture and states what it does not check.
+
+## Not done
+
+- The generated Solidity header still names `Project/SolidityIR.lean` (a path into the engine, `Law 11`); the Quint header no longer names one. Not changed here: the Law 11 gate passes and it is a separate change.
+- Rejection messages that reach the Quint target from `compileSolExpr` speak of the Solidity guard.
+
+---
+
 # Handoff — 2026-11-10 (2): `D44` (`B32`–`B33`) — Epoch-versioned & replay-safe bundles, scoped conditional delegations, `charter diff --impact`, stakeholder duty deltas / `GetActorBrief`, `UCON` mid-saga re-verification, and branching `charter repl`
 
 ## Where

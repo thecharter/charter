@@ -41,11 +41,19 @@ jobs:
           node-version: "20"
       - run: npm install -g @informalsystems/quint
 
-      - name: Build Charter and run full PR-tier battery
-        run: |
-          lake build
-          tools/battery --no-build
+      - name: Build Charter
+        id: build
+        run: lake build
 
+      # The battery's projections gate runs the external tools too; here a missing tool is a
+      # failure, never a skip. A failing step prints its failing cases.
+      - name: Run full PR-tier battery
+        env:
+          CHARTER_REQUIRE_EXTERNAL_TOOLS: "1"
+        run: tools/battery --no-build
+
+      # Runs whenever the build succeeded, so a failure elsewhere in the battery cannot hide
+      # whether the emitted Solidity compiles and the emitted Quint models typecheck.
       - name: Run external-solver differential suite (solc, forge, quint, z3)
-        run: |
-          tools/differential-targets-check --require-external-tools
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: tools/differential-targets-check --require-external-tools
