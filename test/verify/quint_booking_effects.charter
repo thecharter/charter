@@ -1,0 +1,38 @@
+// Quint target (017.4): every kind of state change the model carries, checked step by step
+// against the evaluator in both modes: create with and without expiry, terminate, a create
+// that beats a terminate in the same act, an integer component, an event, a held starting
+// state, and an act that occurs but is void.
+//! explore-domain: duration = 2
+Fact member Identified by Ann, Bob.
+Fact slot Identified by 1, 2.
+Fact booked Identified by member * slot.
+Fact hall Identified by Main.
+Fact frozen Identified by hall.
+Fact warned Identified by member.
+
+Act book Actor member Related to slot
+  Holds when !(Exists member': booked(member', slot))
+  Valid when !frozen(Main)
+  Creates booked(member, slot) For 2.
+
+Act cancel Actor member Related to slot
+  Holds when booked(member, slot)
+  Terminates booked(member, slot)
+  Creates warned(member).
+
+Act renew Actor member Related to slot
+  Holds when booked(member, slot)
+  Terminates booked(member, slot)
+  Creates booked(member, slot).
+
+Event freeze
+  Creates frozen(Main).
+
+Event thaw
+  Terminates frozen(Main).
+
+Invariant one-member-per-slot
+  When (Forall slot, member, member':
+          !(booked(member, slot) && booked(member', slot) && member != member')).
+
+book(Ann, 1).

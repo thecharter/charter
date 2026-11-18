@@ -151,10 +151,12 @@ def generateCommand (args : List String) : IO UInt32 := do
     else sol
     writeOrPrint textOut vSum?
   | "quint" | "veil" =>
-    let qMod := Project.compileQuintModule stem opts.mode cfg
+    let qMod ← match Project.compileQuintModule stem opts.mode dirs.exploreMenu cfg with
+      | .ok m => pure m
+      | .error d => IO.eprintln (d.withFile file).render; return 1
     let qSrc := Project.renderQuintModule qMod
     let vSum? ← if opts.verifyOutput then
-      match Project.verifyAndReplayQuintTarget qMod qSrc cfg dirs.exploreMenu 3 with
+      match Project.verifyQuintTarget qMod qSrc cfg dirs.exploreMenu 3 with
       | .ok s => pure (some s)
       | .error e => IO.eprintln s!"FAIL {file} [{tgt}]: {e}"; return 1
     else pure none

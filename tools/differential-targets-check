@@ -2,9 +2,12 @@
 # Differential & Law-10 Assurance Check for Emitted Targets (`D42`, `#66`, `Law 9`, `Law 10`):
 # - Always checks strict Law-10 assurance metadata (`proved` vs `checked` vs `advisoryOnly`),
 #   real compiled Solidity guard predicates & storage writes, and 3-way `SolidityIR`/`GuardIR`/`Eval` parity.
-# - When `solc`/`forge`, `quint`, and `z3` are installed (or required via `--require-external-tools` in CI),
-#   compiles emitted `.sol` with `solc` + runs Foundry EVM differential trace tests, checks `.qnt` with
-#   `quint`, and exercises `z3` SMT verification.
+# - With `solc`, `forge`, `quint`, and `z3` installed: compiles the emitted `.sol` with `solc`, runs a
+#   Foundry EVM differential trace test, typechecks the emitted `.qnt` models with `quint` and
+#   requires its simulator to reach the same verdict as Charter on each, and runs `z3`.
+# - A tool that is not installed is never skipped quietly: each missing one prints a `SKIP` line
+#   and the last line names them. Under `--require-external-tools` (or
+#   `CHARTER_REQUIRE_EXTERNAL_TOOLS=1`, which CI sets) a missing tool is a failure.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,16 +16,26 @@ B=".lake/build/bin/charter"
 
 require_ext=0
 [ "${1:-}" = "--require-external-tools" ] && require_ext=1
+[ "${CHARTER_REQUIRE_EXTERNAL_TOOLS:-0}" = "1" ] && require_ext=1
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+skipped=""
+
+missing() { # tool: a failure when the tools are required, a named SKIP otherwise
+  if [ "$require_ext" -eq 1 ]; then
+    echo "FAIL differential-targets-check: $1 is required (--require-external-tools) and is not installed"
+    exit 1
+  fi
+  echo "SKIP $1: not installed, so its checks did not run"
+  skipped="$skipped $1"
+}
 
 # 1. Verify strict Law-10 JSON tags on all three targets (never a 5th tag!)
 "$B" generate --target solidity --verify-output --out json -o "$tmp/sol.json" test/verify/safe_fenced_lease.charter >/dev/null
 "$B" generate --target quint --mode adversarial --verify-output --out json -o "$tmp/qnt.json" test/verify/safe_fenced_lease.charter >/dev/null
 "$B" generate --target prompt --actor accountant --out json -o "$tmp/prm.json" Examples/TreasuryMandate/treasury-mandate.charter >/dev/null
 "$B" generate --target solidity --verify-output -o "$tmp/SafeFencedLease.sol" test/verify/safe_fenced_lease.charter >/dev/null
-"$B" generate --target quint --mode adversarial --verify-output -o "$tmp/SafeFencedLease.qnt" test/verify/safe_fenced_lease.charter >/dev/null
 
 python3 -I - "$tmp" <<'PY'
 import json, pathlib, sys
@@ -36,6 +49,10 @@ assert sol_meta["surfaceAssurance"] == "checked" and sol_meta["surfaceAssurance"
 
 qnt_meta = json.loads((tmp / "qnt.json").read_text(encoding="utf-8"))
 assert qnt_meta["surfaceAssurance"] == "checked" and qnt_meta["surfaceAssurance"] in valid_law10
+qnt_src = qnt_meta["quint"]
+assert "held_active_lease.union(Set((p1_node, p0_host)))" in qnt_src, "expected the grant-lease effect in the Quint model"
+assert "clock_now + 3" in qnt_src, "expected the half-open expiry write in the Quint model"
+assert "live_active_lease((p1_node, \"H1\"))" in qnt_src, "expected the compiled `Valid when` guard in the Quint model"
 
 prm_meta = json.loads((tmp / "prm.json").read_text(encoding="utf-8"))
 assert prm_meta["authoritative"] is False
@@ -51,8 +68,8 @@ echo "ok   law10-target-tags-and-compiled-solidity-predicates"
 if command -v solc >/dev/null 2>&1; then
   solc --bin --abi "$tmp/SafeFencedLease.sol" -o "$tmp/solc_out" >/dev/null
   echo "ok   solc-bytecode-and-abi-compiled"
-elif [ "$require_ext" -eq 1 ]; then
-  echo "FAIL differential-targets-check: solc required under --require-external-tools"; exit 1
+else
+  missing solc
 fi
 
 if command -v forge >/dev/null 2>&1; then
@@ -93,20 +110,57 @@ contract DifferentialGuardTest {
 SOL
   (cd "$tmp/foundry" && forge test -vv >/dev/null)
   echo "ok   foundry-evm-differential-trace"
-elif [ "$require_ext" -eq 1 ]; then
-  echo "FAIL differential-targets-check: forge required under --require-external-tools"; exit 1
+else
+  missing forge
 fi
+
+# The emitted Quint models must typecheck, and Quint's own simulator must reach the verdict
+# Charter reaches on each: no violation where Charter's explorer is safe, a violation of the
+# invariant where it finds a counterexample (`T32`).
+quint_verdict() { # label, mode, want (safe|violated), file
+  local label="$1" mode="$2" want="$3" file="$4"
+  local qnt="$tmp/$label.qnt"
+  "$B" generate --target quint --mode "$mode" --verify-output -o "$qnt" "$file" >/dev/null
+  quint typecheck "$qnt" >/dev/null
+  local out st=0
+  out=$(quint run "$qnt" --backend=typescript --seed=0x1 --invariant=charter_invariants \
+          --max-steps=3 --max-samples=2000 2>&1) || st=$?
+  if [ "$want" = safe ] && [ "$st" -eq 0 ] && printf '%s\n' "$out" | grep -q 'No violation found'; then return 0; fi
+  if [ "$want" = violated ] && [ "$st" -ne 0 ] && printf '%s\n' "$out" | grep -q 'Invariant violated'; then return 0; fi
+  echo "FAIL quint-verdict $label [$mode]: Charter says $want, quint exited $st with:"
+  printf '%s\n' "$out" | tail -20 | sed 's/^/     /'
+  exit 1
+}
 
 if command -v quint >/dev/null 2>&1; then
-  quint parse "$tmp/SafeFencedLease.qnt" >/dev/null
-  echo "ok   quint-parse-verified"
-elif [ "$require_ext" -eq 1 ]; then
-  echo "FAIL differential-targets-check: quint required under --require-external-tools"; exit 1
+  quint_verdict safe_lease_adversarial adversarial safe     test/verify/safe_fenced_lease.charter
+  quint_verdict safe_lease_lawful      lawful      safe     test/verify/safe_fenced_lease.charter
+  quint_verdict partition_lease        adversarial violated test/verify/t26_t27_partition_lease.charter
+  quint_verdict booking_adversarial    adversarial violated test/verify/quint_booking_effects.charter
+  quint_verdict booking_lawful         lawful      safe     test/verify/quint_booking_effects.charter
+  echo "ok   quint-typechecks-and-simulator-verdicts-match (5 models)"
+else
+  missing quint
 fi
 
+# z3 is run on the emitted bounded encoding and Charter's replay must find the T30 exploit.
+# This checks that z3 is invoked and returns in time; Charter does not yet read z3's answer
+# (HANDOFF.md, 2026-11-18), so this is not a differential check of the encoding.
 if command -v z3 >/dev/null 2>&1; then
-  "$B" verify --backend smt --depth 3 test/verify/t30_smt_symbolic_threshold.charter >/dev/null || true
-  echo "ok   z3-smt-solver-invoked"
-elif [ "$require_ext" -eq 1 ]; then
-  echo "FAIL differential-targets-check: z3 required under --require-external-tools"; exit 1
+  z3_st=0
+  z3_out=$("$B" verify --backend smt --solver z3 --depth 2 test/verify/t30_smt_symbolic_int.charter 2>&1) || z3_st=$?
+  if [ "$z3_st" -ne 1 ] || ! printf '%s\n' "$z3_out" | grep -q 'smt/z3+native-replay.*invariant cap-preserved violated in 2 step'; then
+    echo "FAIL z3-invoked-and-replay-finds-t30: exit $z3_st"
+    printf '%s\n' "$z3_out" | sed 's/^/     /'
+    exit 1
+  fi
+  echo "ok   z3-invoked-and-replay-finds-t30"
+else
+  missing z3
+fi
+
+if [ -n "$skipped" ]; then
+  echo "external tools not installed, checks SKIPPED:$skipped"
+else
+  echo "external tools: all four ran"
 fi

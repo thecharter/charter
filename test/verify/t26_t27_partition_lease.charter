@@ -1,6 +1,7 @@
 // T26 & T27 (RFC §14): partitioned node records a local revocation unseen by the coordinator,
 // while an unfenced new-host activation races the unexpired lease -> double-authority violation!
 //! explore-domain: duration = 1, 3
+//! explore-domain: actor = "Coord"
 Fact node Identified by N1, N2.
 Fact active-lease Identified by node.
 Fact local-revoked Identified by node.

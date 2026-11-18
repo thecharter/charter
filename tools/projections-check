@@ -7,6 +7,7 @@ B=.lake/build/bin/charter
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fail=0; pass=0
+failed=""
 
 check_case() { # label, want_exit, pattern, cmd...
   local label="$1"; local want="$2"; local pat="$3"; shift 3
@@ -18,7 +19,9 @@ check_case() { # label, want_exit, pattern, cmd...
     echo "FAIL $label (expected exit $want matching '$pat'; got $st)"
     printf '%s\n' "$out" | sed 's/^/     /'
     fail=$((fail+1))
+    failed="$failed $label"
   fi
+  last_out="$out"
 }
 
 # 1. T33: Solidity + ABI generation & differential server parity on finite-domain protocol
@@ -32,24 +35,46 @@ check_case "t33-json-abi-verified" 0 "validated Solidity AST \+ ABI" \
 check_case "chr035-solidity-rejects-unbounded-quantifier" 1 "CHR035" \
   "$B" generate --target solidity Examples/TreasuryMandate/treasury-mandate.charter
 
-# 3. T32: Quint protocol target on safe fenced lease (holds) AND broken partition lease (imports & replays counterexample in Charter.Eval!)
-check_case "t32-quint-safe-fenced-lease" 0 "validated Quint module.*reachable state\(s\) safe" \
+# 3. T32: the Quint model agrees with the evaluator step by step: safe where the explorer is
+#    safe, and on a counterexample both reach the violation on the same trace
+check_case "t32-quint-safe-fenced-lease" 0 "validated Quint module.*reachable state\(s\) safe, [1-9][0-9]* step\(s\) agree with the evaluator" \
   "$B" generate --target quint --mode adversarial --verify-output -o "$tmp/safe_lease.qnt" test/verify/safe_fenced_lease.charter
 
-check_case "t32-quint-partition-counterexample-replayed" 0 "confirmed imported counterexample for .single-authority-fenced. in .* via Charter\.Eval replay" \
+check_case "t32-quint-partition-counterexample-on-model-and-evaluator" 0 "confirmed counterexample for .single-authority-fenced. in 1 step\(s\) on both the model and the evaluator" \
   "$B" generate --target quint --mode adversarial --verify-output -o "$tmp/partition_lease.qnt" test/verify/t26_t27_partition_lease.charter
+
+check_case "t32-quint-effects-adversarial" 0 "confirmed counterexample for .one-member-per-slot. in 1 step\(s\) on both the model and the evaluator" \
+  "$B" generate --target quint --mode adversarial --verify-output -o "$tmp/booking_adv.qnt" test/verify/quint_booking_effects.charter
+
+check_case "t32-quint-effects-lawful" 0 "validated Quint module.*reachable state\(s\) safe, [1-9][0-9]* step\(s\) agree with the evaluator" \
+  "$B" generate --target quint --mode lawful --verify-output -o "$tmp/booking_law.qnt" test/verify/quint_booking_effects.charter
+
+# 3b. 017.2 on the Quint target: what the model cannot carry is refused by name, never
+#     emitted as `true` or left out (three-valued rules, an open component, a non-`Always` property)
+check_case "chr035-quint-rejects-evidenced-and-defeasible" 1 "CHR035: quint target rejects this program" \
+  "$B" generate --target quint Examples/TreasuryMandate/treasury-mandate.charter
+
+check_case "chr035-quint-rejects-component-without-candidates" 1 "CHR035: quint target rejects .unauthorized-drain.: its component .int. is not enumerable; name its candidates with .//! explore-domain: int" \
+  "$B" generate --target quint --mode adversarial test/verify/t29_missing_menu_inconclusive.charter
+
+check_case "chr035-quint-rejects-non-always-property" 1 "CHR035: quint target rejects property " \
+  "$B" generate --target quint test/verify/t31b_temporal_valid.charter
 
 # 4. Advisory prompt stamped authoritative=false / advisoryOnly=true (§9.7)
 check_case "prompt-advisory-stamp" 0 '"authoritative": false' \
   "$B" generate --target prompt --actor accountant --out json Examples/TreasuryMandate/treasury-mandate.charter
 
-# 5. D42 (#66): Law-10 target tags + compiled SolidityIR guard predicates & optional external solvers
+# 5. D42 (#66): Law-10 target tags + compiled SolidityIR guard predicates, and the external tools
+#    (solc, forge, quint, z3) where installed; the ones that are not are named on the last line
 check_case "d42-differential-targets" 0 "ok   law10-target-tags-and-compiled-solidity-predicates" \
   bash tools/differential-targets-check
+ext=$(printf '%s\n' "$last_out" | tail -1)
 
 # 6. #77: Settlement contract target succeeds on large specifications rejected by `--target solidity` (e.g. TreasuryMandate & PSA)
 check_case "t77-settlement-target-large-spec" 0 "validated SettlementIR" \
   "$B" generate --target settlement --verify-output -o "$tmp/TreasuryMandateSettlement.sol" Examples/TreasuryMandate/treasury-mandate.charter
 
-echo "$pass passed, $fail failed, $((pass+fail)) total"
+summary="$pass passed, $fail failed, $((pass+fail)) total"
+[ $fail -ne 0 ] && summary="$summary (failed:$failed)"
+echo "$summary; $ext"
 [ $fail -eq 0 ]
