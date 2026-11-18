@@ -248,4 +248,6 @@ Charter is built on eFLINT. Please cite the work it rests on as well:
 }
 ```
 
+License: MIT ([`LICENSE`](LICENSE)).
+
 Author: Eric Hartford. ORCID: [0009-0002-0159-2127](https://orcid.org/0009-0002-0159-2127). Google Scholar: [SwrFngsAAAAJ](https://scholar.google.com/citations?user=SwrFngsAAAAJ&hl=en). Contact: eric@quixi.ai.
