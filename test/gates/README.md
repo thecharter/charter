@@ -7,6 +7,8 @@ once the fixture format lands.
 
 | Law | Gate | What fails it |
 |---|---|---|
+| 8 | `delivery-provenance.sh` | a command that exits 0 or prints `ok` over a declared `Document` it cannot read; `build` or `generate` delivering coverage `partial`; a delivered output that does not carry its classification (`D46`) |
+| 14 | `law14-sentences-resolve.sh` | a backticked flag in `docs/spec/`, `docs/targets.md`, or `docs/claims.json` that the binary does not parse; a backticked code identifier there with no definition in `src/` or `lib/`; a command in CI's scripts that ends in an unconditional pass (`D49`) |
 | 10 | `law10-trust-grep.sh` | `sorry`, `native_decide`, or `axiom` anywhere in `src/Charter/`, `Examples/`, `src/Main.lean`, `src/Charter.lean`, `Examples.lean` |
 | 11 | `law11-no-engine-in-output.sh` | any author-visible output of the binary (`help`, `check`, `verify`, `sim`, `dsl`, `views`, an unknown command, a missing file, a file that does not parse) naming the engine: `lean`, `lake`, `olean`, `tactic`, `sorry` |
 | 13 | `law13-leak-grep.sh` | the language layer `src/Charter/` naming an example program (`sovereign`, `psa`, `commons`) |

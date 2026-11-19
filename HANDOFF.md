@@ -5,6 +5,36 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-18 (2): `B34`–`B36` ruled and landed (`D46`–`D48`), the Law 14 gate (`D49`), and two new briefs (`B37`, `B38`)
+
+## Where
+
+- `main`. `tools/battery` PASS with `solc` 0.8.24, `forge`, and `quint` 0.33.1 on `PATH` and `CHARTER_REQUIRE_EXTERNAL_TOOLS=1`. Zero build warnings. `z3` is no longer one of the external tools: nothing runs it (`D47`).
+- The external tools are still not installed on the maintainer's machine; they were run from a scratch directory.
+
+## What landed
+
+1. **`D46` (`B34`, `215fd8a`).** A declared `Document` that cannot be read, or does not match its `SHA256` pin, is `CHR053`, raised in the loader (`Cli/Load.lean`, `checkDeclaredDocuments`) so every command reports it. `build` and `generate` refuse coverage `partial` (`CHR054`, `Cli/Provenance.lean`, `deliveryProvenance`) and stamp `complete` or `illustrative` into the manifest, the summary line, and the text of every projection. `check`'s warning count includes provenance warnings. Spec `012.7` carries Eric's words. Gate: `test/gates/delivery-provenance.sh`.
+2. **`D47` (`B36`, `5e21ed6`).** The `smt` backend ran no solver. It is `--backend thresholds` (`Verify/Thresholds.lean`); `--backend smt` is a usage error; `--solver`, `--emit-smt`, the `z3` invocation, and `TVIR.emitSmtLib2` are deleted. A program that couples integer variables is always `INCONCLUSIVE` (`test/verify/d47_coupled_arithmetic.charter` shows why: the threshold witnesses miss a real violation). The exit criterion for a solver-backed backend is in the decision.
+3. **`017.4` reworded (`31e2794`), then `D48` (`B35`, `f9d982c`).** `charter verify --replay <trace.itf.json> <file.charter>` (`Project/QuintReplay.lean`) performs a trace Quint recorded with `--mbt --out-itf` through the evaluator and requires the verdicts to agree. CI replays both Quint counterexamples; `tools/verify-check` replays a committed trace with no external tool.
+4. **`D49`.** `test/gates/law14-sentences-resolve.sh`: backticked flags and code identifiers in `docs/spec/`, `docs/targets.md`, and `docs/claims.json` resolve in `src/`; no CI command ends in an unconditional pass. It checks first that it can fail.
+
+## Open, awaiting Eric
+
+- **The words of `017.4`** are an agent's draft (both commits). `D48` quotes the replay sentence for blessing. In `012.7` the parenthesis naming `CHR054` is the implementer's.
+- **`B37`** Five paths in `docs/spec/` name nothing in the tree; three are sentences the tree contradicts or has overtaken (`lib/lean/Modules/`, `test/diagnostics/`, `tools/spec-inventory`).
+- **`B38`** `charter verify` accepts `--require-complete` and `--report-assumptions` and ignores them.
+
+## Not done
+
+- `--target abi` cannot carry the provenance stamp in its own text (a JSON ABI is a bare array); it is on the summary line and in the `--out json` wrapper (`D46`, cost accepted).
+- The replay compares verdicts, not intermediate states, and does not compare the trace's initial state with the program's (`D48`).
+- `docs/rfc.md` still describes an SMT backend as design intent; left for Eric (`D47`).
+- From the section below, unchanged: the Solidity header names `Project/SolidityIR.lean`; Quint rejections that come from `compileSolExpr` speak of the Solidity guard.
+- **Process slips this session, for the record:** two files were edited in place by script (`Cli/Load.lean` by a heredoc, `Cli/Run.lean` by `sed -i`), against `AGENTS.md`. The resulting diffs were read and are what the commits show; the rest of the session used the edit tool.
+
+---
+
 # Handoff — 2026-11-18: red CI lane fixed at its cause (`D45`: the Quint target), battery reporting, MIT licence, and three briefs awaiting ruling (`B34`–`B36`)
 
 ## Where

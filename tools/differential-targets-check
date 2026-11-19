@@ -130,9 +130,14 @@ quint_verdict() { # label, mode, want (safe|violated), file
   if [ "$want" = violated ] && [ "$st" -ne 0 ] && printf '%s\n' "$out" | grep -q 'Invariant violated'; then
     # 017.4 (`D48`): the counterexample Quint found on the emitted text is performed through
     # the evaluator, which must report a violation at its end too.
-    local itf="$tmp/$label.itf.json" rout rst=0
+    local itf="$tmp/$label.itf.json" rout rst=0 qst=0
+    # quint exits non-zero because it found the violation; what must exist is the trace
     quint run "$qnt" --backend=typescript --seed=0x1 --invariant=charter_invariants \
-      --max-steps=3 --max-samples=2000 --mbt --out-itf="$itf" >/dev/null 2>&1 || true
+      --max-steps=3 --max-samples=2000 --mbt --out-itf="$itf" >/dev/null 2>&1 || qst=$?
+    if [ "$qst" -eq 0 ] || [ ! -s "$itf" ]; then
+      echo "FAIL quint-trace-replay $label [$mode]: quint exited $qst and wrote no counterexample trace"
+      exit 1
+    fi
     rout=$("$B" verify --mode "$mode" --replay "$itf" "$file" 2>&1) || rst=$?
     if [ "$rst" -eq 0 ] && printf '%s\n' "$rout" | grep -q 'both report a violation'; then return 0; fi
     echo "FAIL quint-trace-replay $label [$mode]: Quint's counterexample does not replay through the evaluator (exit $rst):"

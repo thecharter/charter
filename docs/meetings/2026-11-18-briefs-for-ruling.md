@@ -35,3 +35,33 @@
 - **Prediction.** A now, 70%; B is its own work package.
 - **Needs from Eric.** The ruling.
 - **Ruled (Eric, 2026-11-18): A, sharpened.** The backend is renamed `thresholds`, `--backend smt` is refused, and the solver code and flags are deleted; B has an exit criterion. `D47`.
+
+---
+
+# Briefs for rulings, 2026-11-18, second batch (`B37`–`B38`)
+
+**Status:** awaiting ruling (Eric). Nothing below is implemented. Both were found while writing the `D49` gate.
+
+## B37. Five paths named in `docs/spec/` name nothing in the tree (`Law 14`, `D49`)
+
+- **What is there today (scanned, then read).**
+  - `015.5`: a module's properties are "to be proved in `lib/lean/Modules/` by name … (D8; pending `prove`, 013.4)". There is no `lib/lean/`. The module proofs that exist are in `src/Charter/Modules/` (`ExitAndVoice.lean` and eight others).
+  - `docs/spec/diagnostics.md`: "`test/diagnostics/` holds one fixture per code once the fixture format (plan §5.4) lands". There is no `test/diagnostics/`; diagnostics are tested by `//! expect-error:` fixtures under `test/spec/`.
+  - `docs/spec/README.md`: the grammar chapter "is checked against the parser by `tools/spec-inventory` once it exists". It exists, as `test/gates/spec-inventory.sh`.
+  - `docs/spec/README.md` changelog (2026-10-25) and the dated finding in `013`: `Examples/AutonomousCommons/commons.eflint` (now `commons.charter`) and `Examples/SovereignAgency/law3.eflint` (no longer in this repository). These are dated entries about what was true then.
+- **What the references do.** Not a language question; none consulted.
+- **What the spec and mission say.** `Law 14`: a claim that nothing checks is not yet true. `AGENTS.md`: "no reverting spec text to match code"; only Eric rewords the spec.
+- **Mission fit.** `Law 14`. The first three are sentences about the present or the future that the tree contradicts or has overtaken. The dated two are history and honest as history.
+- **Options.** **A.** Reword the first three to what is there (`src/Charter/Modules/`; `test/spec/` fixtures with `//! expect-error:`; `test/gates/spec-inventory.sh`), leave the dated entries, and extend the `D49` gate to backticked paths, skipping lines that carry a date. **B.** Leave the text; no path check.
+- **Prediction.** A, 80%.
+- **Needs from Eric.** The ruling and the words for `015.5`, where D8's `lib/lean/` and the tree disagree about where module proofs live.
+
+## B38. `charter verify` accepts `--require-complete` and `--report-assumptions` and ignores them (`AGENTS.md` "No silent fallbacks", `Law 10`)
+
+- **What happens today (read).** `src/Charter/Cli/Verify.lean`, `parseVerifyArgs`: both flags are consumed and change nothing. `charter explore --require-complete` is real (it sets `requireComplete`). `docs/rfc.md` (line 1401) shows `charter verify --backend smt --report-assumptions test/symbolic/`. Neither flag is in `docs/spec/`, so the `D49` gate does not see them.
+- **What the references do.** Quint's CLI rejects unknown options (`.reference/quint/quint/src/cli.ts:488`, yargs `.strict()`).
+- **What the spec and mission say.** `AGENTS.md`: "When the tool cannot do something correctly, fail loudly with a diagnostic and a non-zero exit."
+- **Mission fit.** `Law 10`. A user who passes `--require-complete` to `verify` believes an inconclusive result will fail the command. It will not, beyond what `verify` already does.
+- **Options.** **A.** Delete both from `verify`; passing either is `unknown flag` (exit 2). **B.** Implement them: `--require-complete` turns `INCONCLUSIVE` (exit 3) into a failure (exit 1); `--report-assumptions` prints each certificate's assumptions.
+- **Prediction.** A, 75%: exit 3 already distinguishes inconclusive, and `--out json` already carries the assumptions.
+- **Needs from Eric.** The ruling.
