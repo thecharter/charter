@@ -8,16 +8,16 @@ on:
 
 jobs:
   differential-targets:
-    name: Battery + EVM (solc/Foundry), Quint, and Z3 Differential Suite
+    name: Battery + EVM (solc/Foundry) and Quint Differential Suite
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Z3 and system dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y z3 python3 curl git
+          sudo apt-get install -y python3 curl git
 
       - name: Install pinned toolchain via elan
         run: |
@@ -54,6 +54,6 @@ jobs:
 
       # Runs whenever the build succeeded, so a failure elsewhere in the battery cannot hide
       # whether the emitted Solidity compiles and the emitted Quint models typecheck.
-      - name: Run external-solver differential suite (solc, forge, quint, z3)
+      - name: Run external-tool differential suite (solc, forge, quint)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/differential-targets-check --require-external-tools

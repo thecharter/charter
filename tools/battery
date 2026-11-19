@@ -7,7 +7,7 @@
 # Exit status is non-zero if any step fails. Each step prints one `ok`/`FAIL` line
 # and keeps its full output under out/battery/ for inspection. A step that fails also
 # prints its failing cases, so the reader of a log (CI's included) never has to rebuild
-# to learn which one it was. External-tool checks (solc, forge, quint, z3) that did not
+# to learn which one it was. External-tool checks (solc, forge, quint) that did not
 # run because a tool is not installed are named on the last line; they fail outright when
 # CHARTER_REQUIRE_EXTERNAL_TOOLS=1, which CI sets.
 set -u

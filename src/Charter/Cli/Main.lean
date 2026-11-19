@@ -43,7 +43,7 @@ def helpText : String :=
   "  test     <file.charter | dir> ...       run scenarios, provenance checks, and invariant exploration\n" ++
   "  analyze  <file.charter> ...             check dead rules, unranked overlaps, and generated scenarios\n" ++
   "  explore  [flags] <file.charter> ...     explore lawful, adversarial, or mixed state spaces\n" ++
-  "  verify   [flags] <file.charter> ...     verify invariants & temporal properties (finite, smt, inductive)\n" ++
+  "  verify   [flags] <file.charter> ...     verify invariants & temporal properties (finite, thresholds, inductive)\n" ++
   "  explain  <expr> <file.charter> [flags]  emit audience-scoped ReasonGraph with counterfactuals\n" ++
   "  plan     <act> <file.charter> [flags]   find shortest lawful and valid sequence enabling <act>\n" ++
   "  bundle   <subcommand> [flags] [<file>]  sign statements, synthesize, or verify justification bundles\n" ++

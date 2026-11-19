@@ -1,0 +1,16 @@
+// D47: a guard that couples two integer variables (`amount + credit`) is outside the fragment
+// where threshold witnesses cover every case. The witnesses around 100 and 1000000 never
+// pair `amount = 1000001` with `credit = -1000001`, which passes the guard and breaks the
+// invariant. `charter verify --backend thresholds` must say INCONCLUSIVE (exit 3), not ok.
+Fact actor_t Identified by Eve.
+Fact amount Identified by Int.
+Placeholder credit For amount.
+Fact moved Identified by amount.
+
+Act move Actor actor_t Related to amount, credit
+  Holds when amount + credit < 100
+  Valid when amount + credit < 100
+  Creates moved(amount).
+
+Invariant moved-stays-small
+  When !(Exists moved: moved.amount > 1000000).

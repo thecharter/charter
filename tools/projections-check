@@ -65,7 +65,7 @@ check_case "prompt-advisory-stamp" 0 '"authoritative": false' \
   "$B" generate --target prompt --actor accountant --out json Examples/TreasuryMandate/treasury-mandate.charter
 
 # 5. D42 (#66): Law-10 target tags + compiled SolidityIR guard predicates, and the external tools
-#    (solc, forge, quint, z3) where installed; the ones that are not are named on the last line
+#    (solc, forge, quint) where installed; the ones that are not are named on the last line
 check_case "d42-differential-targets" 0 "ok   law10-target-tags-and-compiled-solidity-predicates" \
   bash tools/differential-targets-check
 ext=$(printf '%s\n' "$last_out" | tail -1)

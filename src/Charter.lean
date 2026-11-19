@@ -57,7 +57,7 @@ import Charter.Verify.Reduction
 import Charter.Verify.Explorer
 import Charter.Verify.Temporal
 import Charter.Verify.TVIR
-import Charter.Verify.Smt
+import Charter.Verify.Thresholds
 import Charter.Verify.ArithLemmas
 import Charter.Verify.InductiveArith
 import Charter.Prove.Run

@@ -2,9 +2,10 @@
 # Differential & Law-10 Assurance Check for Emitted Targets (`D42`, `#66`, `Law 9`, `Law 10`):
 # - Always checks strict Law-10 assurance metadata (`proved` vs `checked` vs `advisoryOnly`),
 #   real compiled Solidity guard predicates & storage writes, and 3-way `SolidityIR`/`GuardIR`/`Eval` parity.
-# - With `solc`, `forge`, `quint`, and `z3` installed: compiles the emitted `.sol` with `solc`, runs a
+# - With `solc`, `forge`, and `quint` installed: compiles the emitted `.sol` with `solc`, runs a
 #   Foundry EVM differential trace test, typechecks the emitted `.qnt` models with `quint` and
-#   requires its simulator to reach the same verdict as Charter on each, and runs `z3`.
+#   requires its simulator to reach the same verdict as Charter on each. No SMT solver is run:
+#   Charter has no solver-backed backend (`D47`).
 # - A tool that is not installed is never skipped quietly: each missing one prints a `SKIP` line
 #   and the last line names them. Under `--require-external-tools` (or
 #   `CHARTER_REQUIRE_EXTERNAL_TOOLS=1`, which CI sets) a missing tool is a failure.
@@ -64,7 +65,7 @@ assert 'require((false || false), "CharterGuard: guard rejected")' in sol_src, "
 PY
 echo "ok   law10-target-tags-and-compiled-solidity-predicates"
 
-# 2. External tool differential checks (`solc`, `forge`, `quint`, `z3`)
+# 2. External tool differential checks (`solc`, `forge`, `quint`)
 if command -v solc >/dev/null 2>&1; then
   solc --bin --abi "$tmp/SafeFencedLease.sol" -o "$tmp/solc_out" >/dev/null
   echo "ok   solc-bytecode-and-abi-compiled"
@@ -143,24 +144,8 @@ else
   missing quint
 fi
 
-# z3 is run on the emitted bounded encoding and Charter's replay must find the T30 exploit.
-# This checks that z3 is invoked and returns in time; Charter does not yet read z3's answer
-# (HANDOFF.md, 2026-11-18), so this is not a differential check of the encoding.
-if command -v z3 >/dev/null 2>&1; then
-  z3_st=0
-  z3_out=$("$B" verify --backend smt --solver z3 --depth 2 test/verify/t30_smt_symbolic_int.charter 2>&1) || z3_st=$?
-  if [ "$z3_st" -ne 1 ] || ! printf '%s\n' "$z3_out" | grep -q 'smt/z3+native-replay.*invariant cap-preserved violated in 2 step'; then
-    echo "FAIL z3-invoked-and-replay-finds-t30: exit $z3_st"
-    printf '%s\n' "$z3_out" | sed 's/^/     /'
-    exit 1
-  fi
-  echo "ok   z3-invoked-and-replay-finds-t30"
-else
-  missing z3
-fi
-
 if [ -n "$skipped" ]; then
   echo "external tools not installed, checks SKIPPED:$skipped"
 else
-  echo "external tools: all four ran"
+  echo "external tools: all three ran"
 fi

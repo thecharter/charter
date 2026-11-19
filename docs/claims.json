@@ -368,7 +368,7 @@
       "scope": "concrete-trace",
       "artifact": "src/Charter/Project/GuardTarget.lean",
       "symbol": "tools/differential-targets-check",
-      "summary": "Emitted Solidity (.sol + ABI) and Quint (.qnt) surface texts carry Law-10 checked tags and are validated via 3-way stateful differential traces, counterexample replay, and CI solc/Foundry + quint + z3 execution (D42, #66)."
+      "summary": "Emitted Solidity (.sol + ABI) and Quint (.qnt) surface texts carry Law-10 checked tags and are validated via 3-way stateful differential traces for Solidity, a step-by-step differential of the Quint model against the evaluator (D45), and CI solc/Foundry compilation and execution plus quint typechecking and simulator verdicts (D42, #66). No SMT solver takes part (D47)."
     },
     {
       "id": "bundle.reflect_author_no_impersonation",

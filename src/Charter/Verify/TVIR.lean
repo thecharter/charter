@@ -1,11 +1,13 @@
 import Charter.Core.State
 
 /-!
-# Charter.Verify.TVIR — Symbolic Transition Verification IR & Threshold Extractor (`G2.4`)
+# Charter.Verify.TVIR — Threshold extractor (`G2.4`)
 
-Extracts symbolic integer thresholds and action schemas from a `Spec` (`CIR`) and renders
-bounded unrollings as standard SMT-LIB2 (`QF_LIA`) scripts for external solvers (`z3`/`cvc5`)
-as well as boundary candidate menus for native symbolic verification (`Verify.Smt`).
+Extracts the integer constants of a `Spec` (`CIR`) as boundary candidates for the bounded
+threshold search (`Verify.Thresholds`), and decides whether a program stays within the
+fragment where those candidates cover every case (one variable compared with a constant).
+It renders nothing for an external solver: the encoding it used to emit constrained
+nothing and was deleted (`D47`).
 -/
 
 namespace Charter.Verify.TVIR
@@ -149,64 +151,5 @@ def isSingleThresholdFragment (spec : Spec) : Bool :=
                                          | .amendOp _ => true)
       | .fact _ => true
     dOk && cOk && fOk && kOk
-
-def smtIdent (s : String) : String :=
-  String.mk (s.toList.map fun c => if c.isAlphanum || c == '_' then c else '_')
-
-def renderSmtTerm : Term → String
-  | .boolLit true => "true"
-  | .boolLit false => "false"
-  | .intLit i => if i < 0 then s!"(- {-i})" else toString i
-  | .currentTime => "time_cur"
-  | .not a => s!"(not {renderSmtTerm a})"
-  | .and a b => s!"(and {renderSmtTerm a} {renderSmtTerm b})"
-  | .or a b => s!"(or {renderSmtTerm a} {renderSmtTerm b})"
-  | .leq a b => s!"(<= {renderSmtTerm a} {renderSmtTerm b})"
-  | .le a b => s!"(< {renderSmtTerm a} {renderSmtTerm b})"
-  | .geq a b => s!"(>= {renderSmtTerm a} {renderSmtTerm b})"
-  | .ge a b => s!"(> {renderSmtTerm a} {renderSmtTerm b})"
-  | .add a b => s!"(+ {renderSmtTerm a} {renderSmtTerm b})"
-  | .sub a b => s!"(- {renderSmtTerm a} {renderSmtTerm b})"
-  | .mult a b => s!"(* {renderSmtTerm a} {renderSmtTerm b})"
-  | .eq a b => s!"(= {renderSmtTerm a} {renderSmtTerm b})"
-  | .neq a b => s!"(not (= {renderSmtTerm a} {renderSmtTerm b}))"
-  | .untag a | .tag a _ => renderSmtTerm a
-  | .ref x => smtIdent (toString x)
-  | .present (.app d _) => s!"holds_{smtIdent d}"
-  | .present (.ref x) => s!"holds_{smtIdent (toString x)}"
-  | _ => "true"
-
-/-- Emit a well-formed SMT-LIB2 (`QF_LIA`) bounded model-checking query for horizon `depth`. -/
-def emitSmtLib2 (spec : Spec) (state : State) (depth : Nat) : String :=
-  let hdr := [
-    "; Charter TVIR bounded model-checking encoding (G2.4)",
-    "(set-logic QF_LIA)",
-    "(set-option :produce-models true)",
-    "(declare-const time_0 Int)",
-    s!"(assert (= time_0 {state.time}))"
-  ]
-  let stepDecls := (List.range depth).flatMap fun k => [
-    s!"(declare-const step_act_{k} Int)",
-    s!"(declare-const step_arg_int_{k} Int)",
-    s!"(declare-const time_{k + 1} Int)",
-    s!"(assert (>= time_{k + 1} time_{k}))"
-  ]
-  let factDecls := spec.decls.filterMap fun (d, t) =>
-    match t.kind with
-    | .fact _ => some s!"(declare-const holds_{smtIdent d} Bool)"
-    | _ => none
-  let invDisj := match spec.invariants with
-    | [] => ["(assert false)"]
-    | invs =>
-      let terms := invs.map fun inv =>
-        match spec.findDecl inv with
-        | some t =>
-          match t.derivation with
-          | .holdsWhen cond :: _ => s!"(not {renderSmtTerm cond})"
-          | _ => s!"(not holds_{smtIdent inv})"
-        | none => s!"(not holds_{smtIdent inv})"
-      [s!"(assert (or {" ".intercalate terms}))"]
-  let footer := ["(check-sat)", "(exit)"]
-  "\n".intercalate (hdr ++ stepDecls ++ factDecls ++ invDisj ++ footer) ++ "\n"
 
 end Charter.Verify.TVIR

@@ -8,8 +8,9 @@ import Lean.Data.Json
 1. Verifies every entry in `claims.json` points to an existing artifact file containing the
    declared theorem/gate symbol;
 2. Verifies every file digest in `<dir>/charter.lock` matches its current SHA-256 content hash;
-3. Reports availability of optional external verifiers (`z3`, `cvc5`, `solc`, `quint`) truthfully
-   with zero proof-engine terminology (`Law 11`).
+3. Reports whether the external tools the repository's differential checks use (`solc`,
+   `quint`) are on `PATH`. No command of `charter` runs an SMT solver (`D47`), so none is
+   reported.
 -/
 
 namespace Charter.Cli
@@ -115,8 +116,6 @@ def doctorCommand (args : List String) : IO UInt32 := do
     let (lv, lprobs) ← verifyLockDir ld
     lockedChecked := lv
     issues := issues ++ lprobs
-  let hasZ3 ← checkToolOnPath "z3"
-  let hasCvc5 ← checkToolOnPath "cvc5"
   let hasSolc ← checkToolOnPath "solc"
   let hasQuint ← checkToolOnPath "quint"
   let ok := issues.isEmpty
@@ -128,8 +127,6 @@ def doctorCommand (args : List String) : IO UInt32 := do
       ("verifiedLockEntries", Json.num lockedChecked),
       ("issues", Json.arr (issues.map Json.str).toArray),
       ("optionalBackends", Json.mkObj [
-        ("z3", Json.bool hasZ3),
-        ("cvc5", Json.bool hasCvc5),
         ("solc", Json.bool hasSolc),
         ("quint", Json.bool hasQuint)
       ])
@@ -139,7 +136,7 @@ def doctorCommand (args : List String) : IO UInt32 := do
     if !ok then
       for iss in issues do IO.eprintln s!"FAIL doctor: {iss}"
     else
-      IO.println s!"ok   charter doctor (claims verified: {claimsChecked}, lock entries verified: {lockedChecked}; optional solvers: z3={hasZ3}, cvc5={hasCvc5}, solc={hasSolc}, quint={hasQuint})"
+      IO.println s!"ok   charter doctor (claims verified: {claimsChecked}, lock entries verified: {lockedChecked}; external tools: solc={hasSolc}, quint={hasQuint})"
   if !ok && (opts.failOnUnbacked || opts.lockDir.isSome || opts.claimsPath.isSome) then return 1
   return 0
 

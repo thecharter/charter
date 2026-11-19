@@ -65,7 +65,7 @@ Charter enforces strict truth-in-advertising on formal claims ([`docs/assurance-
 
 - **`proved` (`live-evaluator`)**: Kernel-checked Lean 4 theorems over the live `CIR` evaluator and core (`evalPhrase_sound`, `evalPhrase_complete`, `replay_trace_deterministic`, `frame_preservation_unrestricted`, `saturateStratum_least_prefixpoint`, `evalCompiledDAG_eq_spec`, `redactForAudience_preserves_verdict`, `cir_ratchet_trajectory_preserves_entrenched`, `cir_guard_step_correspondence`, `sha256_nist_vectors`, `hmacSha256_rfc4231_vector`) with zero `sorry`, zero `native_decide`, and zero extra axioms.
 - **`decided` (`concrete-trace`)**: Per-program checkpointed theorems emitted by `charter prove`, discharged in Lean's kernel via `kernel_rfl` with **zero axioms (`{}`)**.
-- **`checked` (`concrete-trace` / `bounded-exhaustive`)**: Runtime scenario evaluation, `charter explore` (`lawful`/`adversarial`/`mixed`), `charter verify` (`finite`/`smt`), Law 8 SHA-256 provenance checks, target syntax/differential parity checks (`charter generate --verify-output`), `charter-server replay`, and 196-file eFLINT corpus regression.
+- **`checked` (`concrete-trace` / `bounded-exhaustive`)**: Runtime scenario evaluation, `charter explore` (`lawful`/`adversarial`/`mixed`), `charter verify` (`finite`/`thresholds`), Law 8 SHA-256 provenance checks, target syntax/differential parity checks (`charter generate --verify-output`), `charter-server replay`, and 196-file eFLINT corpus regression.
 - **`assumed`**: Explicitly enumerated external hypotheses (clock monotonicity, oracle/custodian honesty, gateway enforcement of capability tokens, fairness premises on unbounded liveness properties).
 
 ---
@@ -153,7 +153,7 @@ src/
     Resolve/                       Static resolution (`Static.lean`) & assurance gates (`AssuranceGates.lean`)
     Core/                          `Term`, `Spec` (`DomMap`), `State`, `Provenance`, evidence, defaults, amendment
     Eval/                          Stratified fixpoint saturation, judged rules, transitions, & kernel proofs (`Properties.lean`)
-    Verify/                        Explorer, temporal properties, and the finite/SMT/inductive back ends
+    Verify/                        Explorer, temporal properties, and the finite/thresholds/inductive back ends
     Prove/                         Checkpointed proof generator & capped kernel runner (`charter prove`)
     Project/                       Solidity/JSON ABI guard, Quint, and prompt targets; `charter diff`
     Artifact/                      SHA-256, HMAC, and the signed content-addressed artifact

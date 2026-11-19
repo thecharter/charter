@@ -1,7 +1,8 @@
 // T30 (RFC §14): symbolic unbounded `Int` exploit requiring 2 steps:
-// 1. At `--depth 1` with `--min-depth 2`, SMT reports INCONCLUSIVE (exit 3) rather than pass.
-// 2. At `--depth 2`, SMT extracts threshold witness `10000` (without any `explore-domain` menu!),
-//    replays natively in `Charter.Eval`, and finds the exact 2-step exploit!
+// 1. At `--depth 1` with `--min-depth 2`, `--backend thresholds` reports INCONCLUSIVE (exit 3)
+//    rather than pass.
+// 2. At `--depth 2`, it takes the witness `10000` from the guard's constant (no
+//    `explore-domain` menu) and finds the 2-step exploit by ordinary evaluation.
 Fact actor_t Identified by Eve.
 Fact staged Identified by int.
 Fact drained Identified by int.

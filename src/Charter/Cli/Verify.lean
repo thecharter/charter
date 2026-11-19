@@ -1,19 +1,20 @@
 import Charter.Cli.Prove
 import Charter.Cli.Explore
 import Charter.Verify.Temporal
-import Charter.Verify.Smt
+import Charter.Verify.Thresholds
 import Charter.Verify.InductiveArith
 
 /-!
-# Charter.Cli.Verify — `charter verify [--backend finite|smt|inductive] ... <file.charter>` (`G2.5`)
+# Charter.Cli.Verify — `charter verify [--backend finite|thresholds|inductive] ... <file.charter>` (`G2.5`)
 
 Unified formal verification subcommand (`Law 11`-clean — never exposes engine names in flags
 or user output):
 - `--backend finite`: checks all `Invariant` and temporal `Property` obligations across
   `Verify.Explorer` and `Verify.Temporal` (`T26`, `T27`, `T31`).
-- `--backend smt`: lowers unbounded `Int`/`Duration` actions via `Verify.TVIR`, emits optional
-  `QF_LIA` SMT-LIB2 (`--emit-smt`), runs external `z3`/`cvc5` or built-in threshold BMC with
-  mandatory native `Charter.Eval` counterexample replay, and enforces `--min-depth` (`T30`).
+- `--backend thresholds`: bounded search over witnesses `c - 1, c, c + 1` around every integer
+  constant of the program, for acts with unbounded `Int`/`Duration` arguments
+  (`Verify.Thresholds`); enforces `--min-depth` (`T30`) and is inconclusive on arithmetic that
+  couples variables. No solver takes part. `--backend smt` is refused: not implemented (`D47`).
 - `--backend inductive`: generates and checks base-case + transition-step kernel obligations,
   reporting `proved` only when universally closed over enumerable state spaces and `inconclusive`
   (exit `3`) when unbounded inductive lemmas are required.
@@ -25,24 +26,22 @@ open Lean (Json)
 
 inductive VerifyBackend
   | finite
-  | smt
+  | thresholds
   | inductive_
   deriving Repr, DecidableEq, Inhabited
 
 def VerifyBackend.name : VerifyBackend → String
   | .finite => "finite"
-  | .smt => "smt"
+  | .thresholds => "thresholds"
   | .inductive_ => "inductive"
 
 structure VerifyCliOpts where
   backend     : VerifyBackend := .finite
   mode        : Verify.ExploreMode := .adversarial
-  solver      : Verify.Smt.SolverChoice := .auto
   depth       : Nat := 3
   minDepth    : Option Nat := none
   timeoutSec  : Nat := 60
   stateCap    : Nat := 5000
-  emitSmt     : Option String := none
   mustProve   : Bool := false
   json        : Bool := false
   regime      : Option String := none
@@ -53,10 +52,12 @@ structure VerifyCliOpts where
 def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliOpts
   | [], o => .ok { o with files := o.files.reverse }
   | "--backend" :: "finite" :: rest, o => parseVerifyArgs rest { o with backend := .finite }
-  | "--backend" :: "smt" :: rest, o => parseVerifyArgs rest { o with backend := .smt }
+  | "--backend" :: "thresholds" :: rest, o => parseVerifyArgs rest { o with backend := .thresholds }
   | "--backend" :: "inductive" :: rest, o => parseVerifyArgs rest { o with backend := .inductive_ }
-  | "--backend" :: b :: _, _ => .error s!"--backend takes finite, smt, or inductive, not {b}"
-  | ["--backend"], _ => .error "--backend needs finite, smt, or inductive"
+  | "--backend" :: "smt" :: _, _ =>
+    .error "--backend smt is not implemented: no solver-backed backend exists yet. `--backend thresholds` runs the bounded search over integer threshold witnesses that this name used to select"
+  | "--backend" :: b :: _, _ => .error s!"--backend takes finite, thresholds, or inductive, not {b}"
+  | ["--backend"], _ => .error "--backend needs finite, thresholds, or inductive"
   | "--mode" :: "lawful" :: rest, o => parseVerifyArgs rest { o with mode := .lawful }
   | "--mode" :: "adversarial" :: rest, o => parseVerifyArgs rest { o with mode := .adversarial }
   | "--mode" :: "mixed" :: rest, o => parseVerifyArgs rest { o with mode := .mixed [] }
@@ -66,11 +67,6 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
     let xs := actors.splitOn "," |>.map String.trim |>.filter (!·.isEmpty)
     parseVerifyArgs rest { o with mode := .mixed xs }
   | ["--adversary"], _ => .error "--adversary needs actor names"
-  | "--solver" :: "auto" :: rest, o => parseVerifyArgs rest { o with solver := .auto }
-  | "--solver" :: "z3" :: rest, o => parseVerifyArgs rest { o with solver := .z3 }
-  | "--solver" :: "cvc5" :: rest, o => parseVerifyArgs rest { o with solver := .cvc5 }
-  | "--solver" :: s :: _, _ => .error s!"--solver takes auto, z3, or cvc5, not {s}"
-  | ["--solver"], _ => .error "--solver needs auto, z3, or cvc5"
   | "--depth" :: n :: rest, o => match n.toNat? with
     | some k => parseVerifyArgs rest { o with depth := k }
     | none => .error s!"--depth needs a non-negative integer, not {n}"
@@ -85,8 +81,6 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
     | some k => parseVerifyArgs rest { o with timeoutSec := k }
     | none => .error s!"--time needs seconds, not {n}"
   | ["--time"], _ => .error "--time needs seconds"
-  | "--emit-smt" :: p :: rest, o => parseVerifyArgs rest { o with emitSmt := some p }
-  | ["--emit-smt"], _ => .error "--emit-smt needs an output path"
   | "--must-prove" :: rest, o => parseVerifyArgs rest { o with mustProve := true }
   | "--regime" :: r :: rest, o => parseVerifyArgs rest { o with regime := some r }
   | ["--regime"], _ => .error "--regime needs a regime name"
@@ -221,13 +215,13 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
         emitVerifyCert o.json cert s!"INCONCLUSIVE {path}: property {name}: {why}"
         incCount := incCount + 1
     return (okCount, failCount, incCount)
-  | .smt =>
-    match ← Verify.Smt.checkBounded o.solver o.mode o.depth o.minDepth o.timeoutSec o.stateCap menu o.emitSmt cfg with
-    | .counterexample cx solverUsed =>
+  | .thresholds =>
+    match Verify.Thresholds.checkBounded o.mode o.depth o.minDepth o.stateCap menu cfg with
+    | .counterexample cx =>
       if o.json then IO.println cx.toJson.compress
       else
         let trS := ", ".intercalate (cx.trace.map Verify.ActionStep.pp)
-        IO.println s!"FAIL {path} [smt/{solverUsed}]: invariant {cx.invariant} violated in {cx.trace.length} step(s): {trS}"
+        IO.println s!"FAIL {path} [thresholds]: invariant {cx.invariant} violated in {cx.trace.length} step(s): {trS}"
       return (0, 1, 0)
     | .inconclusive why =>
       let cert : Artifact.ClaimCertificate := {
@@ -235,25 +229,25 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
         scope := .boundedExhaustive o.depth, completion := .inconclusive,
         lawSha256 := some lawHash, file := path, note := why
       }
-      emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [smt]: {why}"
+      emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [thresholds]: {why}"
       return (0, 0, 1)
-    | .unsatBounded k vis solverUsed =>
+    | .safeBounded k vis =>
       if o.mustProve then
         let cert : Artifact.ClaimCertificate := {
           claim := "invariants", about := "invariants", verdict := none, assurance := .checked,
           scope := .boundedExhaustive k, completion := .inconclusive,
           lawSha256 := some lawHash, file := path,
-          note := s!"SMT BMC at depth {k} is bounded (`checked`), not universally `proved` (--must-prove)"
+          note := s!"the threshold search at depth {k} is bounded (`checked`), not universally `proved` (--must-prove)"
         }
-        emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [smt/{solverUsed}]: {cert.note}"
+        emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [thresholds]: {cert.note}"
         return (0, 0, 1)
       else
         let cert : Artifact.ClaimCertificate := {
           claim := "invariants", about := "invariants", verdict := some true, assurance := .checked,
           scope := .boundedExhaustive k, completion := .complete,
-          lawSha256 := some lawHash, file := path, note := s!"solver={solverUsed}, visited={vis}"
+          lawSha256 := some lawHash, file := path, note := s!"backend=thresholds, visited={vis}"
         }
-        emitVerifyCert o.json cert s!"ok   {path} [smt/{solverUsed}]: no counterexample up to depth {k} ({vis} symbolic state(s))"
+        emitVerifyCert o.json cert s!"ok   {path} [thresholds]: no counterexample up to depth {k} ({vis} state(s) over threshold witnesses)"
         return (1, 0, 0)
   | .inductive_ =>
     let requestedInvs := if o.invariants.isEmpty then cfg.spec.invariants else o.invariants
@@ -369,7 +363,7 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
 /-- `charter verify [flags] <file.charter> ...`
 Exit status: `0` when verified, `1` on counterexample/error, `2` on usage error, `3` on inconclusive. -/
 def verifyCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter verify [--backend finite|smt|inductive] [--mode lawful|adversarial|mixed] [--depth <N>] [--min-depth <N>] [--time <S>] [--emit-smt <file.smt2>] [--must-prove] [--out json] <file.charter> ..."
+  let usage := "usage: charter verify [--backend finite|thresholds|inductive] [--mode lawful|adversarial|mixed] [--depth <N>] [--min-depth <N>] [--time <S>] [--must-prove] [--out json] <file.charter> ..."
   match parseVerifyArgs args {} with
   | .error e => IO.eprintln s!"charter verify: {e}\n{usage}"; return 2
   | .ok o =>

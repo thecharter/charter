@@ -16,7 +16,7 @@
 | `charter lsp` | run the stdio JSON-RPC Language Server Protocol (`initialize`, live `CHR` diagnostics, `hover`, `definition` to Markdown clauses, `formatting`) (`G5.3`) |
 | `charter doctor [--claims <path>] [--fail-on-unbacked] [--lock [<dir>]]` | verify `claims.json` theorem/gate backing, `charter.lock` SHA-256 digests, and optional external solver availability (`G5.4`) |
 | `charter explore [flags] <file.charter> …` | explore `lawful`, `adversarial`, or `mixed` state spaces with counterexample minimization and `--regime` overlays (`G2.1`, `G3.5`) |
-| `charter verify [flags] <file.charter> …` | verify `Invariant`s and temporal `Property`s via `--backend finite \| smt \| inductive` (`D20`, `G2.3`–`G2.5`) |
+| `charter verify [flags] <file.charter> …` | verify `Invariant`s and temporal `Property`s via `--backend finite \| thresholds \| inductive` (`D20`, `G2.3`–`G2.5`) |
 | `charter run <file.charter>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
 | `charter test <files or directories> …` | eFLINT's test-mode criterion per file (011.10): no error and every claim holds; runs `Scenario` blocks (011.11), the provenance checks (012), and `--explore N` (013.2); honours the `//!` directives (`expect-error`, `expect-warning`, `known-issue`, `expect-failed-claims`, `explore`, `explore-domain`) |
 | `charter repl [file.eflint]` | load the file, then run phrases typed at `charter> ` with indexed state-history navigation and inspection (`:display`, `:options`, `:duties`, `:history`, `:revert`, `:jump <n>`, `:help`, `:quit`) (`D44`) |

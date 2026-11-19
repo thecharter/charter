@@ -33,3 +33,4 @@
 - **Options.** **A.** Label the backend for what it is (threshold-menu search with native replay), stop invoking the solver, and keep `--emit-smt` off until the encoding means something. **B.** Write the bounded encoding over the guard IR (arrays for facts keyed by integers) and make the verdict the conjunction of the solver's answer and the replay.
 - **Prediction.** A now, 70%; B is its own work package.
 - **Needs from Eric.** The ruling.
+- **Ruled (Eric, 2026-11-18): A, sharpened.** The backend is renamed `thresholds`, `--backend smt` is refused, and the solver code and flags are deleted; B has an exit criterion. `D47`.

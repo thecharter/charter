@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verification suite runner for Gate G2 (`Verify/Explorer`, `Verify/Reduction`, `Verify/Temporal`, `Verify/Smt`).
+# Verification suite runner for Gate G2 (`Verify/Explorer`, `Verify/Reduction`, `Verify/Temporal`, `Verify/Thresholds`).
 set -u
 cd "$(dirname "$0")/.." || exit 2
 B=.lake/build/bin/charter
@@ -44,14 +44,27 @@ check_case "safe-fenced-lease-inductive-closed" 0 "^proved " \
 check_case "t26-t27-partition-race-caught" 1 "invariant single-authority-fenced violated" \
   "$B" verify --backend finite --mode adversarial --depth 2 test/verify/t26_t27_partition_lease.charter
 
-# 5. T30: SMT bound smaller than exploit horizon reports INCONCLUSIVE; depth 2 finds symbolic `10000` trace!
-check_case "t30-smt-shallow-bound-inconclusive" 3 "^INCONCLUSIVE.*T30" \
-  "$B" verify --backend smt --depth 1 --min-depth 2 test/verify/t30_smt_symbolic_int.charter
+# 5. T30: a bound smaller than the exploit horizon reports INCONCLUSIVE; depth 2 finds the
+#    `10000` threshold trace with no explore-domain menu.
+check_case "t30-thresholds-shallow-bound-inconclusive" 3 "^INCONCLUSIVE.*\[thresholds\].*T30" \
+  "$B" verify --backend thresholds --depth 1 --min-depth 2 test/verify/t30_threshold_symbolic_int.charter
 
-tmp_smt="out/_t30_emitted.smt2"
-check_case "t30-smt-discovers-symbolic-threshold-exploit" 1 "invariant cap-preserved violated in 2 step" \
-  "$B" verify --backend smt --depth 2 --emit-smt "$tmp_smt" test/verify/t30_smt_symbolic_int.charter
-rm -f "$tmp_smt"
+check_case "t30-thresholds-discovers-threshold-exploit" 1 "\[thresholds\]: invariant cap-preserved violated in 2 step" \
+  "$B" verify --backend thresholds --depth 2 test/verify/t30_threshold_symbolic_int.charter
+
+# 5b. D47: there is no solver-backed backend. `--backend smt` and the flags that pretended to
+#     drive a solver are usage errors (exit 2), never a fall-through to another search.
+check_case "d47-backend-smt-is-not-implemented" 2 "backend smt is not implemented" \
+  "$B" verify --backend smt --depth 2 test/verify/t30_threshold_symbolic_int.charter
+check_case "d47-solver-flag-is-gone" 2 "unknown flag --solver" \
+  "$B" verify --backend thresholds --solver z3 test/verify/t30_threshold_symbolic_int.charter
+check_case "d47-emit-smt-flag-is-gone" 2 "unknown flag --emit-smt" \
+  "$B" verify --backend thresholds --emit-smt out/_x.smt2 test/verify/t30_threshold_symbolic_int.charter
+
+# 5c. D47: arithmetic that couples two integer variables is outside the threshold fragment
+#     and is INCONCLUSIVE, with or without any tool on PATH.
+check_case "d47-coupled-arithmetic-inconclusive" 3 "^INCONCLUSIVE.*\[thresholds\].*couples integer variables" \
+  "$B" verify --backend thresholds --depth 1 test/verify/d47_coupled_arithmetic.charter
 
 # 6. T31: Unbounded liveness without fairness assumption is INCONCLUSIVE (exit 3)
 check_case "t31-unbounded-liveness-requires-fairness" 3 "^INCONCLUSIVE.*T31" \

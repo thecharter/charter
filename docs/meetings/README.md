@@ -6,6 +6,7 @@ Briefs awaiting or supporting rulings: `2026-10-22-briefs-for-ruling.md` (B1–B
 
 ## Decisions
 
+- [D47 — The `smt` backend ran no solver: renamed `thresholds`, `--backend smt` refused as not implemented, solver code and flags deleted; exit criterion set for a real one (`B36`, corrects `D20`)](2026-11-18-D47-the-smt-backend-is-renamed-thresholds-and-its-solver-code-deleted.md)
 - [D46 — A declared `Document` that cannot be read is an error (`CHR053`); `build` and `generate` deliver `complete` or `illustrative`, stamped in every output, and never `partial` (`CHR054`; `B34`, `012.7`)](2026-11-18-D46-an-unreadable-document-is-an-error-and-delivery-is-never-partial.md)
 - [D45 — The Quint target carries a rule's guard and effects or refuses the program with `CHR035`; it never writes `true` for what it cannot say (`D28`, `017.2`; delegated)](2026-11-18-D45-quint-target-carries-the-rules-or-refuses.md)
 - [D44 — Epoch-versioned & replay-safe bundles, scoped conditional delegations, `charter diff --impact`, stakeholder duty deltas / `GetActorBrief`, `UCON` mid-saga re-verification, and branching `charter repl` (`B32`, `018.2`, `018.5`)](2026-11-10-D44-epoch-bundles-conditional-delegation-impact-diff-and-ucon.md)
