@@ -89,8 +89,6 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
   | ["--replay"], _ => .error "--replay needs a trace file"
   | "--regime" :: r :: rest, o => parseVerifyArgs rest { o with regime := some r }
   | ["--regime"], _ => .error "--regime needs a regime name"
-  | "--require-complete" :: rest, o => parseVerifyArgs rest o
-  | "--report-assumptions" :: rest, o => parseVerifyArgs rest o
   | "--out" :: "json" :: rest, o => parseVerifyArgs rest { o with json := true }
   | "--out" :: "text" :: rest, o => parseVerifyArgs rest o
   | "--out" :: other :: _, _ => .error s!"--out takes json or text, not {other}"
@@ -107,8 +105,9 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
 def emitVerifyCert (jsonMode : Bool) (cert : Artifact.ClaimCertificate) (textLine : String) : IO Unit :=
   if jsonMode then IO.println cert.toJson.compress else IO.println textLine
 
-/-- Verify one file under the selected backend; returns `(passed, failed, inconclusive)`. -/
-def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) := do
+/-- Load a program for `verify`: its starting configuration and candidate menu, or `none`
+after printing the diagnostics that stopped it. -/
+def loadVerifyConfig (o : VerifyCliOpts) (path : String) : IO (Option (Config × Explore.Menu)) := do
   let src ← try IO.FS.readFile path catch _ => pure ""
   let dirs := readDirectives src
   let menu := dirs.exploreMenu ++ o.menu
@@ -117,7 +116,7 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
   for d in loadDiags do
     if o.json then IO.println (diagJson d).compress else IO.eprintln d.render
     if d.isError then errs := errs + 1
-  if errs > 0 then return (0, 1, 0)
+  if errs > 0 then return none
   let mut cfg : Config := {}
   for l in items do
     match l.item.val with
@@ -132,45 +131,64 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
           if d.isError then errs := errs + 1
         | _ => pure ()
       cfg := cfg'
-  if errs > 0 then return (0, 1, 0)
+  if errs > 0 then return none
   if let some regName := o.regime then
     match applyRegimeOverlay cfg regName with
     | .ok cfgR => cfg := cfgR
     | .error e =>
       IO.eprintln s!"{path}: error CHR003: {e}"
-      return (0, 1, 0)
+      return none
+  return some (cfg, menu)
+
+/-- `charter verify --replay <trace> <file.charter>` (017.4, `D48`): a trace Quint found is
+performed through the evaluator and the verdicts must agree. Exit status: `0` when it replays
+and agrees; `1` for a finding (the verdicts disagree, or the evaluator does not offer or
+cannot take a recorded step in the given mode) or a program that does not load; `2` when the
+input is not a trace of this program's model (unreadable, malformed, another program's). -/
+def replayOneFile (o : VerifyCliOpts) (path tracePath : String) : IO UInt32 := do
+  let report (tag : String) (kind : String) (why : String) : IO Unit :=
+    if o.json then
+      IO.println (Json.mkObj [("kind", "replay"), ("file", Json.str path), ("trace", Json.str tracePath),
+        ("ok", Json.bool false), ("failure", Json.str kind), ("reason", Json.str why)]).compress
+    else IO.println s!"{tag} {path} [replay]: {why}"
+  let read ← try (Except.ok <$> IO.FS.readFile tracePath) catch e => pure (Except.error (toString e))
+  let raw ← match read with
+    | .ok s => pure s
+    | .error e =>
+      report "INPUT" "input" s!"cannot read {tracePath} ({e})"
+      return (2 : UInt32)
+  let traceJson ← match Json.parse raw with
+    | .ok j => pure j
+    | .error e =>
+      report "INPUT" "input" s!"{tracePath} is not JSON ({e})"
+      return (2 : UInt32)
+  let some (cfg, menu) ← loadVerifyConfig o path | return 1
   let lawHash := Artifact.sha256String (reprStr cfg.spec)
-  if let some tracePath := o.replay then
-    -- 017.4 (`D48`): a trace Quint found is performed through the evaluator; the verdicts must agree
-    let failLine (why : String) : IO (Nat × Nat × Nat) := do
-      if o.json then
-        IO.println (Json.mkObj [("kind", "replay"), ("file", Json.str path), ("trace", Json.str tracePath),
-          ("ok", Json.bool false), ("reason", Json.str why)]).compress
-      else IO.println s!"FAIL {path} [replay]: {why}"
-      return (0, 1, 0)
-    let raw ← try IO.FS.readFile tracePath catch e => return (← failLine s!"cannot read {tracePath} ({e})")
-    let traceJson ← match Json.parse raw with
-      | .ok j => pure j
-      | .error e => return (← failLine s!"{tracePath} is not JSON ({e})")
-    let stem := ((System.FilePath.mk path).fileStem).getD "Institution"
-    let qMod ← match Project.compileQuintModule stem o.mode menu cfg with
-      | .ok m => pure m
-      | .error d =>
-        if o.json then IO.println (diagJson (d.withFile path)).compress else IO.eprintln (d.withFile path).render
-        return (0, 1, 0)
-    match Project.replayQuintTrace qMod menu cfg traceJson with
-    | .error e => return (← failLine e)
-    | .ok r =>
-      let verdict := if r.violated.isEmpty then "neither Quint nor the evaluator reports a violation"
-        else s!"Quint and the evaluator both report a violation ({", ".intercalate r.violated})"
-      let cert : Artifact.ClaimCertificate := {
-        claim := "replay", about := "trace-replay", verdict := some true, assurance := .checked,
-        scope := .concreteTrace, completion := .complete,
-        lawSha256 := some lawHash, file := path,
-        note := s!"trace={tracePath}, steps={r.steps.length}, violated={", ".intercalate r.violated}"
-      }
-      emitVerifyCert o.json cert s!"ok   {path} [replay]: {tracePath} replays through the evaluator in {r.steps.length} step(s) ({o.mode.name} mode); {verdict}"
-      return (1, 0, 0)
+  let stem := ((System.FilePath.mk path).fileStem).getD "Institution"
+  let qMod ← match Project.compileQuintModule stem o.mode menu cfg with
+    | .ok m => pure m
+    | .error d =>
+      if o.json then IO.println (diagJson (d.withFile path)).compress else IO.eprintln (d.withFile path).render
+      return 1
+  match Project.replayQuintTrace qMod menu cfg traceJson with
+  | .error (.input why) => report "INPUT" "input" why; return 2
+  | .error (.finding why) => report "FAIL" "finding" why; return 1
+  | .ok r =>
+    let verdict := if r.violated.isEmpty then "neither Quint nor the evaluator reports a violation"
+      else s!"Quint and the evaluator both report a violation ({", ".intercalate r.violated})"
+    let cert : Artifact.ClaimCertificate := {
+      claim := "replay", about := "trace-replay", verdict := some true, assurance := .checked,
+      scope := .concreteTrace, completion := .complete,
+      lawSha256 := some lawHash, file := path,
+      note := s!"trace={tracePath}, steps={r.steps.length}, violated={", ".intercalate r.violated}"
+    }
+    emitVerifyCert o.json cert s!"ok   {path} [replay]: {tracePath} replays through the evaluator in {r.steps.length} step(s) ({o.mode.name} mode); {verdict}"
+    return 0
+
+/-- Verify one file under the selected backend; returns `(passed, failed, inconclusive)`. -/
+def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) := do
+  let some (cfg, menu) ← loadVerifyConfig o path | return (0, 1, 0)
+  let lawHash := Artifact.sha256String (reprStr cfg.spec)
   match o.backend with
   | .finite =>
     let mut okCount := 0
@@ -406,6 +424,7 @@ def verifyCommand (args : List String) : IO UInt32 := do
     if o.files.isEmpty then IO.eprintln usage; return 2
     if o.replay.isSome && o.files.length != 1 then
       IO.eprintln s!"charter verify: --replay replays one trace against one program, not {o.files.length}\n{usage}"; return 2
+    if let (some tracePath, [f]) := (o.replay, o.files) then return (← replayOneFile o f tracePath)
     let mut okTotal := 0
     let mut failTotal := 0
     let mut incTotal := 0

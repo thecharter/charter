@@ -29,6 +29,15 @@ structure QuintReplayResult where
   /-- The invariants the evaluator reports violated after the last step. -/
   violated       : List DomId
 
+/-- Why a replay did not pass. An `input` failure says the file is not a trace of this
+program's model (malformed, recorded without `--mbt`, another program's): a usage error. A
+`finding` says the trace is one, and the evaluator disagrees with it: a step it does not
+offer or cannot take in the given mode, or a different verdict at the end. That is a fact
+about the emitted model or the trace and is what the replay exists to report. -/
+inductive ReplayFailure where
+  | input (why : String)
+  | finding (why : String)
+
 /-- An ITF integer: a JSON number or `{"#bigint": "n"}`. -/
 def itfInt? (j : Json) : Option Int :=
   match j with
@@ -40,47 +49,47 @@ def itfInt? (j : Json) : Option Int :=
 
 /-- The value Quint picked for one parameter of an action, which must be one of the
 candidates the model was generated with. -/
-def itfPick (key : String) (p : QuintParam) (picks : Json) : Except String SolVal := do
+def itfPick (key : String) (p : QuintParam) (picks : Json) : Except ReplayFailure SolVal := do
   let entry ← match picks.getObjVal? key with
     | .ok e => pure e
-    | .error _ => throw s!"the trace records no pick `{key}`"
+    | .error _ => throw <| .input s!"the trace records no pick `{key}`"
   match entry.getObjValAs? String "tag" with
   | .ok "Some" => pure ()
-  | _ => throw s!"pick `{key}` is not set in the state that takes its action"
+  | _ => throw <| .input s!"pick `{key}` is not set in the state that takes its action"
   let v ← match entry.getObjVal? "value" with
     | .ok v => pure v
-    | .error _ => throw s!"pick `{key}` has no value"
+    | .error _ => throw <| .input s!"pick `{key}` has no value"
   let sv ← match p.ty with
     | "str" =>
       match v.getStr? with
       | .ok s => pure (SolVal.bytes32 s)
-      | .error _ => throw s!"pick `{key}` is not a string: {v.compress}"
+      | .error _ => throw <| .input s!"pick `{key}` is not a string: {v.compress}"
     | "int" =>
       match itfInt? v with
       | some i => pure (SolVal.int i)
-      | none => throw s!"pick `{key}` is not an integer: {v.compress}"
-    | other => throw s!"pick `{key}` has a parameter type the replay does not read: {other}"
+      | none => throw <| .input s!"pick `{key}` is not an integer: {v.compress}"
+    | other => throw <| .input s!"pick `{key}` has a parameter type the replay does not read: {other}"
   if !p.cands.contains sv then
-    throw s!"pick `{key}` = {v.compress} is not one of the candidates the model of this program offers for `{p.dom}`"
+    throw <| .input s!"pick `{key}` = {v.compress} is not one of the candidates the model of this program offers for `{p.dom}`"
   pure sv
 
 /-- Replay an ITF trace recorded with `--mbt` against the evaluator. `m` is the model of the
 same program in the same mode; a step the evaluator does not offer in that mode fails the
 replay, as does a verdict the two do not share. -/
 def replayQuintTrace (m : QuintModule) (menu : Explore.Menu) (cfg₀ : Config) (trace : Json) :
-    Except String QuintReplayResult := do
+    Except ReplayFailure QuintReplayResult := do
   let hdr ← match trace.getObjVal? "#meta" with
     | .ok h => pure h
-    | .error _ => throw "not a trace this command reads: no `#meta` (expected the Informal Trace Format written by `quint run --mbt --out-itf`)"
+    | .error _ => throw <| .input "not a trace this command reads: no `#meta` (expected the Informal Trace Format written by `quint run --mbt --out-itf`)"
   match hdr.getObjValAs? String "format" with
   | .ok "ITF" => pure ()
-  | _ => throw "not a trace this command reads: `#meta.format` is not `ITF`"
+  | _ => throw <| .input "not a trace this command reads: `#meta.format` is not `ITF`"
   let traceViolation ← match hdr.getObjValAs? String "status" with
     | .ok s => pure (s == "violation")
-    | .error _ => throw "the trace does not record its verdict (`#meta.status`)"
+    | .error _ => throw <| .input "the trace does not record its verdict (`#meta.status`)"
   let states ← match trace.getObjValAs? (Array Json) "states" with
     | .ok ss => pure ss.toList
-    | .error _ => throw "the trace has no `states`"
+    | .error _ => throw <| .input "the trace has no `states`"
   let ppTrace (tr : List Verify.ActionStep) : String :=
     if tr.isEmpty then "the start" else "; ".intercalate (tr.map (·.pp))
   let mut cfg := cfg₀
@@ -89,9 +98,9 @@ def replayQuintTrace (m : QuintModule) (menu : Explore.Menu) (cfg₀ : Config) (
   for s in states do
     let name ← match s.getObjValAs? String "mbt::actionTaken" with
       | .ok n => pure n
-      | .error _ => throw "a state does not record `mbt::actionTaken`; record the trace with `quint run --mbt --out-itf`"
+      | .error _ => throw <| .input "a state does not record `mbt::actionTaken`; record the trace with `quint run --mbt --out-itf`"
     if name == "init" then
-      if !first then throw s!"the trace takes `init` again after {ppTrace tr}"
+      if !first then throw <| .input s!"the trace takes `init` again after {ppTrace tr}"
       first := false
       continue
     first := false
@@ -99,32 +108,32 @@ def replayQuintTrace (m : QuintModule) (menu : Explore.Menu) (cfg₀ : Config) (
         match (name.drop 5).toInt? with
         | some d =>
           if m.ticks.contains d then pure (QuintStep.tick d)
-          else throw s!"the trace takes `{name}`, a clock advance the model of this program does not have"
-        | none => throw s!"the trace takes `{name}`, which is not a clock advance of the model"
+          else throw <| .input s!"the trace takes `{name}`, a clock advance the model of this program does not have"
+        | none => throw <| .input s!"the trace takes `{name}`, which is not a clock advance of the model"
       else
         match m.actions.find? (·.ident == name) with
-        | none => throw s!"the trace takes `{name}`, which is not an action of the model generated from this program"
+        | none => throw <| .input s!"the trace takes `{name}`, which is not an action of the model generated from this program"
         | some a =>
           let picks ← match s.getObjVal? "mbt::nondetPicks" with
             | .ok p => pure p
-            | .error _ => throw "a state does not record `mbt::nondetPicks`; record the trace with `quint run --mbt --out-itf`"
+            | .error _ => throw <| .input "a state does not record `mbt::nondetPicks`; record the trace with `quint run --mbt --out-itf`"
           let args ← a.params.zipIdx.mapM fun (p, i) => itfPick s!"n_{a.ident}_{i}" p picks
           pure (QuintStep.act a args)
     let step := q.toActionStep
     let evSteps ← match Verify.candidateSteps m.mode menu cfg with
       | .ok ss => pure ss
-      | .error e => throw s!"the evaluator could not list steps after {ppTrace tr}: {e.message}"
+      | .error e => throw <| .finding s!"the evaluator could not list steps after {ppTrace tr}: {e.message}"
     let some evStep := evSteps.find? (·.pp == step.pp)
-      | throw s!"step {tr.length + 1} of the trace is {step.pp}, which the evaluator does not offer in {m.mode.name} mode after {ppTrace tr}"
+      | throw <| .finding s!"step {tr.length + 1} of the trace is {step.pp}, which the evaluator does not offer in {m.mode.name} mode after {ppTrace tr}"
     cfg ← match Verify.stepConfig cfg evStep with
       | .ok c => pure c
-      | .error e => throw s!"the evaluator could not take {step.pp} after {ppTrace tr}: {e.message}"
+      | .error e => throw <| .finding s!"the evaluator could not take {step.pp} after {ppTrace tr}: {e.message}"
     tr := tr ++ [evStep]
   let violated := Explore.violatedInvariants cfg
   if traceViolation && violated.isEmpty then
-    throw s!"Quint reports an invariant violated at the end of the trace; the evaluator, after the same {tr.length} step(s) ({ppTrace tr}), reports none"
+    throw <| .finding s!"Quint reports an invariant violated at the end of the trace; the evaluator, after the same {tr.length} step(s) ({ppTrace tr}), reports none"
   if !traceViolation && !violated.isEmpty then
-    throw s!"Quint reports no violation; the evaluator, after the same {tr.length} step(s) ({ppTrace tr}), reports {violated} violated"
+    throw <| .finding s!"Quint reports no violation; the evaluator, after the same {tr.length} step(s) ({ppTrace tr}), reports {violated} violated"
   pure { steps := tr, traceViolation, violated }
 
 end Charter.Project

@@ -18,6 +18,8 @@ Spec `017.4` and `D28` item 3 said Quint counterexamples "are certified by nativ
 
 ## Words (`017.4`), for Eric's blessing
 
+*Blessed with one change (Eric, 2026-11-18; `D50`):* the sentence below stated only the violation direction. The spec now carries Eric's words, which state the agreement both ways, name the `--mode`, and say that intermediate states are not compared. `--replay` is confirmed. Failures are split by kind: a finding exits 1, an input that is not a trace of this program's model exits 2 (`D50`).
+
 > A counterexample trace Quint finds on the emitted text (`quint run --mbt --out-itf`) is replayed by `charter verify --replay <trace.itf.json> <file.charter>`: each recorded action, with the values Quint picked for it, is performed through `Charter.Eval`, and the replay passes only when the evaluator reports an invariant violated at the end, as Quint did (`D48`).
 
 The rest of `017.4` (commit `31e2794`) is also a draft: it restates `D45` and the CI workflow. The flag's spelling, `--replay`, is the ruling's suggestion and was left as Eric's call.

@@ -20,7 +20,7 @@
 
 > A declared `Document` that cannot be read, or whose `SHA256` does not match, is an error (`CHRxxx`) in every command that resolves the program. A program that declares no `Document` is `illustrative` (012.10); `build` and `generate` accept it and stamp every output with that classification, and refuse `partial`.
 
-`CHRxxx` is `CHR053`. The spec text also names `CHR054` for the refusal; that parenthesis is the implementer's and is Eric's to strike.
+`CHRxxx` is `CHR053`. The spec text also names `CHR054` for the refusal; that parenthesis was the implementer's. *Kept (Eric, 2026-11-18; `D50`):* two codes, because they are different failures with different fixes, raised at different stages by different commands.
 
 ## Alternatives weighed
 

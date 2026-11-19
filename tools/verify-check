@@ -63,19 +63,28 @@ check_case "d47-emit-smt-flag-is-gone" 2 "unknown flag --emit-smt" \
 
 # 5d. D48 (017.4): a counterexample Quint found is replayed through the evaluator. The trace is
 #     Quint's own output on the emitted model (test/verify/replay/); CI regenerates it live
-#     (tools/differential-targets-check). The replay fails on a mode in which the evaluator
-#     does not offer a step, on another program, and on a trace whose verdict no step reaches.
+#     (tools/differential-targets-check). A finding is exit 1: a mode in which the evaluator
+#     does not offer a step, or a verdict no step reaches. An input that is not a trace of
+#     this program's model is exit 2.
 RP=test/verify/replay
 check_case "d48-replay-quint-counterexample" 0 "^ok .*\[replay\].*3 step\(s\).*both report a violation \(single-authority-fenced\)" \
   "$B" verify --replay "$RP/partition_lease.itf.json" test/verify/t26_t27_partition_lease.charter
 check_case "d48-replay-refuses-step-not-offered-in-mode" 1 "^FAIL .*\[replay\].*does not offer in lawful mode" \
   "$B" verify --mode lawful --replay "$RP/partition_lease.itf.json" test/verify/t26_t27_partition_lease.charter
-check_case "d48-replay-refuses-another-programs-trace" 1 "^FAIL .*\[replay\].*not an action of the model" \
+check_case "d48-replay-another-programs-trace-is-an-input-error" 2 "^INPUT .*\[replay\].*not an action of the model" \
   "$B" verify --replay "$RP/partition_lease.itf.json" test/verify/safe_fenced_lease.charter
 check_case "d48-replay-refuses-unreached-verdict" 1 "^FAIL .*\[replay\].*the evaluator, after the same 0 step\(s\).*reports none" \
   "$B" verify --replay "$RP/partition_lease_truncated.itf.json" test/verify/t26_t27_partition_lease.charter
-check_case "d48-replay-refuses-non-trace" 1 "^FAIL .*\[replay\].*not a trace this command reads" \
+check_case "d48-replay-non-trace-is-an-input-error" 2 "^INPUT .*\[replay\].*not a trace this command reads" \
   "$B" verify --replay docs/claims.json test/verify/t26_t27_partition_lease.charter
+check_case "d48-replay-missing-trace-is-an-input-error" 2 "^INPUT .*\[replay\].*cannot read" \
+  "$B" verify --replay out/_no_such_trace.itf.json test/verify/t26_t27_partition_lease.charter
+
+# 5e. D50 (B38): `verify` no longer accepts the two flags it ignored.
+check_case "d50-verify-require-complete-is-gone" 2 "unknown flag --require-complete" \
+  "$B" verify --require-complete test/verify/safe_fenced_lease.charter
+check_case "d50-verify-report-assumptions-is-gone" 2 "unknown flag --report-assumptions" \
+  "$B" verify --report-assumptions test/verify/safe_fenced_lease.charter
 
 # 5c. D47: arithmetic that couples two integer variables is outside the threshold fragment
 #     and is INCONCLUSIVE, with or without any tool on PATH.
