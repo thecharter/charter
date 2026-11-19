@@ -88,6 +88,28 @@ check_case "d50-explore-require-complete-is-gone" 2 "unknown flag --require-comp
 check_case "d50-verify-report-assumptions-is-gone" 2 "unknown flag --report-assumptions" \
   "$B" verify --report-assumptions test/verify/safe_fenced_lease.charter
 
+# 5f. D51 (B39): `--invariant` restricts every backend; `--time` outside the inductive backend,
+#     the two second spellings, and an unknown flag to `test` are usage errors.
+TI=test/verify/d51_two_invariants.charter
+check_case "d51-finite-all-invariants-finds-violation" 1 "invariant never-flagged violated" \
+  "$B" verify --backend finite --depth 1 "$TI"
+check_case "d51-finite-named-invariant-only" 0 "^ok .*\[finite/adversarial\]: 1 invariant\(s\) verified" \
+  "$B" verify --backend finite --depth 1 --invariant never-sealed "$TI"
+check_case "d51-finite-named-violated-invariant" 1 "invariant never-flagged violated" \
+  "$B" verify --backend finite --depth 1 --invariant never-flagged "$TI"
+check_case "d51-thresholds-named-invariant-only" 0 "^ok .*\[thresholds\]" \
+  "$B" verify --backend thresholds --depth 1 --invariant never-sealed "$TI"
+check_case "d51-unknown-invariant" 1 "CHR003: unknown invariant" \
+  "$B" verify --backend finite --invariant no-such "$TI"
+check_case "d51-time-outside-inductive-is-usage-error" 2 "caps the inductive backend" \
+  "$B" verify --backend finite --time 5 "$TI"
+check_case "d51-approve-reviewed-is-gone" 2 "unknown flag --reviewed" \
+  "$B" approve --reviewed "$TI"
+check_case "d51-explore-minimize-is-gone" 2 "unknown flag --minimize" \
+  "$B" explore --minimize "$TI"
+check_case "d51-test-unknown-flag" 2 "unknown flag --no-such-flag" \
+  "$B" test --no-such-flag "$TI"
+
 # 5c. D47: arithmetic that couples two integer variables is outside the threshold fragment
 #     and is INCONCLUSIVE, with or without any tool on PATH.
 check_case "d47-coupled-arithmetic-inconclusive" 3 "^INCONCLUSIVE.*\[thresholds\].*couples integer variables" \

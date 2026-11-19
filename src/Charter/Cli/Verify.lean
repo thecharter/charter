@@ -41,7 +41,8 @@ structure VerifyCliOpts where
   mode        : Verify.ExploreMode := .adversarial
   depth       : Nat := 3
   minDepth    : Option Nat := none
-  timeoutSec  : Nat := 60
+  /-- `--time <S>`: the cap on the inductive backend's kernel run (default 60). -/
+  timeoutSec  : Option Nat := none
   stateCap    : Nat := 5000
   mustProve   : Bool := false
   /-- `--replay <trace>`: replay a recorded history through the evaluator instead of searching. -/
@@ -81,7 +82,7 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
   | "--invariant" :: inv :: rest, o => parseVerifyArgs rest { o with invariants := o.invariants ++ [inv] }
   | ["--invariant"], _ => .error "--invariant needs an invariant name"
   | "--time" :: n :: rest, o => match n.toNat? with
-    | some k => parseVerifyArgs rest { o with timeoutSec := k }
+    | some k => parseVerifyArgs rest { o with timeoutSec := some k }
     | none => .error s!"--time needs seconds, not {n}"
   | ["--time"], _ => .error "--time needs seconds"
   | "--must-prove" :: rest, o => parseVerifyArgs rest { o with mustProve := true }
@@ -189,6 +190,18 @@ def replayOneFile (o : VerifyCliOpts) (path tracePath : String) : IO UInt32 := d
 def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) := do
   let some (cfg, menu) ← loadVerifyConfig o path | return (0, 1, 0)
   let lawHash := Artifact.sha256String (reprStr cfg.spec)
+  for want in o.invariants do
+    if !cfg.spec.invariants.contains want then
+      IO.eprintln s!"{path}: error CHR003: unknown invariant `{want}`"
+      return (0, 1, 0)
+  -- `--invariant` (`D51`): every backend checks the named invariants and only those. The
+  -- others stay in the program as the derived facts they are; they are not checked.
+  let cfg : Config :=
+    if o.invariants.isEmpty then cfg
+    else { cfg with spec := { cfg.spec with decls := cfg.spec.decls.map fun (d, t) =>
+      match t.kind with
+      | .fact f => if f.invariant && !o.invariants.contains d then (d, { t with kind := .fact { f with invariant := false } }) else (d, t)
+      | _ => (d, t) } }
   match o.backend with
   | .finite =>
     let mut okCount := 0
@@ -304,11 +317,7 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
         emitVerifyCert o.json cert s!"ok   {path} [thresholds]: no counterexample up to depth {k} ({vis} state(s) over threshold witnesses)"
         return (1, 0, 0)
   | .inductive_ =>
-    let requestedInvs := if o.invariants.isEmpty then cfg.spec.invariants else o.invariants
-    for want in o.invariants do
-      if !cfg.spec.invariants.contains want then
-        IO.eprintln s!"{path}: error CHR003: unknown invariant `{want}`"
-        return (0, 1, 0)
+    let requestedInvs := cfg.spec.invariants
     let allFinite := (Verify.modeCoverage o.mode cfg.spec []).isEmpty
     if !allFinite then
       match ← locateCharterRoot with
@@ -334,7 +343,7 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
           | some (proofSrc, _) =>
             let pfFile := outDir / (Verify.InductiveArith.sanId invId ++ ".lean")
             IO.FS.writeFile pfFile proofSrc
-            let (res?, _, _) ← runChecker root outDir pfFile none 4096 o.timeoutSec
+            let (res?, _, _) ← runChecker root outDir pfFile none 4096 (o.timeoutSec.getD 60)
             match res? with
             | some (0, chkOut) =>
               if (chkOut.splitOn badAxToken).length == 1 then
@@ -400,7 +409,7 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
             emitVerifyCert o.json cert s!"INCONCLUSIVE {path} [inductive]: {cert.note}"
             return (0, 0, 1)
           | some root =>
-            let pOpts : ProveOpts := { time := o.timeoutSec }
+            let pOpts : ProveOpts := { time := o.timeoutSec.getD 60 }
             let (_, pFail, pInc) ← proveFile pOpts root cwd path
             if pFail > 0 then return (0, 1, 0)
             else if pInc > 0 then return (0, 0, 1)
@@ -424,6 +433,10 @@ def verifyCommand (args : List String) : IO UInt32 := do
     if o.files.isEmpty then IO.eprintln usage; return 2
     if o.replay.isSome && o.files.length != 1 then
       IO.eprintln s!"charter verify: --replay replays one trace against one program, not {o.files.length}\n{usage}"; return 2
+    if o.timeoutSec.isSome && (o.backend != .inductive_ || o.replay.isSome) then
+      IO.eprintln s!"charter verify: --time caps the inductive backend's kernel run; nothing under `--backend {o.backend.name}`{if o.replay.isSome then " --replay" else ""} is timed\n{usage}"; return 2
+    if o.replay.isSome && !o.invariants.isEmpty then
+      IO.eprintln s!"charter verify: --replay compares verdicts over every invariant of the model; --invariant does not apply\n{usage}"; return 2
     if let (some tracePath, [f]) := (o.replay, o.files) then return (← replayOneFile o f tracePath)
     let mut okTotal := 0
     let mut failTotal := 0

@@ -57,7 +57,6 @@ def parseExploreArgs : List String → ExploreCliOpts → Except String ExploreC
     | none => .error s!"--cap needs a positive integer, not {n}"
   | ["--cap"], _ => .error "--cap needs a positive integer"
   | "--no-minimize" :: rest, o => parseExploreArgs rest { o with minimize := false }
-  | "--minimize" :: rest, o => parseExploreArgs rest { o with minimize := true }
   | "--regime" :: r :: rest, o => parseExploreArgs rest { o with regime := some r }
   | ["--regime"], _ => .error "--regime needs a regime name"
   | "--out" :: "json" :: rest, o => parseExploreArgs rest { o with json := true }

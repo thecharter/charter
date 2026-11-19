@@ -23,7 +23,6 @@ def parseApproveArgs : List String → ApproveOpts → Except String ApproveOpts
   | [], o => .ok o
   | "--lock" :: rest, o => parseApproveArgs rest { o with useLock := true }
   | "--restamp" :: rest, o => parseApproveArgs rest { o with restamp := true }
-  | "--reviewed" :: rest, o => parseApproveArgs rest { o with restamp := true }
   | a :: rest, o =>
     if a.startsWith "-" then .error s!"unknown flag {a}"
     else parseApproveArgs rest { o with files := o.files ++ [a] }

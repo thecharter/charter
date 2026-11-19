@@ -33,10 +33,10 @@ Flags by command, beyond those in the table and the shared flags above. A flag a
 
 - `charter`, `charter-server`: `--help`, `--version`.
 - `build`: `--key-id <id>`, the signer key identifier recorded in the certificate.
-- `approve`: `--lock` records the approval in `charter.lock`; `--restamp` re-records it after a reviewed change; `--reviewed` is the same as `--restamp`.
+- `approve`: `--lock` records the approval in `charter.lock`; `--restamp` re-records it after a reviewed change.
 - `doc`: `--view rulebook|legal`, `--format markdown|html`, `--scenario <name>`.
-- `explore`: `--mode lawful|adversarial|mixed`, `--adversary <actors>` (the actors who may act unlawfully in `mixed` mode), `--depth <N>`, `--strategy bfs|dfs|random`, `--seed <N>`, `--cap <N>` (the most states visited), `--no-minimize` (report the first counterexample found) and `--minimize` (the default), `--regime <name>`, `--explore-domain "<type> = values"`, `--out json`.
-- `verify`: `--mode`, `--adversary`, `--depth`, `--regime`, `--explore-domain`, and `--out json` as for `explore`; `--min-depth <N>` (a bound below it is `INCONCLUSIVE`, `T30`), `--invariant <name>` (repeatable; `inductive` only), `--time <S>` (the kernel's cap, `inductive` only), `--must-prove` (a bounded result is `INCONCLUSIVE`, not a pass).
+- `explore`: `--mode lawful|adversarial|mixed`, `--adversary <actors>` (the actors who may act unlawfully in `mixed` mode), `--depth <N>`, `--strategy bfs|dfs|random`, `--seed <N>`, `--cap <N>` (the most states visited), `--no-minimize` (report the counterexample as found; by default it is shrunk), `--regime <name>`, `--explore-domain "<type> = values"`, `--out json`.
+- `verify`: `--mode`, `--adversary`, `--depth`, `--regime`, `--explore-domain`, and `--out json` as for `explore`; `--min-depth <N>` (a bound below it is `INCONCLUSIVE`, `T30`), `--invariant <name>` (repeatable; every backend checks the named invariants and only those; not with `--replay`), `--time <S>` (the cap on the `inductive` backend's kernel run; a usage error under any other backend), `--must-prove` (a bounded result is `INCONCLUSIVE`, not a pass).
 - `test`: `--mutate-claims` negates each claim in turn and fails the file if a negated claim still passes (`T44`).
 - `generate`: `--mode lawful|adversarial` (`quint`), `--actor <role>` (`prompt`).
 - `analyze`, `plan`: `--depth <N>`.

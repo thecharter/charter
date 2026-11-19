@@ -87,3 +87,4 @@
 - **Options.** **A.** Delete `--reviewed` and `--minimize`; make `--invariant` restrict `finite` and `thresholds` to the named invariants as it does `inductive`, and make `--time` under a backend that has no clock a usage error; make an argument beginning `--` that `test` does not know a usage error. **B.** Delete the two aliases only. **C.** Leave as documented.
 - **Prediction.** A, 75%.
 - **Needs from Eric.** The ruling.
+- **Ruled (Eric, 2026-11-18): A, as predicted.** `D51`.

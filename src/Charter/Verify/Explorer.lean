@@ -187,7 +187,7 @@ def replaysViolation (cfg₀ : Config) (inv : DomId) (trace : List ActionStep) :
       | .error _ => false
   go cfg₀ trace
 
-/-- Shrink a counterexample trace by delta-debugging single-step deletions (`--minimize`). -/
+/-- Shrink a counterexample trace by delta-debugging single-step deletions (the default; `--no-minimize` turns it off). -/
 def minimizeTrace (cfg₀ : Config) (inv : DomId) (trace : List ActionStep) : List ActionStep :=
   let rec shrinkPass (fuel : Nat) (cur : List ActionStep) : List ActionStep :=
     match fuel with

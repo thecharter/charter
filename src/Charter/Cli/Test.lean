@@ -69,7 +69,9 @@ def parseTestArgs : List String → TestOpts → Except String TestOpts
   | ["--expect"], _ => .error "--expect needs a file"
   | "--tolerate" :: f :: rest, o => parseTestArgs rest { o with tolerate := some f }
   | ["--tolerate"], _ => .error "--tolerate needs a file"
-  | p :: rest, o => parseTestArgs rest { o with paths := p :: o.paths }
+  | p :: rest, o =>
+    if p.startsWith "--" then .error s!"unknown flag {p}"
+    else parseTestArgs rest { o with paths := p :: o.paths }
 
 /-- `ok   path` / `FAIL path` lines → (path, passed). Anything after the path is ignored. -/
 def readExpected (file : System.FilePath) : IO (List (String × Bool)) := do

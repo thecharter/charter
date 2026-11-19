@@ -1,0 +1,17 @@
+// D51: `charter verify --invariant <name>` restricts every backend to the named invariant.
+// `never-flagged` is violated in one step; `never-sealed` holds. Asked about `never-sealed`
+// alone, `finite` and `thresholds` must say it is verified and count one invariant; asked
+// about `never-flagged`, or about both, they must report the violation.
+Fact member Identified by Ann.
+Fact flagged Identified by member.
+Fact sealed Identified by member.
+
+Act flag Actor member
+  Holds when True
+  Creates flagged(member).
+
+Invariant never-flagged
+  When !(Exists flagged: flagged).
+
+Invariant never-sealed
+  When !(Exists sealed: sealed).

@@ -5,6 +5,28 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-18 (4): `B39` ruled and landed (`D51`); nothing awaits a ruling
+
+## Where
+
+- `main`. `tools/battery` PASS with `solc`, `forge`, and `quint` on `PATH` and `CHARTER_REQUIRE_EXTERNAL_TOOLS=1`. Zero build warnings.
+- Eric's "approved" (2026-11-18) covered `B39` option A, the agent's wordings named in `D50`, and the deletion of `explore --require-complete`.
+
+## What landed (`D51`)
+
+- `approve --reviewed` and `explore --minimize` deleted (second spellings).
+- `verify --invariant` restricts every backend (`Cli/Verify.lean`, `verifyOneFile`: the unnamed invariants lose their `invariant` flag for the run); with `--replay` it is a usage error.
+- `verify --time` outside `--backend inductive` is a usage error. `charter test` rejects an unknown `--flag`.
+- Fixture `test/verify/d51_two_invariants.charter`; nine cases in `tools/verify-check`.
+
+## Not done
+
+- `--invariant` does not select temporal `Property` checks; `finite` still checks every `Property`.
+- The Law 14 gate shows a flag is named in `018`, not that it is read. `D50` and `D51` were found by reading the parsers.
+- `lib/entity_group.charter` still says in a comment that its theorems are to be reattached under `lib/lean/` (`015.5` no longer names that directory).
+
+---
+
 # Handoff — 2026-11-18 (3): second round of rulings landed (`D50`): `017.4` blessed, replay exit codes, `015.5`, dead flags deleted, the Law 14 gate in both directions; `B39` open
 
 ## Where
@@ -22,7 +44,7 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ## Open, awaiting Eric
 
-- **`B39`** `approve --reviewed` and `explore --minimize` are second spellings; `verify --invariant` and `--time` are read by the inductive backend only; `charter test` treats an unknown `--flag` as a path.
+- *(Ruled the same day; see the section above.)* **`B39`** `approve --reviewed` and `explore --minimize` are second spellings; `verify --invariant` and `--time` are read by the inductive backend only; `charter test` treats an unknown `--flag` as a path.
 - The two pointer rewordings in item 3 and the "Flags by command" list in `018` are an agent's words.
 
 ## Not done
