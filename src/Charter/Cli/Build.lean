@@ -71,14 +71,12 @@ def buildCommand (args : List String) : IO UInt32 := do
       let cleanCfg : Config := { genesisCfg with spec := { genesisCfg.spec with scenarios := [] } }
       let finalSpec := (prog.epochs.getLast?.map (·.spec)).getD emptySpec
       let dir := (System.FilePath.mk f).parent.getD "."
-      let loadedDocs ← readDocuments finalSpec dir
-      let locks ← readClauseLocks dir
-      let finalSpec := hydrateClausesFromDocs finalSpec loadedDocs
-      let provClaims := if finalSpec.clauses.isEmpty && finalSpec.document.isNone && finalSpec.documents.isEmpty then [] else provenanceReportDocs finalSpec loadedDocs locks
-      let cov := computeProvenanceCoverage finalSpec loadedDocs provClaims
-      let failedProv := provClaims.filter (!·.ok)
-      for c in failedProv do IO.eprintln c.render
-      if !failedProv.isEmpty then return 1
+      -- 012.7 (`D46`): a bundle is `complete` or `illustrative`, never `partial`
+      let (cov, loadedDocs, _) ← match ← deliveryProvenance f finalSpec dir with
+        | .ok r => pure r
+        | .error lines =>
+          for ln in lines do IO.eprintln ln
+          return 1
       let docTexts : List (SourceDoc × Option String) := loadedDocs.map fun (sd, r) =>
         (sd, match r with | .ok txt => some txt | .error _ => none)
       let bundle := Artifact.buildSignedBundleDocs prog cleanCfg docTexts cov.asString signKey keyId
@@ -88,7 +86,7 @@ def buildCommand (args : List String) : IO UInt32 := do
         let p := System.FilePath.mk outPath
         if let some parent := p.parent then IO.FS.createDirAll parent
         IO.FS.writeFile p rendered
-        IO.println s!"built {outPath} (sha256:{bundle.artifactSha256}, {prog.epochs.length} epoch(s), keyId:{keyId})"
+        IO.println s!"built {outPath} (sha256:{bundle.artifactSha256}, {prog.epochs.length} epoch(s), keyId:{keyId}, provenance {cov.asString})"
       | none =>
         IO.print rendered
       return 0

@@ -83,17 +83,34 @@ def generateCommand (args : List String) : IO UInt32 := do
       cfg := c'
   let stem := ((System.FilePath.mk file).fileStem).getD "Institution"
   let lawSha := Artifact.sha256String (reprStr cfg.spec)
+  -- 012.7 (`D46`): a projection is delivered `complete` or `illustrative`, never `partial`,
+  -- and says which in its own text
+  let (cov, _, _) ← match ← deliveryProvenance file cfg.spec ((System.FilePath.mk file).parent.getD ".") with
+    | .ok r => pure r
+    | .error lines =>
+      for ln in lines do IO.eprintln ln
+      return 1
+  let stampLine := s!"// Provenance (Law 8): {cov.stamp}"
+  -- after the first line, which in Solidity is the SPDX identifier
+  let stamped (text : String) : String :=
+    match text.splitOn "\n" with
+    | first :: rest => "\n".intercalate (first :: stampLine :: rest)
+    | [] => stampLine ++ "\n"
+  let provJson : String × Lean.Json := ("provenance", Lean.Json.str cov.asString)
   let writeOrPrint (content : String) (verifySummary : Option String) : IO UInt32 := do
     match opts.output with
     | some outP =>
       let p := System.FilePath.mk outP
       if let some parent := p.parent then IO.FS.createDirAll parent
       IO.FS.writeFile p content
-      if let some vs := verifySummary then IO.println s!"ok   {outP}: {vs}"
-      else IO.println s!"wrote {outP}"
+      if let some vs := verifySummary then IO.println s!"ok   {outP}: {vs}; provenance {cov.asString}"
+      else IO.println s!"wrote {outP} (provenance {cov.asString})"
     | none =>
       if let some vs := verifySummary then
-        IO.eprintln s!"ok   {file} [{tgt}]: {vs}"
+        IO.eprintln s!"ok   {file} [{tgt}]: {vs}; provenance {cov.asString}"
+      else if tgt == "abi" && !opts.json then
+        -- an Ethereum JSON ABI is a bare array with no place for a stamp
+        IO.eprintln s!"note {file} [abi]: provenance {cov.asString}"
       IO.print content
     return 0
   match tgt with
@@ -106,7 +123,7 @@ def generateCommand (args : List String) : IO UInt32 := do
     let sc ← match Project.compileSolContractFromGuard ir with
       | .ok c => pure c
       | .error d => IO.eprintln (d.withFile file).render; return 1
-    let sol := Project.renderSolidityContract sc
+    let sol := stamped (Project.renderSolidityContract sc)
     let abi := Project.renderGuardJsonABI ir
     let vSum? ← if opts.verifyOutput then
       match Project.validateGuardOutput ir sc sol abi with
@@ -120,6 +137,7 @@ def generateCommand (args : List String) : IO UInt32 := do
           ("target", Lean.Json.str tgt),
           ("irAssurance", "proved"),
           ("surfaceAssurance", "checked"),
+          provJson,
           ("assumptions", Lean.Json.arr (sc.assumptions.map Lean.Json.str).toArray),
           ("abi", abi),
           ("solidity", Lean.Json.str sol)
@@ -128,7 +146,7 @@ def generateCommand (args : List String) : IO UInt32 := do
     writeOrPrint textOut vSum?
   | "settlement" =>
     let sir := Project.compileSettlementIR stem lawSha cfg
-    let sol := Project.renderSettlementSolidity sir
+    let sol := stamped (Project.renderSettlementSolidity sir)
     let abi := Project.renderSettlementABI sir
     let vSum? ← if opts.verifyOutput then
       match Project.validateSettlementOutput sir sol with
@@ -141,6 +159,7 @@ def generateCommand (args : List String) : IO UInt32 := do
         ("target", "settlement"),
         ("irAssurance", "proved"),
         ("surfaceAssurance", "checked"),
+        provJson,
         ("timelockDuration", Lean.Json.num sir.timelockDur),
         ("scalarParamCount", Lean.Json.num sir.scalarParams.length),
         ("entrenchedBoundCount", Lean.Json.num sir.bounds.length),
@@ -154,7 +173,7 @@ def generateCommand (args : List String) : IO UInt32 := do
     let qMod ← match Project.compileQuintModule stem opts.mode dirs.exploreMenu cfg with
       | .ok m => pure m
       | .error d => IO.eprintln (d.withFile file).render; return 1
-    let qSrc := Project.renderQuintModule qMod
+    let qSrc := stampLine ++ "\n" ++ Project.renderQuintModule qMod
     let vSum? ← if opts.verifyOutput then
       match Project.verifyQuintTarget qMod qSrc cfg dirs.exploreMenu 3 with
       | .ok s => pure (some s)
@@ -165,13 +184,14 @@ def generateCommand (args : List String) : IO UInt32 := do
         ("kind", "generated-target"),
         ("target", "quint"),
         ("surfaceAssurance", "checked"),
+        provJson,
         ("assumptions", Lean.Json.arr (qMod.assumptions.map Lean.Json.str).toArray),
         ("quint", Lean.Json.str qSrc)
       ]).pretty ++ "\n"
     else qSrc
     writeOrPrint outStr vSum?
   | "prompt" =>
-    let (md, jSchema) := Project.renderAdvisoryPrompt stem opts.actor cfg.spec
+    let (md, jSchema) := Project.renderAdvisoryPrompt stem opts.actor cfg.spec cov
     writeOrPrint (if opts.json then jSchema.pretty ++ "\n" else md)
       (if opts.verifyOutput then some "validated advisory AlignmentCard (authoritative=false)" else none)
   | other =>

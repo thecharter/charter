@@ -14,6 +14,7 @@
   - **C.** Leave `012.7`; print the coverage in `build`'s summary line only.
 - **Prediction.** A, 80%. It closes the silent skip without making an author who is exploring write a `Document` first, and it adds no flag (`Law 13`). The reviewer argued for B; B's cost is a flag on every fixture, which is ceremony for programs that claim no document.
 - **Needs from Eric.** The ruling, and the words of `012.7`.
+- **Ruled (Eric, 2026-11-18): A, sharpened.** The classification is stamped into every output, and the warning counter is fixed. `D46`.
 
 ## B35. Spec `017.4` certifies Quint counterexamples by `importQuintTrace`; no such function exists (`017.4`, `D28`, `D45`, `Law 9`, `Law 10`)
 

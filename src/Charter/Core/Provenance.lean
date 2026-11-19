@@ -92,6 +92,14 @@ def ProvenanceCoverage.asString : ProvenanceCoverage → String
   | .partialCov => "partial"
   | .illustrative => "illustrative"
 
+/-- What a delivered output says about its English, one line. `charter build` records the
+classification in the signed manifest and `charter generate` stamps this line into every
+projection (012.7, `D46`); a `partial` program is never delivered. -/
+def ProvenanceCoverage.stamp : ProvenanceCoverage → String
+  | .complete => "complete (every rule is grounded in a declared Document and checked against it)"
+  | .illustrative => "illustrative (no Document or Clause is declared; the rules are not checked against an English text)"
+  | .partialCov => "partial"
+
 /-- A clause is a contiguous passage of the source together with the
 spans that partition it. -/
 structure Clause where

@@ -30,7 +30,8 @@ structure ProvClaim where
   check  : String
   clause : String := ""
   text   : String
-  /-- A warning rather than a failure (the document could not be read). -/
+  /-- A check that could not be carried out. Counted in the summary's warnings and refused
+  at delivery. No check produces one since `D46`: an unreadable `Document` is `CHR053`. -/
   warn   : Bool := false
 
 def ProvClaim.render (c : ProvClaim) : String :=
@@ -412,9 +413,9 @@ def provenanceReportDocs (spec0 : Spec) (loaded : LoadedDocs) (locks : List Clau
       | some wantId, none =>
         { ok := false, check := "verbatim", clause := c.id, text := s!"{c.id}: In {wantId} names no declared Document" }
       | _, none =>
-        { ok := true, warn := true, check := "verbatim", clause := c.id, text := s!"{c.id}: no Document loaded; verbatim check skipped" }
+        { ok := false, check := "verbatim", clause := c.id, text := s!"{c.id}: no Document to check the text against (012.7)" }
       | _, some (sd, .error e) =>
-        { ok := true, warn := true, check := "verbatim", clause := c.id, text := s!"{sd.path} could not be read ({e}); verbatim check skipped" }
+        { ok := false, check := "verbatim", clause := c.id, text := s!"{c.id}: {sd.path} cannot be read ({e}); the text is not checked against it (012.7)" }
       | _, some (sd, .ok doc) =>
         let expandedDoc := applyTemplateBindings bindings doc
         let ok := occursIn doc c.source || occursIn expandedDoc c.source
@@ -464,6 +465,28 @@ def computeProvenanceCoverage (spec : Spec) (loaded : LoadedDocs) (claims : List
     let allClaimsClean := claims.all fun c => c.ok && !c.warn
     let rulesCovered := spec.ruleIds.isEmpty || !spec.clauses.isEmpty
     if allDocsRead && allClaimsClean && rulesCovered then .complete else .partialCov
+
+/-- The provenance of a program about to be delivered (`charter build`, `charter generate`):
+its coverage and the documents read, or the lines that say why it is refused. Delivery
+accepts `complete` and `illustrative` and refuses `partial` (012.7, `D46`, `CHR054`): a
+program that declares its English and is not fully checked against it is not shipped. -/
+def deliveryProvenance (file : String) (spec0 : Spec) (programDir : System.FilePath) :
+    IO (Except (List String) (ProvenanceCoverage × LoadedDocs × Spec)) := do
+  let loaded ← readDocuments spec0 programDir
+  let locks ← readClauseLocks programDir
+  let spec := hydrateClausesFromDocs spec0 loaded
+  let declared := !(spec.clauses.isEmpty && spec.document.isNone && spec.documents.isEmpty)
+  let claims := if declared then provenanceReportDocs spec loaded locks else []
+  let cov := computeProvenanceCoverage spec loaded claims
+  if cov != .partialCov then return .ok (cov, loaded, spec)
+  let failed := (claims.filter fun c => !c.ok || c.warn).map (·.render)
+  let why :=
+    if !failed.isEmpty then s!"{failed.length} provenance check(s) do not pass"
+    else if loaded.isEmpty then "it declares `Clause`s and no `Document` to check them against"
+    else "it declares a `Document` and no `Clause` grounds its rules in it"
+  let d := (Diagnostic.error "CHR054"
+    s!"provenance coverage is `partial` ({why}); a program is delivered `complete` or `illustrative`, never partly checked against its English (012.7)").withFile file
+  return .error (failed ++ [d.render])
 
 /-- Single-document wrapper retained for compatibility (`Cli/Build`). -/
 def provenanceReport (spec : Spec) (doc? : Option (Except String String)) : List ProvClaim :=

@@ -15,7 +15,8 @@ namespace Charter.Project
 
 open Lean (Json)
 
-def renderAdvisoryPrompt (title : String) (actorFilter? : Option String) (spec : Spec) : String × Json :=
+def renderAdvisoryPrompt (title : String) (actorFilter? : Option String) (spec : Spec)
+    (provenance : ProvenanceCoverage) : String × Json :=
   let matchesActor (d : DomId) : Bool :=
     match actorFilter? with
     | none => true
@@ -36,7 +37,8 @@ def renderAdvisoryPrompt (title : String) (actorFilter? : Option String) (spec :
     | .immunity im => some (d, im.against, t.spans)
     | _ => none
   let header := s!"# Charter Advisory Role Briefing — {title}\n\n" ++
-    "> **ADVISORY ARTIFACT (`authoritative = false`)**: This briefing summarizes formal institutional rules and verbatim English spans for planning and explanation only. It is NOT an enforcement boundary; all authoritative legal judgments and execution capabilities are decided by `charter-server` (`docs/rfc.md` §9.7).\n\n"
+    "> **ADVISORY ARTIFACT (`authoritative = false`)**: This briefing summarizes formal institutional rules and verbatim English spans for planning and explanation only. It is NOT an enforcement boundary; all authoritative legal judgments and execution capabilities are decided by `charter-server` (`docs/rfc.md` §9.7).\n\n" ++
+    s!"Provenance (Law 8): {provenance.stamp}\n\n"
   let roleLine := match actorFilter? with | some r => s!"Role scope: `{r}`\n\n" | none => "Role scope: all roles\n\n"
   let powSec := "## Actions & Institutional Powers\n" ++ "\n".intercalate (powers.map fun (d, isP, sps) =>
     let kind := if isP then "Power (requires Valid when)" else "Act"
@@ -54,6 +56,7 @@ def renderAdvisoryPrompt (title : String) (actorFilter? : Option String) (spec :
     ("title", Json.str title),
     ("authoritative", Json.bool false),
     ("advisoryOnly", Json.bool true),
+    ("provenance", Json.str provenance.asString),
     ("role", match actorFilter? with | some r => Json.str r | none => Json.null),
     ("tools", Json.arr (powers.map fun (d, isP, _) =>
       Json.mkObj [

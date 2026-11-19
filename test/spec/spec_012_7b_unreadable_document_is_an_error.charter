@@ -1,0 +1,5 @@
+// 012.7 (D46): a declared `Document` that cannot be read is an error, not a skipped check.
+//! expect-error: CHR053
+Document "include/no-such-document.md".
+
+Fact tenant Identified by Ann.

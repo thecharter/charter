@@ -1,5 +1,7 @@
 // 012.1, 012.8 (T37, T39): cryptographic SHA-256 mismatch on either `Document ... SHA256`
-// or `Clause ... Approved "<sha256>"` marks provenance `STALE` as failed claims.
+// or `Clause ... Approved "<sha256>"` marks provenance `STALE` as failed claims. A `Document`
+// that does not match its pin is also an error in every command (012.7, `CHR053`).
+//! expect-error: CHR053
 //! expect-failed-claims: 2
 Document BYLAW "include/bylaw.md" SHA256 "0000000000000000000000000000000000000000000000000000000000000000".
 

@@ -1,4 +1,5 @@
 import Charter.Surface.Parser
+import Charter.Artifact.Hash
 
 /-!
 # Charter.Cli.Load — Reading a program and its `#include`/`#require` files
@@ -278,6 +279,37 @@ def loadFile (eflint : Bool) (top path : System.FilePath) (seen : List String) (
               edges := edges'
       return (acc, diags, seen, dirs, metas, edges)
 
+/-- 012.7 (`D46`, `CHR053`): a declared `Document` that cannot be read, or whose content does
+not match its `SHA256` pin, is an error in every command, because every command loads its
+program here. A program that names its English and cannot produce it has not been checked
+against it (Law 8). Paths are already relative to the program's directory (`rebaseDocuments`). -/
+def checkDeclaredDocuments (top : System.FilePath) (items : List Located) : IO (List Diagnostic) := do
+  let mut diags : List Diagnostic := []
+  for l in items do
+    match l.item.val with
+    | .inr (.decls ds) =>
+      for rawD in ds do
+        match rawD.stripPos with
+        | .document p _ sha? _ =>
+          let pos := declPosOr l.item.pos rawD
+          let read ← try
+            let txt ← IO.FS.readFile (top / p)
+            pure (Except.ok txt)
+          catch e => pure (Except.error (toString e))
+          match read, sha? with
+          | .error e, _ =>
+            diags := diags ++ [(Diagnostic.error "CHR053"
+              s!"declared Document `{p}` cannot be read ({e}); the program is not checked against its English" pos).withFile l.file]
+          | .ok txt, some want =>
+            let actual := Artifact.sha256String txt
+            if actual != want then
+              diags := diags ++ [(Diagnostic.error "CHR053"
+                s!"declared Document `{p}` does not match its SHA256 pin (expected {want}, actual {actual})" pos).withFile l.file]
+          | .ok _, none => pure ()
+        | _ => pure ()
+    | _ => pure ()
+  return diags
+
 /-- Load a program: its items in order, and the diagnostics of loading. `eflint`
 restricts the keywords to eFLINT's (`--eflint`). -/
 def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Located × List Diagnostic) := do
@@ -286,6 +318,7 @@ def loadProgram (path : System.FilePath) (eflint : Bool := false) : IO (List Loc
     | none => pure []
   let (its, ds, _, _, metas, edges) ← loadFile eflint (dirOf path) path [] ("." :: stdDirs) [] [] 64
   let layoutDiags := if ds.any (·.isError) then [] else checkLayoutRules its metas edges
-  return (its, ds ++ layoutDiags)
+  let docDiags ← checkDeclaredDocuments (dirOf path) its
+  return (its, ds ++ layoutDiags ++ docDiags)
 
 end Charter.Cli

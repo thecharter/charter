@@ -66,6 +66,8 @@ more errors); `warning` does not.
 | CHR050 | error | `Expose` names an undeclared or internal/closed non-triggerable type, or `charter-server` refuses a request outside the declared service interface (`#67`) | `Charter.Resolve` / `Charter.Server` |
 | CHR051 | error | `Amend ... Migrates { ... }` violated an `Entrenched Invariant` on the migrated state; amendment did not take effect (`#71`) | `Charter.Eval.Step` / `Charter.Server` |
 | CHR052 | error | missing or invalid per-actor Schnorr public-key signature on a request naming a key-bound actor (`#76`) | `Charter.Server` |
+| CHR053 | error | a declared `Document` cannot be read, or its content does not match its `SHA256` pin; raised by every command, since every command loads its program (012.7, `D46`) | `Charter.Cli.Load` |
+| CHR054 | error | `charter build` / `charter generate`: provenance coverage is `partial`; a program is delivered `complete` or `illustrative` (012.7, `D46`) | `Charter.Cli.Provenance` |
 
 ## Evaluation (CHR100–CHR149)
 

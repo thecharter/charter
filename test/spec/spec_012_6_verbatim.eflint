@@ -1,4 +1,4 @@
-// Each clause's text must occur verbatim in the document; drifted wording is a failed check, and a document that cannot be read is a warning, not a failure.
+// Each clause's text must occur verbatim in the document; drifted wording is a failed check. (A document that cannot be read is `CHR053`: `spec_012_7b`.)
 //! expect-failed-claims: 2
 Document "include/tenancy.md"
 Fact tenant Identified by T
