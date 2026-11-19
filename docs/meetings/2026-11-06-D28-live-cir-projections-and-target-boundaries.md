@@ -11,7 +11,7 @@
 2. **On-chain / API Guard target (`Project/GuardTarget.lean`, `T33`)**:
    - Lowers finite/scalar `CIR` rules into a typed `GuardIR` state-transition guard, proves `cir_guard_step_correspondence` in Lean (connecting `evalGuardIR` to `Eval`'s `(lawful, valid)` and state transitions), emits Solidity `^0.8.24` + canonical Ethereum JSON ABI, and validates 1-to-1 trace verdict parity against `charter-server` (`--verify-output`, invoking `solc` when installed on `PATH`).
 3. **Protocol Verifier target (`Project/QuintTarget.lean`, `T32`)**:
-   - Emits typed Quint (`.qnt`) protocol specifications in both `--mode lawful` and `--mode adversarial`, validates emitted syntax and transition structure (invoking `quint` CLI when installed), and provides `importQuintTrace` to replay counterexample traces natively in `Charter.Eval` (`T26`, `T27`, `T32`).
+   - Emits typed Quint (`.qnt`) protocol specifications in both `--mode lawful` and `--mode adversarial`, validates emitted syntax and transition structure (`T26`, `T27`, `T32`). *Corrected 2026-11-18 (`B35`, `D45`, `D48`):* this item said the target "provides `importQuintTrace` to replay counterexample traces natively in `Charter.Eval`". No such function existed, and the `quint` CLI was not invoked by `charter`. What is checked is the model's step relation against the evaluator under `--verify-output` (`D45`) and, in CI, `quint` typechecking the emitted text and its simulator reaching Charter's verdict; a trace Quint finds is replayed by `charter verify --replay` (`D48`).
 4. **Advisory AI Briefing target (`Project/PromptTarget.lean`, §9.7)**:
    - Emits role-scoped `AlignmentCard` markdown and JSON tool schemas stamped `advisoryOnly: true` (never advertised as an enforcement boundary).
 
