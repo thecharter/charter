@@ -5,6 +5,33 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ---
 
+# Handoff — 2026-11-18 (3): second round of rulings landed (`D50`): `017.4` blessed, replay exit codes, `015.5`, dead flags deleted, the Law 14 gate in both directions; `B39` open
+
+## Where
+
+- `main`. `tools/battery` PASS with `solc`, `forge`, and `quint` on `PATH` and `CHARTER_REQUIRE_EXTERNAL_TOOLS=1`. Zero build warnings.
+
+## What landed (`D50`)
+
+1. **`017.4`** carries Eric's words for the replay (agreement both ways, the `--mode`, no intermediate states, *checked*, one trace). **`CHR054`** stays as a second code.
+2. **Replay exit status** (`Cli/Verify.lean`, `replayOneFile`; `Project/QuintReplay.lean`, `ReplayFailure`): 0 passes, 1 a finding, 2 an input that is not this model's trace.
+3. **`015.5`** carries Eric's words: a module invariant is *checked*; the v0.3 theorems in `src/Charter/Modules/` do not count toward *proved*. Two pointers in `diagnostics.md` and `docs/spec/README.md` name what exists.
+4. **Deleted:** `verify --require-complete`, `verify --report-assumptions`, and `explore --require-complete` (the last was parsed into a field nothing read; the `B38` brief had called it real, so its deletion is Eric's to veto).
+5. **`docs/rfc.md`** is marked a dated design record in its header and is outside the gate.
+6. **`test/gates/law14-sentences-resolve.sh`** now also checks backticked paths in `docs/spec/` (history skipped by structure) and that every flag a parser accepts is named in `018`. `018` gained a "Flags by command" list.
+
+## Open, awaiting Eric
+
+- **`B39`** `approve --reviewed` and `explore --minimize` are second spellings; `verify --invariant` and `--time` are read by the inductive backend only; `charter test` treats an unknown `--flag` as a path.
+- The two pointer rewordings in item 3 and the "Flags by command" list in `018` are an agent's words.
+
+## Not done
+
+- The gate shows a flag is named in `018`, not that it does anything.
+- `lib/entity_group.charter` still says in a comment that its theorems are to be reattached under `lib/lean/`.
+
+---
+
 # Handoff — 2026-11-18 (2): `B34`–`B36` ruled and landed (`D46`–`D48`), the Law 14 gate (`D49`), and two new briefs (`B37`, `B38`)
 
 ## Where
@@ -21,6 +48,7 @@ before acting on it. The rules are `AGENTS.md`; read it before this file.
 
 ## Open, awaiting Eric
 
+- *(All three items below were ruled the same day; see the section above.)*
 - **The words of `017.4`** are an agent's draft (both commits). `D48` quotes the replay sentence for blessing. In `012.7` the parenthesis naming `CHR054` is the implementer's.
 - **`B37`** Five paths in `docs/spec/` name nothing in the tree; three are sentences the tree contradicts or has overtaken (`lib/lean/Modules/`, `test/diagnostics/`, `tools/spec-inventory`).
 - **`B38`** `charter verify` accepts `--require-complete` and `--report-assumptions` and ignores them.

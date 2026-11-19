@@ -29,7 +29,7 @@ This directory is the canonical normative specification of Charter (`AGENTS.md`,
 
 ## Chapters
 
-Each normative statement in a chapter has a conformance test `test/spec/spec_<chapter>_<section>_<topic>.charter` (plan §5.3). The grammar chapter is checked against the parser by `tools/spec-inventory` once it exists.
+Each normative statement in a chapter has a conformance test `test/spec/spec_<chapter>_<section>_<topic>.charter` (plan §5.3). The grammar chapter's keywords and the diagnostic codes are checked against the lexer and the source by `test/gates/spec-inventory.sh`.
 
 | Chapter | File | Status |
 |---|---|---|

@@ -2,6 +2,7 @@
 
 Status: Approved design RFC (maintainer rulings recorded 2026-11-06 in §18.3); implementation tracked in `docs/plans/2026-11-06-charter-1.0-implementation-plan.md`\
 Prepared: 2026-11-06\
+Standing: a dated design record. It says what was intended on that date, not what the binary does; commands and flags shown here (for instance `charter verify --backend smt --report-assumptions` in its list of release commands) may not exist. `docs/spec/` describes the binary and governs where the two differ, and the Law 14 gate `test/gates/law14-sentences-resolve.sh` does not read this file (`D50`).\
 Target: `thecharter/charter`\
 Primary audience: language implementers, formal-methods engineers, legal-informatics researchers, protocol designers, and deployment/security engineers\
 Project boundary: Charter is a standalone, general-purpose institutional language and tooling project. Its normative requirements, semantics, implementation, proofs, libraries, examples, tests, and release criteria must be independent of any particular application written in Charter.

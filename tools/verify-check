@@ -83,6 +83,8 @@ check_case "d48-replay-missing-trace-is-an-input-error" 2 "^INPUT .*\[replay\].*
 # 5e. D50 (B38): `verify` no longer accepts the two flags it ignored.
 check_case "d50-verify-require-complete-is-gone" 2 "unknown flag --require-complete" \
   "$B" verify --require-complete test/verify/safe_fenced_lease.charter
+check_case "d50-explore-require-complete-is-gone" 2 "unknown flag --require-complete" \
+  "$B" explore --require-complete test/verify/safe_fenced_lease.charter
 check_case "d50-verify-report-assumptions-is-gone" 2 "unknown flag --report-assumptions" \
   "$B" verify --report-assumptions test/verify/safe_fenced_lease.charter
 

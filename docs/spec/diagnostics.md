@@ -4,8 +4,8 @@ Every error and warning the `charter` binary reports is a record
 `{code, severity, message, span: {file, line, col}, notes}` (plan §3). Codes are
 allocated here and never reused or renumbered (Quint ADR002). A code's message is
 hand-written and names the construct and its location; no message names the
-engine (Law 11). `test/diagnostics/` holds one fixture per code once the fixture
-format (plan §5.4) lands; until then the column says where the code is raised.
+engine (Law 11). A code is exercised by a `//! expect-error:` or `//! expect-warning:` fixture
+under `test/spec/` or by a gate under `test/gates/`; the last column says where the code is raised.
 
 Severity: `error` stops evaluation of the program (resolution continues to report
 more errors); `warning` does not.

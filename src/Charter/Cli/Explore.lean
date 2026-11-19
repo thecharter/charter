@@ -19,7 +19,6 @@ structure ExploreCliOpts where
   depth           : Option Nat := none
   stateCap        : Nat := 5000
   minimize        : Bool := true
-  requireComplete : Bool := false
   json            : Bool := false
   regime          : Option String := none
   menu            : Explore.Menu := []
@@ -59,7 +58,6 @@ def parseExploreArgs : List String → ExploreCliOpts → Except String ExploreC
   | ["--cap"], _ => .error "--cap needs a positive integer"
   | "--no-minimize" :: rest, o => parseExploreArgs rest { o with minimize := false }
   | "--minimize" :: rest, o => parseExploreArgs rest { o with minimize := true }
-  | "--require-complete" :: rest, o => parseExploreArgs rest { o with requireComplete := true }
   | "--regime" :: r :: rest, o => parseExploreArgs rest { o with regime := some r }
   | ["--regime"], _ => .error "--regime needs a regime name"
   | "--out" :: "json" :: rest, o => parseExploreArgs rest { o with json := true }
@@ -120,7 +118,7 @@ def runVerifyAt (o : ExploreCliOpts) (depth : Nat) (menu : Explore.Menu)
 Exit status: `0` when complete and safe, `1` on counterexample/error, `2` on usage error,
 and `3` when inconclusive (`T28`, `T29`). -/
 def exploreCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter explore [--mode lawful|adversarial|mixed] [--adversary <actors>] [--depth <N>] [--strategy bfs|dfs|random] [--seed <N>] [--no-minimize] [--require-complete] [--explore-domain \"type = values\"] [--out json] <file.charter> ..."
+  let usage := "usage: charter explore [--mode lawful|adversarial|mixed] [--adversary <actors>] [--depth <N>] [--strategy bfs|dfs|random] [--seed <N>] [--no-minimize] [--cap <N>] [--regime <name>] [--explore-domain \"type = values\"] [--out json] <file.charter> ..."
   match parseExploreArgs args {} with
   | .error e => IO.eprintln s!"charter explore: {e}\n{usage}"; return 2
   | .ok o =>

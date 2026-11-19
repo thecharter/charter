@@ -14,7 +14,7 @@
 | `charter fmt [--check] [--stdout] [--canonical] <file.charter> …` | format files while preserving comments, blank lines, and author line breaks (or render minimal-parenthesis AST form under `--canonical`), verifying round-trip AST equality (`020`, `#31`, `test/spec/spec_018_4_fmt_roundtrip.charter`) |
 | `charter doc <file.charter> [-o <out.md>] [--out json]` | generate a consolidated institutional rulebook with clause tables and `Default`/`Exception` decision tables (`G5.4`) |
 | `charter lsp` | run the stdio JSON-RPC Language Server Protocol (`initialize`, live `CHR` diagnostics, `hover`, `definition` to Markdown clauses, `formatting`) (`G5.3`) |
-| `charter doctor [--claims <path>] [--fail-on-unbacked] [--lock [<dir>]]` | verify `claims.json` theorem/gate backing, `charter.lock` SHA-256 digests, and optional external solver availability (`G5.4`) |
+| `charter doctor [--claims <path>] [--fail-on-unbacked] [--lock [<dir>]]` | verify `claims.json` theorem/gate backing, `charter.lock` SHA-256 digests, and whether the external tools the repository's differential checks use (`solc`, `quint`) are on `PATH` (`G5.4`) |
 | `charter explore [flags] <file.charter> …` | explore `lawful`, `adversarial`, or `mixed` state spaces with counterexample minimization and `--regime` overlays (`G2.1`, `G3.5`) |
 | `charter verify [flags] <file.charter> …` | verify `Invariant`s and temporal `Property`s via `--backend finite \| thresholds \| inductive` (`D20`, `G2.3`–`G2.5`); `--replay <trace.itf.json>` instead performs a recorded Quint trace through the evaluator and requires the verdicts to agree (`017.4`, `D48`) |
 | `charter run <file.charter>` | run the top-level phrases: each transition with its three answers (*occurred*, *lawful*, *valid*), violations, claims, fact changes, the clock; scenarios are noted, not run |
@@ -29,7 +29,21 @@
 
 Flags shared by `check`, `run`, `test`: `--out json` (one record per line: `diagnostic`, `claim`, `transition`, `violation`, `fact`, `clock`, `why`, `scenario`, `summary`), `--eflint` (accepted as a no-op alias under the unified contextual grammar, 002.9, D17), `--scenario <name>` (repeatable on `run` and `test`: execute only the named `Scenario` block(s) after top-level setup, failing with CHR003 if any named scenario is undeclared), `--explore N` and `--explore-domain "<type> = values"` (`run`, `test`; 013.2, D15), and the opt-in static assurance gates `--require-provenance` (`CHR029`, 012.10), `--forbid-midstream-decls` (`CHR030`), `--require-complete-explore` (`CHR031`), and `--deny-warnings` (`test/spec/spec_018_3_assurance_gates.charter`). `test` also takes `--metamorphic` (or `//! metamorphic`: re-run after stripping advisory metadata and permuting non-salient actor atoms, `T04`–`T05`) and `--expect <outcomes>` / `--tolerate <tolerances.json|tolerances.md>` for the corpus comparison (`test/eflint-corpus/README.md`).
 
-**18.3 Exit status.** `0` when every file passed; `1` when any failed; `2` for a usage error.
+Flags by command, beyond those in the table and the shared flags above. A flag a parser accepts that this chapter does not name fails the gate `test/gates/law14-sentences-resolve.sh` (`D50`).
+
+- `charter`, `charter-server`: `--help`, `--version`.
+- `build`: `--key-id <id>`, the signer key identifier recorded in the certificate.
+- `approve`: `--lock` records the approval in `charter.lock`; `--restamp` re-records it after a reviewed change; `--reviewed` is the same as `--restamp`.
+- `doc`: `--view rulebook|legal`, `--format markdown|html`, `--scenario <name>`.
+- `explore`: `--mode lawful|adversarial|mixed`, `--adversary <actors>` (the actors who may act unlawfully in `mixed` mode), `--depth <N>`, `--strategy bfs|dfs|random`, `--seed <N>`, `--cap <N>` (the most states visited), `--no-minimize` (report the first counterexample found) and `--minimize` (the default), `--regime <name>`, `--explore-domain "<type> = values"`, `--out json`.
+- `verify`: `--mode`, `--adversary`, `--depth`, `--regime`, `--explore-domain`, and `--out json` as for `explore`; `--min-depth <N>` (a bound below it is `INCONCLUSIVE`, `T30`), `--invariant <name>` (repeatable; `inductive` only), `--time <S>` (the kernel's cap, `inductive` only), `--must-prove` (a bounded result is `INCONCLUSIVE`, not a pass).
+- `test`: `--mutate-claims` negates each claim in turn and fails the file if a negated claim still passes (`T44`).
+- `generate`: `--mode lawful|adversarial` (`quint`), `--actor <role>` (`prompt`).
+- `analyze`, `plan`: `--depth <N>`.
+- `bundle`: `--seed <seed>`, `--id <id>`, `--author <actor>`, `--actor <actor>`, `--fact <fact>`, `--act <act>`, `--act-a <act>` and `--act-b <act>` (`commute`), `--guard <fact:a,b>` (repeatable; `delegate`), `--args a,b`, `--audience r1,r2`, `--revoked id1,id2`, `--expires <T>`, `--at <T>` (the time of signing), `--statements <pool.json>`, `--bundle <bundle.json>`.
+- `charter-server`: `--key <secret>`, `--log <path>`, `--snapshot <path>`, `--institution <id>`, `--max-skew <N>`; `sign` takes `--intent <id>`.
+
+**18.3 Exit status.** `0` when every file passed; `1` when any failed; `2` for a usage error. `charter explore` and `charter verify` exit `3` when a result is inconclusive. `charter verify --replay` exits `1` for a finding (the evaluator does not offer or cannot take a recorded step, or the verdicts disagree) and `2` for an input that is not a trace of the program's model.
 
 **18.4 Diagnostics and claims are data (plan §3).** Every error and warning is a record with a CHR code (016); every claim carries a tag (*checked* today; *decided* and *proved* with `prove`) and the question it answers (*holds*, *lawful*, *valid*, *violated*, *provenance*, *invariants*).
 

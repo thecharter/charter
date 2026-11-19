@@ -65,3 +65,25 @@
 - **Options.** **A.** Delete both from `verify`; passing either is `unknown flag` (exit 2). **B.** Implement them: `--require-complete` turns `INCONCLUSIVE` (exit 3) into a failure (exit 1); `--report-assumptions` prints each certificate's assumptions.
 - **Prediction.** A, 75%: exit 3 already distinguishes inconclusive, and `--out json` already carries the assumptions.
 - **Needs from Eric.** The ruling.
+
+**`B37` and `B38` ruled (Eric, 2026-11-18): A and A.** `D50`. The `B38` brief was wrong that `--require-complete` is real on `explore`; see `D50` item 6.
+
+---
+
+# Briefs for rulings, 2026-11-18, third batch (`B39`)
+
+**Status:** awaiting ruling (Eric). Nothing below is implemented. Found while listing every parsed flag in `018` for the `D50` gate.
+
+## B39. Four more flags are second spellings or are read by only some of what accepts them (`Law 13`, `AGENTS.md` "No silent fallbacks")
+
+- **What happens today (read in the parsers).**
+  - `charter approve --reviewed` sets the same field as `--restamp` (`src/Charter/Cli/Approve.lean:26`). Nothing in `tools/`, `test/`, or `sdk/` passes it. `018` now lists it as "the same as `--restamp`".
+  - `charter explore --minimize` sets `minimize := true`, which is the default (`Explore.lean`). Only `--no-minimize` changes anything.
+  - `charter verify --invariant <name>` is read by `--backend inductive` only; `finite` and `thresholds` check every invariant and say nothing about the flag. `--time <S>` likewise reaches only the inductive backend's kernel run. `018` now says "`inductive` only" for both.
+  - `charter test` has no unknown-flag error: `parseTestArgs` takes any other argument, `--anything` included, as a path (`Test.lean:72`), and reports it as a file it cannot read.
+- **What the references do.** Quint's CLI rejects unknown options and has no aliases for these (`.reference/quint/quint/src/cli.ts:488`, `.strict()`).
+- **What the spec and mission say.** `Law 13`: one spelling. `AGENTS.md`: "fail loudly with a diagnostic and a non-zero exit."
+- **Mission fit.** `Law 13` for the first two; `Law 10` for `--invariant`, where a user who names one invariant under `finite` is told all of them were verified.
+- **Options.** **A.** Delete `--reviewed` and `--minimize`; make `--invariant` restrict `finite` and `thresholds` to the named invariants as it does `inductive`, and make `--time` under a backend that has no clock a usage error; make an argument beginning `--` that `test` does not know a usage error. **B.** Delete the two aliases only. **C.** Leave as documented.
+- **Prediction.** A, 75%.
+- **Needs from Eric.** The ruling.
