@@ -1,0 +1,101 @@
+{
+ "#meta": {
+  "format": "ITF",
+  "format-description": "https://apalache-mc.org/docs/adr/015adr-trace.html",
+  "source": "partition_lease.qnt",
+  "status": "violation",
+  "description": "partition_lease.itf.json cut to its first state by hand: it still claims a violation, which no step of it reaches",
+  "timestamp": 1795061715087
+ },
+ "vars": [
+  "held_unfenced_restored",
+  "exp_local_revoked",
+  "held_actor",
+  "exp_unfenced_restored",
+  "held_local_revoked",
+  "clock_now",
+  "held_active_lease",
+  "exp_active_lease",
+  "exp_actor",
+  "mbt::actionTaken",
+  "mbt::nondetPicks"
+ ],
+ "states": [
+  {
+   "#meta": {
+    "index": 0
+   },
+   "clock_now": {
+    "#bigint": "0"
+   },
+   "exp_active_lease": {
+    "#map": [
+     [
+      "N1",
+      {
+       "#bigint": "3"
+      }
+     ]
+    ]
+   },
+   "exp_actor": {
+    "#map": []
+   },
+   "exp_local_revoked": {
+    "#map": []
+   },
+   "exp_unfenced_restored": {
+    "#map": []
+   },
+   "held_active_lease": {
+    "#set": [
+     "N1"
+    ]
+   },
+   "held_actor": {
+    "#set": [
+     "Coord"
+    ]
+   },
+   "held_local_revoked": {
+    "#set": []
+   },
+   "held_unfenced_restored": {
+    "#set": []
+   },
+   "mbt::actionTaken": "init",
+   "mbt::nondetPicks": {
+    "n_act_grant_lease_0": {
+     "tag": "None",
+     "value": {
+      "#tup": []
+     }
+    },
+    "n_act_grant_lease_1": {
+     "tag": "None",
+     "value": {
+      "#tup": []
+     }
+    },
+    "n_act_unfenced_activate_0": {
+     "tag": "None",
+     "value": {
+      "#tup": []
+     }
+    },
+    "n_act_unfenced_activate_1": {
+     "tag": "None",
+     "value": {
+      "#tup": []
+     }
+    },
+    "n_event_partitioned_local_revoke_0": {
+     "tag": "None",
+     "value": {
+      "#tup": []
+     }
+    }
+   }
+  }
+ ]
+}

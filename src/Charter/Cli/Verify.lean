@@ -3,6 +3,7 @@ import Charter.Cli.Explore
 import Charter.Verify.Temporal
 import Charter.Verify.Thresholds
 import Charter.Verify.InductiveArith
+import Charter.Project.QuintReplay
 
 /-!
 # Charter.Cli.Verify — `charter verify [--backend finite|thresholds|inductive] ... <file.charter>` (`G2.5`)
@@ -43,6 +44,8 @@ structure VerifyCliOpts where
   timeoutSec  : Nat := 60
   stateCap    : Nat := 5000
   mustProve   : Bool := false
+  /-- `--replay <trace>`: replay a recorded history through the evaluator instead of searching. -/
+  replay      : Option String := none
   json        : Bool := false
   regime      : Option String := none
   invariants  : List DomId := []
@@ -82,6 +85,8 @@ def parseVerifyArgs : List String → VerifyCliOpts → Except String VerifyCliO
     | none => .error s!"--time needs seconds, not {n}"
   | ["--time"], _ => .error "--time needs seconds"
   | "--must-prove" :: rest, o => parseVerifyArgs rest { o with mustProve := true }
+  | "--replay" :: p :: rest, o => parseVerifyArgs rest { o with replay := some p }
+  | ["--replay"], _ => .error "--replay needs a trace file"
   | "--regime" :: r :: rest, o => parseVerifyArgs rest { o with regime := some r }
   | ["--regime"], _ => .error "--regime needs a regime name"
   | "--require-complete" :: rest, o => parseVerifyArgs rest o
@@ -135,6 +140,37 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
       IO.eprintln s!"{path}: error CHR003: {e}"
       return (0, 1, 0)
   let lawHash := Artifact.sha256String (reprStr cfg.spec)
+  if let some tracePath := o.replay then
+    -- 017.4 (`D48`): a trace Quint found is performed through the evaluator; the verdicts must agree
+    let failLine (why : String) : IO (Nat × Nat × Nat) := do
+      if o.json then
+        IO.println (Json.mkObj [("kind", "replay"), ("file", Json.str path), ("trace", Json.str tracePath),
+          ("ok", Json.bool false), ("reason", Json.str why)]).compress
+      else IO.println s!"FAIL {path} [replay]: {why}"
+      return (0, 1, 0)
+    let raw ← try IO.FS.readFile tracePath catch e => return (← failLine s!"cannot read {tracePath} ({e})")
+    let traceJson ← match Json.parse raw with
+      | .ok j => pure j
+      | .error e => return (← failLine s!"{tracePath} is not JSON ({e})")
+    let stem := ((System.FilePath.mk path).fileStem).getD "Institution"
+    let qMod ← match Project.compileQuintModule stem o.mode menu cfg with
+      | .ok m => pure m
+      | .error d =>
+        if o.json then IO.println (diagJson (d.withFile path)).compress else IO.eprintln (d.withFile path).render
+        return (0, 1, 0)
+    match Project.replayQuintTrace qMod menu cfg traceJson with
+    | .error e => return (← failLine e)
+    | .ok r =>
+      let verdict := if r.violated.isEmpty then "neither Quint nor the evaluator reports a violation"
+        else s!"Quint and the evaluator both report a violation ({", ".intercalate r.violated})"
+      let cert : Artifact.ClaimCertificate := {
+        claim := "replay", about := "trace-replay", verdict := some true, assurance := .checked,
+        scope := .concreteTrace, completion := .complete,
+        lawSha256 := some lawHash, file := path,
+        note := s!"trace={tracePath}, steps={r.steps.length}, violated={", ".intercalate r.violated}"
+      }
+      emitVerifyCert o.json cert s!"ok   {path} [replay]: {tracePath} replays through the evaluator in {r.steps.length} step(s) ({o.mode.name} mode); {verdict}"
+      return (1, 0, 0)
   match o.backend with
   | .finite =>
     let mut okCount := 0
@@ -363,11 +399,13 @@ def verifyOneFile (o : VerifyCliOpts) (path : String) : IO (Nat × Nat × Nat) :
 /-- `charter verify [flags] <file.charter> ...`
 Exit status: `0` when verified, `1` on counterexample/error, `2` on usage error, `3` on inconclusive. -/
 def verifyCommand (args : List String) : IO UInt32 := do
-  let usage := "usage: charter verify [--backend finite|thresholds|inductive] [--mode lawful|adversarial|mixed] [--depth <N>] [--min-depth <N>] [--time <S>] [--must-prove] [--out json] <file.charter> ..."
+  let usage := "usage: charter verify [--backend finite|thresholds|inductive] [--mode lawful|adversarial|mixed] [--depth <N>] [--min-depth <N>] [--time <S>] [--must-prove] [--replay <trace.itf.json>] [--out json] <file.charter> ..."
   match parseVerifyArgs args {} with
   | .error e => IO.eprintln s!"charter verify: {e}\n{usage}"; return 2
   | .ok o =>
     if o.files.isEmpty then IO.eprintln usage; return 2
+    if o.replay.isSome && o.files.length != 1 then
+      IO.eprintln s!"charter verify: --replay replays one trace against one program, not {o.files.length}\n{usage}"; return 2
     let mut okTotal := 0
     let mut failTotal := 0
     let mut incTotal := 0

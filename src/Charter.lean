@@ -81,6 +81,7 @@ import Charter.Project.SolidityIR
 import Charter.Project.GuardTarget
 import Charter.Project.SettlementTarget
 import Charter.Project.QuintTarget
+import Charter.Project.QuintReplay
 import Charter.Project.PromptTarget
 import Charter.Cli.Diff
 import Charter.Cli.Generate

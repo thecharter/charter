@@ -1,6 +1,6 @@
 # Briefs for rulings, 2026-11-18 (`B34`–`B36`)
 
-**Status:** awaiting ruling (Eric). Nothing below is implemented. Each arose while fixing the red CI lane (`D45`); `B34` is also the first design point of an outside review of the repository received the same day.
+**Status:** ruled (Eric, 2026-11-18) as `D46`–`D48`; each brief ends with its ruling. When written, nothing below was implemented. Each arose while fixing the red CI lane (`D45`); `B34` is also the first design point of an outside review of the repository received the same day.
 
 ## B34. A program that declares a `Document` it cannot read is checked as if it had none; `build` and `generate` deliver without asking about provenance (`012.7`, `012.10`, `017.1`, `018`, `Law 8`)
 
@@ -24,6 +24,7 @@
 - **Options.** **A.** Implement it: `charter generate --target quint --replay-trace <itf.json>` maps each `mbt::actionTaken` and its picks to a phrase, replays it through the evaluator, and compares every state. One new flag in `017.1` and `018`. **B.** Reword `017.4` to what is checked.
 - **Prediction.** A, 75%.
 - **Needs from Eric.** The ruling; the flag's spelling if A.
+- **Ruled (Eric, 2026-11-18): A, in two moves.** `017.4` is reworded first; the replay is `charter verify --replay <trace.itf.json>`, verdict agreement only, tagged `checked`. `D48`.
 
 ## B36. `charter verify --backend smt` runs the solver and does not read its answer; the emitted encoding constrains nothing (`D20`, `T30`, `Law 10`)
 

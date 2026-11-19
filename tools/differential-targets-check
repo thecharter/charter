@@ -127,7 +127,18 @@ quint_verdict() { # label, mode, want (safe|violated), file
   out=$(quint run "$qnt" --backend=typescript --seed=0x1 --invariant=charter_invariants \
           --max-steps=3 --max-samples=2000 2>&1) || st=$?
   if [ "$want" = safe ] && [ "$st" -eq 0 ] && printf '%s\n' "$out" | grep -q 'No violation found'; then return 0; fi
-  if [ "$want" = violated ] && [ "$st" -ne 0 ] && printf '%s\n' "$out" | grep -q 'Invariant violated'; then return 0; fi
+  if [ "$want" = violated ] && [ "$st" -ne 0 ] && printf '%s\n' "$out" | grep -q 'Invariant violated'; then
+    # 017.4 (`D48`): the counterexample Quint found on the emitted text is performed through
+    # the evaluator, which must report a violation at its end too.
+    local itf="$tmp/$label.itf.json" rout rst=0
+    quint run "$qnt" --backend=typescript --seed=0x1 --invariant=charter_invariants \
+      --max-steps=3 --max-samples=2000 --mbt --out-itf="$itf" >/dev/null 2>&1 || true
+    rout=$("$B" verify --mode "$mode" --replay "$itf" "$file" 2>&1) || rst=$?
+    if [ "$rst" -eq 0 ] && printf '%s\n' "$rout" | grep -q 'both report a violation'; then return 0; fi
+    echo "FAIL quint-trace-replay $label [$mode]: Quint's counterexample does not replay through the evaluator (exit $rst):"
+    printf '%s\n' "$rout" | sed 's/^/     /'
+    exit 1
+  fi
   echo "FAIL quint-verdict $label [$mode]: Charter says $want, quint exited $st with:"
   printf '%s\n' "$out" | tail -20 | sed 's/^/     /'
   exit 1
@@ -139,7 +150,7 @@ if command -v quint >/dev/null 2>&1; then
   quint_verdict partition_lease        adversarial violated test/verify/t26_t27_partition_lease.charter
   quint_verdict booking_adversarial    adversarial violated test/verify/quint_booking_effects.charter
   quint_verdict booking_lawful         lawful      safe     test/verify/quint_booking_effects.charter
-  echo "ok   quint-typechecks-and-simulator-verdicts-match (5 models)"
+  echo "ok   quint-typechecks-and-simulator-verdicts-match (5 models; 2 counterexamples replayed through the evaluator)"
 else
   missing quint
 fi
